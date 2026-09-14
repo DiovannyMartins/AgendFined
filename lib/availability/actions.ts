@@ -66,6 +66,67 @@ export async function setAvailability(
   return { ok: true, data: undefined };
 }
 
+export async function updateAvailability(
+  id: string,
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const weekday = Number(formData.get("weekday"));
+  const startTime = String(formData.get("startTime") ?? "");
+  const endTime = String(formData.get("endTime") ?? "");
+
+  const parsed = availabilitySchema.safeParse({ weekday, startTime, endTime });
+  if (!parsed.success) {
+    return {
+      ok: false,
+      code: "VALIDATION",
+      message: "Revise os campos de disponibilidade.",
+      fieldErrors: parsed.error.flatten().fieldErrors,
+    };
+  }
+
+  const business = await getCurrentBusiness();
+  if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
+
+  const supabase = await createClient();
+
+  // §9.3: same business + day ranges must not overlap (agenda is per business).
+  // Exclude the row being edited so saving without changes always succeeds.
+  const { data: existing } = await supabase
+    .from("availability")
+    .select("*")
+    .eq("business_id", business.id)
+    .eq("weekday", parsed.data.weekday)
+    .eq("is_active", true)
+    .neq("id", id);
+
+  for (const row of existing ?? []) {
+    if (overlaps({ start: row.start_time, end: row.end_time }, { start: startTime, end: endTime })) {
+      return {
+        ok: false,
+        code: "OVERLAP",
+        message: "Este intervalo se sobrepõe a um já existente neste dia.",
+      };
+    }
+  }
+
+  const { error } = await supabase
+    .from("availability")
+    .update({
+      weekday: parsed.data.weekday,
+      start_time: parsed.data.startTime,
+      end_time: parsed.data.endTime,
+    })
+    .eq("id", id)
+    .eq("business_id", business.id);
+
+  if (error) return { ok: false, code: "DB_ERROR", message: "Não foi possível salvar." };
+
+  revalidatePath("/dashboard/bloqueios");
+  revalidatePath("/dashboard/configuracoes");
+  return { ok: true, data: undefined };
+}
+
 export async function deleteAvailability(id: string): Promise<void> {
   const business = await getCurrentBusiness();
   if (!business) return;

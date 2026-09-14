@@ -39,7 +39,6 @@ describe("generateSlotStartTimes (spec §10.4 example)", () => {
 
 describe("isWithinWindow", () => {
   const rules: BusinessRules = {
-    timezone: "America/Sao_Paulo",
     slotIntervalMinutes: 30,
     minNoticeMinutes: 120,
     bookingWindowDays: 60,
@@ -63,14 +62,13 @@ describe("isWithinWindow", () => {
 
 describe("computeAvailableSlots", () => {
   const rules: BusinessRules = {
-    timezone: "America/Sao_Paulo",
     slotIntervalMinutes: 30,
     minNoticeMinutes: 0,
     bookingWindowDays: 60,
   };
 
   const now = new Date("2026-09-10T00:00:00Z");
-  const utc = (time: string, d = "2026-09-10") => zonedTimeToUtcMs(d, time, rules.timezone);
+  const utc = (time: string, d = "2026-09-10") => zonedTimeToUtcMs(d, time);
   const r = (start: number, end: number) => ({ startMs: start, endMs: end });
 
   it("excludes a slot overlapping an existing booking", () => {
@@ -139,23 +137,23 @@ describe("computeAvailableSlots", () => {
 
 describe("zonedTimeToUtc (§9.5 UTC conversion)", () => {
   it("converts São Paulo wall-clock (UTC-3) to the correct UTC instant", () => {
-    expect(zonedTimeToUtc("2026-09-10", "12:00", "America/Sao_Paulo")).toBe("2026-09-10T15:00:00.000Z");
+    expect(zonedTimeToUtc("2026-09-10", "12:00")).toBe("2026-09-10T15:00:00.000Z");
   });
 
-  it("converts a positive-offset timezone correctly", () => {
-    expect(zonedTimeToUtc("2026-09-10", "12:00", "Europe/Lisbon")).toBe("2026-09-10T11:00:00.000Z");
+  it("ignora o segundo param de timezone (fuso fixo da aplicação)", () => {
+    expect(zonedTimeToUtc("2026-09-10", "12:00", "Europe/Lisbon")).toBe("2026-09-10T15:00:00.000Z");
   });
 
   it("zonedTimeToUtcMs agrees with zonedTimeToUtc", () => {
-    expect(new Date(zonedTimeToUtcMs("2026-09-10", "12:00", "America/Sao_Paulo")).toISOString()).toBe(
-      zonedTimeToUtc("2026-09-10", "12:00", "America/Sao_Paulo"),
+    expect(new Date(zonedTimeToUtcMs("2026-09-10", "12:00")).toISOString()).toBe(
+      zonedTimeToUtc("2026-09-10", "12:00"),
     );
   });
 });
 
 describe("localDayRangeUtc (§10.2 business-local day window)", () => {
   it("returns a 24h window spanning the business-local day in UTC", () => {
-    const { start, end } = localDayRangeUtc("2026-09-10", "America/Sao_Paulo");
+    const { start, end } = localDayRangeUtc("2026-09-10");
     // São Paulo is UTC-3: local midnight is 03:00Z that day, next local midnight is 03:00Z next day.
     expect(start).toBe("2026-09-10T03:00:00.000Z");
     expect(end).toBe("2026-09-11T03:00:00.000Z");
@@ -164,7 +162,6 @@ describe("localDayRangeUtc (§10.2 business-local day window)", () => {
 
 describe("isValidSlot min_notice (§10.2 step 8)", () => {
   const rules: BusinessRules = {
-    timezone: "America/Sao_Paulo",
     slotIntervalMinutes: 30,
     minNoticeMinutes: 120,
     bookingWindowDays: 60,

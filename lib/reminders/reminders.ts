@@ -6,9 +6,9 @@
 // marking each one sent afterwards so a scheduling tick never re-sends.
 //
 // Lead rule (per product decision): ONE reminder, sent when the appointment is
-// within 24 hours of now (and still in the future). `start_at` is stored in UTC
-// (ADR 0003); comparisons use UTC `now`, and the rendered date/time is shown in
-// the business timezone.
+// within 24 hours of now (and still in the future). `start_at` is stored in UTC;
+// comparisons use UTC `now`, and the rendered date/time is shown in
+// the app timezone.
 
 export const REMINDER_LEAD_MINUTES = 24 * 60;
 
@@ -19,7 +19,6 @@ export type ReminderCandidateRow = {
   business_id: string;
   business_name: string;
   business_slug: string;
-  business_timezone: string;
   customer_name_snapshot: string;
   customer_email_snapshot: string | null;
   service_name_snapshot: string;
@@ -56,7 +55,7 @@ export function prepareReminderEmails(
 
 export function buildReminderEmail(row: ReminderCandidateRow): ReminderEmail {
   const to = row.customer_email_snapshot!;
-  const when = formatWhen(row.start_at, row.business_timezone);
+  const when = formatWhen(row.start_at);
   return {
     bookingId: row.id,
     to,

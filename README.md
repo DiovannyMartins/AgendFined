@@ -30,7 +30,7 @@ Plataforma SaaS de agendamento online para profissionais e pequenos negócios. O
 - **Disponibilidade inteligente**: janela futura, antecedência mínima e intervalo de slots configuráveis por negócio.
 - **Validação server-side**: revalidação atômica da disponibilidade no servidor, protegida contra sobreposições.
 - **Dashboard do profissional**: gerencie negócio, serviços, disponibilidade e reservas, com blocos/manutenções de agenda.
-- **Timezone IANA por negócio**: datas armazenadas em UTC e exibidas no fuso local do estabelecimento.
+- **Fuso fixo America/Sao_Paulo**: datas armazenadas em UTC e exibidas no horário de Brasília.
 - **Anti-bot**: gate de Cloudflare Turnstile no fluxo público de reserva.
 - **Histórico estável**: snapshots de serviço (nome, preço, duração) preservam o histórico da reserva.
 - **Plano PROFISSIONAL (R$ 19/mês, Mercado Pago)**: relatórios, lembretes automáticos, gestão da lista de espera e exportação da agenda (Google Calendar/.ics). O plano Grátis contém o núcleo completo de agendamento.
@@ -138,7 +138,7 @@ Copie `.env.example` para `.env.local` e preencha:
 
 ## Principais decisões técnicas
 
-- **Timezone IANA por negócio**: datas gravadas em UTC, exibidas no fuso do negócio.
+- **Fuso fixo America/Sao_Paulo**: datas gravadas em UTC, exibidas no horário de Brasília.
 - **Snapshots de reserva**: nome/preço/duração do serviço são copiados no momento da reserva; alterações futuras não mudam o histórico.
 - **Exclusion constraint** em `bookings` para impedir sobreposição sob concorrência.
 - **Service role server-only** no fluxo público, com validação estrita antes da escrita.

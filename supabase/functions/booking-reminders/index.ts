@@ -33,7 +33,7 @@ const REMINDER_LEAD_MS = 24 * 60 * 60 * 1000;
 type Candidate = {
   id: string;
   business_name: string;
-  business_timezone: string;
+  business_timezone?: string;
   customer_name_snapshot: string;
   customer_email_snapshot: string | null;
   service_name_snapshot: string;
@@ -45,9 +45,11 @@ function isDue(startAt: string, now: Date): boolean {
   return diff > 0 && diff <= REMINDER_LEAD_MS;
 }
 
-// Mirror of lib/reminders/reminders.ts::formatReminderDateTime (kept in sync by
-// hand): "dd/mm/yyyy às HH:mm" in the business timezone.
-function formatWhen(iso: string, tz: string): string {
+// Mirror of lib/format/when.ts (kept in sync by
+// hand): "dd/mm/yyyy às HH:mm" em America/Sao_Paulo.
+const APP_TIMEZONE = "America/Sao_Paulo";
+
+function formatWhen(iso: string): string {
   const parts = new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
     month: "2-digit",
@@ -55,14 +57,14 @@ function formatWhen(iso: string, tz: string): string {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-    timeZone: tz,
+    timeZone: APP_TIMEZONE,
   }).formatToParts(new Date(iso));
   const value = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
   return `${value("day")}/${value("month")}/${value("year")} às ${value("hour")}:${value("minute")}`;
 }
 
 function buildEmail(candidate: Candidate): { to: string; subject: string; text: string } {
-  const when = formatWhen(candidate.start_at, candidate.business_timezone);
+  const when = formatWhen(candidate.start_at);
   return {
     to: candidate.customer_email_snapshot!,
     subject: `Lembrete: seu horário está confirmado — ${candidate.business_name}`,

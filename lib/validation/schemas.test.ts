@@ -14,7 +14,6 @@ describe("businessSchema", () => {
     name: "Barbearia Demo",
     slug: "barbearia-demo",
     phone: "+5511999999999",
-    timezone: "America/Sao_Paulo",
     slotIntervalMinutes: 30,
     minNoticeMinutes: 120,
     bookingWindowDays: 60,

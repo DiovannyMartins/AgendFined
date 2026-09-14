@@ -35,9 +35,6 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
           {business.description && (
             <p className="mx-auto mt-2 max-w-xl text-muted-foreground">{business.description}</p>
           )}
-          <p className="mt-2 text-sm text-muted-foreground">
-            {business.timezone.replace("_", " ")}
-          </p>
         </header>
 
         <BookingWidget

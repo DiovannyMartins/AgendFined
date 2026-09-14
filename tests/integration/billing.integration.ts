@@ -42,7 +42,6 @@ beforeAll(async () => {
         name: "Agenda Billing",
         slug: `agenda-billing-${stamp}`,
         phone: "+5511987654321",
-        timezone: "America/Sao_Paulo",
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
         booking_window_days: 60,

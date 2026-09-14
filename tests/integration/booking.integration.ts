@@ -37,7 +37,6 @@ beforeAll(async () => {
           name: "Biz Integracao",
           slug: `biz-integracao-${stamp}`,
           phone: "+5511987654321",
-          timezone: "America/Sao_Paulo",
           slot_interval_minutes: 30,
           min_notice_minutes: 0,
           booking_window_days: 60,
@@ -139,10 +138,9 @@ describe("createBooking RPC (§11.4)", () => {
     const lo = row?.[0];
     expect(typeof lo?.service_name).toBe("string");
     expect(lo?.business_slug).toContain("biz-integracao");
-    expect(lo?.business_timezone).toBe("America/Sao_Paulo");
     // The public code must never authorize customer personal data.
     expect(Object.keys(lo ?? {}).sort()).toEqual(
-      ["business_name", "business_phone", "business_slug", "business_timezone", "end_at", "service_name", "start_at"].sort(),
+      ["business_name", "business_phone", "business_slug", "end_at", "service_name", "start_at"].sort(),
     );
   });
 

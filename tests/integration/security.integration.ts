@@ -94,7 +94,6 @@ beforeAll(async () => {
           name: `Biz ${idSuffix}`,
           slug,
           phone: "+5511977777777",
-          timezone: "America/Sao_Paulo",
           slot_interval_minutes: 30,
           min_notice_minutes: 0,
           booking_window_days: 60,

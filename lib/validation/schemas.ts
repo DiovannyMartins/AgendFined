@@ -23,7 +23,6 @@ export const businessSchema = z.object({
     .max(50)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug inválido: apenas letras minúsculas, números e hífen."),
   phone: z.string().trim().min(8).max(20),
-  timezone: z.string().min(1),
   slotIntervalMinutes: z.union([z.literal(15), z.literal(30), z.literal(60)], { error: "Intervalo deve ser 15, 30 ou 60." }),
   minNoticeMinutes: z.number().int().min(0).max(10080),
   bookingWindowDays: z.number().int().min(1).max(180),
@@ -44,7 +43,6 @@ export const businessFormSchema = z.object({
     .max(50)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug inválido: apenas letras minúsculas, números e hífen."),
   phone: z.string().trim().min(8).max(20),
-  timezone: z.string().min(1),
   slotIntervalMinutes: z.string().regex(/^(15|30|60)$/, "Intervalo deve ser 15, 30 ou 60."),
   minNoticeMinutes: z.number().int().min(0).max(10080),
   bookingWindowDays: z.number().int().min(1).max(180),

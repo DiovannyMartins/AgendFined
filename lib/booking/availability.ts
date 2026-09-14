@@ -1,3 +1,5 @@
+import { APP_TIMEZONE } from "@/lib/app-timezone";
+
 export interface SlotInterval {
   startTime: string;
   endTime: string;
@@ -11,10 +13,11 @@ export type TimeRange = { start: string; end: string };
 export type UtcRange = { startMs: number; endMs: number };
 
 export interface BusinessRules {
-  timezone: string;
   slotIntervalMinutes: number;
   minNoticeMinutes: number;
   bookingWindowDays: number;
+  // Removido: timezone por negócio. Mantido opcional para compat temporária.
+  timezone?: string;
 }
 
 // Overlap of two local wall-clock faixas represented as HH:MM. Valid only for
@@ -41,7 +44,8 @@ export function minutesToTime(totalMinutes: number): string {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-function tzOffsetMinutes(timezone: string, utcMs: number): number {
+function tzOffsetMinutes(_timezone: string, utcMs: number): number {
+  const timezone = APP_TIMEZONE;
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
     year: "numeric",
@@ -84,9 +88,9 @@ export function generateSlotStartTimes(
   return candidates;
 }
 
-export function toLocalDate(date: Date, timezone: string): string {
+export function toLocalDate(date: Date, _timezone?: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
+    timeZone: APP_TIMEZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -98,45 +102,44 @@ export function toLocalDate(date: Date, timezone: string): string {
 export function isWithinWindow(date: string, rules: BusinessRules, now: Date): boolean {
   const [y, m, d] = date.split("-").map(Number);
   const target = new Date(Date.UTC(y, m - 1, d));
-  const today = new Date(toLocalDate(now, rules.timezone) + "T00:00:00Z");
+  const today = new Date(toLocalDate(now) + "T00:00:00Z");
   const windowEnd = new Date(today);
   windowEnd.setUTCDate(windowEnd.getUTCDate() + rules.bookingWindowDays);
   return target >= today && target <= windowEnd;
 }
 
-export function zonedTimeToUtcMs(date: string, time: string, timezone: string): number {
+export function zonedTimeToUtcMs(date: string, time: string, _timezone?: string): number {
   const [y, m, d] = date.split("-").map(Number);
   const [hh, mm] = time.split(":").map(Number);
-  // UTC instant whose local (in `timezone`) wall-clock reading equals date+time.
+  // UTC instant whose local (em America/Sao_Paulo) wall-clock reading equals date+time.
   // Iterate to converge on DST-aware offsets.
   const naive = Date.UTC(y, m - 1, d, hh, mm);
-  let guess = naive - tzOffsetMinutes(timezone, naive) * 60_000;
-  guess = naive - tzOffsetMinutes(timezone, guess) * 60_000;
-  guess = naive - tzOffsetMinutes(timezone, guess) * 60_000;
+  let guess = naive - tzOffsetMinutes(APP_TIMEZONE, naive) * 60_000;
+  guess = naive - tzOffsetMinutes(APP_TIMEZONE, guess) * 60_000;
+  guess = naive - tzOffsetMinutes(APP_TIMEZONE, guess) * 60_000;
   return guess;
 }
 
-export function zonedTimeToUtc(date: string, time: string, timezone: string): string {
-  return new Date(zonedTimeToUtcMs(date, time, timezone)).toISOString();
+export function zonedTimeToUtc(date: string, time: string, _timezone?: string): string {
+  return new Date(zonedTimeToUtcMs(date, time)).toISOString();
 }
 
-// Inclusive start / exclusive end of the business-local calendar day `date`,
-// expressed as UTC instants. Used so availability/blocks/bookings are fetched
-// per the business's actual day, not the UTC day.
-export function localDayRangeUtc(date: string, timezone: string): { start: string; end: string } {
-  const startMs = zonedTimeToUtcMs(date, "00:00", timezone);
+// Inclusive start / exclusive end of the local calendar day `date`,
+// expressed as UTC instants.
+export function localDayRangeUtc(date: string, _timezone?: string): { start: string; end: string } {
+  const startMs = zonedTimeToUtcMs(date, "00:00");
   const [y, m, d] = date.split("-").map(Number);
   const next = new Date(Date.UTC(y, m - 1, d + 1));
   const nextDate = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
-  const endMs = zonedTimeToUtcMs(nextDate, "00:00", timezone);
+  const endMs = zonedTimeToUtcMs(nextDate, "00:00");
   return { start: new Date(startMs).toISOString(), end: new Date(endMs).toISOString() };
 }
 
-// Weekday of a business-local date (ISO yyyy-mm-dd), as 1=Sun..7=Sat.
+// Weekday of a local date (ISO yyyy-mm-dd), as 1=Sun..7=Sat.
 // Mirrors JS Date.getDay()+1, which is the convention the availability form
 // exposes (1 - Domingo, 2 - Segunda, ... 7 - Sábado).
-export function weekdayOf(date: string, timezone: string): number {
-  const short = new Intl.DateTimeFormat("en-US", { timeZone: timezone, weekday: "short" }).format(
+export function weekdayOf(date: string, _timezone?: string): number {
+  const short = new Intl.DateTimeFormat("en-US", { timeZone: APP_TIMEZONE, weekday: "short" }).format(
     new Date(`${date}T12:00:00Z`),
   );
   const map: Record<string, number> = {
@@ -146,9 +149,9 @@ export function weekdayOf(date: string, timezone: string): number {
 }
 
 export function isValidSlot(date: string, start: string, now: Date, rules: BusinessRules): boolean {
-  // Convert the business-local date+time to its real UTC instant, then measure
+  // Convert the local date+time to its real UTC instant, then measure
   // the notice against "now" on the same UTC timeline.
-  const slotInstant = zonedTimeToUtcMs(date, start, rules.timezone);
+  const slotInstant = zonedTimeToUtcMs(date, start);
   const noticeMs = rules.minNoticeMinutes * 60 * 1000;
   return slotInstant - now.getTime() >= noticeMs;
 }
@@ -170,8 +173,8 @@ export function computeAvailableSlots(params: {
   for (const interval of intervals) {
     const starts = generateSlotStartTimes(interval, rules.slotIntervalMinutes, durationMinutes);
     for (const start of starts) {
-      // Build the candidate in UTC (business-local slot -> UTC), per §9.5/§10.3.
-      const startMs = zonedTimeToUtcMs(date, start, rules.timezone);
+      // Build the candidate in UTC (local slot -> UTC), per §9.5/§10.3.
+      const startMs = zonedTimeToUtcMs(date, start);
       const candidateUtc: UtcRange = {
         startMs,
         endMs: startMs + durationMinutes * 60_000,

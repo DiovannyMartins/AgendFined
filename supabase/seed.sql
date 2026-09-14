@@ -8,14 +8,13 @@ insert into public.profiles (id, display_name)
 values ('00000000-0000-0000-0000-000000000001', 'Demo Barber')
 on conflict (id) do nothing;
 
-insert into public.businesses (id, owner_id, name, slug, phone, timezone)
+insert into public.businesses (id, owner_id, name, slug, phone)
 values (
   '10000000-0000-0000-0000-000000000001',
   '00000000-0000-0000-0000-000000000001',
   'Barbearia Demo',
   'barbearia-demo',
-  '+5511999999999',
-  'America/Sao_Paulo'
+  '+5511999999999'
 )
 on conflict (id) do nothing;
 

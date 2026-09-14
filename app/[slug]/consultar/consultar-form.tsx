@@ -10,6 +10,7 @@ import { TurnstileWidget } from "@/components/turnstile-widget";
 import { CopyCode } from "@/components/copy-code";
 import { consultBooking } from "@/lib/booking/actions";
 import type { ConsultState } from "@/lib/bookings/lookup";
+import { APP_TIMEZONE } from "@/lib/app-timezone";
 
 const INITIAL: ConsultState = { status: "idle" };
 
@@ -28,11 +29,10 @@ function ConsultarFormInner({ slug, onReset }: { slug: string; onReset: () => vo
 
   if (state.status === "success") {
     const booking = state.booking;
-    const tz = booking.businessTimezone || "UTC";
-    const dateStr = new Intl.DateTimeFormat("pt-BR", { dateStyle: "full", timeZone: tz }).format(
+    const dateStr = new Intl.DateTimeFormat("pt-BR", { dateStyle: "full", timeZone: APP_TIMEZONE }).format(
       new Date(booking.startAt),
     );
-    const timeStr = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: tz }).format(
+    const timeStr = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: APP_TIMEZONE }).format(
       new Date(booking.startAt),
     );
 

@@ -17,7 +17,7 @@ export type GcalExportBooking = {
   service_name_snapshot: string;
 };
 
-export type GcalExportBusiness = GatedBusiness & { timezone: string };
+export type GcalExportBusiness = GatedBusiness & { timezone?: string };
 
 export type FetchGcalBookings = (businessId: string) => Promise<GcalExportBooking[]>;
 
@@ -39,7 +39,7 @@ export function isUpcomingConfirmed(
 
 // The owner's upcoming confirmed bookings, mapped to calendar events for the
 // importable .ics feed. Past and non-confirmed bookings are excluded.
-export function toGcalBookings(rows: GcalExportBooking[], now: Date, timezone: string): GcalBooking[] {
+export function toGcalBookings(rows: GcalExportBooking[], now: Date, timezone?: string): GcalBooking[] {
   return rows
     .filter((b) => isUpcomingConfirmed(b, now))
     .map((b) => ({
@@ -58,7 +58,6 @@ export async function buildGcalExportResult(
   const gated = await runProGated(business, (businessId) => fetchBookings(businessId));
   if (gated.status !== "ok") return gated;
 
-  // The gate only passes for a non-null Pro business, so the timezone is set.
-  const events = toGcalBookings(gated.data, now, business!.timezone);
+  const events = toGcalBookings(gated.data, now);
   return { status: "ok", icsFeed: buildIcsFeed(events), count: events.length };
 }

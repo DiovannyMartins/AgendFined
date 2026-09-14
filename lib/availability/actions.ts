@@ -223,14 +223,13 @@ export async function getSlotsForDate(
   if (!service) return { available: [], error: "service_not_found" };
 
   const rules = {
-    timezone: business.timezone,
     slotIntervalMinutes: business.slot_interval_minutes,
     minNoticeMinutes: business.min_notice_minutes,
     bookingWindowDays: business.booking_window_days,
   };
 
-  // §10.2: interpret "now" and the requested date in the business timezone.
-  const weekday = weekdayOf(date, business.timezone);
+  // §10.2: interpret "now" and the requested date no fuso da aplicação.
+  const weekday = weekdayOf(date);
 
   // Availability, blocks and occupied slots are resolved for the business only.
   const { data: intervals } = await supabase
@@ -240,7 +239,7 @@ export async function getSlotsForDate(
     .eq("weekday", weekday)
     .eq("is_active", true);
 
-  const day = localDayRangeUtc(date, business.timezone);
+  const day = localDayRangeUtc(date);
 
   const [{ data: blocks }, { data: bookings }] = await Promise.all([
     supabase

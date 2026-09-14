@@ -17,7 +17,6 @@ function row(overrides: Partial<ReminderCandidateRow>): ReminderCandidateRow {
     business_id: "biz1",
     business_name: "Barbearia Demo",
     business_slug: "barbearia-demo",
-    business_timezone: "America/Sao_Paulo",
     customer_name_snapshot: "Ana",
     customer_email_snapshot: "ana@example.com",
     service_name_snapshot: "Corte",
@@ -79,8 +78,8 @@ describe("prepareReminderEmails", () => {
 });
 
 describe("formatWhen (datas renderizadas no fuso do negócio)", () => {
-  it("renders the appointment in the business timezone (UTC-3 -> 15:00)", () => {
-    expect(formatWhen("2026-05-10T18:00:00Z", "America/Sao_Paulo")).toBe("10/05/2026 às 15:00");
+  it("renders the appointment in the app timezone (UTC-3 -> 15:00)", () => {
+    expect(formatWhen("2026-05-10T18:00:00Z")).toBe("10/05/2026 às 15:00");
   });
 });
 

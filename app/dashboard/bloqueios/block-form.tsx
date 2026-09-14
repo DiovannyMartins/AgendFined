@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createBlock, deleteBlock, type ActionResult } from "@/lib/availability/actions";
+import { APP_TIMEZONE } from "@/lib/app-timezone";
 
 const INITIAL = { ok: true } as ActionResult;
 
@@ -40,19 +41,17 @@ export function BlockRow({
   startAt,
   endAt,
   reason,
-  timezone,
 }: {
   id: string;
   startAt: string;
   endAt: string;
   reason: string | null;
-  timezone: string;
 }) {
   const fmt = (iso: string) =>
     new Intl.DateTimeFormat("pt-BR", {
       dateStyle: "short",
       timeStyle: "short",
-      timeZone: timezone,
+      timeZone: APP_TIMEZONE,
     }).format(new Date(iso));
 
   return (

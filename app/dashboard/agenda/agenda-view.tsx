@@ -45,12 +45,10 @@ function shiftDays(key: string, delta: number): string {
 export function AgendaView({
   bookings,
   availability,
-  timezone,
   slotIntervalMinutes,
 }: {
   bookings: AgendaBooking[];
   availability: AvailabilityRow[];
-  timezone: string;
   slotIntervalMinutes: number;
 }) {
   const [view, setView] = useState<ViewMode>("list");
@@ -59,7 +57,7 @@ export function AgendaView({
   const [dateFilter, setDateFilter] = useState<string | null>(null);
   const [status, setStatus] = useState<StatusFilter>("");
 
-  const todayKey = toLocalDate(new Date(), timezone);
+  const todayKey = toLocalDate(new Date());
   // The day/week grids always need a concrete anchor; fall back to today when
   // the date filter is off.
   const anchorDate = dateFilter ?? todayKey;
@@ -69,20 +67,19 @@ export function AgendaView({
   const filtered = useMemo(
     () =>
       filterAgenda(bookings, {
-        tz: timezone,
         filters: {
           status: status || null,
         },
       }),
-    [bookings, timezone, status],
+    [bookings, status],
   );
 
   const listBookings = useMemo(
     () =>
       dateFilter
-        ? filterAgenda(filtered, { tz: timezone, filters: { dateKey: dateFilter } })
+        ? filterAgenda(filtered, { filters: { dateKey: dateFilter } })
         : filtered,
-    [filtered, timezone, dateFilter],
+    [filtered, dateFilter],
   );
 
   const dateStep = view === "week" ? 7 : 1;
@@ -164,12 +161,11 @@ export function AgendaView({
 
       <div className="mt-4">
         {view === "list" ? (
-          <AgendaList bookings={listBookings} timezone={timezone} />
+          <AgendaList bookings={listBookings} />
         ) : (
           <AgendaGrid
             view={view}
             dateKey={anchorDate}
-            timezone={timezone}
             slotIntervalMinutes={slotIntervalMinutes}
             availability={availability}
             filtered={filtered}

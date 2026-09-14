@@ -42,7 +42,7 @@ export async function createBooking(input: {
   if (!preamble.ok) return preamble.result;
   const { supabase, business } = preamble;
 
-  const startAtIso = zonedTimeToUtc(input.date, input.startTime, business.timezone);
+  const startAtIso = zonedTimeToUtc(input.date, input.startTime);
 
   const parsed = bookingSchema.safeParse({
     serviceId: input.serviceId,
@@ -74,13 +74,12 @@ export async function createBooking(input: {
   // Server-side revalidation of availability (§11.3 step 5). `getSlotRange`
   // returns null only when the day has no active availability range for the
   // business.
-  const slotRange = await getSlotRange(supabase, business.id, input.date, business.timezone);
+  const slotRange = await getSlotRange(supabase, business.id, input.date);
   if (slotRange === null) {
     return { ok: false, code: "no_availability", message: "Este dia não possui horários disponíveis. Escolha outra data." };
   }
 
   const rules = {
-    timezone: business.timezone,
     slotIntervalMinutes: business.slot_interval_minutes,
     minNoticeMinutes: business.min_notice_minutes,
     bookingWindowDays: business.booking_window_days,
@@ -239,7 +238,7 @@ export async function cancelPublicBooking(
 
 // Waitlist join (INC-3). When a customer's preferred slot is already occupied
 // they can leave their contact + the desired slot so a later opening can be
-// offered. The server re-validates everything (business/timezone/slot/contact),
+// offered. The server re-validates everything (business/slot/contact),
 // requires the slot to be genuinely occupied (a free slot should just be booked),
 // and the `join_waitlist` RPC enforces integrity + dedup atomically. Same anti-bot
 // and fail-closed reservation limiter as createBooking: this is an anonymous write.
@@ -260,7 +259,7 @@ export async function joinWaitlist(input: {
   if (!preamble.ok) return preamble.result;
   const { business } = preamble;
 
-  const startAt = zonedTimeToUtc(input.date, input.startTime, business.timezone);
+  const startAt = zonedTimeToUtc(input.date, input.startTime);
 
   const parsed = parseWaitlistInput({
     serviceId: input.serviceId,
@@ -304,7 +303,6 @@ export async function joinWaitlist(input: {
 // admin client and the resolved business, or an `ActionResult` error to surface.
 type ResolvedBusiness = {
   id: string;
-  timezone: string;
   slot_interval_minutes: number;
   min_notice_minutes: number;
   booking_window_days: number;
@@ -356,9 +354,8 @@ async function getSlotRange(
   supabase: ServerClient,
   businessId: string,
   date: string,
-  timezone: string,
 ): Promise<SlotRange | null> {
-  const weekday = weekdayOf(date, timezone);
+  const weekday = weekdayOf(date);
 
   // Availability, blocks and occupied slots belong to the business, so the
   // revalidation is scoped to the business.
@@ -371,7 +368,7 @@ async function getSlotRange(
 
   if (!intervals || intervals.length === 0) return null;
 
-  const day = localDayRangeUtc(date, timezone);
+  const day = localDayRangeUtc(date);
 
   const [{ data: blocks }, { data: bookings }] = await Promise.all([
     supabase

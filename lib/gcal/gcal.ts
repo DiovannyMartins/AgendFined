@@ -12,7 +12,7 @@ export type GcalBooking = {
   endAt: string; // ISO-8601 UTC instant
   location?: string;
   description?: string;
-  timezone: string;
+  timezone?: string;
 };
 
 // A multi-event VCALENDAR feed (e.g. the business's active upcoming bookings),
@@ -48,7 +48,7 @@ export function buildGoogleCalendarUrl(b: GcalBooking): string {
     action: "TEMPLATE",
     text: b.summary,
     dates: `${toGcalUtc(b.startAt)}/${toGcalUtc(b.endAt)}`,
-    ctz: b.timezone,
+    ctz: b.timezone ?? "America/Sao_Paulo",
   });
   if (b.location) params.set("location", b.location);
   if (b.description) params.set("details", b.description);
@@ -57,7 +57,7 @@ export function buildGoogleCalendarUrl(b: GcalBooking): string {
 
 // RFC 5545 VCALENDAR for a single booking (downloadable file). Uses UTC Z
 // timestamps so a consumer importing the .ics gets the exact moment regardless of
-// their own timezone; the business timezone is kept for framing/display context.
+// their own timezone.
 export function buildIcsString(b: GcalBooking): string {
   return [...calendarHeader(), ...buildSingleEvent(b), "END:VCALENDAR"].join("\r\n");
 }

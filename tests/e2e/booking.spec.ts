@@ -34,7 +34,6 @@ test.beforeAll(async () => {
       name: "Barbearia E2E",
       slug: SLUG,
       phone: "+5511987654321",
-      timezone: "America/Sao_Paulo",
       slot_interval_minutes: 30,
       min_notice_minutes: 0,
       booking_window_days: 60,

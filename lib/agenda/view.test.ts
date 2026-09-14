@@ -20,8 +20,8 @@ describe("bookingLocalDate", () => {
     expect(bookingLocalDate(LATE_UTC, SP)).toBe("2026-09-01");
   });
 
-  it("is tz-sensitive: the same UTC instant lands on a different day in UTC", () => {
-    expect(bookingLocalDate(LATE_UTC, "UTC")).toBe("2026-09-02");
+  it("usa fuso fixo da aplicação: mesmo com UTC passado, cai no dia de SP", () => {
+    expect(bookingLocalDate(LATE_UTC, "UTC")).toBe("2026-09-01");
   });
 
   it("keeps a daytime booking on the same date", () => {
@@ -115,7 +115,7 @@ describe("filterAgenda", () => {
       b({ id: "a", start_at: LATE_UTC }), // 2026-09-01 in São Paulo
       b({ id: "b", start_at: "2026-09-02T16:00:00.000Z" }), // 2026-09-02
     ];
-    const out = filterAgenda(bookings, { tz: SP, filters: { dateKey: "2026-09-02" } });
+    const out = filterAgenda(bookings, { filters: { dateKey: "2026-09-02" } });
     expect(out.map((x) => x.id)).toEqual(["b"]);
   });
 
@@ -124,7 +124,7 @@ describe("filterAgenda", () => {
       b({ id: "a", status: "confirmed" }),
       b({ id: "b", status: "cancelled" }),
     ];
-    const out = filterAgenda(bookings, { tz: SP, filters: { status: "cancelled" } });
+    const out = filterAgenda(bookings, { filters: { status: "cancelled" } });
     expect(out.map((x) => x.id)).toEqual(["b"]);
   });
 
@@ -135,7 +135,6 @@ describe("filterAgenda", () => {
       b({ id: "c", start_at: "2026-09-02T17:00:00.000Z", status: "confirmed" }),
     ];
     const out = filterAgenda(bookings, {
-      tz: SP,
       filters: { dateKey: "2026-09-02", status: "confirmed" },
     });
     expect(out.map((x) => x.id)).toEqual(["c"]);
@@ -143,6 +142,6 @@ describe("filterAgenda", () => {
 
   it("no filters returns everything unchanged", () => {
     const bookings = [b({ id: "a" }), b({ id: "b" })];
-    expect(filterAgenda(bookings, { tz: SP, filters: {} })).toEqual(bookings);
+    expect(filterAgenda(bookings, { filters: {} })).toEqual(bookings);
   });
 });

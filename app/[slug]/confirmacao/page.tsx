@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { CheckCircle2, CalendarClock } from "lucide-react";
 import { CopyCode } from "@/components/copy-code";
 import { deriveCancelToken } from "@/lib/bookings/cancel";
+import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { CancelBooking } from "./cancel-booking";
 
 async function ConfirmationContent({ code, slug }: { code: string; slug: string }) {
@@ -14,15 +15,14 @@ async function ConfirmationContent({ code, slug }: { code: string; slug: string 
   const booking = data?.[0];
   if (!booking) notFound();
 
-  const tz = booking.business_timezone || "UTC";
   const dateStr = new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "full",
-    timeZone: tz,
+    timeZone: APP_TIMEZONE,
   }).format(new Date(booking.start_at));
   const timeStr = new Intl.DateTimeFormat("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
-    timeZone: tz,
+    timeZone: APP_TIMEZONE,
   }).format(new Date(booking.start_at));
 
   const cancelToken = deriveCancelToken(process.env.CANCEL_TOKEN_SECRET ?? "", code);

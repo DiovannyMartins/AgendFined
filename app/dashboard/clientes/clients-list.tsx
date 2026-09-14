@@ -14,21 +14,12 @@ import {
 } from "@/components/ui/dialog";
 import { filterCustomers, type CustomerHistory } from "@/lib/customers/history";
 import { statusLabel } from "@/lib/bookings/status";
-
-function formatWhen(iso: string, tz: string): string {
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: tz,
-  }).format(new Date(iso));
-}
+import { formatWhen } from "@/lib/format/when";
 
 export function ClientsList({
   history,
-  timezone,
 }: {
   history: CustomerHistory[];
-  timezone: string;
 }) {
   const [query, setQuery] = useState("");
 
@@ -99,7 +90,7 @@ export function ClientsList({
                       )}
                     </DialogDescription>
                   </DialogHeader>
-                  <HistoryList bookings={bookings} timezone={timezone} />
+                  <HistoryList bookings={bookings} />
                 </DialogContent>
               </DialogTrigger>
             </Dialog>
@@ -112,10 +103,8 @@ export function ClientsList({
 
 function HistoryList({
   bookings,
-  timezone,
 }: {
   bookings: CustomerHistory["bookings"];
-  timezone: string;
 }) {
   if (bookings.length === 0) {
     return (
@@ -133,7 +122,7 @@ function HistoryList({
             <div className="flex items-center justify-between gap-2">
               <p className="font-medium">
                 <CalendarDays className="mr-1 inline size-4 text-muted-foreground" />
-                {formatWhen(booking.start_at, timezone)}
+                {formatWhen(booking.start_at)}
               </p>
               <Badge variant={status.variant}>{status.label}</Badge>
             </div>

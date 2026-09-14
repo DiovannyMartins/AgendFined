@@ -14,7 +14,6 @@ const row = {
   business_name: "Barbearia Demo",
   business_slug: "barbearia-demo",
   business_phone: "+5511987654321",
-  business_timezone: "America/Sao_Paulo",
 };
 
 const fetcher: LookupFetcher = async () => ({ data: row, error: null });
@@ -31,7 +30,6 @@ describe("lookupBookingByPublicCode", () => {
         businessName: "Barbearia Demo",
         businessSlug: "barbearia-demo",
         businessPhone: "+5511987654321",
-        businessTimezone: "America/Sao_Paulo",
       },
     });
   });
@@ -72,7 +70,6 @@ describe("toConsultState", () => {
           businessName: "Barbearia Demo",
           businessSlug: "barbearia-demo",
           businessPhone: "+5511987654321",
-          businessTimezone: "America/Sao_Paulo",
         },
       }),
     ).toEqual({
@@ -84,7 +81,6 @@ describe("toConsultState", () => {
         businessName: "Barbearia Demo",
         businessSlug: "barbearia-demo",
         businessPhone: "+5511987654321",
-        businessTimezone: "America/Sao_Paulo",
       },
     });
   });

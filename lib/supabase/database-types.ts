@@ -204,7 +204,6 @@ export type Database = {
           plan: Database["public"]["Enums"]["business_plan"]
           slot_interval_minutes: number
           slug: string
-          timezone: string
           updated_at: string
         }
         Insert: {
@@ -220,7 +219,6 @@ export type Database = {
           plan?: Database["public"]["Enums"]["business_plan"]
           slot_interval_minutes?: number
           slug: string
-          timezone: string
           updated_at?: string
         }
         Update: {
@@ -236,7 +234,6 @@ export type Database = {
           plan?: Database["public"]["Enums"]["business_plan"]
           slot_interval_minutes?: number
           slug?: string
-          timezone?: string
           updated_at?: string
         }
         Relationships: [
@@ -565,7 +562,6 @@ export type Database = {
           business_name: string
           business_phone: string
           business_slug: string
-          business_timezone: string
           end_at: string
           service_name: string
           start_at: string
@@ -577,7 +573,6 @@ export type Database = {
           business_id: string
           business_name: string
           business_slug: string
-          business_timezone: string
           customer_email_snapshot: string
           customer_name_snapshot: string
           id: string

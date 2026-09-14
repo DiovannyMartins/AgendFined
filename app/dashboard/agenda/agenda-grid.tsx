@@ -13,14 +13,15 @@ import {
   type AvailabilityRow,
 } from "@/lib/agenda/view";
 import { statusLabel } from "@/lib/bookings/status";
+import { APP_TIMEZONE } from "@/lib/app-timezone";
 
-function dayHeading(dateKey: string, timezone: string): string {
+function dayHeading(dateKey: string): string {
   const [y, m, d] = dateKey.split("-").map(Number);
   return new Intl.DateTimeFormat("pt-BR", {
     weekday: "short",
     day: "2-digit",
     month: "2-digit",
-    timeZone: timezone,
+    timeZone: APP_TIMEZONE,
   }).format(new Date(Date.UTC(y, m - 1, d, 12)));
 }
 
@@ -34,14 +35,12 @@ function rangeFrom(rows: AvailabilityRow[]): { start: string; end: string } | nu
 export function AgendaGrid({
   view,
   dateKey,
-  timezone,
   slotIntervalMinutes,
   availability,
   filtered,
 }: {
   view: "day" | "week";
   dateKey: string;
-  timezone: string;
   slotIntervalMinutes: number;
   availability: AvailabilityRow[];
   filtered: AgendaBooking[];
@@ -50,7 +49,6 @@ export function AgendaGrid({
     return (
       <WeekGrid
         dateKey={dateKey}
-        timezone={timezone}
         slotIntervalMinutes={slotIntervalMinutes}
         availability={availability}
         filtered={filtered}
@@ -60,7 +58,6 @@ export function AgendaGrid({
   return (
     <DayGrid
       dateKey={dateKey}
-      timezone={timezone}
       slotIntervalMinutes={slotIntervalMinutes}
       availability={availability}
       filtered={filtered}
@@ -80,13 +77,11 @@ function EmptyGridDay() {
 
 function DayGrid({
   dateKey,
-  timezone,
   slotIntervalMinutes,
   availability,
   filtered,
 }: {
   dateKey: string;
-  timezone: string;
   slotIntervalMinutes: number;
   availability: AvailabilityRow[];
   filtered: AgendaBooking[];
@@ -96,17 +91,17 @@ function DayGrid({
   const range = rangeFrom(dayAvailability);
 
   const dayBookings = useMemo(
-    () => filterAgenda(filtered, { tz: timezone, filters: { dateKey } }),
-    [filtered, timezone, dateKey],
+    () => filterAgenda(filtered, { filters: { dateKey } }),
+    [filtered, dateKey],
   );
 
   const byCell = useMemo(() => {
     const map = new Map<string, AgendaBooking>();
     for (const booking of dayBookings) {
-      map.set(bookingLocalTime(booking.start_at, timezone), booking);
+      map.set(bookingLocalTime(booking.start_at), booking);
     }
     return map;
-  }, [dayBookings, timezone]);
+  }, [dayBookings]);
 
   if (!range) return <EmptyGridDay />;
   const times = dayGridTimes(range.start, range.end, slotIntervalMinutes);
@@ -129,7 +124,7 @@ function DayGrid({
                 {time}
               </td>
               <td className="px-2 py-1.5 align-top">
-                {byCell.get(time) && <BookingCell booking={byCell.get(time)!} timezone={timezone} />}
+                {byCell.get(time) && <BookingCell booking={byCell.get(time)!} />}
               </td>
             </tr>
           ))}
@@ -139,14 +134,14 @@ function DayGrid({
   );
 }
 
-function BookingCell({ booking, timezone }: { booking: AgendaBooking; timezone: string }) {
+function BookingCell({ booking }: { booking: AgendaBooking }) {
   const status = statusLabel(booking.status);
   return (
     <div className="rounded-lg border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs">
       <p className="font-medium">{booking.service_name_snapshot}</p>
       <p className="text-muted-foreground">{booking.customer_name_snapshot}</p>
       <p className="mt-0.5 text-muted-foreground">
-        {bookingLocalTime(booking.start_at, timezone)} · {booking.duration_minutes_snapshot} min
+        {bookingLocalTime(booking.start_at)} · {booking.duration_minutes_snapshot} min
       </p>
       <Badge variant={status.variant} className="mt-1">
         {status.label}
@@ -157,13 +152,11 @@ function BookingCell({ booking, timezone }: { booking: AgendaBooking; timezone: 
 
 function WeekGrid({
   dateKey,
-  timezone,
   slotIntervalMinutes,
   availability,
   filtered,
 }: {
   dateKey: string;
-  timezone: string;
   slotIntervalMinutes: number;
   availability: AvailabilityRow[];
   filtered: AgendaBooking[];
@@ -174,10 +167,10 @@ function WeekGrid({
     () =>
       dates.reduce(
         (acc, d) =>
-          acc + filterAgenda(filtered, { tz: timezone, filters: { dateKey: d } }).length,
+          acc + filterAgenda(filtered, { filters: { dateKey: d } }).length,
         0,
       ),
-    [dates, filtered, timezone],
+    [dates, filtered],
   );
 
   if (totalForWeek === 0) {
@@ -211,7 +204,7 @@ function WeekGrid({
             </th>
             {dates.map((d) => (
               <th key={d} className="px-2 py-2 text-left font-medium capitalize">
-                <span>{d === dateKey ? "Hoje" : dayHeading(d, timezone)}</span>
+                <span>{d === dateKey ? "Hoje" : dayHeading(d)}</span>
               </th>
             ))}
           </tr>
@@ -223,7 +216,7 @@ function WeekGrid({
                 {time}
               </td>
               {dates.map((d) => (
-                <WeekCell key={`${d}-${time}`} dateKey={d} time={time} timezone={timezone} filtered={filtered} />
+                <WeekCell key={`${d}-${time}`} dateKey={d} time={time} filtered={filtered} />
               ))}
             </tr>
           ))}
@@ -236,20 +229,18 @@ function WeekGrid({
 function WeekCell({
   dateKey,
   time,
-  timezone,
   filtered,
 }: {
   dateKey: string;
   time: string;
-  timezone: string;
   filtered: AgendaBooking[];
 }) {
   const bookings = useMemo(
     () =>
-      filterAgenda(filtered, { tz: timezone, filters: { dateKey } }).filter(
-        (b) => bookingLocalTime(b.start_at, timezone) === time,
+      filterAgenda(filtered, { filters: { dateKey } }).filter(
+        (b) => bookingLocalTime(b.start_at) === time,
       ),
-    [filtered, timezone, dateKey, time],
+    [filtered, dateKey, time],
   );
 
   if (bookings.length === 0) return <td className="px-2 py-1.5" />;

@@ -13,12 +13,10 @@ const now = new Date("2026-09-01T12:00:00.000Z");
 const proBusiness: GcalExportBusiness = {
   id: "biz-pro",
   plan: "pro",
-  timezone: "America/Sao_Paulo",
 };
 const freeBusiness: GcalExportBusiness = {
   id: "biz-free",
   plan: "free",
-  timezone: "America/Sao_Paulo",
 };
 
 const upcoming: GcalExportBooking = {
@@ -44,7 +42,7 @@ describe("buildGcalExportResult (Pro gate, ADR 0008)", () => {
 
   it("fails closed for a business with a null plan", async () => {
     const result = await buildGcalExportResult(
-      { id: "biz", plan: null, timezone: "UTC" },
+      { id: "biz", plan: null },
       async () => [],
       now,
     );

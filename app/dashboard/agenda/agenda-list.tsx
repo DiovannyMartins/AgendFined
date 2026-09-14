@@ -9,23 +9,22 @@ import { StatusAction } from "./status-action";
 import type { AgendaBooking } from "@/lib/agenda/view";
 import { statusLabel } from "@/lib/bookings/status";
 import { formatPublicCode } from "@/lib/bookings/public-code";
+import { APP_TIMEZONE } from "@/lib/app-timezone";
 
 type BookingRow = AgendaBooking;
 
-function formatBookingTime(iso: string, tz: string): string {
+function formatBookingTime(iso: string): string {
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
-    timeZone: tz,
+    timeZone: APP_TIMEZONE,
   }).format(new Date(iso));
 }
 
 export function AgendaList({
   bookings,
-  timezone,
 }: {
   bookings: BookingRow[];
-  timezone: string;
 }) {
   const [query, setQuery] = useState("");
 
@@ -90,7 +89,7 @@ export function AgendaList({
                     <Badge variant={status.variant}>{status.label}</Badge>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {formatBookingTime(booking.start_at, timezone)} · {booking.duration_minutes_snapshot} min
+                    {formatBookingTime(booking.start_at)} · {booking.duration_minutes_snapshot} min
                   </p>
                   <p className="mt-1 text-sm">
                     {booking.customer_name_snapshot} · {booking.customer_phone_snapshot}

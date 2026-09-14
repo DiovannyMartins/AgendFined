@@ -29,13 +29,10 @@ export default async function AgendaPage() {
   ]);
 
   const list = bookings ?? [];
-  const tz = business.timezone;
   const now = new Date();
 
-  // "Today" is measured in the business timezone, not the server's.
-  const todayKey = toLocalDate(now, tz);
+  const todayKey = toLocalDate(now);
   const todayBookings = filterAgenda(list, {
-    tz,
     filters: { dateKey: todayKey },
   }).filter((b) => b.status !== "cancelled");
 
@@ -107,7 +104,6 @@ export default async function AgendaPage() {
       <AgendaView
         bookings={list}
         availability={availability ?? []}
-        timezone={tz}
         slotIntervalMinutes={business.slot_interval_minutes}
       />
     </div>

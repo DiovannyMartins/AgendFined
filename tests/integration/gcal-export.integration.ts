@@ -39,7 +39,6 @@ beforeAll(async () => {
         name: "Agenda Grátis",
         slug: `gcal-free-${stamp}`,
         phone: "+5511987654321",
-        timezone: "America/Sao_Paulo",
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
         booking_window_days: 60,
@@ -66,7 +65,6 @@ beforeAll(async () => {
         name: "Agenda Pro",
         slug: `gcal-pro-${stamp}`,
         phone: "+5511987654323",
-        timezone: "America/Sao_Paulo",
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
         booking_window_days: 60,
@@ -123,14 +121,14 @@ describe("INC-3 exportação de agenda: gate de plano (free negado, pro liberado
   it("denies a Free business with upgrade_required before any fetch", async () => {
     const { data: freeBiz } = await admin
       .from("businesses")
-      .select("id, plan, timezone")
+      .select("id, plan")
       .eq("id", freeBusinessId)
       .single();
     expect(freeBiz?.plan).toBe("free");
 
     const fetchSpy = vi.fn<FetchGcalBookings>(async () => []);
     const result = await getGcalExport({
-      getBusiness: async () => ({ id: freeBusinessId, plan: "free", timezone: freeBiz!.timezone }),
+      getBusiness: async () => ({ id: freeBusinessId, plan: "free" }),
       fetchBookings: fetchSpy,
     });
     expect(result).toEqual({ status: "upgrade_required" });
@@ -140,14 +138,14 @@ describe("INC-3 exportação de agenda: gate de plano (free negado, pro liberado
   it("lets a Pro business export the agenda through the user-scoped boundary", async () => {
     const { data: proBiz } = await admin
       .from("businesses")
-      .select("id, plan, timezone")
+      .select("id, plan")
       .eq("id", proBusinessId)
       .single();
     expect(proBiz?.plan).toBe("pro");
 
     const proOwner = await anonClientForUser(PRO_EMAIL, PASSWORD);
     const result = await getGcalExport({
-      getBusiness: async () => ({ id: proBusinessId, plan: "pro", timezone: proBiz!.timezone }),
+      getBusiness: async () => ({ id: proBusinessId, plan: "pro" }),
       fetchBookings: async (businessId) => {
         const { data, error } = await proOwner
           .from("bookings")

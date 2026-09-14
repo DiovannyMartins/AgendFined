@@ -57,7 +57,6 @@ beforeAll(async () => {
         name: "Agenda Cancelamento",
         slug: `agenda-cancelamento-${stamp}`,
         phone: "+5511987654321",
-        timezone: "America/Sao_Paulo",
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
         booking_window_days: 60,

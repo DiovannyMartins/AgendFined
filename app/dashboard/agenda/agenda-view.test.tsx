@@ -7,8 +7,6 @@ vi.mock("./status-action", () => ({
   StatusAction: () => null,
 }));
 
-const TZ = "America/Sao_Paulo";
-
 function booking(over: Partial<AgendaBooking> & { id: string }): AgendaBooking {
   const startAt = over.start_at ?? "2026-09-20T11:00:00.000Z";
   return {
@@ -34,7 +32,6 @@ describe("AgendaView list view", () => {
       <AgendaView
         bookings={[onDay, offDay]}
         availability={[]}
-        timezone={TZ}
         slotIntervalMinutes={30}
       />,
     );
@@ -51,7 +48,6 @@ describe("AgendaView list view", () => {
       <AgendaView
         bookings={[onDay, offDay]}
         availability={[]}
-        timezone={TZ}
         slotIntervalMinutes={30}
       />,
     );
@@ -71,7 +67,6 @@ describe("AgendaView list view", () => {
       <AgendaView
         bookings={[onDay, offDay]}
         availability={[]}
-        timezone={TZ}
         slotIntervalMinutes={30}
       />,
     );

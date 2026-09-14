@@ -85,7 +85,6 @@ beforeAll(async () => {
         name: "Agenda Lembrete",
         slug: `agenda-lembrete-${stamp}`,
         phone: "+5511987654321",
-        timezone: "America/Sao_Paulo",
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
         booking_window_days: 60,
@@ -122,7 +121,6 @@ beforeAll(async () => {
         name: "Agenda Grátis",
         slug: `agenda-gratis-${stamp}`,
         phone: "+5511987654322",
-        timezone: "America/Sao_Paulo",
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
         booking_window_days: 60,
@@ -220,7 +218,6 @@ describe("INC-2 lembretes: get_due_booking_reminders", () => {
     const { data } = await admin.rpc("get_due_booking_reminders", { p_lead_minutes: 1440 });
     const row = data!.find((b) => b.id === dueBookingId)!;
     expect(row.business_name).toBe("Agenda Lembrete");
-    expect(row.business_timezone).toBe("America/Sao_Paulo");
     expect(row.customer_email_snapshot).toBe("due@example.com");
     expect(row.customer_name_snapshot).toBe("Cliente");
     expect(row.service_name_snapshot).toBe("Corte");

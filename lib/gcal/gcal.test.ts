@@ -7,7 +7,6 @@ const booking: GcalBooking = {
   endAt: "2026-09-01T20:30:00.000Z",
   location: "Barbearia Demo",
   description: "Reserva em Barbearia Demo",
-  timezone: "America/Sao_Paulo",
 };
 
 describe("buildGoogleCalendarUrl (INC-3: export de reserva)", () => {
@@ -29,7 +28,7 @@ describe("buildGoogleCalendarUrl (INC-3: export de reserva)", () => {
   });
 
   it("omits optional query params when absent", () => {
-    const url = buildGoogleCalendarUrl({ summary: "S", startAt: "2026-09-01T20:00:00.000Z", endAt: "2026-09-01T20:30:00.000Z", timezone: "UTC" });
+    const url = buildGoogleCalendarUrl({ summary: "S", startAt: "2026-09-01T20:00:00.000Z", endAt: "2026-09-01T20:30:00.000Z" });
     const parsed = new URL(url);
     expect(parsed.searchParams.get("location")).toBeNull();
     expect(parsed.searchParams.get("details")).toBeNull();
@@ -51,7 +50,7 @@ describe("buildIcsString (INC-3: .ics da reserva)", () => {
   });
 
   it("escapes commas, semicolons and backslashes in text fields", () => {
-    const ics = buildIcsString({ summary: "a,b;c\\d", startAt: "2026-09-01T20:00:00.000Z", endAt: "2026-09-01T20:30:00.000Z", timezone: "UTC" });
+    const ics = buildIcsString({ summary: "a,b;c\\d", startAt: "2026-09-01T20:00:00.000Z", endAt: "2026-09-01T20:30:00.000Z" });
     expect(ics).toContain("SUMMARY:a\\,b\\;c\\\\d");
   });
 

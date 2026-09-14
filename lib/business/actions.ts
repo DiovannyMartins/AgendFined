@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { businessSchema } from "@/lib/validation/schemas";
-import { describeTimezoneImpact, type TimezoneImpact } from "@/lib/business/timezone-lock";
 
 export type ActionResult<T = undefined, E = undefined> =
   | { ok: true; data: T }
@@ -39,14 +38,13 @@ type BusinessPayload = {
   name: string;
   slug: string;
   phone: string;
-  timezone: string;
   slotIntervalMinutes: number;
   minNoticeMinutes: number;
   bookingWindowDays: number;
   description?: string | null;
 };
 
-export type ActionResultState = ActionResult<undefined, { affected: TimezoneImpact }>;
+export type ActionResultState = ActionResult<undefined>;
 
 export async function upsertBusiness(
   _prev: ActionResultState,
@@ -56,7 +54,6 @@ export async function upsertBusiness(
     name: String(formData.get("name") ?? ""),
     slug: String(formData.get("slug") ?? "").trim().toLowerCase(),
     phone: String(formData.get("phone") ?? ""),
-    timezone: String(formData.get("timezone") ?? ""),
     slotIntervalMinutes: Number(formData.get("slotIntervalMinutes") ?? 30),
     minNoticeMinutes: Number(formData.get("minNoticeMinutes") ?? 120),
     bookingWindowDays: Number(formData.get("bookingWindowDays") ?? 60),
@@ -88,43 +85,11 @@ export async function upsertBusiness(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, code: "UNAUTHENTICATED", message: "Faça login para continuar." };
 
-  // Timezone lock (§9.5): block changing timezone with future bookings.
   const existing = await supabase
     .from("businesses")
-    .select("id, timezone, created_at")
+    .select("id, created_at")
     .eq("owner_id", user.id)
     .maybeSingle();
-
-  if (existing.data && existing.data.timezone !== parsed.data.timezone) {
-    const { data: futureBookings } = await supabase
-      .from("bookings")
-      .select("id, start_at, service_name_snapshot, customer_name_snapshot")
-      .eq("business_id", existing.data.id)
-      .gt("start_at", new Date().toISOString())
-      .neq("status", "cancelled")
-      .order("start_at", { ascending: true });
-
-    const impact: TimezoneImpact = describeTimezoneImpact(
-      (futureBookings ?? []).map((row) => ({
-        id: row.id,
-        startAt: row.start_at,
-        serviceName: row.service_name_snapshot,
-        customerName: row.customer_name_snapshot,
-      })),
-      existing.data.timezone,
-    );
-
-    if (impact.count > 0) {
-      return {
-        ok: false,
-        code: "TIMEZONE_LOCKED",
-        message:
-          "Não é possível mudar o fuso horário com reservas futuras ativas. Cancele ou reagende as reservas abaixo ou mantenha o fuso atual.",
-        fieldErrors: { timezone: ["Bloqueado com reservas futuras ativas."] },
-        details: { affected: impact },
-      };
-    }
-  }
 
   if (existing.data?.id) {
     const { error } = await supabase
@@ -133,7 +98,6 @@ export async function upsertBusiness(
         name: parsed.data.name,
         slug: parsed.data.slug,
         phone: parsed.data.phone,
-        timezone: parsed.data.timezone,
         slot_interval_minutes: parsed.data.slotIntervalMinutes,
         min_notice_minutes: parsed.data.minNoticeMinutes,
         booking_window_days: parsed.data.bookingWindowDays,
@@ -160,7 +124,6 @@ export async function upsertBusiness(
       name: parsed.data.name,
       slug: parsed.data.slug,
       phone: parsed.data.phone,
-      timezone: parsed.data.timezone,
       slot_interval_minutes: parsed.data.slotIntervalMinutes,
       min_notice_minutes: parsed.data.minNoticeMinutes,
       booking_window_days: parsed.data.bookingWindowDays,

@@ -1,8 +1,9 @@
-// Agenda view seam (INC-1). Pure, timezone-aware helpers that turn the business's
+// Agenda view seam (INC-1). Pure helpers that turn the business's
 // raw bookings into the shapes the dashboard's day/week grid renders. Booking
-// `start_at`s are UTC; a "day" is measured in the business's local timezone, so
-// the same instant can land on a different date for a different business.
+// `start_at`s are UTC; a "day" is measured in the app timezone, so
+// the same instant can land on a different date.
 import type { BookingStatus } from "@/lib/bookings/transitions";
+import { APP_TIMEZONE } from "@/lib/app-timezone";
 
 export interface AgendaBooking {
   id: string;
@@ -51,27 +52,27 @@ function minutesToTime(totalMinutes: number): string {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-const dateKeyFormatter = (tz: string) =>
+const dateKeyFormatter = (_tz?: string) =>
   new Intl.DateTimeFormat("en-CA", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-    timeZone: tz,
+    timeZone: APP_TIMEZONE,
   });
 
-// The local calendar date ("YYYY-MM-DD") on which a UTC instant falls, per tz.
-export function bookingLocalDate(iso: string, tz: string): string {
-  return dateKeyFormatter(tz).format(new Date(iso));
+// The local calendar date ("YYYY-MM-DD") on which a UTC instant falls.
+export function bookingLocalDate(iso: string, _tz?: string): string {
+  return dateKeyFormatter().format(new Date(iso));
 }
 
-// The local wall-clock "HH:MM" of a UTC instant, per tz (used to place a booking
+// The local wall-clock "HH:MM" of a UTC instant (used to place a booking
 // on the day grid's time rows).
-export function bookingLocalTime(iso: string, tz: string): string {
+export function bookingLocalTime(iso: string, _tz?: string): string {
   return new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-    timeZone: tz,
+    timeZone: APP_TIMEZONE,
   }).format(new Date(iso));
 }
 
@@ -105,17 +106,17 @@ export function weekDateKeys(reference: string): string[] {
   });
 }
 
-// Apply the agenda filters. `dateKey` is matched in `tz`; all filters combine
+// Apply the agenda filters. `dateKey` is matched in the app timezone; all filters combine
 // with AND. Missing filters are ignored (treated as "all").
 export function filterAgenda(
   bookings: AgendaBooking[],
-  opts: { tz: string; filters: AgendaFilters },
+  opts: { tz?: string; filters: AgendaFilters },
 ): AgendaBooking[] {
-  const { tz, filters } = opts;
+  const { filters } = opts;
   return bookings.filter((booking) => {
     if (
       filters.dateKey &&
-      bookingLocalDate(booking.start_at, tz) !== filters.dateKey
+      bookingLocalDate(booking.start_at) !== filters.dateKey
     ) {
       return false;
     }

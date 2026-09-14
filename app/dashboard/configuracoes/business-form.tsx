@@ -22,11 +22,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { TimezoneLockWarning } from "@/components/timezone-lock-warning";
 import { upsertBusiness, type ActionResultState } from "@/lib/business/actions";
 import { businessFormSchema, type BusinessFormValues } from "@/lib/validation/schemas";
 
-const TIMEZONES = ["America/Sao_Paulo", "America/New_York", "Europe/Lisbon", "Europe/London"];
 const SLOT_INTERVALS: Record<string, string> = { "15": "15 min", "30": "30 min", "60": "60 min" };
 const INITIAL: ActionResultState = { ok: true, data: undefined };
 
@@ -41,13 +39,11 @@ export function BusinessForm({
   const [pending, startTransition] = useTransition();
   const slug = typeof initial?.slug === "string" ? initial.slug : "";
   const creating = !slug;
-  const savedTimezone = String(initial?.timezone ?? "America/Sao_Paulo");
 
   const {
     register,
     control,
     handleSubmit,
-    setValue,
     formState: { errors },
   } = useForm<BusinessFormValues>({
     resolver: zodResolver(businessFormSchema),
@@ -55,7 +51,6 @@ export function BusinessForm({
       name: String(initial?.name ?? ""),
       slug,
       phone: String(initial?.phone ?? ""),
-      timezone: savedTimezone,
       slotIntervalMinutes: String(initial?.slotIntervalMinutes ?? 30),
       minNoticeMinutes: Number(initial?.minNoticeMinutes ?? 120),
       bookingWindowDays: Number(initial?.bookingWindowDays ?? 60),
@@ -69,7 +64,6 @@ export function BusinessForm({
       fd.set("name", values.name);
       fd.set("slug", values.slug);
       fd.set("phone", values.phone);
-      fd.set("timezone", values.timezone);
       fd.set("slotIntervalMinutes", values.slotIntervalMinutes);
       fd.set("minNoticeMinutes", String(values.minNoticeMinutes));
       fd.set("bookingWindowDays", String(values.bookingWindowDays));
@@ -79,9 +73,6 @@ export function BusinessForm({
       setSubmitted(true);
       if (result.ok && creating) {
         router.push("/dashboard");
-      }
-      if (!result.ok && result.code === "TIMEZONE_LOCKED") {
-        setValue("timezone", savedTimezone);
       }
     });
   }
@@ -132,37 +123,7 @@ export function BusinessForm({
                 </p>
               )}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="timezone">Fuso horário</Label>
-              <Controller
-                control={control}
-                name="timezone"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Escolha o fuso" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIMEZONES.map((tz) => (
-                        <SelectItem key={tz} value={tz}>
-                          {tz}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {(errors.timezone || fieldErrors.timezone) && (
-                <p className="text-sm text-destructive">
-                  {errors.timezone?.message ?? fieldErrors.timezone?.[0]}
-                </p>
-              )}
-            </div>
           </div>
-
-          {!state.ok && state.code === "TIMEZONE_LOCKED" && state.details?.affected && (
-            <TimezoneLockWarning impact={state.details.affected} />
-          )}
 
           <div className="space-y-2">
             <Label htmlFor="description">Descrição (opcional)</Label>
@@ -234,7 +195,7 @@ export function BusinessForm({
               Negócio criado! Redirecionando para o seu painel...
             </p>
           )}
-          {!state.ok && state.code !== "TIMEZONE_LOCKED" && (
+          {!state.ok && (
             <p className="text-sm text-destructive">{state.message}</p>
           )}
 

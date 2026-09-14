@@ -36,6 +36,7 @@ export function ServiceForm({ service }: { service?: ServiceRow }) {
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors },
   } = useForm<ServiceFormValues>({
     resolver: zodResolver(serviceFormSchema),
@@ -46,6 +47,16 @@ export function ServiceForm({ service }: { service?: ServiceRow }) {
       price: service ? (service.priceCents / 100).toFixed(2) : "",
     },
   });
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    // O formulário de criação é reutilizado entre aberturas: sem reset, a
+    // próxima criação vinha preenchida com os dados do serviço anterior.
+    if (next && !service) {
+      reset({ name: "", description: "", durationMinutes: 30, price: "" });
+      setState(INITIAL);
+    }
+  }
 
   function onSubmit(values: ServiceFormValues) {
     startTransition(async () => {
@@ -62,7 +73,7 @@ export function ServiceForm({ service }: { service?: ServiceRow }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={<Button variant={service ? "outline" : "default"} size={service ? "sm" : "default"} />}
       >

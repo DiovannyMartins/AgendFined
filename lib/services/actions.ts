@@ -121,6 +121,29 @@ export async function deleteService(id: string): Promise<ActionResult> {
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
 
   const supabase = await createClient();
+
+  // Serviço com reserva agendada (confirmada e ainda não encerrada) não pode
+  // ser excluído: o compromisso futuro precisa ser cancelado/concluído antes.
+  // Só histórico (passadas, concluídas, canceladas, no-show) libera a exclusão;
+  // essas reservas são preservadas via snapshot (service_id -> null).
+  const { data: scheduled } = await supabase
+    .from("bookings")
+    .select("id")
+    .eq("business_id", business.id)
+    .eq("service_id", id)
+    .eq("status", "confirmed")
+    .gt("end_at", new Date().toISOString())
+    .limit(1);
+
+  if (scheduled && scheduled.length > 0) {
+    return {
+      ok: false,
+      code: "HAS_SCHEDULED_BOOKINGS",
+      message:
+        "Este serviço possui reservas agendadas e não pode ser excluído. Cancele ou conclua as reservas agendadas antes de excluir.",
+    };
+  }
+
   const { error, data: deleted } = await supabase
     .from("services")
     .delete()

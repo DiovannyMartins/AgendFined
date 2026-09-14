@@ -13,7 +13,7 @@ Pessoa que reserva um serviço. Não possui conta; os dados são coletados no fl
 _Avoid_: Usuário, consumidor, lead, paciente
 
 **Serviço**:
-O que o negócio oferece: nome, duração e preço. Pode ser desativado (is_active = false) ou excluído; ao excluir, as reservas existentes são preservadas no histórico via snapshot e perdem apenas o vínculo (service_id).
+O que o negócio oferece: nome, duração e preço. Pode ser desativado (is_active = false) ou excluído; ao excluir, as reservas existentes são preservadas no histórico via snapshot e perdem apenas o vínculo (service_id). Com reserva agendada (confirmada e ainda não encerrada), a exclusão é bloqueada até não haver mais nada agendado.
 _Avoid_: Produto, item
 
 **Disponibilidade**:

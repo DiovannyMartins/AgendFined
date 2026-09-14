@@ -20,16 +20,21 @@ export default async function ServicosPage() {
 
   const { data: bookingRefs } = await supabase
     .from("bookings")
-    .select("service_id")
+    .select("service_id, status, end_at")
     .eq("business_id", business?.id ?? "");
 
+  const now = new Date().toISOString();
   const bookingCountByService = new Map<string, number>();
+  const scheduledByService = new Map<string, number>();
   for (const row of bookingRefs ?? []) {
     if (!row.service_id) continue;
     bookingCountByService.set(
       row.service_id,
       (bookingCountByService.get(row.service_id) ?? 0) + 1,
     );
+    if (row.status === "confirmed" && row.end_at > now) {
+      scheduledByService.set(row.service_id, (scheduledByService.get(row.service_id) ?? 0) + 1);
+    }
   }
 
   return (
@@ -85,6 +90,8 @@ export default async function ServicosPage() {
                   name={service.name}
                   hasHistory={bookingCountByService.has(service.id)}
                   bookingCount={bookingCountByService.get(service.id) ?? 0}
+                  hasScheduled={scheduledByService.has(service.id)}
+                  scheduledCount={scheduledByService.get(service.id) ?? 0}
                 />
               </div>
             </div>

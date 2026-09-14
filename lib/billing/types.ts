@@ -12,13 +12,15 @@ export type SubscriptionStatus = "pending" | "authorized" | "paused" | "cancelle
 
 // The current subscription as shown in the dashboard. Maps one-to-one to a row
 // in `public.subscriptions`, but with snake_case keys re-mapped to camelCase so
-// the UI never leaks the database column names.
+// the UI never leaks the database column names. `gracePeriodEnd` is optional to
+// keep existing callers compiling; new reads populate it from the row.
 export interface BillingSubscription {
   mpPreapprovalId: string;
   status: SubscriptionStatus;
   plan: BillingPlan;
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
+  gracePeriodEnd?: string | null;
 }
 
 // A `cancelled`/`paused` subscription is no longer being charged and sits in the
@@ -27,4 +29,12 @@ export interface BillingSubscription {
 // (re-subscribe) and whether the re-subscribe CTA should show.
 export function isSubscriptionInGrace(status: SubscriptionStatus | null | undefined): boolean {
   return status === "cancelled" || status === "paused";
+}
+
+// True when a grace timestamp is still in the future. Used by the dashboard to
+// distinguish "pending with an older grace still active" (stays Pro until the
+// grace lapses) from a plain "pending" (still Free).
+export function isGraceActive(gracePeriodEnd: string | null | undefined, now: Date = new Date()): boolean {
+  if (!gracePeriodEnd) return false;
+  return new Date(gracePeriodEnd).getTime() >= now.getTime();
 }

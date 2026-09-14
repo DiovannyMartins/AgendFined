@@ -4,6 +4,7 @@ import { isProPlan } from "@/lib/plan/plan";
 import { getSubscription } from "@/lib/billing/get-subscription";
 import { PLAN_INFO } from "@/lib/billing/plans";
 import { isSubscriptionInGrace, type BillingPlan, type SubscriptionStatus } from "@/lib/billing/types";
+import { GraceCountdown } from "./grace-countdown";
 import { UpgradeButton } from "./upgrade-button";
 import { CancelSubscriptionButton } from "./cancel-subscription-button";
 
@@ -22,13 +23,28 @@ const STATUS_BADGE: Record<SubscriptionStatus, { label: string; variant: "defaul
 };
 
 export async function PlanSection({ business }: { business: { id: string; plan: BillingPlan } }) {
-  const { plan, subscription } = await getSubscription(business);
+  const { plan, subscription, graceSubscription } = await getSubscription(business);
   const info = PLAN_INFO[plan];
   const isPro = isProPlan(plan);
   const status = subscription?.status ?? null;
+  const pendingGrace = status === "pending" ? graceSubscription : null;
+  // Re-subscribe during the grace window: the latest row is `pending` (new
+  // checkout) while an older `paused`/`cancelled` row still grants Pro. Show
+  // the grace — not the pending checkout — as the subscription status, so a
+  // "pending" business never looks like it got Pro for free.
+  const pendingDuringGrace = pendingGrace !== null;
+  const displayStatus = pendingGrace ? pendingGrace.status : status;
+  // Live countdown target: the pending checkout hides the grace row, so use
+  // the older grace row; otherwise use the current row's own grace.
+  const graceEnd =
+    pendingGrace?.gracePeriodEnd
+      ? pendingGrace.gracePeriodEnd
+      : isSubscriptionInGrace(status) && subscription?.gracePeriodEnd
+        ? subscription.gracePeriodEnd
+        : null;
 
-  const badge = status
-    ? STATUS_BADGE[status]
+  const badge = displayStatus
+    ? STATUS_BADGE[displayStatus]
     : isPro
       ? { label: "Ativo", variant: "default" as const }
       : { label: "Atual", variant: "secondary" as const };
@@ -70,9 +86,27 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
         <p className="mt-4 text-sm text-muted-foreground">
           Status da assinatura:{" "}
           <span className="font-medium text-foreground">
-            {subscription ? STATUS_LABEL[subscription.status] : "Sem assinatura"}
+            {displayStatus ? STATUS_LABEL[displayStatus] : "Sem assinatura"}
           </span>
         </p>
+        {pendingDuringGrace && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Novo pagamento em andamento. Você mantém o PROFISSIONAL até o fim da carência
+            {graceEnd && (
+              <>
+                {" ("}
+                <GraceCountdown gracePeriodEnd={graceEnd} />
+                {")"}
+              </>
+            )}
+            ; se o pagamento não for concluído, o plano volta para Grátis.
+          </p>
+        )}
+        {!pendingDuringGrace && graceEnd && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            <GraceCountdown gracePeriodEnd={graceEnd} />
+          </p>
+        )}
 
         {!isPro && (
           <div className="border-t border-border pt-4">

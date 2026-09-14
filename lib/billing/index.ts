@@ -2,11 +2,12 @@
 // here (or from the specific submodule) rather than the Mercado Pago
 // implementation, which stays behind `BillingProvider` and is wired only by the
 // server action (`actions.ts`).
-export { getSubscription } from "./get-subscription";
-export type { FetchSubscription, GetSubscriptionResult } from "./get-subscription";
+export { getSubscription, fetchActiveGraceSubscription, fetchCurrentSubscription } from "./get-subscription";
+export type { FetchGraceSubscription, FetchSubscription, GetSubscriptionResult } from "./get-subscription";
 export { startUpgrade } from "./start-upgrade";
 export type { SaveSubscription, StartUpgradeDeps, StartUpgradeResult } from "./start-upgrade";
 export type { BillingPlan, BillingSubscription, SubscriptionStatus } from "./types";
+export { isGraceActive, isSubscriptionInGrace } from "./types";
 export type {
   BillingProvider,
   CreatePreapprovalInput,

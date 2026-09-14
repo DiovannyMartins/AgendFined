@@ -18,6 +18,20 @@ export default async function ServicosPage() {
 
   const list = services ?? [];
 
+  const { data: bookingRefs } = await supabase
+    .from("bookings")
+    .select("service_id")
+    .eq("business_id", business?.id ?? "");
+
+  const bookingCountByService = new Map<string, number>();
+  for (const row of bookingRefs ?? []) {
+    if (!row.service_id) continue;
+    bookingCountByService.set(
+      row.service_id,
+      (bookingCountByService.get(row.service_id) ?? 0) + 1,
+    );
+  }
+
   return (
     <div className="mx-auto max-w-4xl">
       <div className="flex items-center justify-between">
@@ -66,7 +80,12 @@ export default async function ServicosPage() {
                     priceCents: service.price_cents,
                   }}
                 />
-                <ServiceDelete id={service.id} name={service.name} />
+                <ServiceDelete
+                  id={service.id}
+                  name={service.name}
+                  hasHistory={bookingCountByService.has(service.id)}
+                  bookingCount={bookingCountByService.get(service.id) ?? 0}
+                />
               </div>
             </div>
           ))}

@@ -16,7 +16,17 @@ import { deleteService, type ActionResult } from "@/lib/services/actions";
 
 const INITIAL: ActionResult = { ok: true, data: undefined };
 
-export function ServiceDelete({ id, name }: { id: string; name: string }) {
+export function ServiceDelete({
+  id,
+  name,
+  hasHistory = false,
+  bookingCount = 0,
+}: {
+  id: string;
+  name: string;
+  hasHistory?: boolean;
+  bookingCount?: number;
+}) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<ActionResult>(INITIAL);
   const [pending, startTransition] = useTransition();
@@ -38,7 +48,17 @@ export function ServiceDelete({ id, name }: { id: string; name: string }) {
         <DialogHeader>
           <DialogTitle>Excluir serviço</DialogTitle>
           <DialogDescription>
-            Tem certeza que deseja excluir &quot;{name}&quot;? Esta ação não pode ser desfeita.
+            Tem certeza que deseja excluir &quot;{name}&quot;? Esta ação não pode ser
+            desfeita.
+            {hasHistory && (
+              <>
+                {" "}
+                {bookingCount > 0
+                  ? `${bookingCount} reserva${bookingCount === 1 ? "" : "s"} desse serviço
+                    será mantida no histórico (agenda, clientes e relatórios).`
+                  : "As reservas desse serviço serão mantidas no histórico (agenda, clientes e relatórios)."}
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
         {!state.ok && <p className="text-sm text-destructive">{state.message}</p>}

@@ -129,13 +129,6 @@ export async function deleteService(id: string): Promise<ActionResult> {
     .select();
 
   if (error) {
-    if (error.code === "23503") {
-      return {
-        ok: false,
-        code: "HAS_BOOKINGS",
-        message: "Este serviço possui reservas e não pode ser excluído. Desative-o para não receber novas reservas.",
-      };
-    }
     return { ok: false, code: "DB_ERROR", message: "Não foi possível excluir o serviço." };
   }
   if (!deleted || deleted.length === 0) {

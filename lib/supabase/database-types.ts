@@ -118,7 +118,7 @@ export type Database = {
           price_cents_snapshot: number
           public_code: string
           reminder_sent_at: string | null
-          service_id: string
+          service_id: string | null
           service_name_snapshot: string
           start_at: string
           status: Database["public"]["Enums"]["booking_status"]
@@ -182,11 +182,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "bookings_service_business_fkey"
-            columns: ["service_id", "business_id"]
+            foreignKeyName: "bookings_service_id_fkey"
+            columns: ["service_id"]
             isOneToOne: false
             referencedRelation: "services"
-            referencedColumns: ["id", "business_id"]
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -472,7 +472,7 @@ export type Database = {
           price_cents_snapshot: number
           public_code: string
           reminder_sent_at: string | null
-          service_id: string
+          service_id: string | null
           service_name_snapshot: string
           start_at: string
           status: Database["public"]["Enums"]["booking_status"]
@@ -544,7 +544,7 @@ export type Database = {
           price_cents_snapshot: number
           public_code: string
           reminder_sent_at: string | null
-          service_id: string
+          service_id: string | null
           service_name_snapshot: string
           start_at: string
           status: Database["public"]["Enums"]["booking_status"]

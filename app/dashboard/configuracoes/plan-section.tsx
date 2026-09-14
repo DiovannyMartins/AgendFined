@@ -5,6 +5,7 @@ import { getSubscription } from "@/lib/billing/get-subscription";
 import { PLAN_INFO } from "@/lib/billing/plans";
 import { isSubscriptionInGrace, type BillingPlan, type SubscriptionStatus } from "@/lib/billing/types";
 import { GraceCountdown } from "./grace-countdown";
+import { RetryUpgradeButton } from "./retry-upgrade-button";
 import { UpgradeButton } from "./upgrade-button";
 import { CancelSubscriptionButton } from "./cancel-subscription-button";
 
@@ -108,7 +109,18 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
           </p>
         )}
 
-        {!isPro && (
+        {!pendingDuringGrace && status === "pending" && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Você iniciou uma assinatura mas ainda não concluiu o pagamento. Conclua abaixo para ativar o PROFISSIONAL.
+          </p>
+        )}
+        {status === "pending" && (
+          <div className="border-t border-border pt-4">
+            <RetryUpgradeButton />
+          </div>
+        )}
+
+        {!isPro && status !== "pending" && (
           <div className="border-t border-border pt-4">
             <p className="text-sm text-muted-foreground">
               Destrave relatórios, lembretes automáticos, gestão da lista de espera e exportação de agenda.

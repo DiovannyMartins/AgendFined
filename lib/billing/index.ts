@@ -6,6 +6,8 @@ export { getSubscription, fetchActiveGraceSubscription, fetchCurrentSubscription
 export type { FetchGraceSubscription, FetchSubscription, GetSubscriptionResult } from "./get-subscription";
 export { startUpgrade } from "./start-upgrade";
 export type { SaveSubscription, StartUpgradeDeps, StartUpgradeResult } from "./start-upgrade";
+export { retryPendingUpgrade } from "./retry-upgrade";
+export type { ReplaceSubscription, RetryUpgradeDeps, RetryUpgradeResult } from "./retry-upgrade";
 export type { BillingPlan, BillingSubscription, SubscriptionStatus } from "./types";
 export { isGraceActive, isSubscriptionInGrace } from "./types";
 export type {

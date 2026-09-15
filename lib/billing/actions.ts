@@ -60,7 +60,7 @@ export async function startUpgrade(): Promise<StartUpgradeResult> {
   } = await supabase.auth.getUser();
 
   const provider = createMercadoPagoProvider({ accessToken });
-  const backUrl = `${process.env.APP_URL ?? "http://localhost:3000"}/dashboard/configuracoes`;
+  const backUrl = `${(process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "")}/dashboard/configuracoes`;
   const notificationUrl = process.env.MERCADO_PAGO_NOTIFICATION_URL;
 
   return buildStartUpgrade({
@@ -102,7 +102,7 @@ export async function retryUpgrade(): Promise<RetryUpgradeResult> {
 
   const provider = createMercadoPagoProvider({ accessToken });
   const admin = createAdminClient();
-  const backUrl = `${process.env.APP_URL ?? "http://localhost:3000"}/dashboard/configuracoes`;
+  const backUrl = `${(process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "")}/dashboard/configuracoes`;
   const notificationUrl = process.env.MERCADO_PAGO_NOTIFICATION_URL;
 
   return buildRetryPendingUpgrade({

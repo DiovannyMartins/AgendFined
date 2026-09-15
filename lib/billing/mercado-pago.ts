@@ -1,6 +1,6 @@
 // Mercado Pago provider implementation (ADR 0008). Behind the `BillingProvider`
 // seam; nothing outside `lib/billing/` imports this directly. Creates a
-// recurring preapproval (R$ 19/mês) and returns its `init_point`. The access
+// recurring preapproval (R$ 1/mês) and returns its `init_point`. The access
 // token is TEST-* in sandbox (dev) and APP_USR-* in production; the API base
 // stays the same. `apiBaseUrl` is injectable so the unit tests can point at a
 // stub server or stub `fetch` without a real network call.
@@ -16,11 +16,11 @@ const CANCELLED = "cancelled";
 
 const DEFAULT_API_BASE_URL = "https://api.mercadopago.com";
 
-// The recurring subscription terms per plan. Only the PROFISSIONAL plan (R$ 19)
+// The recurring subscription terms per plan. Only the PROFISSIONAL plan (R$ 1)
 // is sold as a subscription; a `free` plan has no preapproval, so it is rejected.
 const SUBSCRIPTION_TERMS: Record<BillingPlan, { amount: number; label: string } | null> = {
   free: null,
-  pro: { amount: 19, label: "PROFISSIONAL" },
+  pro: { amount: 1, label: "PROFISSIONAL" },
 };
 
 export interface MercadoPagoConfig {

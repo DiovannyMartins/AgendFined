@@ -31,7 +31,7 @@ export const PLAN_INFO: Record<Plan, PlanInfo> = {
   },
   pro: {
     name: "PROFISSIONAL",
-    price: "R$ 19",
+    price: "R$ 1",
     period: "/mês",
     description: "Tudo do Grátis, mais recursos para fazer o negócio crescer.",
     features: [

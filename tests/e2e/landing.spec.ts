@@ -17,7 +17,7 @@ test("landing shows the two plans with price and privileges", async ({ page }) =
   await expect(page.getByText("Grátis", { exact: true })).toBeVisible();
   await expect(page.getByText("R$ 0", { exact: true })).toBeVisible();
   await expect(page.getByText("PROFISSIONAL", { exact: true })).toBeVisible();
-  await expect(page.getByText("R$ 19", { exact: true })).toBeVisible();
+  await expect(page.getByText("R$ 1", { exact: true })).toBeVisible();
   await expect(page.getByText("Relatórios", { exact: true })).toBeVisible();
   await expect(page.getByText("Lembretes automáticos", { exact: true })).toBeVisible();
   await expect(page.getByText("Gestão da lista de espera", { exact: true })).toBeVisible();

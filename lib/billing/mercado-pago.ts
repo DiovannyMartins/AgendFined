@@ -1,6 +1,7 @@
 // Mercado Pago provider implementation (ADR 0008). Behind the `BillingProvider`
 // seam; nothing outside `lib/billing/` imports this directly. Creates a
-// recurring preapproval (R$ 1/mês) and returns its `init_point`. The access
+// recurring preapproval (temporary R$ 1 test price, see SUBSCRIPTION_TERMS TODO)
+// and returns its `init_point`. The access
 // token is TEST-* in sandbox (dev) and APP_USR-* in production; the API base
 // stays the same. `apiBaseUrl` is injectable so the unit tests can point at a
 // stub server or stub `fetch` without a real network call.
@@ -16,8 +17,10 @@ const CANCELLED = "cancelled";
 
 const DEFAULT_API_BASE_URL = "https://api.mercadopago.com";
 
-// The recurring subscription terms per plan. Only the PROFISSIONAL plan (R$ 1)
+// The recurring subscription terms per plan. Only the PROFISSIONAL plan
 // is sold as a subscription; a `free` plan has no preapproval, so it is rejected.
+// TODO(test-price): amount is a temporary R$ 1 test price while validating the
+// Mercado Pago checkout; revert to 19 (CONTEXT.md + ADR 0008) before launch.
 const SUBSCRIPTION_TERMS: Record<BillingPlan, { amount: number; label: string } | null> = {
   free: null,
   pro: { amount: 1, label: "PROFISSIONAL" },
@@ -78,9 +81,14 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
 
       await assertOk(res, "preapproval");
 
-      const body = (await res.json()) as { id?: string; init_point?: string };
+      const body = (await res.json()) as { id?: string; init_point?: string; sandbox_init_point?: string };
       const preapprovalId = body.id ?? "";
-      const initPoint = body.init_point ?? "";
+      // Test preapprovals must be opened in Mercado Pago's sandbox. The
+      // production init_point can be returned alongside sandbox_init_point,
+      // but it does not resolve the TEST-* preapproval and shows a 404 page.
+      const initPoint = config.accessToken.startsWith("TEST-")
+        ? (body.sandbox_init_point ?? "")
+        : (body.init_point ?? "");
       if (!preapprovalId || !initPoint) {
         throw new Error("Mercado Pago preapproval response missing id/init_point");
       }

@@ -24,7 +24,7 @@ describe("createMercadoPagoProvider", () => {
   it("creates a preapproval for the R$1/mês plan and returns init_point", async () => {
     const fetchMock = stubFetch(async () => jsonResponse({ id: "mp_123", init_point: "https://mp.example/checkout" }));
 
-    const provider = createMercadoPagoProvider({ accessToken: "TEST-123" });
+    const provider = createMercadoPagoProvider({ accessToken: "APP_USR-123" });
     const result = await provider.createPreapproval({
       plan: "pro",
       externalReference: "biz_1",
@@ -38,7 +38,7 @@ describe("createMercadoPagoProvider", () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.mercadopago.com/preapproval");
     expect(init.method).toBe("POST");
-    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer TEST-123");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer APP_USR-123");
     const body = JSON.parse(String(init.body));
     expect(body.auto_recurring).toEqual({
       frequency: 1,
@@ -50,6 +50,24 @@ describe("createMercadoPagoProvider", () => {
     expect(body.payer_email).toBe("owner@example.com");
     expect(body.back_url).toBe("https://app.example/dashboard/configuracoes");
     expect(body.notification_url).toBe("https://tunnel.example/api/webhooks/mercadopago");
+  });
+
+  it("uses sandbox_init_point for test credentials", async () => {
+    stubFetch(async () =>
+      jsonResponse({
+        id: "mp_test_123",
+        init_point: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_id=mp_test_123",
+        sandbox_init_point: "https://sandbox.mercadopago.com.br/subscriptions/checkout?preapproval_id=mp_test_123",
+      }),
+    );
+
+    const provider = createMercadoPagoProvider({ accessToken: "TEST-123" });
+    await expect(
+      provider.createPreapproval({ plan: "pro", externalReference: "biz_1", backUrl: "https://app.example" }),
+    ).resolves.toEqual({
+      preapprovalId: "mp_test_123",
+      initPoint: "https://sandbox.mercadopago.com.br/subscriptions/checkout?preapproval_id=mp_test_123",
+    });
   });
 
   it("omits notification_url when not provided", async () => {

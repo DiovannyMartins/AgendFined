@@ -10,7 +10,7 @@ import { UpgradeButton } from "./upgrade-button";
 import { CancelSubscriptionButton } from "./cancel-subscription-button";
 
 const STATUS_LABEL: Record<SubscriptionStatus, string> = {
-  pending: "Pagamento pendente",
+  pending: "Checkout não concluído",
   authorized: "Assinatura ativa",
   paused: "Assinatura pausada",
   cancelled: "Assinatura cancelada",
@@ -111,7 +111,7 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
 
         {!pendingDuringGrace && status === "pending" && (
           <p className="mt-1 text-sm text-muted-foreground">
-            Você iniciou uma assinatura mas ainda não concluiu o pagamento. Conclua abaixo para ativar o PROFISSIONAL.
+            O link de pagamento foi criado, mas a assinatura ainda não foi autorizada. Clique abaixo para abrir um novo checkout.
           </p>
         )}
         {status === "pending" && (

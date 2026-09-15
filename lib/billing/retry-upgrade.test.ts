@@ -42,7 +42,7 @@ describe("retryPendingUpgrade", () => {
     expect(deps.provider.cancelPreapproval).toHaveBeenCalledWith("mp_old");
   });
 
-  it("still retries when cancelling the stale preapproval fails", async () => {
+  it("fails safely when cancelling the stale preapproval fails", async () => {
     const deps = makeDeps({
       provider: {
         createPreapproval: vi.fn(async () => ({ preapprovalId: "mp_new", initPoint: "https://mp.example/new" })),
@@ -54,8 +54,9 @@ describe("retryPendingUpgrade", () => {
     });
     const result = await retryPendingUpgrade(deps);
 
-    expect(result).toEqual({ ok: true, initPoint: "https://mp.example/new" });
-    expect(deps.replaceSubscription).toHaveBeenCalledWith("mp_old", { mpPreapprovalId: "mp_new" });
+    expect(result).toEqual({ ok: false, code: "PROVIDER_ERROR", message: "cannot cancel" });
+    expect(deps.provider.createPreapproval).not.toHaveBeenCalled();
+    expect(deps.replaceSubscription).not.toHaveBeenCalled();
   });
 
   it("fails when there is no subscription", async () => {

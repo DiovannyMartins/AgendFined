@@ -56,7 +56,7 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
         method: "POST",
         headers: {
           Authorization: `Bearer ${config.accessToken}`,
-          "Content-Type": "application/json",
+          "Content-Type": "application/json; charset=utf-8",
         },
         body: JSON.stringify({
           reason: `Assinatura ${terms.label} - AgendFined (R$ ${terms.amount}/mês)`,
@@ -92,7 +92,7 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
         method: "GET",
         headers: {
           Authorization: `Bearer ${config.accessToken}`,
-          "Content-Type": "application/json",
+          "Content-Type": "application/json; charset=utf-8",
         },
       });
 
@@ -122,7 +122,7 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
         method: "PUT",
         headers: {
           Authorization: `Bearer ${config.accessToken}`,
-          "Content-Type": "application/json",
+          "Content-Type": "application/json; charset=utf-8",
         },
         body: JSON.stringify({ status: CANCELLED }),
       });

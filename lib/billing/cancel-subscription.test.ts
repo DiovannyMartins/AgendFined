@@ -89,4 +89,16 @@ describe("cancelSubscription (US16)", () => {
       gracePeriodEnd: "2026-09-10T12:00:00.000Z",
     });
   });
+
+  it("reports a persistence failure after provider cancellation", async () => {
+    const deps = makeDeps({
+      updateSubscription: vi.fn(async () => {
+        throw new Error("database unavailable");
+      }),
+    });
+
+    const result = await cancelSubscription(deps);
+
+    expect(result).toEqual({ ok: false, code: "SAVE_ERROR", message: "database unavailable" });
+  });
 });

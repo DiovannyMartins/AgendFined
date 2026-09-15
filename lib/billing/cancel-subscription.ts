@@ -48,12 +48,23 @@ export async function cancelSubscription(deps: CancelSubscriptionDeps): Promise<
   }
 
   const now = deps.now?.() ?? new Date();
-  await deps.updateSubscription(subscription.mpPreapprovalId, {
-    status: "cancelled",
-    gracePeriodEnd: new Date(
-      now.getTime() + (deps.graceDays ?? DEFAULT_GRACE_DAYS) * MS_PER_DAY,
-    ).toISOString(),
-  });
+  try {
+    await deps.updateSubscription(subscription.mpPreapprovalId, {
+      status: "cancelled",
+      gracePeriodEnd: new Date(
+        now.getTime() + (deps.graceDays ?? DEFAULT_GRACE_DAYS) * MS_PER_DAY,
+      ).toISOString(),
+    });
+  } catch (err) {
+    // The provider cancellation already succeeded. Surface the persistence
+    // failure explicitly so the caller can retry/reconcile the local state;
+    // do not report success while the dashboard still says authorized.
+    return {
+      ok: false,
+      code: "SAVE_ERROR",
+      message: err instanceof Error ? err.message : "A assinatura foi cancelada, mas não foi possível atualizar o sistema.",
+    };
+  }
 
   return { ok: true };
 }

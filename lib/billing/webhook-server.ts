@@ -32,19 +32,6 @@ export function createWebhookPersistence() {
         gracePeriodEnd: data.grace_period_end,
       };
     },
-    createSubscription: async (input: {
-      businessId: string;
-      mpPreapprovalId: string;
-      status: SubscriptionStatus;
-    }) => {
-      const { error } = await admin.from("subscriptions").insert({
-        business_id: input.businessId,
-        mp_preapproval_id: input.mpPreapprovalId,
-        plan: "pro",
-        status: input.status,
-      });
-      if (error) throw new Error(error.message);
-    },
     setPlan: async (businessId: string, plan: "free" | "pro") => {
       const { error } = await admin.from("businesses").update({ plan }).eq("id", businessId);
       if (error) throw new Error(error.message);

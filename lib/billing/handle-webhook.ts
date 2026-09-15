@@ -52,11 +52,6 @@ export interface HandleWebhookDeps {
   event: WebhookEvent;
   getPreapproval: (dataId: string) => Promise<PreapprovalResource>;
   findSubscription: (mpPreapprovalId: string) => Promise<SubscriptionForWebhook | null>;
-  createSubscription: (input: {
-    businessId: string;
-    mpPreapprovalId: string;
-    status: SubscriptionStatus;
-  }) => Promise<void>;
   setPlan: (businessId: string, plan: Plan) => Promise<void>;
   updateSubscription: (mpPreapprovalId: string, update: SubscriptionUpdate) => Promise<void>;
   graceDays?: number;
@@ -96,21 +91,20 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
   }
 
   const sub = await deps.findSubscription(event.dataId);
-  const businessId = sub?.businessId ?? preapproval.externalReference;
-  if (!businessId) {
-    return { ok: false, code: "NO_BUSINESS", message: "Não foi possível identificar o negócio da assinatura." };
+  // Never trust external_reference as authorization to grant Pro. A valid
+  // provider notification can refer to a preapproval created outside this
+  // application, and its external_reference is provider-controlled input.
+  // Returning an error makes the route answer 5xx so Mercado Pago retries; this
+  // also covers the short race where a new retry preapproval notifies before its
+  // local row has been repointed.
+  if (!sub) {
+    return {
+      ok: false,
+      code: "UNKNOWN_SUBSCRIPTION",
+      message: "A assinatura recebida não está registrada neste sistema.",
+    };
   }
-  // Only mint a subscription row for a preapproval that represents an active or
-  // in-progress subscription. A `paused`/`cancelled` notification for an unknown
-  // preapproval has no subscription to track, and must not write a Pro row for a
-  // business that isn't Pro.
-  if (!sub && (preapproval.status === "authorized" || preapproval.status === "pending")) {
-    await deps.createSubscription({
-      businessId,
-      mpPreapprovalId: event.dataId,
-      status: preapproval.status,
-    });
-  }
+  const businessId = sub.businessId;
 
   const now = deps.now?.() ?? new Date();
 

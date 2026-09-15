@@ -25,7 +25,6 @@ function makeDeps(overrides: Partial<HandleWebhookDeps> = {}) {
       plan: "free" as const,
       gracePeriodEnd: null,
     })),
-    createSubscription: vi.fn(async () => undefined),
     setPlan: vi.fn(async () => undefined),
     updateSubscription: vi.fn(async () => undefined),
     now: () => NOW,
@@ -127,17 +126,16 @@ describe("handleWebhook (issue #24) lifecycle", () => {
     expect(deps.updateSubscription).not.toHaveBeenCalled();
   });
 
-  it("creates the subscription from the preapproval's external_reference when it is missing", async () => {
+  it("rejects an unregistered preapproval instead of trusting external_reference", async () => {
     const deps = makeDeps({ findSubscription: vi.fn(async () => null) });
     const result = await handleWebhook(deps);
 
-    expect(result).toEqual({ ok: true, applied: "authorized" });
-    expect(deps.createSubscription).toHaveBeenCalledWith({
-      businessId: "biz_1",
-      mpPreapprovalId: "mp_1",
-      status: "authorized",
+    expect(result).toEqual({
+      ok: false,
+      code: "UNKNOWN_SUBSCRIPTION",
+      message: expect.any(String),
     });
-    expect(deps.setPlan).toHaveBeenCalledWith("biz_1", "pro");
+    expect(deps.setPlan).not.toHaveBeenCalled();
   });
 
   it("fails when no business can be resolved", async () => {
@@ -147,8 +145,7 @@ describe("handleWebhook (issue #24) lifecycle", () => {
     });
     const result = await handleWebhook(deps);
 
-    expect(result).toEqual({ ok: false, code: "NO_BUSINESS", message: expect.any(String) });
-    expect(deps.createSubscription).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: false, code: "UNKNOWN_SUBSCRIPTION", message: expect.any(String) });
     expect(deps.setPlan).not.toHaveBeenCalled();
   });
 

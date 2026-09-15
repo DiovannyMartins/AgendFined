@@ -1,5 +1,6 @@
 // The upgrade seam (ADR 0008). `startUpgrade` creates a Mercado Pago preapproval
-// for the PROFISSIONAL plan (R$ 1/mês) through the `BillingProvider` interface
+// for the PROFISSIONAL plan (temporary R$ 1 test price, see SUBSCRIPTION_TERMS
+// TODO in mercado-pago.ts) through the `BillingProvider` interface
 // and persists a `pending` subscription row, then returns the checkout
 // `init_point` for the caller to redirect to. The provider, the
 // subscription-save and the (optional) subscription read are injectable, so this

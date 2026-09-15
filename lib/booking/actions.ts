@@ -74,7 +74,16 @@ export async function createBooking(input: {
   // Server-side revalidation of availability (§11.3 step 5). `getSlotRange`
   // returns null only when the day has no active availability range for the
   // business.
-  const slotRange = await getSlotRange(supabase, business.id, input.date);
+  let slotRange: SlotRange | null;
+  try {
+    slotRange = await getSlotRange(supabase, business.id, input.date);
+  } catch {
+    return {
+      ok: false,
+      code: "db_error",
+      message: "Não foi possível verificar a disponibilidade. Tente novamente.",
+    };
+  }
   if (slotRange === null) {
     return { ok: false, code: "no_availability", message: "Este dia não possui horários disponíveis. Escolha outra data." };
   }
@@ -359,18 +368,19 @@ async function getSlotRange(
 
   // Availability, blocks and occupied slots belong to the business, so the
   // revalidation is scoped to the business.
-  const { data: intervals } = await supabase
+  const { data: intervals, error: intervalsError } = await supabase
     .from("availability")
     .select("start_time, end_time")
     .eq("business_id", businessId)
     .eq("weekday", weekday)
     .eq("is_active", true);
 
+  if (intervalsError) throw new Error(intervalsError.message);
   if (!intervals || intervals.length === 0) return null;
 
   const day = localDayRangeUtc(date);
 
-  const [{ data: blocks }, { data: bookings }] = await Promise.all([
+  const [{ data: blocks, error: blocksError }, { data: bookings, error: bookingsError }] = await Promise.all([
     supabase
       .from("availability_blocks")
       .select("start_at, end_at")
@@ -385,6 +395,12 @@ async function getSlotRange(
       .lt("start_at", day.end)
       .gt("end_at", day.start),
   ]);
+
+  // Availability revalidation is security-critical: a read failure must not be
+  // interpreted as an empty schedule, otherwise a booking can bypass a block
+  // or an existing occupancy.
+  if (blocksError) throw new Error(blocksError.message);
+  if (bookingsError) throw new Error(bookingsError.message);
 
   return {
     intervals: intervals.map((i) => ({ startTime: i.start_time, endTime: i.end_time })),

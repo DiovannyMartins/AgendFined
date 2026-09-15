@@ -31,6 +31,8 @@ export const PLAN_INFO: Record<Plan, PlanInfo> = {
   },
   pro: {
     name: "PROFISSIONAL",
+    // TODO(test-price): temporary R$ 1 test price while validating the Mercado
+    // Pago checkout; revert to "R$ 19" (CONTEXT.md + ADR 0008) before launch.
     price: "R$ 1",
     period: "/mês",
     description: "Tudo do Grátis, mais recursos para fazer o negócio crescer.",

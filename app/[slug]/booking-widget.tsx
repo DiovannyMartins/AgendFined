@@ -10,6 +10,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import { createBooking, joinWaitlist } from "@/lib/booking/actions";
 import { getSlotsForDate } from "@/lib/availability/actions";
+import { toLocalDate } from "@/lib/booking/availability";
 import { cn } from "@/lib/utils";
 
 type ServiceOption = {
@@ -55,7 +56,7 @@ export function BookingWidget({
   const minDate = useMemo(() => {
     // Allow today; the server enforces min_notice and the future window, so a
     // same-day calendar date is valid when the business permits it.
-    return new Date().toISOString().slice(0, 10);
+    return toLocalDate(new Date());
   }, []);
 
   function handleServiceChange(value: string) {

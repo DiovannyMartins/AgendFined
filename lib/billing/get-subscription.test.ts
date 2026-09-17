@@ -1,8 +1,44 @@
 import { describe, expect, it, vi } from "vitest";
-import { getSubscription, type FetchSubscription } from "./get-subscription";
+import { createClient } from "@/lib/supabase/server";
+import { fetchCurrentSubscription, getSubscription, type FetchSubscription } from "./get-subscription";
 import type { BillingSubscription } from "./types";
 
+vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
+
 describe("getSubscription (ADR 0008)", () => {
+  it("reads the subscription referenced by the business current pointer", async () => {
+    const from = vi.fn((table: string) => {
+      const query = {
+        select: vi.fn(() => query),
+        eq: vi.fn(() => query),
+        maybeSingle: vi.fn(async () => table === "businesses"
+          ? { data: { current_subscription_id: "sub_current" }, error: null }
+          : {
+              data: {
+                id: "sub_current",
+                mp_preapproval_id: "mp_current",
+                status: "pending",
+                plan: "pro",
+                current_period_start: null,
+                current_period_end: null,
+                grace_period_end: null,
+              },
+              error: null,
+            }),
+      };
+      return query;
+    });
+    vi.mocked(createClient).mockResolvedValue({ from } as never);
+
+    await expect(fetchCurrentSubscription("biz_1")).resolves.toMatchObject({
+      subscriptionId: "sub_current",
+      mpPreapprovalId: "mp_current",
+      status: "pending",
+    });
+    expect(from).toHaveBeenNthCalledWith(1, "businesses");
+    expect(from).toHaveBeenNthCalledWith(2, "subscriptions");
+  });
+
   it("returns the business plan and null when there is no subscription", async () => {
     const fetchSubscription: FetchSubscription = vi.fn(async () => null);
 

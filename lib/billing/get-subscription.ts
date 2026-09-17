@@ -53,12 +53,19 @@ function mapRow(row: {
 // action's pending-guard.
 export const fetchCurrentSubscription: FetchSubscription = async (businessId) => {
   const supabase = await createClient();
+  const { data: business, error: businessError } = await supabase
+    .from("businesses")
+    .select("current_subscription_id")
+    .eq("id", businessId)
+    .maybeSingle();
+  if (businessError) throw new Error(businessError.message);
+  if (!business?.current_subscription_id) return null;
+
   const { data, error } = await supabase
     .from("subscriptions")
     .select("*")
     .eq("business_id", businessId)
-    .order("created_at", { ascending: false })
-    .limit(1)
+    .eq("id", business.current_subscription_id)
     .maybeSingle();
   if (error) throw new Error(error.message);
   return data ? mapRow(data) : null;

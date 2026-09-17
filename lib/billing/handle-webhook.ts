@@ -12,7 +12,6 @@
 // injected so the decision core is unit-testable without a database, and the
 // plan is never set from the provider's word alone — `authorized` is the only
 // path that makes a business Pro, and a missing/invalid status fails closed.
-import type { Plan } from "@/lib/plan/plan";
 import type { SubscriptionStatus } from "./types";
 
 // The current state of a preapproval, as read from the provider (`GET
@@ -36,24 +35,33 @@ export interface SubscriptionForWebhook {
   businessId: string;
   mpPreapprovalId: string;
   status: SubscriptionStatus;
-  plan: Plan;
   gracePeriodEnd: string | null;
 }
 
-export type SubscriptionUpdate = {
-  status?: SubscriptionStatus;
-  plan?: Plan;
-  gracePeriodEnd?: string | null;
-  currentPeriodStart?: string | null;
-  currentPeriodEnd?: string | null;
-};
+export interface AppliedSubscriptionSnapshot {
+  subscriptionId: string;
+  businessId: string;
+  subscriptionStatus: SubscriptionStatus;
+  isCurrent: boolean;
+  effectivePlan: "free" | "pro";
+  effectiveGracePeriodEnd: string | null;
+}
+
+export interface ApplySubscriptionSnapshotInput {
+  businessId: string;
+  subscriptionId: string;
+  mpPreapprovalId: string;
+  status: SubscriptionStatus;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  gracePeriodEnd: string | null;
+}
 
 export interface HandleWebhookDeps {
   event: WebhookEvent;
   getPreapproval: (dataId: string) => Promise<PreapprovalResource>;
   findSubscription: (mpPreapprovalId: string) => Promise<SubscriptionForWebhook | null>;
-  setPlan: (businessId: string, plan: Plan) => Promise<void>;
-  updateSubscription: (mpPreapprovalId: string, update: SubscriptionUpdate) => Promise<void>;
+  applySnapshot: (input: ApplySubscriptionSnapshotInput) => Promise<AppliedSubscriptionSnapshot>;
   graceDays?: number;
   now?: () => Date;
 }
@@ -107,42 +115,36 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
   const businessId = sub.businessId;
 
   const now = deps.now?.() ?? new Date();
+  let gracePeriodEnd: string | null = null;
+  if (preapproval.status === "paused" || preapproval.status === "cancelled") {
+    const existingGrace = sub.gracePeriodEnd ? new Date(sub.gracePeriodEnd) : null;
+    gracePeriodEnd =
+      existingGrace && existingGrace.getTime() > now.getTime()
+        ? existingGrace.toISOString()
+        : new Date(now.getTime() + (deps.graceDays ?? DEFAULT_GRACE_DAYS) * MS_PER_DAY).toISOString();
+  }
 
-  switch (preapproval.status) {
-    case "authorized":
-      await deps.setPlan(businessId, "pro");
-      await deps.updateSubscription(event.dataId, {
-        status: "authorized",
-        plan: "pro",
-        gracePeriodEnd: null,
-        currentPeriodStart: preapproval.currentPeriodStart,
-        currentPeriodEnd: preapproval.currentPeriodEnd,
-      });
-      return { ok: true, applied: "authorized" };
-    case "paused":
-    case "cancelled": {
-      // Idempotent grace: preserve an already-set future grace (so a provider
-      // retry of the same `paused`/`cancelled` event does not keep pushing the
-      // downgrade further out), otherwise start a fresh grace window.
-      const existingGrace = sub?.gracePeriodEnd ? new Date(sub.gracePeriodEnd) : null;
-      const graceEnd =
-        existingGrace && existingGrace.getTime() > now.getTime()
-          ? existingGrace
-          : new Date(now.getTime() + (deps.graceDays ?? DEFAULT_GRACE_DAYS) * MS_PER_DAY);
-      await deps.updateSubscription(event.dataId, {
-        status: preapproval.status,
-        gracePeriodEnd: graceEnd.toISOString(),
-      });
+  try {
+    await deps.applySnapshot({
+      businessId,
+      subscriptionId: sub.id,
+      mpPreapprovalId: event.dataId,
+      status: preapproval.status,
+      currentPeriodStart: preapproval.currentPeriodStart,
+      currentPeriodEnd: preapproval.currentPeriodEnd,
+      gracePeriodEnd,
+    });
+
+    if (preapproval.status === "authorized") return { ok: true, applied: "authorized" };
+    if (preapproval.status === "paused" || preapproval.status === "cancelled") {
       return { ok: true, applied: "grace" };
     }
-    case "pending":
-      await deps.updateSubscription(event.dataId, { status: "pending" });
-      return { ok: true, applied: "pending" };
-    default:
-      // An unrecognised status is acknowledged (so Mercado Pago stops retrying)
-      // and logged for observability, instead of surfacing a 502 that the
-      // provider would retry indefinitely.
-      console.warn(`handleWebhook: unknown preapproval status "${preapproval.status}" (${event.dataId})`);
-      return { ok: true, applied: "ignored" };
+    return { ok: true, applied: "pending" };
+  } catch (err) {
+    return {
+      ok: false,
+      code: "DATABASE_ERROR",
+      message: err instanceof Error ? err.message : "Não foi possível aplicar o estado da assinatura.",
+    };
   }
 }

@@ -71,7 +71,7 @@ describe("createMercadoPagoProvider", () => {
   });
 
   it("omits notification_url when not provided", async () => {
-    const fetchMock = stubFetch(async () => jsonResponse({ id: "mp_1", init_point: "https://mp.example/x" }));
+    const fetchMock = stubFetch(async () => jsonResponse({ id: "mp_1", init_point: "https://mp.example/x", sandbox_init_point: "https://mp.example/x" }));
 
     const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });
     await provider.createPreapproval({
@@ -85,7 +85,7 @@ describe("createMercadoPagoProvider", () => {
   });
 
   it("omits payer_email when not provided", async () => {
-    const fetchMock = stubFetch(async () => jsonResponse({ id: "mp_1", init_point: "https://mp.example/x" }));
+    const fetchMock = stubFetch(async () => jsonResponse({ id: "mp_1", init_point: "https://mp.example/x", sandbox_init_point: "https://mp.example/x" }));
 
     const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });
     await provider.createPreapproval({
@@ -158,6 +158,23 @@ describe("createMercadoPagoProvider", () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.mercadopago.com/preapproval/mp_1");
     expect(init.method).toBe("GET");
+  });
+
+  it("aborts a slow preapproval GET at the configured timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = stubFetch(async (_url, init) => await new Promise<Response>((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => reject(init.signal?.reason ?? new Error("aborted")));
+      }));
+      const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });
+      const pending = provider.getPreapproval("mp_1", { timeoutMs: 1000 });
+      const outcome = pending.catch(error => error);
+      await vi.advanceTimersByTimeAsync(1000);
+      await expect(outcome).resolves.toEqual(expect.objectContaining({ message: expect.stringMatching(/timed out|abort/i) }));
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("throws when fetching a preapproval returns a non-ok status", async () => {

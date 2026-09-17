@@ -16,6 +16,14 @@ import type {
 const CANCELLED = "cancelled";
 
 const DEFAULT_API_BASE_URL = "https://api.mercadopago.com";
+export const DEFAULT_GET_PREAPPROVAL_TIMEOUT_MS = 30_000;
+
+export class MercadoPagoAmbiguousError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MercadoPagoAmbiguousError";
+  }
+}
 
 // The recurring subscription terms per plan. Only the PROFISSIONAL plan
 // is sold as a subscription; a `free` plan has no preapproval, so it is rejected.
@@ -55,33 +63,44 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
         throw new Error(`Mercado Pago does not sell a subscription for the ${input.plan} plan`);
       }
 
-      const res = await fetch(`${apiBaseUrl}/preapproval`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${config.accessToken}`,
-          "Content-Type": "application/json; charset=utf-8",
-        },
-        body: JSON.stringify({
-          reason: `Assinatura ${terms.label} - AgendFined (R$ ${terms.amount}/mês)`,
-          auto_recurring: {
-            frequency: 1,
-            frequency_type: "months",
-            transaction_amount: terms.amount,
-            currency_id: "BRL",
+      let res: Response;
+      try {
+        res = await fetch(`${apiBaseUrl}/preapproval`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${config.accessToken}`,
+            "Content-Type": "application/json; charset=utf-8",
           },
-          back_url: input.backUrl,
-          external_reference: input.externalReference,
-          ...(input.payerEmail ? { payer_email: input.payerEmail } : {}),
-          // A hint only — Mercado Pago does not persist `notification_url` on a
-          // preapproval; notifications are delivered to the URL configured in
-          // "Your integrations" (topic `subscription_preapproval`).
-          ...(input.notificationUrl ? { notification_url: input.notificationUrl } : {}),
-        }),
-      });
+          body: JSON.stringify({
+            reason: `Assinatura ${terms.label} - AgendFined (R$ ${terms.amount}/mês)`,
+            auto_recurring: {
+              frequency: 1,
+              frequency_type: "months",
+              transaction_amount: terms.amount,
+              currency_id: "BRL",
+            },
+            back_url: input.backUrl,
+            external_reference: input.externalReference,
+            ...(input.payerEmail ? { payer_email: input.payerEmail } : {}),
+            ...(input.notificationUrl ? { notification_url: input.notificationUrl } : {}),
+          }),
+        });
+      } catch (error) {
+        throw new MercadoPagoAmbiguousError(
+          error instanceof Error ? error.message : "Mercado Pago preapproval response was not received",
+        );
+      }
 
       await assertOk(res, "preapproval");
 
-      const body = (await res.json()) as { id?: string; init_point?: string; sandbox_init_point?: string };
+      let body: { id?: string; init_point?: string; sandbox_init_point?: string };
+      try {
+        body = (await res.json()) as { id?: string; init_point?: string; sandbox_init_point?: string };
+      } catch (error) {
+        throw new MercadoPagoAmbiguousError(
+          error instanceof Error ? error.message : "Mercado Pago preapproval response was not readable",
+        );
+      }
       const preapprovalId = body.id ?? "";
       // Test preapprovals must be opened in Mercado Pago's sandbox. The
       // production init_point can be returned alongside sandbox_init_point,
@@ -90,19 +109,30 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
         ? (body.sandbox_init_point ?? "")
         : (body.init_point ?? "");
       if (!preapprovalId || !initPoint) {
-        throw new Error("Mercado Pago preapproval response missing id/init_point");
+        throw new MercadoPagoAmbiguousError("Mercado Pago preapproval response missing id/init_point");
       }
       return { preapprovalId, initPoint };
     },
 
-    async getPreapproval(id: string): Promise<Preapproval> {
-      const res = await fetch(`${apiBaseUrl}/preapproval/${id}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${config.accessToken}`,
-          "Content-Type": "application/json; charset=utf-8",
-        },
-      });
+    async getPreapproval(id: string, options = {}): Promise<Preapproval> {
+      const controller = new AbortController();
+      const timeout = setTimeout(
+        () => controller.abort(new Error("Mercado Pago preapproval fetch timed out")),
+        options.timeoutMs ?? DEFAULT_GET_PREAPPROVAL_TIMEOUT_MS,
+      );
+      let res: Response;
+      try {
+        res = await fetch(`${apiBaseUrl}/preapproval/${id}`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${config.accessToken}`,
+            "Content-Type": "application/json; charset=utf-8",
+          },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
 
       await assertOk(res, "preapproval fetch");
 

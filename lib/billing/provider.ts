@@ -45,7 +45,7 @@ export interface BillingProvider {
   createPreapproval(input: CreatePreapprovalInput): Promise<CreatePreapprovalResult>;
   // Fetches a preapproval by id so the webhook handler can read its current
   // status and map it onto the plan lifecycle.
-  getPreapproval(id: string): Promise<Preapproval>;
+  getPreapproval(id: string, options?: { timeoutMs?: number }): Promise<Preapproval>;
   // Cancels a preapproval so the provider stops charging (user-initiated cancel).
   // Idempotent: cancelling an already-cancelled preapproval succeeds.
   cancelPreapproval(id: string): Promise<void>;

@@ -70,13 +70,18 @@ async function insertBooking(opts: {
 beforeAll(async () => {
   admin = adminClient();
 
-  const { data: p } = await admin.auth.admin.createUser({
+  const { data: p, error: ownerAuthError } = await admin.auth.admin.createUser({
     email: EMAIL,
     password: PASSWORD,
     email_confirm: true,
   });
-  ownerId = p?.user?.id ?? "";
-  await admin.from("profiles").upsert({ id: ownerId, display_name: "Dona Lembrete" }, { onConflict: "id" });
+  if (ownerAuthError) throw new Error(`owner auth user: ${ownerAuthError.message}`);
+  if (!p.user?.id) throw new Error("owner auth user did not return a user id");
+  ownerId = p.user.id;
+  const { error: ownerProfileError } = await admin
+    .from("profiles")
+    .upsert({ id: ownerId, display_name: "Dona Lembrete" }, { onConflict: "id" });
+  if (ownerProfileError) throw new Error(`owner profile: ${ownerProfileError.message}`);
   businessId = await retryOnFk(async () => {
     const { data: biz, error: bizErr } = await admin
       .from("businesses")
@@ -104,13 +109,18 @@ beforeAll(async () => {
 
   // A second owner for the FREE business (a business is owned by exactly one
   // profile, so the free business needs its own owner).
-  const { data: fp } = await admin.auth.admin.createUser({
+  const { data: fp, error: freeOwnerAuthError } = await admin.auth.admin.createUser({
     email: FREE_EMAIL,
     password: PASSWORD,
     email_confirm: true,
   });
-  freeOwnerId = fp?.user?.id ?? "";
-  await admin.from("profiles").upsert({ id: freeOwnerId, display_name: "Dona Grátis" }, { onConflict: "id" });
+  if (freeOwnerAuthError) throw new Error(`free owner auth user: ${freeOwnerAuthError.message}`);
+  if (!fp.user?.id) throw new Error("free owner auth user did not return a user id");
+  freeOwnerId = fp.user.id;
+  const { error: freeOwnerProfileError } = await admin
+    .from("profiles")
+    .upsert({ id: freeOwnerId, display_name: "Dona Grátis" }, { onConflict: "id" });
+  if (freeOwnerProfileError) throw new Error(`free owner profile: ${freeOwnerProfileError.message}`);
 
   // A FREE business (default plan) whose due booking must be excluded by the gate.
   freeBusinessId = await retryOnFk(async () => {

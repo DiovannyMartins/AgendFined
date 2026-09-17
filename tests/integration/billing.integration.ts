@@ -1,7 +1,7 @@
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 import { adminClient, anonClientForUser, retryOnFk } from "./index";
 import { getSubscription } from "@/lib/billing/get-subscription";
-import { startUpgrade, type SaveSubscription } from "@/lib/billing/start-upgrade";
+import { startUpgrade, type StartUpgradeDeps } from "@/lib/billing/start-upgrade";
 import type { BillingProvider } from "@/lib/billing/provider";
 import type { BillingSubscription } from "@/lib/billing/types";
 
@@ -130,27 +130,91 @@ describe("issue #23 billing: assinatura + RLS", () => {
       getPreapproval: vi.fn(),
       cancelPreapproval: vi.fn(),
     };
-    const saveSubscription: SaveSubscription = async (input) => {
-      const { error } = await admin.from("subscriptions").insert({
-        business_id: input.businessId,
-        mp_preapproval_id: input.mpPreapprovalId,
-        plan: input.plan,
-        status: input.status,
+    const idempotencyKey = `billing-upgrade-${stamp}`;
+    const claimAttempt: StartUpgradeDeps["claimAttempt"] = async (input) => {
+      const { data, error } = await admin.rpc("claim_billing_attempt", {
+        p_business_id: input.businessId,
+        p_kind: input.kind,
+        p_idempotency_key: input.idempotencyKey,
       });
       if (error) throw new Error(error.message);
+      if (!data) throw new Error("BILLING_ATTEMPT_NOT_RETURNED");
+      return {
+        id: data.id,
+        businessId: data.business_id,
+        kind: data.kind,
+        status: data.status,
+        idempotencyKey: data.idempotency_key,
+        providerPreapprovalId: data.provider_preapproval_id,
+      };
+    };
+    const startAttempt: StartUpgradeDeps["startAttempt"] = async (attemptId, key) => {
+      const { data, error } = await admin.rpc("start_billing_attempt", {
+        p_attempt_id: attemptId,
+        p_idempotency_key: key,
+      });
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error("BILLING_ATTEMPT_NOT_RETURNED");
+      return {
+        id: data.id,
+        businessId: data.business_id,
+        kind: data.kind,
+        status: data.status,
+        idempotencyKey: data.idempotency_key,
+        providerPreapprovalId: data.provider_preapproval_id,
+      };
+    };
+    const finishAttempt = vi.fn<StartUpgradeDeps["finishAttempt"]>(async (input) => {
+      const { data, error } = await admin.rpc("finish_billing_attempt", {
+        p_attempt_id: input.attemptId,
+        p_status: input.status,
+        p_provider_preapproval_id: input.providerPreapprovalId ?? null,
+      });
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error("BILLING_ATTEMPT_NOT_RETURNED");
+      return {
+        id: data.id,
+        businessId: data.business_id,
+        kind: data.kind,
+        status: data.status,
+        idempotencyKey: data.idempotency_key,
+        providerPreapprovalId: data.provider_preapproval_id,
+      };
+    });
+    const linkAttempt: StartUpgradeDeps["linkAttempt"] = async (input) => {
+      const { data, error } = await admin.rpc("link_billing_attempt_subscription", {
+        p_attempt_id: input.attemptId,
+        p_mp_preapproval_id: input.mpPreapprovalId,
+        p_status: "pending",
+      });
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error("SUBSCRIPTION_NOT_RETURNED");
     };
 
     const result = await startUpgrade({
       business: { id: businessId, plan: "free" },
       provider,
-      saveSubscription,
+      claimAttempt,
+      startAttempt,
+      finishAttempt,
+      linkAttempt,
       backUrl: "https://app.example/dashboard/configuracoes",
+      idempotencyKey,
     });
 
     expect(result).toEqual({ ok: true, initPoint: "https://sandbox.mercadopago.com/checkout" });
     expect(provider.createPreapproval).toHaveBeenCalledWith(
-      expect.objectContaining({ plan: "pro", externalReference: businessId }),
+      expect.objectContaining({ plan: "pro" }),
     );
+
+    const preapprovalInput = vi.mocked(provider.createPreapproval).mock.calls[0][0];
+    const { data: attempt } = await admin
+      .from("billing_attempts")
+      .select("*")
+      .eq("idempotency_key", idempotencyKey)
+      .single();
+    expect(attempt).not.toBeNull();
+    expect(preapprovalInput.externalReference).toBe(attempt!.id);
 
     const owner = await anonClientForUser(EMAIL, PASSWORD);
     const { data } = await owner
@@ -162,5 +226,20 @@ describe("issue #23 billing: assinatura + RLS", () => {
       .single();
     expect(data?.status).toBe("pending");
     expect(data?.mp_preapproval_id).toBe(`mp-up-${stamp}`);
+
+    const { data: business } = await admin
+      .from("businesses")
+      .select("current_subscription_id")
+      .eq("id", businessId)
+      .single();
+    expect(business?.current_subscription_id).toBe(data?.id);
+
+    const { data: linkedAttempt } = await admin
+      .from("billing_attempts")
+      .select("status, provider_preapproval_id")
+      .eq("id", attempt!.id)
+      .single();
+    expect(linkedAttempt).toEqual({ status: "linked", provider_preapproval_id: `mp-up-${stamp}` });
+    expect(finishAttempt).not.toHaveBeenCalled();
   });
 });

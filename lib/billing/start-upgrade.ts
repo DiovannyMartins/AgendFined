@@ -8,16 +8,20 @@
 // `pro` once the preapproval is `authorized` (webhook lifecycle, issue #24) —
 // this function never touches `businesses.plan`.
 import { isProPlan } from "@/lib/plan/plan";
-import { isSubscriptionInGrace, type BillingPlan, type BillingSubscription, type SubscriptionStatus } from "./types";
+import { isSubscriptionInGrace, type BillingPlan, type BillingSubscription } from "./types";
 import type { BillingProvider } from "./provider";
 import type { FetchSubscription } from "./get-subscription";
+import { MercadoPagoAmbiguousError } from "./mercado-pago";
+import { randomUUID } from "node:crypto";
 
-export type SaveSubscription = (input: {
+export type BillingAttempt = {
+  id: string;
   businessId: string;
-  mpPreapprovalId: string;
-  plan: BillingPlan;
-  status: SubscriptionStatus;
-}) => Promise<void>;
+  kind: "initial" | "retry";
+  status: "reserved" | "creating" | "unknown" | "linked" | "failed" | "ambiguous";
+  idempotencyKey: string;
+  providerPreapprovalId: string | null;
+};
 
 export type StartUpgradeResult =
   | { ok: true; initPoint: string }
@@ -26,19 +30,45 @@ export type StartUpgradeResult =
 export interface StartUpgradeDeps {
   business: { id: string; plan: BillingPlan };
   provider: BillingProvider;
-  saveSubscription: SaveSubscription;
+  claimAttempt: (input: {
+    businessId: string;
+    kind: "initial";
+    idempotencyKey: string;
+  }) => Promise<BillingAttempt>;
+  startAttempt: (attemptId: string, idempotencyKey: string) => Promise<BillingAttempt>;
+  finishAttempt: (input: {
+    attemptId: string;
+    status: "failed" | "unknown";
+    providerPreapprovalId?: string | null;
+  }) => Promise<BillingAttempt>;
+  linkAttempt: (input: {
+    attemptId: string;
+    mpPreapprovalId: string;
+  }) => Promise<void>;
   backUrl: string;
   payerEmail?: string;
   // Where Mercado Pago POSTs subscription webhook notifications (the tunnel /
   // deployed `/api/webhooks/mercadopago` URL). Required for subscriptions.
   notificationUrl?: string;
+  idempotencyKey?: string;
   // When provided, guards against starting a second preapproval while one is
   // still pending (avoids orphaned preapprovals from double-clicking "upgrade").
   fetchSubscription?: FetchSubscription;
 }
 
 export async function startUpgrade(deps: StartUpgradeDeps): Promise<StartUpgradeResult> {
-  const { business, provider, saveSubscription, backUrl, payerEmail, notificationUrl, fetchSubscription } = deps;
+  const {
+    business,
+    provider,
+    claimAttempt,
+    startAttempt,
+    finishAttempt,
+    linkAttempt,
+    backUrl,
+    payerEmail,
+    notificationUrl,
+    fetchSubscription,
+  } = deps;
 
   let existing: BillingSubscription | null = null;
   if (fetchSubscription) {
@@ -61,34 +91,85 @@ export async function startUpgrade(deps: StartUpgradeDeps): Promise<StartUpgrade
     };
   }
 
+  const idempotencyKey = deps.idempotencyKey ?? randomUUID();
+  let attempt: BillingAttempt;
+  try {
+    attempt = await claimAttempt({ businessId: business.id, kind: "initial", idempotencyKey });
+  } catch (err) {
+    return {
+      ok: false,
+      code: "ATTEMPT_ERROR",
+      message: err instanceof Error ? err.message : "Não foi possível iniciar a tentativa de upgrade.",
+    };
+  }
+
+  if (attempt.status === "unknown" || attempt.status === "ambiguous") {
+    return {
+      ok: false,
+      code: "UPGRADE_RECONCILIATION_REQUIRED",
+      message: "Existe uma tentativa de pagamento aguardando reconciliação.",
+    };
+  }
+
+  if (attempt.idempotencyKey !== idempotencyKey || attempt.status !== "reserved") {
+    return {
+      ok: false,
+      code: "UPGRADE_IN_PROGRESS",
+      message: "Já existe uma tentativa de upgrade em andamento.",
+    };
+  }
+
+  try {
+    attempt = await startAttempt(attempt.id, idempotencyKey);
+  } catch (err) {
+    return {
+      ok: false,
+      code: "ATTEMPT_ERROR",
+      message: err instanceof Error ? err.message : "Não foi possível reservar a tentativa de upgrade.",
+    };
+  }
+
+  if (attempt.status !== "creating") {
+    return {
+      ok: false,
+      code: "UPGRADE_IN_PROGRESS",
+      message: "Já existe uma tentativa de upgrade em andamento.",
+    };
+  }
+
   let created;
   try {
     created = await provider.createPreapproval({
       plan: "pro",
-      externalReference: business.id,
+      externalReference: attempt.id,
       payerEmail,
       backUrl,
       notificationUrl,
     });
   } catch (err) {
+    const ambiguous = err instanceof MercadoPagoAmbiguousError;
+    await finishAttempt({
+      attemptId: attempt.id,
+      status: ambiguous ? "unknown" : "failed",
+    }).catch(() => undefined);
     return {
       ok: false,
-      code: "PROVIDER_ERROR",
+      code: ambiguous ? "PROVIDER_UNKNOWN" : "PROVIDER_ERROR",
       message: err instanceof Error ? err.message : "Não foi possível iniciar a assinatura.",
     };
   }
 
   try {
-    await saveSubscription({
-      businessId: business.id,
-      mpPreapprovalId: created.preapprovalId,
-      plan: "pro",
-      status: "pending",
-    });
+    await linkAttempt({ attemptId: attempt.id, mpPreapprovalId: created.preapprovalId });
   } catch (err) {
+    await finishAttempt({
+      attemptId: attempt.id,
+      status: "unknown",
+      providerPreapprovalId: created.preapprovalId,
+    }).catch(() => undefined);
     return {
       ok: false,
-      code: "SAVE_ERROR",
+      code: "SAVE_UNKNOWN",
       message: err instanceof Error ? err.message : "Não foi possível salvar a assinatura.",
     };
   }

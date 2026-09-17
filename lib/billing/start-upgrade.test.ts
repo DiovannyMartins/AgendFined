@@ -1,208 +1,106 @@
 import { describe, expect, it, vi } from "vitest";
-import { startUpgrade } from "./start-upgrade";
+import { startUpgrade, type StartUpgradeDeps } from "./start-upgrade";
+import { MercadoPagoAmbiguousError } from "./mercado-pago";
 import type { BillingProvider, CreatePreapprovalResult } from "./provider";
 
 const BUSINESS = { id: "biz_1", plan: "free" as const };
 
-function makeProvider(result: CreatePreapprovalResult) {
-  return {
-    createPreapproval: vi.fn(async () => result),
-    getPreapproval: vi.fn(),
-    cancelPreapproval: vi.fn(),
-  } satisfies BillingProvider;
+function makeProvider(result: CreatePreapprovalResult): BillingProvider {
+  return { createPreapproval: vi.fn(async () => result), getPreapproval: vi.fn(), cancelPreapproval: vi.fn() };
 }
 
-describe("startUpgrade (ADR 0008)", () => {
-  it("creates a pending preapproval and returns the init_point", async () => {
-    const provider = makeProvider({ preapprovalId: "mp_123", initPoint: "https://mp.example/checkout" });
-    const saveSubscription = vi.fn(async () => undefined);
+function makeAttempt(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "attempt_1",
+    businessId: "biz_1",
+    kind: "initial" as const,
+    status: "reserved" as const,
+    idempotencyKey: "key_1",
+    providerPreapprovalId: null,
+    ...overrides,
+  };
+}
 
-    const result = await startUpgrade({
-      business: BUSINESS,
-      provider,
-      saveSubscription,
-      backUrl: "https://app.example/dashboard/configuracoes",
-      payerEmail: "owner@example.com",
-    });
+function makeDeps(overrides: Partial<StartUpgradeDeps> = {}): StartUpgradeDeps {
+  const provider = makeProvider({ preapprovalId: "mp_123", initPoint: "https://mp.example/checkout" });
+  return {
+    business: BUSINESS,
+    provider,
+    claimAttempt: vi.fn(async () => makeAttempt()),
+    startAttempt: vi.fn(async () => makeAttempt({ status: "creating" })),
+    finishAttempt: vi.fn(async (input: { status: "failed" | "unknown" }) => makeAttempt({ status: input.status })),
+    linkAttempt: vi.fn(async () => undefined),
+    backUrl: "https://app.example/dashboard/configuracoes",
+    payerEmail: "owner@example.com",
+    idempotencyKey: "key_1",
+    ...overrides,
+  };
+}
 
+describe("startUpgrade with billing_attempts", () => {
+  it("claims, starts, creates, links, and returns the checkout", async () => {
+    const deps = makeDeps();
+    const result = await startUpgrade(deps);
     expect(result).toEqual({ ok: true, initPoint: "https://mp.example/checkout" });
-    expect(provider.createPreapproval).toHaveBeenCalledWith({
-      plan: "pro",
-      externalReference: "biz_1",
-      payerEmail: "owner@example.com",
-      backUrl: "https://app.example/dashboard/configuracoes",
-    });
-    expect(saveSubscription).toHaveBeenCalledWith({
-      businessId: "biz_1",
-      mpPreapprovalId: "mp_123",
-      plan: "pro",
-      status: "pending",
-    });
+    expect(deps.claimAttempt).toHaveBeenCalledWith({ businessId: "biz_1", kind: "initial", idempotencyKey: "key_1" });
+    expect(deps.startAttempt).toHaveBeenCalledWith("attempt_1", "key_1");
+    expect(deps.provider.createPreapproval).toHaveBeenCalledTimes(1);
+    expect(deps.linkAttempt).toHaveBeenCalledWith({ attemptId: "attempt_1", mpPreapprovalId: "mp_123" });
   });
 
-  it("persists a pending subscription for the pro plan", async () => {
-    const provider = makeProvider({ preapprovalId: "mp_456", initPoint: "https://mp.example/x" });
-    const saveSubscription = vi.fn(async () => undefined);
-
-    await startUpgrade({ business: BUSINESS, provider, saveSubscription, backUrl: "https://app.example" });
-
-    expect(saveSubscription).toHaveBeenCalledWith(
-      expect.objectContaining({ mpPreapprovalId: "mp_456", plan: "pro", status: "pending" }),
-    );
+  it("does not create when another active attempt won the claim", async () => {
+    const deps = makeDeps({ claimAttempt: vi.fn(async () => makeAttempt({ idempotencyKey: "other-key" })) });
+    const result = await startUpgrade(deps);
+    expect(result).toEqual({ ok: false, code: "UPGRADE_IN_PROGRESS", message: expect.any(String) });
+    expect(deps.provider.createPreapproval).not.toHaveBeenCalled();
   });
 
-  it("refuses to upgrade a business that is already pro", async () => {
-    const provider = makeProvider({ preapprovalId: "mp_789", initPoint: "https://mp.example/y" });
-    const saveSubscription = vi.fn(async () => undefined);
-
-    const result = await startUpgrade({
-      business: { id: "biz_1", plan: "pro" },
-      provider,
-      saveSubscription,
-      backUrl: "https://app.example",
-    });
-
-    expect(result).toEqual({ ok: false, code: "ALREADY_PRO", message: expect.any(String) });
-    expect(provider.createPreapproval).not.toHaveBeenCalled();
-    expect(saveSubscription).not.toHaveBeenCalled();
+  it.each(["unknown", "ambiguous"] as const)("does not create while attempt is %s", async (status) => {
+    const deps = makeDeps({ claimAttempt: vi.fn(async () => makeAttempt({ status })) });
+    const result = await startUpgrade(deps);
+    expect(result).toEqual({ ok: false, code: "UPGRADE_RECONCILIATION_REQUIRED", message: expect.any(String) });
+    expect(deps.provider.createPreapproval).not.toHaveBeenCalled();
   });
 
-  it("allows re-subscribing a pro business whose subscription is cancelled (grace)", async () => {
-    const provider = makeProvider({ preapprovalId: "mp_re", initPoint: "https://mp.example/r" });
-    const saveSubscription = vi.fn(async () => undefined);
-    const fetchSubscription = vi.fn(async () => ({
-      mpPreapprovalId: "mp_cancelled",
-      status: "cancelled" as const,
-      plan: "pro" as const,
-      currentPeriodStart: null,
-      currentPeriodEnd: null,
-    }));
-
-    const result = await startUpgrade({
-      business: { id: "biz_1", plan: "pro" },
-      provider,
-      saveSubscription,
-      fetchSubscription,
-      backUrl: "https://app.example",
-    });
-
-    expect(result).toEqual({ ok: true, initPoint: "https://mp.example/r" });
-    expect(provider.createPreapproval).toHaveBeenCalledWith(
-      expect.objectContaining({ plan: "pro", externalReference: "biz_1" }),
-    );
-  });
-
-  it("allows re-subscribing a pro business whose subscription is paused (grace)", async () => {
-    const provider = makeProvider({ preapprovalId: "mp_pause", initPoint: "https://mp.example/p" });
-    const saveSubscription = vi.fn(async () => undefined);
-    const fetchSubscription = vi.fn(async () => ({
-      mpPreapprovalId: "mp_paused",
-      status: "paused" as const,
-      plan: "pro" as const,
-      currentPeriodStart: null,
-      currentPeriodEnd: null,
-    }));
-
-    const result = await startUpgrade({
-      business: { id: "biz_1", plan: "pro" },
-      provider,
-      saveSubscription,
-      fetchSubscription,
-      backUrl: "https://app.example",
-    });
-
-    expect(result).toEqual({ ok: true, initPoint: "https://mp.example/p" });
-    expect(provider.createPreapproval).toHaveBeenCalled();
-  });
-
-  it("refuses to re-subscribe a pro business whose subscription is still authorized", async () => {
-    const provider = makeProvider({ preapprovalId: "mp_auth", initPoint: "https://mp.example/a" });
-    const saveSubscription = vi.fn(async () => undefined);
-    const fetchSubscription = vi.fn(async () => ({
-      mpPreapprovalId: "mp_authorized",
-      status: "authorized" as const,
-      plan: "pro" as const,
-      currentPeriodStart: null,
-      currentPeriodEnd: null,
-    }));
-
-    const result = await startUpgrade({
-      business: { id: "biz_1", plan: "pro" },
-      provider,
-      saveSubscription,
-      fetchSubscription,
-      backUrl: "https://app.example",
-    });
-
-    expect(result).toEqual({ ok: false, code: "ALREADY_PRO", message: expect.any(String) });
-    expect(provider.createPreapproval).not.toHaveBeenCalled();
-  });
-
-  it("refuses to start a second preapproval while one is pending", async () => {
-    const provider = makeProvider({ preapprovalId: "mp_999", initPoint: "https://mp.example/p" });
-    const saveSubscription = vi.fn(async () => undefined);
-    const fetchSubscription = vi.fn(async () => ({
-      mpPreapprovalId: "mp_pending",
-      status: "pending" as const,
-      plan: "pro" as const,
-      currentPeriodStart: null,
-      currentPeriodEnd: null,
-    }));
-
-    const result = await startUpgrade({
-      business: BUSINESS,
-      provider,
-      saveSubscription,
-      fetchSubscription,
-      backUrl: "https://app.example",
-    });
-
-    expect(result).toEqual({ ok: false, code: "UPGRADE_PENDING", message: expect.any(String) });
-    expect(provider.createPreapproval).not.toHaveBeenCalled();
-    expect(saveSubscription).not.toHaveBeenCalled();
-  });
-
-  it("proceeds when an existing subscription is not pending", async () => {
-    const provider = makeProvider({ preapprovalId: "mp_777", initPoint: "https://mp.example/q" });
-    const saveSubscription = vi.fn(async () => undefined);
-    const fetchSubscription = vi.fn(async () => null);
-
-    const result = await startUpgrade({
-      business: BUSINESS,
-      provider,
-      saveSubscription,
-      fetchSubscription,
-      backUrl: "https://app.example",
-    });
-
-    expect(result).toEqual({ ok: true, initPoint: "https://mp.example/q" });
-    expect(provider.createPreapproval).toHaveBeenCalled();
-  });
-
-  it("maps a provider failure to PROVIDER_ERROR and never saves", async () => {
+  it("marks a clearly rejected provider request failed", async () => {
     const provider = {
-      createPreapproval: vi.fn(async () => {
-        throw new Error("Mercado Pago preapproval failed (401)");
-      }),
-      getPreapproval: vi.fn(),
-      cancelPreapproval: vi.fn(),
+      createPreapproval: vi.fn(async () => { throw new Error("Mercado Pago preapproval failed (400)"); }),
+      getPreapproval: vi.fn(), cancelPreapproval: vi.fn(),
     } satisfies BillingProvider;
-    const saveSubscription = vi.fn(async () => undefined);
-
-    const result = await startUpgrade({ business: BUSINESS, provider, saveSubscription, backUrl: "https://app.example" });
-
-    expect(result).toEqual({ ok: false, code: "PROVIDER_ERROR", message: "Mercado Pago preapproval failed (401)" });
-    expect(saveSubscription).not.toHaveBeenCalled();
+    const deps = makeDeps({ provider });
+    const result = await startUpgrade(deps);
+    expect(result).toEqual({ ok: false, code: "PROVIDER_ERROR", message: expect.any(String) });
+    expect(deps.finishAttempt).toHaveBeenCalledWith({ attemptId: "attempt_1", status: "failed" });
   });
 
-  it("maps a save failure to SAVE_ERROR", async () => {
-    const provider = makeProvider({ preapprovalId: "mp_000", initPoint: "https://mp.example/z" });
-    const saveSubscription = vi.fn(async () => {
-      throw new Error("insert failed");
+  it("marks an ambiguous provider response unknown", async () => {
+    const provider = {
+      createPreapproval: vi.fn(async () => { throw new MercadoPagoAmbiguousError("timeout"); }),
+      getPreapproval: vi.fn(), cancelPreapproval: vi.fn(),
+    } satisfies BillingProvider;
+    const deps = makeDeps({ provider });
+    const result = await startUpgrade(deps);
+    expect(result).toEqual({ ok: false, code: "PROVIDER_UNKNOWN", message: "timeout" });
+    expect(deps.finishAttempt).toHaveBeenCalledWith({ attemptId: "attempt_1", status: "unknown" });
+    expect(deps.linkAttempt).not.toHaveBeenCalled();
+  });
+
+  it("marks local linking failure unknown and never returns a checkout", async () => {
+    const deps = makeDeps({ linkAttempt: vi.fn(async () => { throw new Error("database unavailable"); }) });
+    const result = await startUpgrade(deps);
+    expect(result).toEqual({ ok: false, code: "SAVE_UNKNOWN", message: "database unavailable" });
+    expect(deps.finishAttempt).toHaveBeenCalledWith({ attemptId: "attempt_1", status: "unknown", providerPreapprovalId: "mp_123" });
+  });
+
+  it("preserves the existing Pro/pending product rule", async () => {
+    const provider = makeProvider({ preapprovalId: "mp_ignored", initPoint: "https://mp.example/ignored" });
+    const result = await startUpgrade({
+      business: { id: "biz_1", plan: "pro" }, provider,
+      claimAttempt: vi.fn(), startAttempt: vi.fn(), finishAttempt: vi.fn(), linkAttempt: vi.fn(),
+      fetchSubscription: vi.fn(async () => ({ mpPreapprovalId: "mp_pending", status: "pending" as const, plan: "pro" as const, currentPeriodStart: null, currentPeriodEnd: null })),
+      backUrl: "https://app.example",
     });
-
-    const result = await startUpgrade({ business: BUSINESS, provider, saveSubscription, backUrl: "https://app.example" });
-
-    expect(result).toEqual({ ok: false, code: "SAVE_ERROR", message: "insert failed" });
+    expect(result).toEqual({ ok: false, code: "ALREADY_PRO", message: expect.any(String) });
+    expect(provider.createPreapproval).not.toHaveBeenCalled();
   });
 });

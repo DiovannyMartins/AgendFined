@@ -1,18 +1,11 @@
-// Retry seam for an abandoned checkout (ADR 0008). `startUpgrade` deliberately
-// blocks a second preapproval while one is `pending` (avoids orphaned
-// preapprovals from double-clicking), but that leaves the owner with no way to
-// pay if the checkout tab was closed: the `init_point` is only returned once
-// and is not stored. `retryPendingUpgrade` closes that dead-end: when the
-// current subscription is `pending`, it creates a FRESH preapproval and points
-// the pending row at the new id, then returns the new `init_point`.
-// The old pending preapproval is cancelled before the replacement is created;
-// otherwise repeated retries can leave multiple active checkout authorizations.
-// The provider, the read and the replace are injectable so this seam is
-// testable without Mercado Pago or a database. Never touches `businesses.plan`.
+// Retry flow backed by billing_attempts. The old pending subscription is
+// never overwritten: a retry creates a new subscription row and switches the
+// current pointer only after the provider object is durably linked.
+import { randomUUID } from "node:crypto";
 import type { BillingProvider } from "./provider";
+import { MercadoPagoAmbiguousError } from "./mercado-pago";
+import type { BillingAttempt } from "./start-upgrade";
 import type { FetchSubscription } from "./get-subscription";
-
-export type ReplaceSubscription = (oldMpPreapprovalId: string, input: { mpPreapprovalId: string }) => Promise<void>;
 
 export type RetryUpgradeResult = { ok: true; initPoint: string } | { ok: false; code: string; message: string };
 
@@ -20,64 +13,112 @@ export interface RetryUpgradeDeps {
   business: { id: string };
   provider: BillingProvider;
   fetchSubscription: FetchSubscription;
-  replaceSubscription: ReplaceSubscription;
+  claimAttempt: (input: {
+    businessId: string;
+    kind: "retry";
+    expectedSubscriptionId: string;
+    idempotencyKey: string;
+  }) => Promise<BillingAttempt>;
+  startRetry: (input: {
+    attemptId: string;
+    idempotencyKey: string;
+    expectedSubscriptionId: string;
+    expectedMpPreapprovalId: string;
+  }) => Promise<BillingAttempt>;
+  finishAttempt: (input: {
+    attemptId: string;
+    status: "failed" | "unknown";
+    providerPreapprovalId?: string | null;
+  }) => Promise<BillingAttempt>;
+  linkAttempt: (input: { attemptId: string; mpPreapprovalId: string }) => Promise<void>;
   backUrl: string;
   payerEmail?: string;
-  // Where Mercado Pago POSTs subscription webhook notifications (the tunnel /
-  // deployed `/api/webhooks/mercadopago` URL). Required for subscriptions.
   notificationUrl?: string;
+  idempotencyKey?: string;
 }
 
 export async function retryPendingUpgrade(deps: RetryUpgradeDeps): Promise<RetryUpgradeResult> {
-  const { business, provider, fetchSubscription, replaceSubscription, backUrl, payerEmail, notificationUrl } = deps;
-
-  const existing = await fetchSubscription(business.id);
+  const existing = await deps.fetchSubscription(deps.business.id);
   if (!existing || existing.status !== "pending") {
-    return {
-      ok: false,
-      code: "NO_PENDING_SUBSCRIPTION",
-      message: "Você não tem um pagamento pendente para concluir.",
-    };
+    return { ok: false, code: "NO_PENDING_SUBSCRIPTION", message: "Você não tem um pagamento pendente para concluir." };
+  }
+  if (!existing.subscriptionId) {
+    return { ok: false, code: "SUBSCRIPTION_ID_UNAVAILABLE", message: "Não foi possível identificar a assinatura pendente." };
   }
 
-  // Do not create another provider subscription while the previous checkout is
-  // still alive. If cancellation fails, keep the existing row and let the user
-  // retry rather than orphaning another preapproval.
+  const idempotencyKey = deps.idempotencyKey ?? randomUUID();
+  let attempt: BillingAttempt;
   try {
-    await provider.cancelPreapproval(existing.mpPreapprovalId);
+    attempt = await deps.claimAttempt({
+      businessId: deps.business.id,
+      kind: "retry",
+      expectedSubscriptionId: existing.subscriptionId,
+      idempotencyKey,
+    });
   } catch (err) {
-    return {
-      ok: false,
-      code: "PROVIDER_ERROR",
-      message: err instanceof Error ? err.message : "Não foi possível invalidar o checkout anterior.",
-    };
+    return { ok: false, code: "ATTEMPT_ERROR", message: err instanceof Error ? err.message : "Não foi possível iniciar o retry." };
+  }
+
+  if (attempt.kind !== "retry" || attempt.idempotencyKey !== idempotencyKey) {
+    return { ok: false, code: "UPGRADE_IN_PROGRESS", message: "Já existe uma operação de billing em andamento." };
+  }
+  if (attempt.status === "unknown" || attempt.status === "ambiguous") {
+    return { ok: false, code: "UPGRADE_RECONCILIATION_REQUIRED", message: "Existe uma tentativa aguardando reconciliação." };
+  }
+  if (attempt.status !== "reserved") {
+    return { ok: false, code: "UPGRADE_IN_PROGRESS", message: "O retry já está em andamento." };
+  }
+
+  try {
+    attempt = await deps.startRetry({
+      attemptId: attempt.id,
+      idempotencyKey,
+      expectedSubscriptionId: existing.subscriptionId,
+      expectedMpPreapprovalId: existing.mpPreapprovalId,
+    });
+  } catch (err) {
+    return { ok: false, code: "RETRY_SUBSCRIPTION_CONFLICT", message: err instanceof Error ? err.message : "A assinatura pendente foi alterada." };
+  }
+  if (attempt.status !== "creating") {
+    return { ok: false, code: "UPGRADE_IN_PROGRESS", message: "O retry já está em andamento." };
   }
 
   let created;
   try {
-    created = await provider.createPreapproval({
+    created = await deps.provider.createPreapproval({
       plan: "pro",
-      externalReference: business.id,
-      payerEmail,
-      backUrl,
-      notificationUrl,
+      externalReference: attempt.id,
+      payerEmail: deps.payerEmail,
+      backUrl: deps.backUrl,
+      notificationUrl: deps.notificationUrl,
     });
   } catch (err) {
+    const ambiguous = err instanceof MercadoPagoAmbiguousError;
+    await deps.finishAttempt({ attemptId: attempt.id, status: ambiguous ? "unknown" : "failed" }).catch(() => undefined);
     return {
       ok: false,
-      code: "PROVIDER_ERROR",
+      code: ambiguous ? "PROVIDER_UNKNOWN" : "PROVIDER_ERROR",
       message: err instanceof Error ? err.message : "Não foi possível gerar um novo link de pagamento.",
     };
   }
 
   try {
-    await replaceSubscription(existing.mpPreapprovalId, { mpPreapprovalId: created.preapprovalId });
+    await deps.linkAttempt({ attemptId: attempt.id, mpPreapprovalId: created.preapprovalId });
   } catch (err) {
-    return {
-      ok: false,
-      code: "SAVE_ERROR",
-      message: err instanceof Error ? err.message : "Não foi possível atualizar a assinatura.",
-    };
+    await deps.finishAttempt({
+      attemptId: attempt.id,
+      status: "unknown",
+      providerPreapprovalId: created.preapprovalId,
+    }).catch(() => undefined);
+    return { ok: false, code: "SAVE_UNKNOWN", message: err instanceof Error ? err.message : "Não foi possível salvar a nova assinatura." };
+  }
+
+  // Cancellation happens only after the replacement is locally linked. A
+  // failure here is observable and does not trigger another provider create.
+  try {
+    await deps.provider.cancelPreapproval(existing.mpPreapprovalId);
+  } catch (err) {
+    return { ok: false, code: "OLD_SUBSCRIPTION_CANCEL_ERROR", message: err instanceof Error ? err.message : "A nova assinatura foi vinculada, mas a anterior não foi cancelada." };
   }
 
   return { ok: true, initPoint: created.initPoint };

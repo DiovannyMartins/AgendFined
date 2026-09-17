@@ -28,6 +28,7 @@ export interface GetSubscriptionResult {
 // row always represents the paid (Pro) plan, so the row's `plan` is carried
 // through as-is (it is `pro`).
 function mapRow(row: {
+  id: string;
   mp_preapproval_id: string;
   status: SubscriptionStatus;
   plan: BillingPlan;
@@ -36,6 +37,7 @@ function mapRow(row: {
   grace_period_end?: string | null;
 }): BillingSubscription {
   return {
+    subscriptionId: row.id,
     mpPreapprovalId: row.mp_preapproval_id,
     status: row.status,
     plan: row.plan,

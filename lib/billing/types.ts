@@ -15,6 +15,7 @@ export type SubscriptionStatus = "pending" | "authorized" | "paused" | "cancelle
 // the UI never leaks the database column names. `gracePeriodEnd` is optional to
 // keep existing callers compiling; new reads populate it from the row.
 export interface BillingSubscription {
+  subscriptionId?: string;
   mpPreapprovalId: string;
   status: SubscriptionStatus;
   plan: BillingPlan;

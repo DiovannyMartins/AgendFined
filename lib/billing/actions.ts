@@ -8,7 +8,6 @@ import { createMercadoPagoProvider } from "./mercado-pago";
 import { fetchCurrentSubscription } from "./get-subscription";
 import {
   startUpgrade as buildStartUpgrade,
-  type SaveSubscription,
   type StartUpgradeResult,
 } from "./start-upgrade";
 import {
@@ -19,21 +18,6 @@ import {
   retryPendingUpgrade as buildRetryPendingUpgrade,
   type RetryUpgradeResult,
 } from "./retry-upgrade";
-
-// Writes the new subscription row. The owner RLS policy only allows SELECT on
-// `subscriptions`, so the server action uses the service-role client (which
-// bypasses RLS) to persist the preapproval the webhook (issue #24) will later
-// authorize.
-const saveSubscriptionViaAdmin: SaveSubscription = async (input) => {
-  const admin = createAdminClient();
-  const { error } = await admin.from("subscriptions").insert({
-    business_id: input.businessId,
-    mp_preapproval_id: input.mpPreapprovalId,
-    plan: input.plan,
-    status: input.status,
-  });
-  if (error) throw new Error(error.message);
-};
 
 // Server action called by the "Fazer upgrade" button. Returns the Mercado Pago
 // `init_point` so the client can redirect the payer to the checkout (sandbox in
@@ -66,7 +50,68 @@ export async function startUpgrade(): Promise<StartUpgradeResult> {
   return buildStartUpgrade({
     business: { id: business.id, plan: business.plan },
     provider,
-    saveSubscription: saveSubscriptionViaAdmin,
+    claimAttempt: async (input) => {
+      const admin = createAdminClient();
+      const { data, error } = await admin.rpc("claim_billing_attempt", {
+        p_business_id: input.businessId,
+        p_kind: input.kind,
+        p_idempotency_key: input.idempotencyKey,
+      });
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error("BILLING_ATTEMPT_NOT_RETURNED");
+      return {
+        id: data.id,
+        businessId: data.business_id,
+        kind: data.kind,
+        status: data.status,
+        idempotencyKey: data.idempotency_key,
+        providerPreapprovalId: data.provider_preapproval_id,
+      };
+    },
+    startAttempt: async (attemptId, idempotencyKey) => {
+      const admin = createAdminClient();
+      const { data, error } = await admin.rpc("start_billing_attempt", {
+        p_attempt_id: attemptId,
+        p_idempotency_key: idempotencyKey,
+      });
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error("BILLING_ATTEMPT_NOT_RETURNED");
+      return {
+        id: data.id,
+        businessId: data.business_id,
+        kind: data.kind,
+        status: data.status,
+        idempotencyKey: data.idempotency_key,
+        providerPreapprovalId: data.provider_preapproval_id,
+      };
+    },
+    finishAttempt: async (input) => {
+      const admin = createAdminClient();
+      const { data, error } = await admin.rpc("finish_billing_attempt", {
+        p_attempt_id: input.attemptId,
+        p_status: input.status,
+        p_provider_preapproval_id: input.providerPreapprovalId ?? null,
+      });
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error("BILLING_ATTEMPT_NOT_RETURNED");
+      return {
+        id: data.id,
+        businessId: data.business_id,
+        kind: data.kind,
+        status: data.status,
+        idempotencyKey: data.idempotency_key,
+        providerPreapprovalId: data.provider_preapproval_id,
+      };
+    },
+    linkAttempt: async ({ attemptId, mpPreapprovalId }) => {
+      const admin = createAdminClient();
+      const { error } = await admin.rpc("link_billing_attempt_subscription", {
+        p_attempt_id: attemptId,
+        p_mp_preapproval_id: mpPreapprovalId,
+        p_status: "pending",
+      });
+      if (error) throw new Error(error.message);
+    },
     fetchSubscription: fetchCurrentSubscription,
     backUrl,
     payerEmail: user?.email,
@@ -109,12 +154,44 @@ export async function retryUpgrade(): Promise<RetryUpgradeResult> {
     business: { id: business.id },
     provider,
     fetchSubscription: fetchCurrentSubscription,
-    replaceSubscription: async (oldMpPreapprovalId, input) => {
-      const { error } = await admin
-        .from("subscriptions")
-        .update({ mp_preapproval_id: input.mpPreapprovalId })
-        .eq("business_id", business.id)
-        .eq("mp_preapproval_id", oldMpPreapprovalId);
+    claimAttempt: async (input) => {
+      const { data, error } = await admin.rpc("claim_billing_attempt", {
+        p_business_id: input.businessId,
+        p_kind: input.kind,
+        p_expected_subscription_id: input.expectedSubscriptionId,
+        p_idempotency_key: input.idempotencyKey,
+      });
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error("BILLING_ATTEMPT_NOT_RETURNED");
+      return { id: data.id, businessId: data.business_id, kind: data.kind, status: data.status, idempotencyKey: data.idempotency_key, providerPreapprovalId: data.provider_preapproval_id };
+    },
+    startRetry: async (input) => {
+      const { data, error } = await admin.rpc("start_billing_retry", {
+        p_attempt_id: input.attemptId,
+        p_idempotency_key: input.idempotencyKey,
+        p_expected_subscription_id: input.expectedSubscriptionId,
+        p_expected_mp_preapproval_id: input.expectedMpPreapprovalId,
+      });
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error("BILLING_ATTEMPT_NOT_RETURNED");
+      return { id: data.id, businessId: data.business_id, kind: data.kind, status: data.status, idempotencyKey: data.idempotency_key, providerPreapprovalId: data.provider_preapproval_id };
+    },
+    finishAttempt: async (input) => {
+      const { data, error } = await admin.rpc("finish_billing_attempt", {
+        p_attempt_id: input.attemptId,
+        p_status: input.status,
+        p_provider_preapproval_id: input.providerPreapprovalId ?? null,
+      });
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error("BILLING_ATTEMPT_NOT_RETURNED");
+      return { id: data.id, businessId: data.business_id, kind: data.kind, status: data.status, idempotencyKey: data.idempotency_key, providerPreapprovalId: data.provider_preapproval_id };
+    },
+    linkAttempt: async (input) => {
+      const { error } = await admin.rpc("link_billing_attempt_subscription", {
+        p_attempt_id: input.attemptId,
+        p_mp_preapproval_id: input.mpPreapprovalId,
+        p_status: "pending",
+      });
       if (error) throw new Error(error.message);
     },
     backUrl,

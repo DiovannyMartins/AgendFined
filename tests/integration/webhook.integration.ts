@@ -80,12 +80,26 @@ beforeAll(async () => {
     return biz!.id;
   });
 
-  await admin.from("subscriptions").insert({
+  const { data: subscription, error: subscriptionError } = await admin
+    .from("subscriptions")
+    .insert({
     business_id: businessId,
     mp_preapproval_id: MP_ID,
     plan: "pro",
     status: "pending",
-  });
+    })
+    .select("id")
+    .single();
+  if (subscriptionError) throw new Error(`subscription insert: ${subscriptionError.message}`);
+  if (!subscription) throw new Error("subscription insert did not return an id");
+
+  const { error: currentSubscriptionError } = await admin
+    .from("businesses")
+    .update({ current_subscription_id: subscription.id })
+    .eq("id", businessId);
+  if (currentSubscriptionError) {
+    throw new Error(`current subscription update: ${currentSubscriptionError.message}`);
+  }
 });
 
 afterAll(async () => {

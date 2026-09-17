@@ -194,6 +194,7 @@ export type Database = {
         Row: {
           booking_window_days: number
           created_at: string
+          current_subscription_id: string | null
           description: string | null
           id: string
           is_active: boolean
@@ -209,6 +210,7 @@ export type Database = {
         Insert: {
           booking_window_days?: number
           created_at?: string
+          current_subscription_id?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
@@ -224,6 +226,7 @@ export type Database = {
         Update: {
           booking_window_days?: number
           created_at?: string
+          current_subscription_id?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
@@ -396,6 +399,66 @@ export type Database = {
           },
         ]
       }
+      billing_attempts: {
+        Row: {
+          business_id: string
+          claimed_at: string | null
+          created_at: string
+          expires_at: string | null
+          expected_subscription_id: string | null
+          id: string
+          idempotency_key: string
+          kind: Database["public"]["Enums"]["billing_attempt_kind"]
+          provider_preapproval_id: string | null
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["billing_attempt_status"]
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          claimed_at?: string | null
+          created_at?: string
+          expires_at?: string | null
+          expected_subscription_id?: string | null
+          id?: string
+          idempotency_key: string
+          kind: Database["public"]["Enums"]["billing_attempt_kind"]
+          provider_preapproval_id?: string | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["billing_attempt_status"]
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          claimed_at?: string | null
+          created_at?: string
+          expires_at?: string | null
+          expected_subscription_id?: string | null
+          id?: string
+          idempotency_key?: string
+          kind?: Database["public"]["Enums"]["billing_attempt_kind"]
+          provider_preapproval_id?: string | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["billing_attempt_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_attempts_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_attempts_expected_subscription_id_fkey"
+            columns: ["expected_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       waitlist_entries: {
         Row: {
           business_id: string
@@ -555,6 +618,95 @@ export type Database = {
         }
       }
       downgrade_expired_subscriptions: { Args: never; Returns: number }
+      claim_billing_attempt: {
+        Args: {
+          p_business_id: string
+          p_expected_subscription_id?: string
+          p_idempotency_key?: string
+          p_kind: Database["public"]["Enums"]["billing_attempt_kind"]
+        }
+        Returns: Database["public"]["Tables"]["billing_attempts"]["Row"]
+      }
+      apply_subscription_snapshot: {
+        Args: {
+          p_business_id: string
+          p_current_period_end?: string | null
+          p_current_period_start?: string | null
+          p_expected_current_subscription_id?: string | null
+          p_grace_period_end?: string | null
+          p_make_current?: boolean
+          p_mp_preapproval_id: string
+          p_status: Database["public"]["Enums"]["subscription_status"]
+          p_subscription_id: string
+        }
+        Returns: {
+          business_id: string
+          effective_grace_period_end: string | null
+          effective_plan: Database["public"]["Enums"]["business_plan"]
+          is_current: boolean
+          subscription_id: string
+          subscription_status: Database["public"]["Enums"]["subscription_status"]
+        }[]
+      }
+      start_billing_attempt: {
+        Args: { p_attempt_id: string; p_idempotency_key: string }
+        Returns: Database["public"]["Tables"]["billing_attempts"]["Row"]
+      }
+      finish_billing_attempt: {
+        Args: {
+          p_attempt_id: string
+          p_provider_preapproval_id?: string | null
+          p_status: Database["public"]["Enums"]["billing_attempt_status"]
+        }
+        Returns: Database["public"]["Tables"]["billing_attempts"]["Row"]
+      }
+      link_billing_attempt_subscription: {
+        Args: {
+          p_attempt_id: string
+          p_mp_preapproval_id: string
+          p_status?: Database["public"]["Enums"]["subscription_status"]
+        }
+        Returns: Database["public"]["Tables"]["subscriptions"]["Row"]
+      }
+      start_billing_retry: {
+        Args: {
+          p_attempt_id: string
+          p_expected_mp_preapproval_id: string
+          p_expected_subscription_id: string
+          p_idempotency_key: string
+        }
+        Returns: Database["public"]["Tables"]["billing_attempts"]["Row"]
+      }
+      claim_billing_reconciliation: {
+        Args: { p_claim_token: string; p_lease_seconds?: number; p_resource_key: string }
+        Returns: boolean
+      }
+      release_billing_reconciliation: {
+        Args: { p_claim_token: string; p_resource_key: string }
+        Returns: boolean
+      }
+      reconcile_billing_attempt_subscription: {
+        Args: {
+          p_attempt_id: string
+          p_current_period_end?: string | null
+          p_current_period_start?: string | null
+          p_grace_period_end?: string | null
+          p_mp_preapproval_id: string
+          p_status: Database["public"]["Enums"]["subscription_status"]
+          p_claim_token?: string | null
+        }
+        Returns: Database["public"]["Tables"]["subscriptions"]["Row"]
+      }
+      mark_billing_attempt_reconciliation: {
+        Args: {
+          p_attempt_id: string
+          p_claim_token: string
+          p_expected_status: Database["public"]["Enums"]["billing_attempt_status"]
+          p_new_status: Database["public"]["Enums"]["billing_attempt_status"]
+          p_provider_preapproval_id?: string | null
+        }
+        Returns: Database["public"]["Tables"]["billing_attempts"]["Row"]
+      }
       generate_public_code: { Args: never; Returns: string }
       get_booking_by_public_code: {
         Args: { p_code: string }
@@ -650,6 +802,8 @@ export type Database = {
     }
     Enums: {
       booking_status: "confirmed" | "completed" | "cancelled" | "no_show"
+      billing_attempt_kind: "initial" | "retry"
+      billing_attempt_status: "reserved" | "creating" | "unknown" | "linked" | "failed" | "ambiguous"
       business_plan: "free" | "pro"
       subscription_status: "pending" | "authorized" | "paused" | "cancelled"
     }
@@ -780,6 +934,8 @@ export const Constants = {
   public: {
     Enums: {
       booking_status: ["confirmed", "completed", "cancelled", "no_show"],
+      billing_attempt_kind: ["initial", "retry"],
+      billing_attempt_status: ["reserved", "creating", "unknown", "linked", "failed", "ambiguous"],
       business_plan: ["free", "pro"],
       subscription_status: ["pending", "authorized", "paused", "cancelled"],
     },

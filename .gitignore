@@ -63,3 +63,4 @@ docs/agents/
 
 # product spec (kept local, not committed)
 documento-projeto.md
+.env*

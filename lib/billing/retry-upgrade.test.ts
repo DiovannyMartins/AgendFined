@@ -37,6 +37,7 @@ describe("retryPendingUpgrade with billing_attempts", () => {
     const d = deps({ startRetry: vi.fn(async () => { throw new Error("RETRY_SUBSCRIPTION_CONFLICT"); }) });
     const result = await retryPendingUpgrade(d);
     expect(result).toEqual({ ok: false, code: "RETRY_SUBSCRIPTION_CONFLICT", message: expect.any(String) });
+    expect(d.finishAttempt).toHaveBeenCalledWith({ attemptId: "attempt_retry", status: "failed" });
     expect(d.provider.createPreapproval).not.toHaveBeenCalled();
   });
 

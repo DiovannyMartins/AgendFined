@@ -77,6 +77,10 @@ export async function retryPendingUpgrade(deps: RetryUpgradeDeps): Promise<Retry
       expectedMpPreapprovalId: existing.mpPreapprovalId,
     });
   } catch (err) {
+    // The reservation is only useful while the expected pending subscription
+    // still exists. If the CAS rejects it, release the reservation so a stale
+    // retry cannot strand the business in "billing in progress" forever.
+    await deps.finishAttempt({ attemptId: attempt.id, status: "failed" }).catch(() => undefined);
     return { ok: false, code: "RETRY_SUBSCRIPTION_CONFLICT", message: err instanceof Error ? err.message : "A assinatura pendente foi alterada." };
   }
   if (attempt.status !== "creating") {

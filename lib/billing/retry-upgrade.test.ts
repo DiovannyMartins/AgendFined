@@ -16,14 +16,14 @@ function deps(overrides: Partial<RetryUpgradeDeps> = {}): RetryUpgradeDeps {
 }
 
 describe("retryPendingUpgrade with billing_attempts", () => {
-  it("claims, CAS-validates, creates, links, then cancels the old provider subscription", async () => {
+  it("claims, CAS-validates, creates, and links without cancelling before payment", async () => {
     const d = deps(); const result = await retryPendingUpgrade(d);
     expect(result).toEqual({ ok: true, initPoint: "https://mp.example/new" });
     expect(d.claimAttempt).toHaveBeenCalledWith({ businessId: "biz_1", kind: "retry", expectedSubscriptionId: "sub_old", idempotencyKey: "key" });
     expect(d.startRetry).toHaveBeenCalledWith({ attemptId: "attempt_retry", idempotencyKey: "key", expectedSubscriptionId: "sub_old", expectedMpPreapprovalId: "mp_old" });
     expect(d.provider.createPreapproval).toHaveBeenCalledTimes(1);
     expect(d.linkAttempt).toHaveBeenCalledWith({ attemptId: "attempt_retry", mpPreapprovalId: "mp_new" });
-    expect(d.provider.cancelPreapproval).toHaveBeenCalledWith("mp_old");
+    expect(d.provider.cancelPreapproval).not.toHaveBeenCalled();
   });
 
   it.each(["unknown", "ambiguous"] as const)("blocks when retry attempt is %s", async (status) => {

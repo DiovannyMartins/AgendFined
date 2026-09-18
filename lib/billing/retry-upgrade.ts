@@ -1,6 +1,10 @@
 // Retry flow backed by billing_attempts. The old pending subscription is
 // never overwritten: a retry creates a new subscription row and switches the
-// current pointer only after the provider object is durably linked.
+// current pointer only after the provider object is durably linked. The old
+// provider preapproval is intentionally not cancelled here: the new checkout
+// is still pending, and cancelling it before payment makes Mercado Pago send a
+// misleading cancellation e-mail. Provider cleanup must happen only after a
+// replacement is authorized, with webhook/reconciliation state available.
 import { randomUUID } from "node:crypto";
 import type { BillingProvider } from "./provider";
 import { MercadoPagoAmbiguousError } from "./mercado-pago";
@@ -115,14 +119,6 @@ export async function retryPendingUpgrade(deps: RetryUpgradeDeps): Promise<Retry
       providerPreapprovalId: created.preapprovalId,
     }).catch(() => undefined);
     return { ok: false, code: "SAVE_UNKNOWN", message: err instanceof Error ? err.message : "Não foi possível salvar a nova assinatura." };
-  }
-
-  // Cancellation happens only after the replacement is locally linked. A
-  // failure here is observable and does not trigger another provider create.
-  try {
-    await deps.provider.cancelPreapproval(existing.mpPreapprovalId);
-  } catch (err) {
-    return { ok: false, code: "OLD_SUBSCRIPTION_CANCEL_ERROR", message: err instanceof Error ? err.message : "A nova assinatura foi vinculada, mas a anterior não foi cancelada." };
   }
 
   return { ok: true, initPoint: created.initPoint };

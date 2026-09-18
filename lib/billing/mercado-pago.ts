@@ -79,6 +79,10 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
               transaction_amount: terms.amount,
               currency_id: "BRL",
             },
+            // The checkout collects the payment method after this request.
+            // Mercado Pago requires an explicit pending status for a
+            // preapproval created without a card_token_id.
+            status: "pending",
             back_url: input.backUrl,
             external_reference: input.externalReference,
             ...(input.payerEmail ? { payer_email: input.payerEmail } : {}),

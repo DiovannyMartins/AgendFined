@@ -46,6 +46,7 @@ describe("createMercadoPagoProvider", () => {
       transaction_amount: 1,
       currency_id: "BRL",
     });
+    expect(body.status).toBe("pending");
     expect(body.external_reference).toBe("biz_1");
     expect(body.payer_email).toBe("owner@example.com");
     expect(body.back_url).toBe("https://app.example/dashboard/configuracoes");

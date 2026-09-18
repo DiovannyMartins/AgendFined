@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,18 +14,10 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { upsertBusiness, type ActionResultState } from "@/lib/business/actions";
 import { businessFormSchema, type BusinessFormValues } from "@/lib/validation/schemas";
 
-const SLOT_INTERVALS: Record<string, string> = { "15": "15 min", "30": "30 min", "60": "60 min" };
 const INITIAL: ActionResultState = { ok: true, data: undefined };
 
 export function BusinessForm({
@@ -42,7 +34,6 @@ export function BusinessForm({
 
   const {
     register,
-    control,
     handleSubmit,
     formState: { errors },
   } = useForm<BusinessFormValues>({
@@ -133,22 +124,15 @@ export function BusinessForm({
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="slotIntervalMinutes">Intervalo (min)</Label>
-              <Controller
-                control={control}
-                name="slotIntervalMinutes"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange} items={SLOT_INTERVALS}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="15">15 min</SelectItem>
-                      <SelectItem value="30">30 min</SelectItem>
-                      <SelectItem value="60">60 min</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
+              <Input
+                id="slotIntervalMinutes"
+                type="number"
+                min={1}
+                max={1440}
+                step={1}
+                {...register("slotIntervalMinutes")}
               />
+              <p className="text-xs text-muted-foreground">Informe qualquer valor inteiro entre 1 e 1440 minutos.</p>
               {(errors.slotIntervalMinutes || fieldErrors.slotIntervalMinutes) && (
                 <p className="text-sm text-destructive">
                   {errors.slotIntervalMinutes?.message ?? fieldErrors.slotIntervalMinutes?.[0]}

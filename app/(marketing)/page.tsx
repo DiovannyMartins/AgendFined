@@ -254,6 +254,25 @@ export default function MarketingHome() {
       {/* Planos */}
       <Plans />
 
+      {/* Sobre */}
+      <section id="sobre" className="border-y border-border bg-muted/30">
+        <div className="mx-auto w-full max-w-3xl px-4 py-14 text-center lg:px-6 md:py-20">
+          <Reveal>
+            <Badge variant="secondary" className="mb-4 rounded-full px-3.5 text-sm">
+              Sobre o AgendFined
+            </Badge>
+            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+              Mais tempo para cuidar do seu negócio
+            </h2>
+            <p className="mt-4 text-muted-foreground">
+              O AgendFined ajuda profissionais e pequenos negócios a organizar a
+              agenda, receber reservas online e oferecer uma experiência simples
+              para seus clientes.
+            </p>
+          </Reveal>
+        </div>
+      </section>
+
       {/* FAQ */}
       <section id="faq" className="mx-auto w-full max-w-3xl px-4 py-14 lg:px-6 md:py-20">
         <Reveal>

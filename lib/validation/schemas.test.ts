@@ -31,8 +31,13 @@ describe("businessSchema", () => {
     expect(businessSchema.safeParse({ ...valid, slug: "a--b" }).success).toBe(false);
   });
 
-  it("rejects non-allowed slot interval", () => {
-    expect(businessSchema.safeParse({ ...valid, slotIntervalMinutes: 45 }).success).toBe(false);
+  it("accepts a custom slot interval", () => {
+    expect(businessSchema.safeParse({ ...valid, slotIntervalMinutes: 45 }).success).toBe(true);
+  });
+
+  it("rejects zero and intervals longer than one day", () => {
+    expect(businessSchema.safeParse({ ...valid, slotIntervalMinutes: 0 }).success).toBe(false);
+    expect(businessSchema.safeParse({ ...valid, slotIntervalMinutes: 1441 }).success).toBe(false);
   });
 });
 

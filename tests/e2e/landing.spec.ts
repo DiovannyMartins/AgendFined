@@ -27,6 +27,15 @@ test("landing shows the two plans with price and privileges", async ({ page }) =
   await expect(proCta).toHaveAttribute("href", "/cadastro");
 });
 
+test("landing footer Sobre link points to an existing section", async ({ page }) => {
+  await page.goto("/");
+  const aboutLink = page.getByRole("link", { name: "Sobre", exact: true });
+  await expect(aboutLink).toHaveAttribute("href", "/#sobre");
+  await aboutLink.click();
+  await expect(page).toHaveURL(/\/#sobre$/);
+  await expect(page.locator("#sobre")).toBeVisible();
+});
+
 test("auth and legal pages render", async ({ page }) => {
   await page.goto("/login");
   await expect(page.getByText("Acesse seu painel do AgendFined.")).toBeVisible();

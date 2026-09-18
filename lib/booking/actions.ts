@@ -141,6 +141,19 @@ export async function consultBooking(
 ): Promise<ConsultState> {
   const code = String(formData.get("code") ?? "");
   const turnstileToken = String(formData.get("cfTurnstileToken") ?? "");
+
+  // Validate the user input before running the anti-bot gate. Otherwise a
+  // malformed code is reported as a Turnstile failure, hiding the actionable
+  // validation message and making the consultation flow look broken.
+  const parsedCode = publicCodeSchema.safeParse(code);
+  if (!parsedCode.success) {
+    return {
+      status: "error",
+      code: "INVALID_CODE",
+      message: "Informe um código de reserva válido.",
+    };
+  }
+
   const gate = await verifyTurnstile(turnstileToken || undefined);
   if (!gate.ok) {
     return { status: "error", code: "CAPTCHA", message: "Verificação humana falhou. Tente novamente." };
@@ -171,7 +184,7 @@ export async function consultBooking(
       const { data, error } = await supabase.rpc("get_booking_by_public_code", { p_code: c });
       return { data: data?.[0] ?? null, error };
     },
-    code,
+    parsedCode.data,
   );
   return toConsultState(result);
 }

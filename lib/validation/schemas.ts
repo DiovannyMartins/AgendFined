@@ -23,7 +23,7 @@ export const businessSchema = z.object({
     .max(50)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug inválido: apenas letras minúsculas, números e hífen."),
   phone: z.string().trim().min(8).max(20),
-  slotIntervalMinutes: z.union([z.literal(15), z.literal(30), z.literal(60)], { error: "Intervalo deve ser 15, 30 ou 60." }),
+  slotIntervalMinutes: z.number().int().min(1, "O intervalo deve ser de pelo menos 1 minuto.").max(1440, "O intervalo não pode passar de 1440 minutos."),
   minNoticeMinutes: z.number().int().min(0).max(10080),
   bookingWindowDays: z.number().int().min(1).max(180),
   // nullish: accepts "", null (empty in the form maps to null server-side) and
@@ -43,7 +43,10 @@ export const businessFormSchema = z.object({
     .max(50)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug inválido: apenas letras minúsculas, números e hífen."),
   phone: z.string().trim().min(8).max(20),
-  slotIntervalMinutes: z.string().regex(/^(15|30|60)$/, "Intervalo deve ser 15, 30 ou 60."),
+  slotIntervalMinutes: z
+    .string()
+    .regex(/^\d+$/, "Informe um número inteiro de minutos.")
+    .refine((value) => Number(value) >= 1 && Number(value) <= 1440, "Use um intervalo entre 1 e 1440 minutos."),
   minNoticeMinutes: z.number().int().min(0).max(10080),
   bookingWindowDays: z.number().int().min(1).max(180),
   description: z.string().trim().max(500).nullish(),

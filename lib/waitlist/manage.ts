@@ -21,6 +21,8 @@ export type ManageWaitlistEntry = {
   customer_email: string | null;
   status: WaitlistStatus;
   created_at: string;
+  priority_score?: number;
+  priority_confidence?: number;
 };
 
 export type WaitlistManagementBusiness = GatedBusiness;

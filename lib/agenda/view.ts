@@ -17,6 +17,10 @@ export interface AgendaBooking {
   // Present on the full DB rows the agenda list renders; absent on filtered views.
   public_code?: string;
   cancel_reason?: string | null;
+  cancel_reason_category?: string | null;
+  customer_note?: string | null;
+  customer_note_category?: string | null;
+  customer_note_requires_follow_up?: boolean;
 }
 
 export interface AgendaFilters {

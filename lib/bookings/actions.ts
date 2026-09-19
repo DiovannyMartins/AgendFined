@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { createClient } from "@/lib/supabase/server";
 import { canTransition, type BookingStatus } from "@/lib/bookings/transitions";
+import { classifyCancellationReason } from "@/lib/typesafe/judgments";
 
 export async function updateBookingStatus(
   _prev: { ok: boolean; message?: string },
@@ -47,6 +48,17 @@ export async function updateBookingStatus(
     .eq("business_id", business.id);
 
   if (error) return { ok: false, message: "Não foi possível atualizar a reserva." };
+
+  if (nextStatus === "cancelled" && cancelReason) {
+    const judgment = await classifyCancellationReason(cancelReason);
+    if (judgment && judgment.confidence >= 0.7) {
+      await supabase
+        .from("bookings")
+        .update({ cancel_reason_category: judgment.category })
+        .eq("id", id)
+        .eq("business_id", business.id);
+    }
+  }
 
   revalidatePath("/dashboard/agenda");
   revalidatePath("/dashboard/clientes");

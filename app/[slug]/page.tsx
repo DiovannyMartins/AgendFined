@@ -43,9 +43,11 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
           services={(services ?? []).map((s) => ({
             id: s.id,
             name: s.name,
+            description: s.description,
             durationMinutes: s.duration_minutes,
             priceCents: s.price_cents,
           }))}
+          semanticServiceSearchEnabled={Boolean(process.env.TYPESAFE_API_KEY)}
         />
 
         <p className="mt-6 text-center text-sm text-muted-foreground">

@@ -106,11 +106,14 @@ export type Database = {
         Row: {
           business_id: string
           cancel_reason: string | null
+          cancel_reason_category: string | null
           created_at: string
           customer_email_snapshot: string | null
           customer_id: string
           customer_name_snapshot: string
           customer_note: string | null
+          customer_note_category: string | null
+          customer_note_requires_follow_up: boolean
           customer_phone_snapshot: string
           duration_minutes_snapshot: number
           end_at: string
@@ -127,11 +130,14 @@ export type Database = {
         Insert: {
           business_id: string
           cancel_reason?: string | null
+          cancel_reason_category?: string | null
           created_at?: string
           customer_email_snapshot?: string | null
           customer_id: string
           customer_name_snapshot: string
           customer_note?: string | null
+          customer_note_category?: string | null
+          customer_note_requires_follow_up?: boolean
           customer_phone_snapshot: string
           duration_minutes_snapshot: number
           end_at: string
@@ -148,11 +154,14 @@ export type Database = {
         Update: {
           business_id?: string
           cancel_reason?: string | null
+          cancel_reason_category?: string | null
           created_at?: string
           customer_email_snapshot?: string | null
           customer_id?: string
           customer_name_snapshot?: string
           customer_note?: string | null
+          customer_note_category?: string | null
+          customer_note_requires_follow_up?: boolean
           customer_phone_snapshot?: string
           duration_minutes_snapshot?: number
           end_at?: string
@@ -520,11 +529,14 @@ export type Database = {
         Returns: {
           business_id: string
           cancel_reason: string | null
+          cancel_reason_category: string | null
           created_at: string
           customer_email_snapshot: string | null
           customer_id: string
           customer_name_snapshot: string
           customer_note: string | null
+          customer_note_category: string | null
+          customer_note_requires_follow_up: boolean
           customer_phone_snapshot: string
           duration_minutes_snapshot: number
           end_at: string
@@ -554,11 +566,14 @@ export type Database = {
         Returns: {
           business_id: string
           cancel_reason: string | null
+          cancel_reason_category: string | null
           created_at: string
           customer_email_snapshot: string | null
           customer_id: string
           customer_name_snapshot: string
           customer_note: string | null
+          customer_note_category: string | null
+          customer_note_requires_follow_up: boolean
           customer_phone_snapshot: string
           duration_minutes_snapshot: number
           end_at: string
@@ -592,11 +607,14 @@ export type Database = {
         Returns: {
           business_id: string
           cancel_reason: string | null
+          cancel_reason_category: string | null
           created_at: string
           customer_email_snapshot: string | null
           customer_id: string
           customer_name_snapshot: string
           customer_note: string | null
+          customer_note_category: string | null
+          customer_note_requires_follow_up: boolean
           customer_phone_snapshot: string
           duration_minutes_snapshot: number
           end_at: string

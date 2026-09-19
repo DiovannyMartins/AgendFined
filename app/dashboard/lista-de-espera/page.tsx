@@ -72,6 +72,11 @@ function EntriesList({ entries }: { entries: ManageWaitlistEntry[] }) {
                 {entry.customer_name} · {entry.customer_phone}
                 {entry.customer_email ? ` · ${entry.customer_email}` : ""}
               </p>
+              {entry.priority_score !== undefined && entry.priority_confidence !== undefined && entry.priority_confidence >= 0.7 && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Prioridade assistida: {entry.priority_score >= 2.5 ? "alta" : entry.priority_score >= 1.5 ? "média" : "baixa"}
+                </p>
+              )}
             </div>
             <WaitlistActions entry={entry} />
           </div>

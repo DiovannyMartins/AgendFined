@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Search, Phone, Mail, CalendarDays, Ticket } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ import {
 import { filterCustomers, type CustomerHistory } from "@/lib/customers/history";
 import { statusLabel } from "@/lib/bookings/status";
 import { formatWhen } from "@/lib/format/when";
+import { semanticSearchCustomers } from "@/lib/customers/search";
 
 export function ClientsList({
   history,
@@ -22,15 +23,30 @@ export function ClientsList({
   history: CustomerHistory[];
 }) {
   const [query, setQuery] = useState("");
+  const [semanticIds, setSemanticIds] = useState<Set<string> | null>(null);
+  const [isSearchingSemantically, startSemanticSearch] = useTransition();
+
+  function runSemanticSearch() {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setSemanticIds(null);
+      return;
+    }
+    startSemanticSearch(async () => {
+      const result = await semanticSearchCustomers(history, trimmed);
+      setSemanticIds(result ? new Set(result.ids) : null);
+    });
+  }
 
   const shown = useMemo(() => {
+    if (semanticIds) return history.filter((h) => semanticIds.has(h.customer.id));
     const matchedRows = filterCustomers(
       history.map((h) => h.customer),
       query,
     );
     const ids = new Set(matchedRows.map((c) => c.id));
     return history.filter((h) => ids.has(h.customer.id));
-  }, [history, query]);
+  }, [history, query, semanticIds]);
 
   return (
     <div className="mt-6">
@@ -38,11 +54,24 @@ export function ClientsList({
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setSemanticIds(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              runSemanticSearch();
+            }
+          }}
           placeholder="Buscar por nome, telefone ou e-mail"
           className="pl-9"
           autoComplete="off"
         />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Pressione Enter para buscar também pelo histórico de reservas.
+          {isSearchingSemantically ? " Buscando..." : ""}
+        </p>
       </div>
 
       {shown.length === 0 ? (

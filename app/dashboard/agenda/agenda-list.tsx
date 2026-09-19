@@ -10,6 +10,8 @@ import type { AgendaBooking } from "@/lib/agenda/view";
 import { statusLabel } from "@/lib/bookings/status";
 import { formatPublicCode } from "@/lib/bookings/public-code";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
+import { CANCELLATION_REASON_CATEGORY_LABELS } from "@/lib/typesafe/labels";
+import type { CancellationReasonCategory } from "@/lib/typesafe/labels";
 
 type BookingRow = AgendaBooking;
 
@@ -100,6 +102,14 @@ export function AgendaList({
                   {booking.cancel_reason && (
                     <p className="mt-1 text-xs text-muted-foreground">
                       Motivo: {booking.cancel_reason}
+                      {booking.cancel_reason_category
+                        ? ` · ${CANCELLATION_REASON_CATEGORY_LABELS[booking.cancel_reason_category as CancellationReasonCategory] ?? "categoria assistida"}`
+                        : ""}
+                    </p>
+                  )}
+                  {booking.customer_note_requires_follow_up && (
+                    <p className="mt-1 text-xs font-medium text-amber-700">
+                      Observação requer acompanhamento manual
                     </p>
                   )}
                 </div>

@@ -12,10 +12,12 @@ import { createBooking, joinWaitlist } from "@/lib/booking/actions";
 import { getSlotsForDate } from "@/lib/availability/actions";
 import { toLocalDate } from "@/lib/booking/availability";
 import { cn } from "@/lib/utils";
+import { suggestService } from "@/lib/services/search";
 
 type ServiceOption = {
   id: string;
   name: string;
+  description: string | null;
   durationMinutes: number;
   priceCents: number;
 };
@@ -24,10 +26,12 @@ export function BookingWidget({
   businessId,
   slug,
   services,
+  semanticServiceSearchEnabled,
 }: {
   businessId: string;
   slug: string;
   services: ServiceOption[];
+  semanticServiceSearchEnabled: boolean;
 }) {
   const router = useRouter();
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
@@ -48,6 +52,9 @@ export function BookingWidget({
   const [waitlistOffered, setWaitlistOffered] = useState(false);
   const [waitlistSubmitted, setWaitlistSubmitted] = useState<string | null>(null);
   const [waitlistBusy, setWaitlistBusy] = useState(false);
+  const [serviceDescription, setServiceDescription] = useState("");
+  const [serviceSearchBusy, setServiceSearchBusy] = useState(false);
+  const [serviceSearchMessage, setServiceSearchMessage] = useState<string | null>(null);
 
   const [isPending, startTransition] = useTransition();
 
@@ -64,6 +71,25 @@ export function BookingWidget({
     setSelectedSlot(null);
     setSlots([]);
     resetWaitlist();
+    setServiceSearchMessage(null);
+  }
+
+  async function handleServiceSearch() {
+    const description = serviceDescription.trim();
+    if (!description) return;
+    setServiceSearchBusy(true);
+    setServiceSearchMessage(null);
+    const result = await suggestService(
+      description,
+      services.map(({ id, name, description: serviceText }) => ({ id, name, description: serviceText })),
+    );
+    setServiceSearchBusy(false);
+    if (!result) {
+      setServiceSearchMessage("Não encontrei um serviço com confiança suficiente. Escolha na lista abaixo.");
+      return;
+    }
+    handleServiceChange(result.serviceId);
+    setServiceSearchMessage("Serviço selecionado com base na sua descrição.");
   }
 
   function handleDateChange(value: string) {
@@ -183,6 +209,30 @@ export function BookingWidget({
               </option>
             ))}
           </select>
+          {semanticServiceSearchEnabled && (
+            <div className="rounded-lg border border-dashed border-border p-3">
+              <Label htmlFor="serviceDescription">Ou descreva o que você precisa</Label>
+              <div className="mt-2 flex gap-2">
+                <Input
+                  id="serviceDescription"
+                  value={serviceDescription}
+                  onChange={(e) => setServiceDescription(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void handleServiceSearch();
+                    }
+                  }}
+                  placeholder="Ex.: quero fazer a barba"
+                  maxLength={200}
+                />
+                <Button type="button" variant="outline" onClick={() => void handleServiceSearch()} disabled={serviceSearchBusy}>
+                  {serviceSearchBusy ? "Buscando..." : "Encontrar"}
+                </Button>
+              </div>
+              {serviceSearchMessage && <p className="mt-1 text-xs text-muted-foreground">{serviceSearchMessage}</p>}
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">

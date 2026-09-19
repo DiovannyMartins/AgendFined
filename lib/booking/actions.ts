@@ -20,6 +20,11 @@ import {
 } from "@/lib/booking/availability";
 import { enforceRateLimit, enforceConsultRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 import { verifyTurnstile } from "@/lib/booking/anti-bot";
+import {
+  classifyCancellationReason,
+  classifyCustomerNote,
+  classifyOperationalError,
+} from "@/lib/typesafe/judgments";
 
 export type ActionResult = { ok: boolean; code?: string; message?: string; publicCode?: string };
 
@@ -123,7 +128,25 @@ export async function createBooking(input: {
     if (message.includes("bookings_no_overlap") || /overlap|SLOT|23P01/i.test(message)) {
       return { ok: false, code: "slot_taken", message: "Esse horário acabou de ser reservado. Escolha outro." };
     }
+    const judgment = await classifyOperationalError("create_booking", message);
+    if (judgment?.category === "slot_conflict" && judgment.confidence >= 0.8) {
+      return { ok: false, code: "slot_taken", message: "Esse horário acabou de ser reservado. Escolha outro." };
+    }
     return { ok: false, code: "db_error", message: "Não foi possível concluir a reserva. Tente novamente." };
+  }
+
+  if (data?.id && parsed.data.customerNote) {
+    const judgment = await classifyCustomerNote(parsed.data.customerNote);
+    if (judgment && judgment.categoryConfidence >= 0.7) {
+      await admin
+        .from("bookings")
+        .update({
+          customer_note_category: judgment.category,
+          customer_note_requires_follow_up: judgment.requiresManualFollowUp,
+        })
+        .eq("id", data.id)
+        .eq("business_id", business.id);
+    }
   }
 
   return { ok: true, publicCode: data?.public_code };
@@ -252,7 +275,31 @@ export async function cancelPublicBooking(
     if (/BOOKING_NOT_CONFIRMED/i.test(msg)) {
       return { status: "error", code: "NOT_CONFIRMED", message: "Esta reserva já não pode ser cancelada." };
     }
+    const judgment = await classifyOperationalError("cancel_public_booking", msg);
+    if (judgment?.category === "not_found" && judgment.confidence >= 0.8) {
+      return { status: "error", code: "NOT_FOUND", message: "Reserva não encontrada." };
+    }
+    if (judgment?.category === "invalid_state" && judgment.confidence >= 0.8) {
+      return { status: "error", code: "NOT_CONFIRMED", message: "Esta reserva já não pode ser cancelada." };
+    }
     return { status: "error", code: "DB_ERROR", message: "Não foi possível cancelar. Tente novamente." };
+  }
+
+  if (reason) {
+    const judgment = await classifyCancellationReason(reason);
+    if (judgment && judgment.confidence >= 0.7) {
+      const { data: booking } = await supabase
+        .from("bookings")
+        .select("id")
+        .eq("public_code", parsed.data)
+        .maybeSingle();
+      if (booking) {
+        await supabase
+          .from("bookings")
+          .update({ cancel_reason_category: judgment.category })
+          .eq("id", booking.id);
+      }
+    }
   }
 
   return { status: "done" };

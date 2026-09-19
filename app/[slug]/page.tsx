@@ -8,21 +8,16 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
   const { slug } = await params;
   const supabase = await createClient();
 
-  const { data: business } = await supabase
-    .from("businesses")
-    .select("*")
-    .eq("slug", slug)
-    .eq("is_active", true)
-    .single();
+  const { data: businesses, error: businessError } = await supabase.rpc("get_public_business", { p_slug: slug });
+  if (businessError) throw new Error("PUBLIC_BUSINESS_LOOKUP_FAILED");
+  const business = businesses?.[0];
 
   if (!business) notFound();
 
-  const { data: services } = await supabase
-    .from("services")
-    .select("*")
-    .eq("business_id", business.id)
-    .eq("is_active", true)
-    .order("created_at", { ascending: true });
+  const { data: services, error: servicesError } = await supabase.rpc("get_public_services", {
+    p_business_id: business.id,
+  });
+  if (servicesError) throw new Error("PUBLIC_SERVICES_LOOKUP_FAILED");
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-muted/30">

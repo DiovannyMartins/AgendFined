@@ -1,12 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { runBoundedReconciliation } from "@/lib/billing/reconciliation-runner";
 
 export const runtime = "nodejs";
 
 function authorized(request: NextRequest): boolean {
-  const secret = process.env.RECONCILIATION_CRON_SECRET;
+  const secret = process.env.CRON_SECRET ?? process.env.RECONCILIATION_CRON_SECRET;
   const header = request.headers.get("authorization");
-  return Boolean(secret && header === `Bearer ${secret}`);
+  if (!secret || !header?.startsWith("Bearer ")) return false;
+  const provided = Buffer.from(header.slice("Bearer ".length));
+  const expected = Buffer.from(secret);
+  return provided.length === expected.length && timingSafeEqual(provided, expected);
 }
 
 async function run(request: NextRequest) {

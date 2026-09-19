@@ -163,6 +163,7 @@ export async function consultBooking(
   formData: FormData,
 ): Promise<ConsultState> {
   const code = String(formData.get("code") ?? "");
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
   const turnstileToken = String(formData.get("cfTurnstileToken") ?? "");
 
   // Validate the user input before running the anti-bot gate. Otherwise a
@@ -176,6 +177,9 @@ export async function consultBooking(
       message: "Informe um código de reserva válido.",
     };
   }
+  if (!slug || slug.length > 50) {
+    return { status: "error", code: "NOT_FOUND", message: "Nenhuma reserva encontrada com esse código." };
+  }
 
   const gate = await verifyTurnstile(turnstileToken || undefined);
   if (!gate.ok) {
@@ -185,14 +189,11 @@ export async function consultBooking(
   const supabase = createAdminClient();
 
   const ip = await getClientIp();
-  // Fail-open on the limiter: a transient DB error during a public lookup should
-  // not block a legitimate consultation, unlike the reservation flow where the
-  // limiter is fail-closed.
   let allowed: boolean;
   try {
     allowed = await enforceConsultRateLimit(supabase, ip);
   } catch {
-    allowed = true;
+    allowed = false;
   }
   if (!allowed) {
     return {
@@ -209,6 +210,9 @@ export async function consultBooking(
     },
     parsedCode.data,
   );
+  if (result.ok && result.data.businessSlug !== slug) {
+    return { status: "error", code: "NOT_FOUND", message: "Nenhuma reserva encontrada com esse código." };
+  }
   return toConsultState(result);
 }
 
@@ -217,7 +221,7 @@ export async function consultBooking(
 // public lookup never returns it, so possession is the proof of the customer's
 // own reservation. The RPC performs the atomic confirmed -> cancelled transition
 // (service_role-only), which also frees the slot for a new reservation. Gated by
-// a fail-open per-IP rate limit like the consultation flow.
+// the same fail-closed per-IP consultation limit as the lookup flow.
 export type CancelState =
   | { status: "idle" }
   | { status: "done" }
@@ -252,7 +256,7 @@ export async function cancelPublicBooking(
   try {
     allowed = await enforceConsultRateLimit(supabase, ip);
   } catch {
-    allowed = true;
+    allowed = false;
   }
   if (!allowed) {
     return {

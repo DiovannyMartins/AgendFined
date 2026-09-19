@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { createClient } from "@/lib/supabase/server";
 import { canTransition, type BookingStatus } from "@/lib/bookings/transitions";
+import { bookingStatusSchema } from "@/lib/validation/schemas";
 import { classifyCancellationReason } from "@/lib/typesafe/judgments";
 
 export async function updateBookingStatus(
@@ -11,13 +12,17 @@ export async function updateBookingStatus(
   formData: FormData,
 ): Promise<{ ok: boolean; message?: string }> {
   const id = String(formData.get("id") ?? "");
-  const nextStatus = String(formData.get("status") ?? "") as BookingStatus;
-  const cancelReason = String(formData.get("cancelReason") ?? "").trim() || null;
+  const nextStatusValue = String(formData.get("status") ?? "");
+  const nextStatusParsed = bookingStatusSchema.safeParse(nextStatusValue);
+  const nextStatus = nextStatusParsed.success ? nextStatusParsed.data : null;
+  const cancelReasonValue = String(formData.get("cancelReason") ?? "").trim();
+  const cancelReason = cancelReasonValue || null;
 
   if (!id) return { ok: false, message: "Reserva inválida." };
-  if (!["confirmed", "completed", "cancelled", "no_show"].includes(nextStatus)) {
+  if (!nextStatus) {
     return { ok: false, message: "Status inválido." };
   }
+  if (cancelReasonValue.length > 500) return { ok: false, message: "O motivo do cancelamento é muito longo." };
 
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, message: "Configure seu negócio primeiro." };
@@ -38,16 +43,21 @@ export async function updateBookingStatus(
     return { ok: false, message: `Não é possível mudar de "${current}" para "${nextStatus}".` };
   }
 
-  const { error } = await supabase
+  const { error, data: updated } = await supabase
     .from("bookings")
     .update({
       status: nextStatus,
       ...(nextStatus === "cancelled" ? { cancel_reason: cancelReason } : {}),
     })
     .eq("id", id)
-    .eq("business_id", business.id);
+    .eq("business_id", business.id)
+    .eq("status", current)
+    .select("id");
 
   if (error) return { ok: false, message: "Não foi possível atualizar a reserva." };
+  if (!updated || updated.length === 0) {
+    return { ok: false, message: "A reserva foi alterada por outra operação. Atualize a página e tente novamente." };
+  }
 
   if (nextStatus === "cancelled" && cancelReason) {
     const judgment = await classifyCancellationReason(cancelReason);

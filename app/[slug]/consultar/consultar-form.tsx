@@ -76,6 +76,7 @@ function ConsultarFormInner({ slug, onReset }: { slug: string; onReset: () => vo
         Informe o código da sua reserva para ver os detalhes.
       </p>
       <form action={formAction} className="mt-6 space-y-4 text-left">
+        <input type="hidden" name="slug" value={slug} />
         <div className="space-y-2">
           <Label htmlFor="code">Código da reserva</Label>
           <Input

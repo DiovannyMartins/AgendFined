@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { serviceSchema } from "@/lib/validation/schemas";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import type { ActionResult } from "@/lib/business/actions";
@@ -102,40 +103,38 @@ export async function updateService(
   return { ok: true, data: undefined };
 }
 
-export async function toggleService(id: string, isActive: boolean): Promise<void> {
+export async function toggleService(id: string, isActive: boolean): Promise<ActionResult> {
   const business = await getCurrentBusiness();
-  if (!business) return;
+  if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
 
   const supabase = await createClient();
-  await supabase
+  const { error, data } = await supabase
     .from("services")
     .update({ is_active: isActive })
     .eq("id", id)
-    .eq("business_id", business.id);
+    .eq("business_id", business.id)
+    .select("id");
+
+  if (error) return { ok: false, code: "DB_ERROR", message: "Não foi possível atualizar o serviço." };
+  if (!data?.length) return { ok: false, code: "NOT_FOUND", message: "Serviço não encontrado." };
 
   revalidatePath("/dashboard/servicos");
+  return { ok: true, data: undefined };
 }
 
 export async function deleteService(id: string): Promise<ActionResult> {
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
 
-  const supabase = await createClient();
+  const admin = createAdminClient();
+  const { data: result, error } = await admin.rpc("delete_service_if_unused", {
+    p_business_id: business.id,
+    p_service_id: id,
+    p_now: new Date().toISOString(),
+  });
 
-  // Serviço com reserva agendada (confirmada e ainda não encerrada) não pode
-  // ser excluído: o compromisso futuro precisa ser cancelado/concluído antes.
-  // Só histórico (passadas, concluídas, canceladas, no-show) libera a exclusão;
-  // essas reservas são preservadas via snapshot (service_id -> null).
-  const { data: scheduled } = await supabase
-    .from("bookings")
-    .select("id")
-    .eq("business_id", business.id)
-    .eq("service_id", id)
-    .eq("status", "confirmed")
-    .gt("end_at", new Date().toISOString())
-    .limit(1);
-
-  if (scheduled && scheduled.length > 0) {
+  if (error) return { ok: false, code: "DB_ERROR", message: "Não foi possível excluir o serviço." };
+  if (result === "HAS_SCHEDULED_BOOKINGS") {
     return {
       ok: false,
       code: "HAS_SCHEDULED_BOOKINGS",
@@ -143,20 +142,7 @@ export async function deleteService(id: string): Promise<ActionResult> {
         "Este serviço possui reservas agendadas e não pode ser excluído. Cancele ou conclua as reservas agendadas antes de excluir.",
     };
   }
-
-  const { error, data: deleted } = await supabase
-    .from("services")
-    .delete()
-    .eq("id", id)
-    .eq("business_id", business.id)
-    .select();
-
-  if (error) {
-    return { ok: false, code: "DB_ERROR", message: "Não foi possível excluir o serviço." };
-  }
-  if (!deleted || deleted.length === 0) {
-    return { ok: false, code: "NOT_FOUND", message: "Serviço não encontrado." };
-  }
+  if (result !== "DELETED") return { ok: false, code: "NOT_FOUND", message: "Serviço não encontrado." };
   revalidatePath("/dashboard/servicos");
   return { ok: true, data: undefined };
 }

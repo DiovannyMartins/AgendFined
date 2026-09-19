@@ -173,15 +173,15 @@ describe("RLS (§13.2)", () => {
     expect(data!.length).toBeGreaterThan(0);
   });
 
-  it("an outsider CAN read the public business profile (sec 13.1) but cannot read its bookings", async () => {
+  it("an outsider reads the minimal public business RPC but cannot read its bookings", async () => {
     const outsider = await anonClientForUser(OTHER_EMAIL, PASSWORD);
-    // Public business profile is readable via the public policy.
-    const { data: biz } = await outsider
-      .from("businesses")
-      .select("id, name, slug, is_active")
-      .eq("id", businessId)
-      .maybeSingle();
+    const { data: businesses, error: businessError } = await outsider.rpc("get_public_business", {
+      p_slug: `biz-integracao-${stamp}`,
+    });
+    expect(businessError).toBeNull();
+    const biz = businesses?.[0];
     expect(biz?.id).toBe(businessId);
+    expect(Object.keys(biz ?? {}).sort()).toEqual(["description", "id", "name", "slug"]);
     // But the outsider cannot read the owner's bookings (private data).
     const { data: rows } = await outsider.from("bookings").select("*").eq("business_id", businessId);
     expect(rows?.length ?? 0).toBe(0);

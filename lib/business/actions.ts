@@ -108,6 +108,7 @@ export async function upsertBusiness(
 
     if (error) return mapDbError(error);
     revalidatePath("/dashboard");
+    revalidatePath("/dashboard/configuracoes");
     return { ok: true, data: undefined };
   }
 
@@ -132,6 +133,7 @@ export async function upsertBusiness(
 
   if (error) return mapDbError(error);
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/configuracoes");
   return { ok: true, data: undefined };
 }
 

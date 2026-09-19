@@ -10,12 +10,9 @@ export default async function ConsultarPage({
   const { slug } = await params;
   const supabase = await createClient();
 
-  const { data: business } = await supabase
-    .from("businesses")
-    .select("*")
-    .eq("slug", slug)
-    .eq("is_active", true)
-    .single();
+  const { data: businesses, error } = await supabase.rpc("get_public_business", { p_slug: slug });
+  if (error) throw new Error("PUBLIC_BUSINESS_LOOKUP_FAILED");
+  const business = businesses?.[0];
 
   if (!business) notFound();
 

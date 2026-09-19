@@ -26,6 +26,14 @@ function iso(offsetMinutes: number): string {
 
 // The one booking that SHOULD be due: confirmed, future, within lead, has e-mail.
 let dueBookingId = "";
+let dueClaimedRow: {
+  business_name: string;
+  customer_email_snapshot: string;
+  customer_name_snapshot: string;
+  service_name_snapshot: string;
+  public_code: string;
+  reminder_claim_token: string;
+} | null = null;
 // A due booking on a FREE business that must be excluded by the plan gate.
 let freeDueBookingId = "";
 
@@ -214,6 +222,8 @@ describe("INC-2 lembretes: get_due_booking_reminders", () => {
       .filter((b) => b.business_id === businessId)
       .map((b) => b.id);
     expect(ids).toContain(dueBookingId);
+    dueClaimedRow = data!.find((b) => b.id === dueBookingId)!;
+    expect(dueClaimedRow.reminder_claim_token).toBeTruthy();
     // None of the filtered out bookings are present.
     expect(ids).toHaveLength(1);
   });
@@ -225,8 +235,7 @@ describe("INC-2 lembretes: get_due_booking_reminders", () => {
   });
 
   it("surfaces the fields the reminder e-mail needs", async () => {
-    const { data } = await admin.rpc("get_due_booking_reminders", { p_lead_minutes: 1440 });
-    const row = data!.find((b) => b.id === dueBookingId)!;
+    const row = dueClaimedRow!;
     expect(row.business_name).toBe("Agenda Lembrete");
     expect(row.customer_email_snapshot).toBe("due@example.com");
     expect(row.customer_name_snapshot).toBe("Cliente");
@@ -237,7 +246,10 @@ describe("INC-2 lembretes: get_due_booking_reminders", () => {
 
 describe("INC-2 lembretes: set_booking_reminders_sent (dedup)", () => {
   it("marks the due booking and removes it from the next tick", async () => {
-    const { data: marked, error } = await admin.rpc("set_booking_reminders_sent", { p_booking_ids: [dueBookingId] });
+    const { data: marked, error } = await admin.rpc("set_booking_reminders_sent", {
+      p_booking_ids: [dueBookingId],
+      p_claim_tokens: [dueClaimedRow!.reminder_claim_token],
+    });
     expect(error).toBeNull();
     expect(marked).toBe(1);
 

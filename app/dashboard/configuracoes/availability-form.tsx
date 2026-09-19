@@ -92,7 +92,11 @@ export function AvailabilityRow({
   const label = WEEKDAYS.find((d) => d.value === weekday)?.label ?? String(weekday);
 
   useEffect(() => {
-    if (state.ok && state !== INITIAL) setEditing(false);
+    if (!state.ok || state === INITIAL) return;
+    const closeAfterRender = window.setTimeout(() => setEditing(false), 0);
+    return () => {
+      window.clearTimeout(closeAfterRender);
+    };
   }, [state]);
 
   if (!editing) {

@@ -120,6 +120,8 @@ export type Database = {
           id: string
           price_cents_snapshot: number
           public_code: string
+          reminder_claim_token: string | null
+          reminder_claimed_at: string | null
           reminder_sent_at: string | null
           service_id: string | null
           service_name_snapshot: string
@@ -144,6 +146,8 @@ export type Database = {
           id?: string
           price_cents_snapshot: number
           public_code?: string
+          reminder_claim_token?: string | null
+          reminder_claimed_at?: string | null
           reminder_sent_at?: string | null
           service_id: string
           service_name_snapshot: string
@@ -168,6 +172,8 @@ export type Database = {
           id?: string
           price_cents_snapshot?: number
           public_code?: string
+          reminder_claim_token?: string | null
+          reminder_claimed_at?: string | null
           reminder_sent_at?: string | null
           service_id?: string
           service_name_snapshot?: string
@@ -737,6 +743,26 @@ export type Database = {
           start_at: string
         }[]
       }
+      get_public_business: {
+        Args: { p_slug: string }
+        Returns: {
+          description: string | null
+          id: string
+          name: string
+          slug: string
+        }[]
+      }
+      get_public_services: {
+        Args: { p_business_id: string }
+        Returns: {
+          business_id: string
+          description: string | null
+          duration_minutes: number
+          id: string
+          name: string
+          price_cents: number
+        }[]
+      }
       get_due_booking_reminders: {
         Args: { p_lead_minutes?: number }
         Returns: {
@@ -747,6 +773,7 @@ export type Database = {
           customer_name_snapshot: string
           id: string
           public_code: string
+          reminder_claim_token: string
           service_name_snapshot: string
           start_at: string
         }[]
@@ -813,8 +840,12 @@ export type Database = {
         }
       }
       process_booking_reminders: { Args: never; Returns: number }
+      delete_service_if_unused: {
+        Args: { p_business_id: string; p_now?: string; p_service_id: string }
+        Returns: string
+      }
       set_booking_reminders_sent: {
-        Args: { p_booking_ids: string[] }
+        Args: { p_booking_ids: string[]; p_claim_tokens?: string[] }
         Returns: number
       }
     }

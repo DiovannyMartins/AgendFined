@@ -127,13 +127,21 @@ export async function updateAvailability(
   return { ok: true, data: undefined };
 }
 
-export async function deleteAvailability(id: string): Promise<void> {
+export async function deleteAvailability(id: string): Promise<ActionResult> {
   const business = await getCurrentBusiness();
-  if (!business) return;
+  if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
   const supabase = await createClient();
-  await supabase.from("availability").delete().eq("id", id).eq("business_id", business.id);
+  const { error, data } = await supabase
+    .from("availability")
+    .delete()
+    .eq("id", id)
+    .eq("business_id", business.id)
+    .select("id");
+  if (error) return { ok: false, code: "DB_ERROR", message: "Não foi possível excluir o horário." };
+  if (!data?.length) return { ok: false, code: "NOT_FOUND", message: "Horário não encontrado." };
   revalidatePath("/dashboard/bloqueios");
   revalidatePath("/dashboard/configuracoes");
+  return { ok: true, data: undefined };
 }
 
 export async function createBlock(
@@ -188,12 +196,20 @@ export async function createBlock(
   return { ok: true, data: undefined };
 }
 
-export async function deleteBlock(id: string): Promise<void> {
+export async function deleteBlock(id: string): Promise<ActionResult> {
   const business = await getCurrentBusiness();
-  if (!business) return;
+  if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
   const supabase = await createClient();
-  await supabase.from("availability_blocks").delete().eq("id", id).eq("business_id", business.id);
+  const { error, data } = await supabase
+    .from("availability_blocks")
+    .delete()
+    .eq("id", id)
+    .eq("business_id", business.id)
+    .select("id");
+  if (error) return { ok: false, code: "DB_ERROR", message: "Não foi possível excluir o bloqueio." };
+  if (!data?.length) return { ok: false, code: "NOT_FOUND", message: "Bloqueio não encontrado." };
   revalidatePath("/dashboard/bloqueios");
+  return { ok: true, data: undefined };
 }
 
 export async function getSlotsForDate(
@@ -204,15 +220,16 @@ export async function getSlotsForDate(
   // Public booking flow reads blocks and bookings of any business; anonymous RLS
   // would block that, so we use the server-only admin client for these reads.
   const supabase = createAdminClient();
-  const { data: business } = await supabase
+  const { data: business, error: businessError } = await supabase
     .from("businesses")
-    .select("*")
+    .select("id, is_active, slot_interval_minutes, min_notice_minutes, booking_window_days")
     .eq("id", businessId)
     .single();
 
+  if (businessError) return { available: [], error: "db_error" };
   if (!business || !business.is_active) return { available: [], error: "not_found" };
 
-  const { data: service } = await supabase
+  const { data: service, error: serviceError } = await supabase
     .from("services")
     .select("duration_minutes")
     .eq("id", serviceId)
@@ -220,6 +237,7 @@ export async function getSlotsForDate(
     .eq("is_active", true)
     .single();
 
+  if (serviceError) return { available: [], error: "db_error" };
   if (!service) return { available: [], error: "service_not_found" };
 
   const rules = {
@@ -232,16 +250,18 @@ export async function getSlotsForDate(
   const weekday = weekdayOf(date);
 
   // Availability, blocks and occupied slots are resolved for the business only.
-  const { data: intervals } = await supabase
+  const { data: intervals, error: intervalsError } = await supabase
     .from("availability")
     .select("start_time, end_time")
     .eq("business_id", businessId)
     .eq("weekday", weekday)
     .eq("is_active", true);
 
+  if (intervalsError) return { available: [], error: "db_error" };
+
   const day = localDayRangeUtc(date);
 
-  const [{ data: blocks }, { data: bookings }] = await Promise.all([
+  const [{ data: blocks, error: blocksError }, { data: bookings, error: bookingsError }] = await Promise.all([
     supabase
       .from("availability_blocks")
       .select("start_at, end_at")
@@ -256,6 +276,8 @@ export async function getSlotsForDate(
       .lt("start_at", day.end)
       .gt("end_at", day.start),
   ]);
+
+  if (blocksError || bookingsError) return { available: [], error: "db_error" };
 
   // Blocks/bookings are read in UTC; computeAvailableSlots resolves each local
   // candidate to UTC before overlap checking (fixes midnight-crossing blocks).

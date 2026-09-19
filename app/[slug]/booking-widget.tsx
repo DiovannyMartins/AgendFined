@@ -37,6 +37,7 @@ export function BookingWidget({
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
   const [date, setDate] = useState("");
   const [slots, setSlots] = useState<string[]>([]);
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
 
   const [customerName, setCustomerName] = useState("");
@@ -70,6 +71,7 @@ export function BookingWidget({
     setServiceId(value);
     setSelectedSlot(null);
     setSlots([]);
+    setAvailabilityError(null);
     resetWaitlist();
     setServiceSearchMessage(null);
   }
@@ -96,6 +98,7 @@ export function BookingWidget({
     setDate(value);
     setSelectedSlot(null);
     setSlots([]);
+    setAvailabilityError(null);
     resetWaitlist();
   }
 
@@ -110,7 +113,20 @@ export function BookingWidget({
     let cancelled = false;
     startTransition(() => {
       getSlotsForDate(businessId, serviceId, date).then((res) => {
-        if (!cancelled) setSlots(res.available ?? []);
+        if (cancelled) return;
+        setSlots(res.available ?? []);
+        setAvailabilityError(
+          res.error === "db_error"
+            ? "Não foi possível carregar os horários. Tente novamente."
+            : res.error
+              ? "Não foi possível encontrar este serviço ou negócio."
+              : null,
+        );
+      }).catch(() => {
+        if (!cancelled) {
+          setSlots([]);
+          setAvailabilityError("Não foi possível carregar os horários. Tente novamente.");
+        }
       });
     });
     return () => {
@@ -182,9 +198,12 @@ export function BookingWidget({
       setWaitlistOffered(false);
       setError(res.message ?? "Esse horário está livre.");
       setSelectedSlot(null);
-      getSlotsForDate(businessId, serviceId, lastAttempt.date).then((r) =>
-        setSlots(r.available ?? []),
-      );
+      getSlotsForDate(businessId, serviceId, lastAttempt.date)
+        .then((r) => {
+          setSlots(r.available ?? []);
+          setAvailabilityError(r.error ? "Não foi possível atualizar os horários." : null);
+        })
+        .catch(() => setAvailabilityError("Não foi possível atualizar os horários."));
     } else {
       setError(res.message ?? "Não foi possível entrar na lista de espera.");
     }
@@ -254,6 +273,8 @@ export function BookingWidget({
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Spinner className="size-4" /> Carregando...
             </div>
+          ) : availabilityError ? (
+            <p className="text-sm text-destructive">{availabilityError}</p>
           ) : slots.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nenhum horário disponível nesta data. Escolha outra.</p>
           ) : (

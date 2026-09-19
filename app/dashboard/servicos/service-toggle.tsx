@@ -13,7 +13,9 @@ export function ServiceToggle({ id, isActive }: { id: string; isActive: boolean 
       checked={checked}
       onCheckedChange={(next) => {
         setChecked(next);
-        startTransition(() => toggleService(id, next));
+        startTransition(() => {
+          void toggleService(id, next);
+        });
       }}
       aria-label="Ativar serviço"
     />

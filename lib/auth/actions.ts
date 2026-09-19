@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { emailSchema, loginSchema, signupSchema } from "@/lib/validation/schemas";
 
 export type ActionResult<T = undefined> =
   | { ok: true; data: T }
@@ -15,26 +16,24 @@ const genericError = (message: string): { ok: false; code: string; message: stri
 
 export async function signup(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const password = String(formData.get("password") ?? "");
-  const displayName = String(formData.get("displayName") ?? "").trim();
-
-  if (!email || !password || !displayName) {
-    return { ok: false, code: "VALIDATION", message: "Preencha todos os campos.", fieldErrors: {} };
-  }
-  if (password.length < 8) {
+  const parsed = signupSchema.safeParse({
+    email: String(formData.get("email") ?? "").trim().toLowerCase(),
+    password: String(formData.get("password") ?? ""),
+    displayName: String(formData.get("displayName") ?? "").trim(),
+  });
+  if (!parsed.success) {
     return {
       ok: false,
       code: "VALIDATION",
-      message: "A senha deve ter pelo menos 8 caracteres.",
-      fieldErrors: { password: ["A senha deve ter pelo menos 8 caracteres."] },
+      message: "Revise os campos destacados.",
+      fieldErrors: parsed.error.flatten().fieldErrors,
     };
   }
 
   const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { displayName } },
+    email: parsed.data.email,
+    password: parsed.data.password,
+    options: { data: { displayName: parsed.data.displayName } },
   });
 
   if (error) {
@@ -50,15 +49,17 @@ export async function signup(_prev: ActionResult, formData: FormData): Promise<A
 
 export async function login(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const password = String(formData.get("password") ?? "");
+  const parsed = loginSchema.safeParse({
+    email: String(formData.get("email") ?? "").trim().toLowerCase(),
+    password: String(formData.get("password") ?? ""),
+  });
   const next = String(formData.get("next") ?? "/dashboard");
 
-  if (!email || !password) {
-    return { ok: false, code: "VALIDATION", message: "Preencha e-mail e senha.", fieldErrors: {} };
+  if (!parsed.success) {
+    return { ok: false, code: "VALIDATION", message: "Preencha e-mail e senha.", fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) {
     return {
       ok: false,
@@ -83,13 +84,14 @@ export async function requestPasswordReset(_prev: ActionResult, formData: FormDa
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const origin = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
 
-  if (!email) {
-    return { ok: false, code: "VALIDATION", message: "Informe seu e-mail.", fieldErrors: {} };
+  const parsedEmail = emailSchema.safeParse(email);
+  if (!parsedEmail.success || !origin) {
+    return { ok: false, code: "VALIDATION", message: "Informe um e-mail válido.", fieldErrors: {} };
   }
 
   // Route the recovery callback through the existing code-exchange handler so the
   // session is established before the new-password form renders (§24).
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+  const { error } = await supabase.auth.resetPasswordForEmail(parsedEmail.data, {
     redirectTo: `${origin}/auth/callback?next=/redefinir-senha`,
   });
 
@@ -104,7 +106,7 @@ export async function updatePassword(_prev: ActionResult, formData: FormData): P
   const supabase = await createClient();
   const password = String(formData.get("password") ?? "");
 
-  if (password.length < 8) {
+  if (password.length < 8 || password.length > 128) {
     return {
       ok: false,
       code: "VALIDATION",

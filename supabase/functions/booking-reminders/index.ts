@@ -29,6 +29,7 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const RESEND_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") ?? "";
 
 const REMINDER_LEAD_MS = 24 * 60 * 60 * 1000;
+const REMINDER_BATCH_LIMIT = 50;
 
 type Candidate = {
   id: string;
@@ -38,7 +39,25 @@ type Candidate = {
   customer_email_snapshot: string | null;
   service_name_snapshot: string;
   start_at: string;
+  reminder_claim_token: string;
 };
+
+function isCandidate(value: unknown): value is Candidate {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<Candidate>;
+  return Boolean(
+    typeof candidate.id === "string" &&
+      /^[0-9a-f-]{36}$/i.test(candidate.id) &&
+      typeof candidate.business_name === "string" &&
+      typeof candidate.customer_name_snapshot === "string" &&
+      (typeof candidate.customer_email_snapshot === "string" || candidate.customer_email_snapshot === null) &&
+      typeof candidate.service_name_snapshot === "string" &&
+      typeof candidate.start_at === "string" &&
+      !Number.isNaN(new Date(candidate.start_at).getTime()) &&
+      typeof candidate.reminder_claim_token === "string" &&
+      /^[0-9a-f-]{36}$/i.test(candidate.reminder_claim_token),
+  );
+}
 
 function isDue(startAt: string, now: Date): boolean {
   const diff = new Date(startAt).getTime() - now.getTime();
@@ -97,8 +116,10 @@ Deno.serve(async (req) => {
   let candidates: Candidate[];
   try {
     const body = await req.json();
-    if (!Array.isArray(body)) throw new Error("payload must be an array");
-    candidates = body as Candidate[];
+    if (!Array.isArray(body) || body.length > REMINDER_BATCH_LIMIT || !body.every(isCandidate)) {
+      throw new Error("payload must be a bounded candidate array");
+    }
+    candidates = body;
   } catch {
     return json({ error: "invalid_payload" }, 400);
   }
@@ -133,8 +154,18 @@ Deno.serve(async (req) => {
   }
 
   if (sentIds.length > 0) {
+    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+      return json({ error: "reminder_storage_not_configured" }, 503);
+    }
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-    await admin.rpc("set_booking_reminders_sent", { p_booking_ids: sentIds });
+    const sentCandidates = candidates.filter((candidate) => sentIds.includes(candidate.id));
+    const { data: marked, error } = await admin.rpc("set_booking_reminders_sent", {
+      p_booking_ids: sentCandidates.map((candidate) => candidate.id),
+      p_claim_tokens: sentCandidates.map((candidate) => candidate.reminder_claim_token),
+    });
+    if (error || marked !== sentCandidates.length) {
+      return json({ error: "reminder_mark_failed" }, 502);
+    }
   }
 
   return json({ attempted: candidates.length, sent: sentIds.length });

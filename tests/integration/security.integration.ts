@@ -172,7 +172,7 @@ describe("create_booking integrity (§8/§9/§32/§33/§34)", () => {
   it("rejects a service that belongs to another business", async () => {
     const { error } = await admin.rpc("create_booking", bookingArgs(businessA, serviceB, SLOT_2, `+551195${stamp}`));
     expect(error).not.toBeNull();
-    expect(String(error?.message).toLowerCase()).toMatch(/mismatch|service_business|permission/i);
+    expect(String(error?.message).toLowerCase()).toMatch(/mismatch|service_business|service_not_found|permission/i);
   });
 
   it("rejects an inactive business even though the service is active", async () => {
@@ -269,18 +269,32 @@ describe("anon data exposure (§36)", () => {
     expect(data?.length ?? 0).toBe(0);
   });
 
-  it("anon can read an active business but not an inactive one", async () => {
+  it("anon can read an active business only through the minimal public RPC", async () => {
     const anon = anonClient();
-    const { data: active } = await anon.from("businesses").select("*").eq("id", businessA);
-    expect(active?.length ?? 0).toBeGreaterThan(0);
-    const { data: inactive } = await anon.from("businesses").select("*").eq("id", businessC);
+    const { data: active, error: activeError } = await anon.rpc("get_public_business", { p_slug: `biz-a-${stamp}` });
+    expect(activeError).toBeNull();
+    expect(active?.[0]?.id).toBe(businessA);
+    expect(Object.keys(active?.[0] ?? {}).sort()).toEqual(["description", "id", "name", "slug"]);
+    const { data: inactive, error: inactiveError } = await anon.rpc("get_public_business", { p_slug: `biz-c-${stamp}` });
+    expect(inactiveError).toBeNull();
     expect(inactive?.length ?? 0).toBe(0);
   });
 
-  it("anon can read active services of an active business but not inactive services", async () => {
+  it("anon cannot read services through PostgREST base tables", async () => {
     const anon = anonClient();
     const { data: svc } = await anon.from("services").select("*").eq("id", inactiveServiceA);
     expect(svc?.length ?? 0).toBe(0);
+    const { data: publicServices, error } = await anon.rpc("get_public_services", { p_business_id: businessA });
+    expect(error).toBeNull();
+    expect(publicServices?.some((service) => service.id === activeServiceA)).toBe(true);
+    expect(Object.keys(publicServices?.[0] ?? {}).sort()).toEqual([
+      "business_id",
+      "description",
+      "duration_minutes",
+      "id",
+      "name",
+      "price_cents",
+    ]);
   });
 });
 

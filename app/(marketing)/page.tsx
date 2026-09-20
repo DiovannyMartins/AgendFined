@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -14,9 +13,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Reveal } from "@/components/reveal";
-import { Cta, SecondaryCta } from "./layout";
 import { Faq } from "./faq";
 import { Plans } from "./plans";
+import { Hero } from "@/components/marketing/hero";
 
 const benefits = [
   {
@@ -85,55 +84,9 @@ const audiences = [
 export default function MarketingHome() {
   return (
     <div className="flex flex-col">
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 -z-10">
-          <Image
-            src="/images/hero.png"
-            alt=""
-            fill
-            priority
-            className="object-cover"
-            sizes="100vw"
-          />
-          <div className="absolute inset-0 bg-background/70" />
-          <div className="absolute left-1/2 top-[-20%] h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-primary/10 blur-[140px] motion-safe:animate-glow-drift" />
-        </div>
-
-        <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-4 pt-16 pb-20 text-center lg:px-6 md:pt-24">
-          <Reveal variant="down">
-            <Badge variant="outline" className="rounded-full px-3.5 py-1 text-sm">
-              <Sparkles className="size-3" />
-              Agendamentos online para profissionais
-            </Badge>
-          </Reveal>
-
-          <Reveal delay={90}>
-            <h1 className="mt-6 max-w-3xl text-balance text-4xl font-semibold leading-tight tracking-tight sm:text-5xl md:text-6xl">
-              Sua agenda trabalhando por você,{" "}
-              <span className="text-gradient">24 horas por dia</span>.
-            </h1>
-          </Reveal>
-
-          <Reveal delay={180}>
-            <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground">
-              Receba agendamentos online, organize seus horários e ofereça uma
-              experiência mais profissional aos seus clientes.
-            </p>
-          </Reveal>
-
-          <Reveal delay={270}>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Cta />
-              <SecondaryCta href="/#como-funciona" label="Ver como funciona" />
-            </div>
-          </Reveal>
-
-          <Reveal delay={360} variant="zoom" className="mt-16 w-full max-w-3xl">
-            <BookingPreview />
-          </Reveal>
-        </div>
-      </section>
+      <Hero>
+        <BookingPreview />
+      </Hero>
 
       {/* Prova social */}
       <section className="border-y border-border py-10">

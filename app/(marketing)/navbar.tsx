@@ -25,13 +25,13 @@ export function Navbar() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 border-b transition-all duration-300",
+        "fixed inset-x-0 top-0 z-50 border-b transition-all duration-300",
         scrolled
           ? "border-border bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60"
           : "border-transparent bg-transparent",
       )}
     >
-      <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 lg:px-6">
+      <nav className="mx-auto flex h-20 max-w-6xl items-center justify-between px-4 lg:px-6">
         <Link href="/" className="group flex items-center gap-2 font-semibold">
           <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-transform duration-300 group-hover:scale-105">
             <CalendarClock className="size-4" />

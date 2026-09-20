@@ -12,7 +12,7 @@ const links = [
   { href: "/#planos", label: "Preços" },
 ];
 
-export function Navbar() {
+export function Navbar({ isAuthenticated }: { isAuthenticated: boolean }) {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -52,12 +52,20 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Link href="/login" className={cn(buttonVariants({ variant: "ghost" }))}>
-            Entrar
-          </Link>
-          <Link href="/cadastro" className={buttonVariants({ size: "sm" })}>
-            Começar grátis
-          </Link>
+          {isAuthenticated ? (
+            <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
+              Abrir painel
+            </Link>
+          ) : (
+            <>
+              <Link href="/login" className={cn(buttonVariants({ variant: "ghost" }))}>
+                Entrar
+              </Link>
+              <Link href="/cadastro" className={buttonVariants({ size: "sm" })}>
+                Começar grátis
+              </Link>
+            </>
+          )}
         </div>
       </nav>
     </header>

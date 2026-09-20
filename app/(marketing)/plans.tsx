@@ -51,9 +51,9 @@ const PLAN_COPY: Record<Plan, {
 
 export function Plans() {
   return (
-    <section id="planos" className="relative overflow-hidden border-y border-border bg-muted/20">
+    <section id="planos" className="relative scroll-mt-24 overflow-hidden border-y border-border bg-muted/20">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.07),transparent_38%)]" />
-      <div className="relative mx-auto w-full max-w-6xl px-4 py-24 lg:px-6 md:py-32">
+      <div className="relative mx-auto w-full max-w-6xl px-4 py-20 lg:px-6 md:py-24">
         <Reveal>
           <div className="mx-auto max-w-2xl text-center">
             <Badge variant="secondary" className="mb-5 rounded-full px-3.5 text-sm">
@@ -68,7 +68,7 @@ export function Plans() {
           </div>
         </Reveal>
 
-        <div className="mx-auto mt-12 grid max-w-5xl gap-5 lg:grid-cols-2">
+        <div className="mx-auto mt-10 grid max-w-5xl gap-5 lg:grid-cols-2">
           {PLAN_KEYS.map((key, i) => {
             const info = PLAN_INFO[key];
             const copy = PLAN_COPY[key];
@@ -78,7 +78,7 @@ export function Plans() {
               <Reveal key={key} delay={i * 100} className="h-full">
                 <article
                   className={cn(
-                    "group relative flex h-full flex-col overflow-hidden rounded-[2rem] border p-7 transition-all duration-300 hover:-translate-y-1 sm:p-9",
+                    "group relative flex h-full flex-col overflow-hidden rounded-[2rem] border p-6 transition-all duration-300 hover:-translate-y-1 sm:p-7",
                     highlighted
                       ? "border-foreground bg-primary text-primary-foreground shadow-2xl shadow-black/25"
                       : "border-border bg-card/60 hover:border-foreground/25 hover:bg-card",
@@ -102,15 +102,15 @@ export function Plans() {
                     )}
                   </div>
 
-                  <p className={cn("relative mt-6 max-w-md text-lg font-medium leading-snug", highlighted ? "text-primary-foreground" : "text-foreground")}>
+                  <p className={cn("relative mt-5 max-w-md text-base font-medium leading-snug", highlighted ? "text-primary-foreground" : "text-foreground")}>
                     {copy.title}
                   </p>
-                  <p className={cn("relative mt-3 max-w-md text-sm leading-relaxed", highlighted ? "text-primary-foreground/70" : "text-muted-foreground")}>
+                  <p className={cn("relative mt-2 max-w-md text-xs leading-relaxed", highlighted ? "text-primary-foreground/70" : "text-muted-foreground")}>
                     {copy.description}
                   </p>
 
-                  <div className="relative mt-8 flex items-end gap-2">
-                    <span className="text-5xl font-semibold tracking-tight">{info.price}</span>
+                  <div className="relative mt-6 flex items-end gap-2">
+                    <span className="text-4xl font-semibold tracking-tight">{info.price}</span>
                     <span className={cn("pb-1", highlighted ? "text-primary-foreground/60" : "text-muted-foreground")}>
                       {info.period}
                     </span>
@@ -119,12 +119,12 @@ export function Plans() {
                     {copy.audience}
                   </p>
 
-                  <div className={cn("my-8 h-px", highlighted ? "bg-primary-foreground/15" : "bg-border")} />
+                  <div className={cn("my-6 h-px", highlighted ? "bg-primary-foreground/15" : "bg-border")} />
                   <p className={cn("text-xs font-semibold uppercase tracking-[0.2em]", highlighted ? "text-primary-foreground/60" : "text-muted-foreground")}>
                     O que está incluído
                   </p>
 
-                  <ul className="relative mt-5 flex-1 space-y-4">
+                  <ul className="relative mt-4 grid flex-1 gap-x-5 gap-y-3 lg:grid-cols-2">
                     {info.features.map((feature) => (
                       <li key={feature} className="flex items-start gap-3">
                         <span className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full", highlighted ? "bg-primary-foreground/15" : "bg-muted")}>
@@ -132,7 +132,7 @@ export function Plans() {
                         </span>
                         <span>
                           <span className={cn("block text-sm font-medium", highlighted ? "text-primary-foreground" : "text-foreground")}>{feature}</span>
-                          <span className={cn("mt-0.5 block text-xs leading-relaxed", highlighted ? "text-primary-foreground/60" : "text-muted-foreground")}>
+                          <span className={cn("mt-0.5 block text-[11px] leading-snug", highlighted ? "text-primary-foreground/60" : "text-muted-foreground")}>
                             {copy.featureDescriptions[feature]}
                           </span>
                         </span>
@@ -143,7 +143,7 @@ export function Plans() {
                   <Link
                     href="/cadastro"
                     className={cn(
-                      "relative mt-9 inline-flex h-12 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium transition-all hover:scale-[1.02] active:scale-[0.98]",
+                      "relative mt-7 inline-flex h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium transition-all hover:scale-[1.02] active:scale-[0.98]",
                       highlighted
                         ? "bg-background text-foreground"
                         : "border border-border bg-background text-foreground hover:border-foreground/30",
@@ -152,7 +152,7 @@ export function Plans() {
                     {cta}
                     <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
                   </Link>
-                  <div className={cn("mt-4 flex items-center justify-center gap-2 text-xs", highlighted ? "text-primary-foreground/60" : "text-muted-foreground")}>
+                  <div className={cn("mt-3 flex items-center justify-center gap-2 text-[11px]", highlighted ? "text-primary-foreground/60" : "text-muted-foreground")}>
                     <ShieldCheck className="size-3.5" />
                     Sem complicação para começar
                   </div>

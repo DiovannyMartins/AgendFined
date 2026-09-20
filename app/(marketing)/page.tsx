@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   ArrowUpRight,
+  CalendarDays,
   CheckCircle2,
   CalendarCheck,
   CalendarClock,
@@ -337,57 +338,81 @@ export default function MarketingHome() {
 }
 
 function BookingPreview() {
+  const timeSlots = ["08:00", "08:30", "09:00", "09:30", "10:00", "10:30"];
+
   return (
-    <div className="relative rounded-3xl border border-border bg-card/80 p-4 text-left shadow-2xl backdrop-blur-sm">
-      <div className="rounded-2xl bg-background p-5">
-        <div className="mb-5 flex items-center justify-between border-b border-border pb-4">
-          <div className="flex items-center gap-2 font-semibold">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+    <div className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-black/50 p-2 text-left shadow-2xl shadow-black/30 backdrop-blur-sm">
+      <div className="pointer-events-none absolute -right-24 -top-24 size-64 rounded-full bg-white/[0.06] blur-[80px]" />
+      <div className="relative rounded-[1.5rem] border border-white/10 bg-[#111] p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white">
               <CalendarClock className="size-4" />
             </span>
-            Barbearia Demo
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-white">Barbearia Demo</p>
+              <p className="text-xs text-white/45">Página pública de reservas</p>
+            </div>
           </div>
-          <Badge variant="secondary">
-            <span className="size-1.5 rounded-full bg-emerald-500 motion-safe:animate-pulse" />
+          <Badge className="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/10 text-xs text-emerald-300">
+            <span className="size-1.5 rounded-full bg-emerald-400 motion-safe:animate-pulse" />
             Disponível
           </Badge>
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <div className="flex-1 space-y-2.5">
-            <div className="mb-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Serviço
-              </p>
-              <p className="mt-1 text-sm font-medium">Corte + Barba</p>
-              <p className="text-sm text-muted-foreground">R$ 60 · 45 min</p>
+
+        <div className="my-5 h-px bg-white/10" />
+
+        <div className="grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">Resumo</p>
+                <p className="mt-2 text-base font-semibold text-white">Corte + Barba</p>
+                <p className="mt-1 text-xs text-white/55">R$ 60 · 45 min</p>
+              </div>
+              <span className="flex size-8 items-center justify-center rounded-lg bg-white/10 text-white/70">
+                <CalendarDays className="size-4" />
+              </span>
             </div>
-            <div className="space-y-2.5">
+
+            <div className="mt-5 grid gap-2">
               {[
                 { label: "Data", value: "Hoje, 14:30" },
-                { label: "Cliente", value: "Maria S." },
+                { label: "Cliente", value: "João" },
                 { label: "Status", value: "Confirmada" },
               ].map((row) => (
-                <div key={row.label} className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-sm">
-                  <span className="text-muted-foreground">{row.label}</span>
-                  <span className="font-medium">{row.value}</span>
+                <div key={row.label} className="flex items-center justify-between rounded-xl bg-black/20 px-3 py-2.5 text-xs">
+                  <span className="text-white/50">{row.label}</span>
+                  <span className="font-medium text-white/90">{row.value}</span>
                 </div>
               ))}
             </div>
           </div>
-          <div className="grid flex-1 content-start grid-cols-3 gap-2">
-            {["08:00", "08:30", "09:00", "09:30", "10:00", "10:30"].map((time, i) => (
-              <div
-                key={time}
-                className={
-                  "rounded-lg border px-2 py-2 text-center text-sm transition-colors " +
-                  (i === 2
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border motion-safe:hover:bg-muted motion-safe:hover:animate-none")
-                }
-              >
-                {time}
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">Horários disponíveis</p>
+                <p className="mt-2 text-sm font-medium text-white">Escolha um horário</p>
               </div>
-            ))}
+              <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-medium text-white/60">Hoje</span>
+            </div>
+            <div className="mt-5 grid grid-cols-3 gap-2">
+              {timeSlots.map((time, i) => (
+                <div
+                  key={time}
+                  className={
+                    "rounded-xl border px-2 py-2.5 text-center text-xs font-medium transition-all " +
+                    (i === 2
+                      ? "border-white bg-white text-black shadow-[0_0_18px_rgba(255,255,255,0.12)]"
+                      : "border-white/10 bg-black/10 text-white/80 hover:border-white/30 hover:bg-white/10")
+                  }
+                >
+                  {time}
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 text-center text-[10px] text-white/40">Horários atualizados agora</p>
           </div>
         </div>
       </div>

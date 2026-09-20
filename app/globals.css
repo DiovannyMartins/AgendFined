@@ -168,16 +168,6 @@
   }
 }
 
-@utility bg-grid {
-  background-image: linear-gradient(
-      to right,
-      var(--border) 1px,
-      transparent 1px
-    ),
-    linear-gradient(to bottom, var(--border) 1px, transparent 1px);
-  background-size: 36px 36px;
-}
-
 @utility animate-glow-drift {
   animation: glow-drift 14s ease-in-out infinite;
 }

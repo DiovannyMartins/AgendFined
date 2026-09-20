@@ -1,7 +1,7 @@
 "use client";
 
 import Hls from "hls.js";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { ArrowRight, Play, Sparkles } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -11,9 +11,11 @@ const videoSrc =
   "https://stream.mux.com/T6oQJQ02cQ6N01TR6iHwZkKFkbepS34dkkIc9iukgy400g.m3u8";
 
 export function Hero({ children }: { children?: React.ReactNode }) {
+  const reduceMotion = useReducedMotion();
+
   return (
     <section id="top" className="relative isolate min-h-[calc(100svh-1px)] scroll-mt-20 overflow-hidden bg-black text-white">
-      <HeroVideo />
+      <HeroVideo reduceMotion={reduceMotion} />
 
       <div className="pointer-events-none absolute left-[20%] top-[-20%] -z-10 size-[600px] rounded-full bg-white/10 blur-[120px] mix-blend-screen" />
       <div className="pointer-events-none absolute bottom-[-10%] right-[20%] -z-10 size-[500px] rounded-full bg-zinc-500/10 blur-[120px] mix-blend-screen" />
@@ -22,50 +24,53 @@ export function Hero({ children }: { children?: React.ReactNode }) {
 
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center px-4 pb-16 pt-32 text-center sm:pt-40 lg:px-6">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={reduceMotion ? false : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.6 }}
           className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm text-white/80 backdrop-blur-md"
         >
           <Sparkles className="size-3.5 text-white" />
-          Agendamentos online para profissionais
+          Reservas online para profissionais
         </motion.div>
 
         <motion.p
-          initial={{ opacity: 0, y: 20 }}
+          initial={reduceMotion ? false : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.6, delay: 0.1 }}
           className="mt-9 font-display text-3xl leading-[1.1] text-white sm:text-5xl lg:text-[48px]"
         >
           Sua agenda trabalhando por você
         </motion.p>
 
         <motion.h1
-          initial={{ opacity: 0, scale: 0.9 }}
+          initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.6, delay: 0.2 }}
           className="mt-4 max-w-5xl text-balance text-6xl font-semibold leading-[0.9] tracking-tighter text-transparent [background-image:linear-gradient(to_bottom,#fff_0%,#fff_52%,#a7a7a7_100%)] bg-clip-text sm:text-8xl lg:text-[136px]"
         >
           24 horas por dia
         </motion.h1>
 
         <motion.p
-          initial={{ opacity: 0 }}
+          initial={reduceMotion ? false : { opacity: 0 }}
           animate={{ opacity: 0.72 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.6, delay: 0.4 }}
           className="mx-auto mt-8 max-w-xl text-pretty text-lg leading-[1.65] text-white sm:text-[20px]"
         >
-          Receba agendamentos online, organize seus horários e ofereça uma
+          Receba reservas online, organize seus horários e ofereça uma
           experiência mais profissional aos seus clientes.
         </motion.p>
 
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={reduceMotion ? false : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.5, delay: 0.6 }}
           className="mt-9 flex flex-col items-center gap-4 sm:flex-row sm:gap-6"
         >
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.98 }}>
+          <motion.div
+            whileHover={reduceMotion ? undefined : { scale: 1.05 }}
+            whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+          >
             <Link
               href="/cadastro"
               className="group relative inline-flex items-center gap-4 overflow-hidden rounded-full bg-white py-2 pl-6 pr-2 text-lg font-medium text-[#111] shadow-[0_0_0_rgba(255,255,255,0)] transition-shadow hover:shadow-[0_0_28px_rgba(255,255,255,0.25)]"
@@ -90,9 +95,9 @@ export function Hero({ children }: { children?: React.ReactNode }) {
 
         {children ? (
           <motion.div
-            initial={{ opacity: 0, y: 28 }}
+            initial={reduceMotion ? false : { opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.8 }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.7, delay: 0.8 }}
             className="mt-16 w-full max-w-3xl text-left"
           >
             {children}
@@ -103,12 +108,12 @@ export function Hero({ children }: { children?: React.ReactNode }) {
   );
 }
 
-function HeroVideo() {
+function HeroVideo({ reduceMotion }: { reduceMotion: boolean | null }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || reduceMotion) return;
 
     let hls: Hls | undefined;
     const playVideo = () => {
@@ -129,7 +134,7 @@ function HeroVideo() {
       hls?.destroy();
       video.removeEventListener("loadedmetadata", playVideo);
     };
-  }, []);
+  }, [reduceMotion]);
 
   return (
     <div className="pointer-events-none absolute inset-0 -z-20 overflow-hidden bg-black">
@@ -141,16 +146,18 @@ function HeroVideo() {
         className="object-cover"
         sizes="100vw"
       />
-      <video
-        ref={videoRef}
-        aria-hidden="true"
-        autoPlay
-        muted
-        loop
-        playsInline
-        poster="/images/hero.png"
-        className="absolute inset-0 size-full object-cover opacity-60 grayscale saturate-0"
-      />
+      {!reduceMotion && (
+        <video
+          ref={videoRef}
+          aria-hidden="true"
+          autoPlay
+          muted
+          loop
+          playsInline
+          poster="/images/hero.png"
+          className="absolute inset-0 size-full object-cover opacity-60 grayscale saturate-0"
+        />
+      )}
     </div>
   );
 }

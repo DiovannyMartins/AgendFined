@@ -31,7 +31,7 @@ const PLAN_COPY: Record<Plan, {
       "Serviços ilimitados": "Cadastre tudo o que você oferece.",
       "Clientes e histórico": "Mantenha informações importantes organizadas.",
       Bloqueios: "Proteja pausas, férias e horários pessoais.",
-      "Gestão de reservas": "Confirme e acompanhe cada agendamento.",
+      "Gestão de reservas": "Confirme e acompanhe cada reserva.",
       "Cancelamento self-service": "Dê autonomia para seus clientes.",
     },
   },

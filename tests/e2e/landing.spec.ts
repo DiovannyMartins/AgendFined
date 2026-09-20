@@ -6,13 +6,15 @@ test("landing page shows hero and CTAs", async ({ page }) => {
     page.getByRole("heading", { level: 1 }).filter({ hasText: "24 horas por dia" }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Entrar" }).first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Como funciona", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Do primeiro clique à reserva.", exact: true }),
+  ).toBeVisible();
 });
 
 test("landing shows the two plans with price and privileges", async ({ page }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Dois planos para o seu negócio", exact: true }),
+    page.getByRole("heading", { name: "Escolha o ritmo do seu negócio.", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("Grátis", { exact: true })).toBeVisible();
   await expect(page.getByText("R$ 0", { exact: true })).toBeVisible();

@@ -1,15 +1,20 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
+
+const serverOnlyTestStub = fileURLToPath(new URL("./tests/mocks/server-only.ts", import.meta.url));
+const testResolve = {
+  alias: { "server-only": serverOnlyTestStub },
+  tsconfigPaths: true,
+};
 
 export default defineConfig({
   plugins: [react()],
-  resolve: {
-    tsconfigPaths: true,
-  },
+  resolve: testResolve,
   test: {
     projects: [
       {
-        resolve: { tsconfigPaths: true },
+        resolve: testResolve,
         test: {
           name: "unit",
           environment: "jsdom",
@@ -23,7 +28,7 @@ export default defineConfig({
         },
       },
       {
-        resolve: { tsconfigPaths: true },
+        resolve: testResolve,
         test: {
           name: "integration",
           environment: "node",

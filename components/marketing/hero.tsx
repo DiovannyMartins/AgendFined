@@ -12,7 +12,7 @@ const videoSrc =
 
 export function Hero({ children }: { children?: React.ReactNode }) {
   return (
-    <section className="relative isolate min-h-[calc(100svh-1px)] overflow-hidden bg-black text-white">
+    <section id="top" className="relative isolate min-h-[calc(100svh-1px)] scroll-mt-20 overflow-hidden bg-black text-white">
       <HeroVideo />
 
       <div className="pointer-events-none absolute left-[20%] top-[-20%] -z-10 size-[600px] rounded-full bg-white/10 blur-[120px] mix-blend-screen" />

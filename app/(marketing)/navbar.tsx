@@ -32,7 +32,7 @@ export function Navbar() {
       )}
     >
       <nav className="mx-auto flex h-20 max-w-6xl items-center justify-between px-4 lg:px-6">
-        <Link href="/" className="group flex items-center gap-2 font-semibold">
+        <Link href="/#top" className="group flex items-center gap-2 font-semibold">
           <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-transform duration-300 group-hover:scale-105">
             <CalendarClock className="size-4" />
           </span>

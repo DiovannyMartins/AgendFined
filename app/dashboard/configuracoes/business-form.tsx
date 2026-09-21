@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { upsertBusiness, type ActionResultState } from "@/lib/business/actions";
 import { businessFormSchema, type BusinessFormValues } from "@/lib/validation/schemas";
+import { getBookingWindowLimitDays, type Plan } from "@/lib/plan/plan";
 
 const INITIAL: ActionResultState = { ok: true, data: undefined };
 
@@ -31,6 +32,8 @@ export function BusinessForm({
   const [pending, startTransition] = useTransition();
   const slug = typeof initial?.slug === "string" ? initial.slug : "";
   const creating = !slug;
+  const plan: Plan = initial?.plan === "pro" ? "pro" : "free";
+  const bookingWindowLimitDays = getBookingWindowLimitDays(plan);
 
   const {
     register,
@@ -44,7 +47,7 @@ export function BusinessForm({
       phone: String(initial?.phone ?? ""),
       slotIntervalMinutes: String(initial?.slotIntervalMinutes ?? 30),
       minNoticeMinutes: Number(initial?.minNoticeMinutes ?? 120),
-      bookingWindowDays: Number(initial?.bookingWindowDays ?? 60),
+      bookingWindowDays: Math.min(Number(initial?.bookingWindowDays ?? 60), bookingWindowLimitDays),
       description: String(initial?.description ?? ""),
     },
   });
@@ -155,14 +158,17 @@ export function BusinessForm({
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="bookingWindowDays">Janela futura (dias)</Label>
+              <Label htmlFor="bookingWindowDays">Janela de reservas (dias)</Label>
               <Input
                 id="bookingWindowDays"
                 type="number"
                 min={1}
-                max={180}
+                max={bookingWindowLimitDays}
                 {...register("bookingWindowDays", { valueAsNumber: true })}
               />
+              <p className="text-xs text-muted-foreground">
+                Seu plano permite reservas com até {bookingWindowLimitDays} dias de antecedência.
+              </p>
               {(errors.bookingWindowDays || fieldErrors.bookingWindowDays) && (
                 <p className="text-sm text-destructive">
                   {errors.bookingWindowDays?.message ?? fieldErrors.bookingWindowDays?.[0]}

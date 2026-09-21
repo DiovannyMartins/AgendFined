@@ -5,8 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { availabilitySchema } from "@/lib/validation/schemas";
 import { getCurrentBusiness } from "@/lib/business/queries";
+import { getEffectiveBookingWindowDays } from "@/lib/plan/plan";
 import type { ActionResult } from "@/lib/business/actions";
-import { computeAvailableSlots, localDayRangeUtc, overlaps, toUtcRange, weekdayOf } from "@/lib/booking/availability";
+import { computeAvailableSlots, isWithinWindow, localDayRangeUtc, overlaps, toUtcRange, weekdayOf } from "@/lib/booking/availability";
 import type { UtcRange } from "@/lib/booking/availability";
 
 export type { ActionResult };
@@ -222,7 +223,7 @@ export async function getSlotsForDate(
   const supabase = createAdminClient();
   const { data: business, error: businessError } = await supabase
     .from("businesses")
-    .select("id, is_active, slot_interval_minutes, min_notice_minutes, booking_window_days")
+    .select("id, is_active, slot_interval_minutes, min_notice_minutes, booking_window_days, plan")
     .eq("id", businessId)
     .single();
 
@@ -243,8 +244,9 @@ export async function getSlotsForDate(
   const rules = {
     slotIntervalMinutes: business.slot_interval_minutes,
     minNoticeMinutes: business.min_notice_minutes,
-    bookingWindowDays: business.booking_window_days,
+    bookingWindowDays: getEffectiveBookingWindowDays(business.plan, business.booking_window_days),
   };
+  if (!isWithinWindow(date, rules, new Date())) return { available: [], error: "booking_window" };
 
   // §10.2: interpret "now" and the requested date no fuso da aplicação.
   const weekday = weekdayOf(date);

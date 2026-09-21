@@ -27,7 +27,7 @@ export const businessSchema = z.object({
   phone: z.string().trim().min(8).max(20),
   slotIntervalMinutes: z.number().int().min(1, "O intervalo deve ser de pelo menos 1 minuto.").max(1440, "O intervalo não pode passar de 1440 minutos."),
   minNoticeMinutes: z.number().int().min(0).max(10080),
-  bookingWindowDays: z.number().int().min(1).max(180),
+  bookingWindowDays: z.number().int().min(1).max(365),
   // nullish: accepts "", null (empty in the form maps to null server-side) and
   // undefined, so the optional description can genuinely be left blank.
   description: z.string().trim().max(500).nullish(),
@@ -50,7 +50,7 @@ export const businessFormSchema = z.object({
     .regex(/^\d+$/, "Informe um número inteiro de minutos.")
     .refine((value) => Number(value) >= 1 && Number(value) <= 1440, "Use um intervalo entre 1 e 1440 minutos."),
   minNoticeMinutes: z.number().int().min(0).max(10080),
-  bookingWindowDays: z.number().int().min(1).max(180),
+  bookingWindowDays: z.number().int().min(1).max(365),
   description: z.string().trim().max(500).nullish(),
 });
 export type BusinessFormValues = z.infer<typeof businessFormSchema>;
@@ -108,6 +108,17 @@ export const bookingSchema = z.object({
   customerNote: z.string().trim().max(500).optional(),
 });
 export type BookingInput = z.infer<typeof bookingSchema>;
+
+// Public reservations need an address so the customer can receive their
+// confirmation. Keep `bookingSchema` optional for existing non-public callers.
+export const publicBookingSchema = bookingSchema.extend({
+  customerEmail: z
+    .string()
+    .trim()
+    .max(200, "O e-mail não pode passar de 200 caracteres.")
+    .email("Informe um e-mail válido."),
+});
+export type PublicBookingInput = z.infer<typeof publicBookingSchema>;
 
 export const bookingStatusSchema = z.enum(["confirmed", "completed", "cancelled", "no_show"]);
 export type BookingStatus = z.infer<typeof bookingStatusSchema>;

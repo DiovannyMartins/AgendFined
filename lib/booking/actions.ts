@@ -1,7 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { bookingSchema, publicCodeSchema } from "@/lib/validation/schemas";
+import { publicBookingSchema, publicCodeSchema } from "@/lib/validation/schemas";
 import {
   lookupBookingByPublicCode,
   toConsultState,
@@ -11,6 +11,7 @@ import { verifyCancelToken } from "@/lib/bookings/cancel";
 import { isWaitlistEligible, parseWaitlistInput } from "@/lib/waitlist/waitlist";
 import {
   computeAvailableSlots,
+  isWithinWindow,
   localDayRangeUtc,
   toUtcRange,
   weekdayOf,
@@ -20,6 +21,9 @@ import {
 } from "@/lib/booking/availability";
 import { enforceRateLimit, enforceConsultRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 import { verifyTurnstile } from "@/lib/booking/anti-bot";
+import { getEffectiveBookingWindowDays } from "@/lib/plan/plan";
+import type { Plan } from "@/lib/plan/plan";
+import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
 import {
   classifyCancellationReason,
   classifyCustomerNote,
@@ -49,12 +53,12 @@ export async function createBooking(input: {
 
   const startAtIso = zonedTimeToUtc(input.date, input.startTime);
 
-  const parsed = bookingSchema.safeParse({
+  const parsed = publicBookingSchema.safeParse({
     serviceId: input.serviceId,
     startAt: startAtIso,
     customerName: input.customerName,
     customerPhone: input.customerPhone,
-    customerEmail: input.customerEmail || "",
+    customerEmail: input.customerEmail ?? "",
     customerNote: input.customerNote || "",
   });
   if (!parsed.success) {
@@ -96,8 +100,15 @@ export async function createBooking(input: {
   const rules = {
     slotIntervalMinutes: business.slot_interval_minutes,
     minNoticeMinutes: business.min_notice_minutes,
-    bookingWindowDays: business.booking_window_days,
+    bookingWindowDays: getEffectiveBookingWindowDays(business.plan, business.booking_window_days),
   };
+  if (!isWithinWindow(input.date, rules, new Date())) {
+    return {
+      ok: false,
+      code: "booking_window",
+      message: `A data está fora da janela de reservas de ${rules.bookingWindowDays} dias deste negócio.`,
+    };
+  }
   const available = computeAvailableSlots({
     intervals: slotRange.intervals,
     rules,
@@ -119,12 +130,19 @@ export async function createBooking(input: {
     p_start_at: startAtIso,
     p_customer_name: parsed.data.customerName,
     p_customer_phone: parsed.data.customerPhone,
-    p_customer_email: parsed.data.customerEmail || undefined,
+    p_customer_email: parsed.data.customerEmail,
     p_customer_note: parsed.data.customerNote || undefined,
   });
 
   if (error) {
     const message = String(error.message ?? "");
+    if (/BOOKING_OUTSIDE_PLAN_WINDOW/i.test(message)) {
+      return {
+        ok: false,
+        code: "booking_window",
+        message: "O plano deste negócio não permite reservas para essa data.",
+      };
+    }
     if (message.includes("bookings_no_overlap") || /overlap|SLOT|23P01/i.test(message)) {
       return { ok: false, code: "slot_taken", message: "Esse horário acabou de ser reservado. Escolha outro." };
     }
@@ -133,6 +151,23 @@ export async function createBooking(input: {
       return { ok: false, code: "slot_taken", message: "Esse horário acabou de ser reservado. Escolha outro." };
     }
     return { ok: false, code: "db_error", message: "Não foi possível concluir a reserva. Tente novamente." };
+  }
+
+  if (data?.id && data.public_code) {
+    const emailResult = await sendBookingConfirmationEmail({
+      customerName: parsed.data.customerName,
+      customerEmail: parsed.data.customerEmail,
+      businessName: business.name,
+      serviceName: service.name,
+      startAt: startAtIso,
+      publicCode: data.public_code,
+    });
+    if (!emailResult.sent) {
+      console.error("booking_confirmation_email_failed", {
+        bookingId: data.id,
+        reason: emailResult.reason,
+      });
+    }
   }
 
   if (data?.id && parsed.data.customerNote) {
@@ -376,6 +411,8 @@ export async function joinWaitlist(input: {
 // admin client and the resolved business, or an `ActionResult` error to surface.
 type ResolvedBusiness = {
   id: string;
+  name: string;
+  plan: Plan | null;
   slot_interval_minutes: number;
   min_notice_minutes: number;
   booking_window_days: number;

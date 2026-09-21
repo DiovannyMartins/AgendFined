@@ -27,6 +27,7 @@ export const PLAN_INFO: Record<Plan, PlanInfo> = {
       "Bloqueios",
       "Gestão de reservas",
       "Cancelamento self-service",
+      "Reservas futuras até 90 dias",
     ],
   },
   pro: {
@@ -41,6 +42,7 @@ export const PLAN_INFO: Record<Plan, PlanInfo> = {
       "Lembretes automáticos",
       "Gestão da lista de espera",
       "Exportação Google Calendar/.ics",
+      "Reservas futuras até 365 dias",
     ],
   },
 };

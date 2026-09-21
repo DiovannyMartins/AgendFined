@@ -12,6 +12,10 @@ _Avoid_: Empresa, comerciante, prestador, estabelecimento
 Pessoa que reserva um serviço. Não possui conta; os dados são coletados no fluxo de reserva.
 _Avoid_: Usuário, consumidor, lead, paciente
 
+**Confirmação por e-mail**:
+Mensagem enviada ao endereço obrigatório informado pelo cliente após uma reserva pública ser confirmada, com os dados do atendimento e o código público.
+_Avoid_: Recibo, token de acesso
+
 **Serviço**:
 O que o negócio oferece: nome, duração e preço. Pode ser desativado (is_active = false) ou excluído; ao excluir, as reservas existentes são preservadas no histórico via snapshot e perdem apenas o vínculo (service_id). Com reserva agendada (confirmada e ainda não encerrada), a exclusão é bloqueada até não haver mais nada agendado.
 _Avoid_: Produto, item
@@ -41,7 +45,7 @@ O mínimo de tempo entre agora e o início da reserva (min_notice_minutes). Padr
 _Avoid_: Lead time, aviso prévio, notice
 
 **Janela (futura)**:
-Quantos dias à frente um cliente pode reservar (booking_window_days). Padrão: 60 dias.
+Quantos dias à frente um cliente pode reservar (booking_window_days). Padrão: 60 dias. O plano Grátis permite até 90 dias e o PRO até 365; a janela efetiva respeita o menor entre o valor configurado e o limite do plano.
 _Avoid_: Prazo, alcance, horizonte, window
 
 **Snapshot (da reserva)**:
@@ -49,7 +53,7 @@ Cópia do nome, preço e duração do serviço no momento da reserva. Garante qu
 _Avoid_: Cópia, imagem, ponto no tempo
 
 **Código público (public_code)**:
-Código de 8 caracteres em Crockford base32 (sem 0/O, 1/I/L), armazenado sem hífen e exibido agrupado (AB12-CD34), usado apenas na tela pública de confirmação. Nunca autoriza acesso a dados do cliente.
+Código de 8 caracteres em Crockford base32 (sem 0/O, 1/I/L), armazenado sem hífen e exibido agrupado (AB12-CD34), usado para identificar a reserva na tela e no e-mail de confirmação. Nunca autoriza acesso a dados do cliente.
 _Avoid_: Token, link de confirmação, código de rastreio
 
 **Token de cancelamento**:
@@ -75,11 +79,11 @@ A camada de produto que determina quais recursos um negócio pode usar. No Agend
 _Avoid_: Pacote, tier, versão, nível
 
 **Grátis**:
-O plano sem custo mensal. Contém o núcleo do agendamento: página pública, dashboard, serviços ilimitados, clientes e histórico, bloqueios, gestão de reservas e cancelamento self-service.
+O plano sem custo mensal. Contém o núcleo do agendamento: página pública, dashboard, serviços ilimitados, clientes e histórico, bloqueios, gestão de reservas e cancelamento self-service. Permite configurar uma janela futura de até 90 dias.
 _Avoid_: Free, gratuito, plano básico
 
 **PROFISSIONAL**:
-O plano pago (R$ 19/mês) que destrava os recursos profissionais: relatórios, lembretes automáticos, gestão da lista de espera e exportação para Google Calendar/.ics.
+O plano pago (R$ 19/mês) que destrava os recursos profissionais: relatórios, lembretes automáticos, gestão da lista de espera, exportação para Google Calendar/.ics e uma janela futura de até 365 dias.
 _Avoid_: Pro, premium, avançado, plano pago
 
 **Assinatura**:

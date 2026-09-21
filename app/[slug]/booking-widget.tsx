@@ -118,6 +118,8 @@ export function BookingWidget({
         setAvailabilityError(
           res.error === "db_error"
             ? "Não foi possível carregar os horários. Tente novamente."
+            : res.error === "booking_window"
+              ? "Esta data está fora da janela de reservas do negócio. Escolha outra."
             : res.error
               ? "Não foi possível encontrar este serviço ou negócio."
               : null,
@@ -326,13 +328,17 @@ export function BookingWidget({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="customerEmail">E-mail (opcional)</Label>
+            <Label htmlFor="customerEmail">E-mail para confirmação</Label>
             <Input
               id="customerEmail"
               type="email"
               value={customerEmail}
               onChange={(e) => setCustomerEmail(e.target.value)}
+              required
             />
+            <p className="text-xs text-muted-foreground">
+              Enviaremos os dados da reserva para este endereço.
+            </p>
           </div>
         </div>
 

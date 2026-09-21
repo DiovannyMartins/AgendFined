@@ -7,6 +7,22 @@
 
 export type Plan = "free" | "pro";
 
+export const BOOKING_WINDOW_LIMIT_DAYS: Record<Plan, number> = {
+  free: 90,
+  pro: 365,
+};
+
+export function getBookingWindowLimitDays(plan: Plan | null | undefined): number {
+  return plan === "pro" ? BOOKING_WINDOW_LIMIT_DAYS.pro : BOOKING_WINDOW_LIMIT_DAYS.free;
+}
+
+export function getEffectiveBookingWindowDays(
+  plan: Plan | null | undefined,
+  configuredDays: number,
+): number {
+  return Math.min(configuredDays, getBookingWindowLimitDays(plan));
+}
+
 export type PlanGateResult = { ok: true } | { ok: false; code: "UPGRADE_REQUIRED" };
 
 // Fail-closed: anything that isn't exactly "pro" (free, null, undefined) is not

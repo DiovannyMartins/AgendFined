@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { businessSchema } from "@/lib/validation/schemas";
+import { getBookingWindowLimitDays } from "@/lib/plan/plan";
 
 export type ActionResult<T = undefined, E = undefined> =
   | { ok: true; data: T }
@@ -87,9 +88,21 @@ export async function upsertBusiness(
 
   const existing = await supabase
     .from("businesses")
-    .select("id, created_at")
+    .select("id, plan")
     .eq("owner_id", user.id)
     .maybeSingle();
+
+  const bookingWindowLimitDays = getBookingWindowLimitDays(existing.data?.plan);
+  if (parsed.data.bookingWindowDays > bookingWindowLimitDays) {
+    return {
+      ok: false,
+      code: "VALIDATION",
+      message: "A janela de reservas excede o limite do seu plano.",
+      fieldErrors: {
+        bookingWindowDays: [`O limite do seu plano é de ${bookingWindowLimitDays} dias.`],
+      },
+    };
+  }
 
   if (existing.data?.id) {
     const { error } = await supabase

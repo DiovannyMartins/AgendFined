@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { useState, useTransition } from "react";
-import { startUpgrade } from "@/lib/billing/actions";
+import { retryUpgrade, startUpgrade } from "@/lib/billing/actions";
 
 const ctaClassName =
   "relative mt-7 inline-flex h-11 items-center justify-center gap-2 rounded-full bg-background px-5 text-sm font-medium text-foreground transition-all hover:scale-[1.02] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60";
@@ -40,7 +40,11 @@ export function MarketingPlanCta({
     checkoutWindow.opener = null;
     startTransition(async () => {
       try {
-        const result = await startUpgrade();
+        const initialResult = await startUpgrade();
+        const result =
+          !initialResult.ok && initialResult.code === "UPGRADE_PENDING"
+            ? await retryUpgrade()
+            : initialResult;
         if (result.ok) {
           checkoutWindow.location.href = result.initPoint;
         } else {

@@ -26,4 +26,5 @@ Os testes unitários devem cobrir:
 2. Fazer login com uma conta que tenha negócio no plano Grátis.
 3. Voltar para a página inicial e clicar em `Assinar PROFISSIONAL`.
 4. Confirmar que a página de marketing permanece aberta e uma nova aba navega diretamente para o checkout do Mercado Pago.
-5. Cancelar ou concluir o checkout e confirmar que o retorno continua usando o fluxo de billing existente.
+5. Fechar o checkout sem pagar, clicar novamente em `Assinar PROFISSIONAL` e confirmar que uma nova aba recebe um checkout novo, sem a mensagem de assinatura pendente.
+6. Cancelar ou concluir o checkout e confirmar que o retorno continua usando o fluxo de billing existente.

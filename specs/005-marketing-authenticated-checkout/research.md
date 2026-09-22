@@ -23,3 +23,9 @@
 - **Decision**: falhas fecham a aba temporária e aparecem como mensagem inline no CTA.
 - **Rationale**: preserva a página de marketing e reutiliza as mensagens de domínio retornadas pelo billing para negócio ausente, ambiente não configurado ou assinatura já existente.
 - **Alternatives considered**: redirecionar ao dashboard em erro seria inesperado e não resolve a falha; usar alert nativo é menos acessível e menos consistente com a UI.
+
+## Decisão 5: retry automático para checkout pendente
+
+- **Decision**: quando `startUpgrade` retornar `UPGRADE_PENDING`, o CTA chamará `retryUpgrade` e usará o novo `initPoint` retornado.
+- **Rationale**: o billing já possui um fluxo de retry protegido por tentativa esperada e idempotência. Reutilizá-lo permite que o botão público resolva o checkout abandonado sem duplicar regras nem mandar o usuário ao dashboard.
+- **Alternatives considered**: exibir somente a mensagem deixa o usuário bloqueado; chamar `retryUpgrade` sempre falha para contas sem pagamento pendente; criar um novo endpoint duplicaria o orquestrador existente.

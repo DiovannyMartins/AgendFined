@@ -2,8 +2,8 @@
 
 **Feature Branch**: `005-marketing-authenticated-checkout`
 **Created**: 2026-09-21
-**Status**: Draft
-**Input**: User description: "Para quem já está logado, o botão Assinar PROFISSIONAL deve abrir o Mercado Pago em vez de ir para o dashboard."
+**Status**: Updated
+**Input**: User description: "Para quem já está logado, o botão Assinar PROFISSIONAL deve abrir o Mercado Pago em vez de ir para o dashboard; se já houver checkout pendente, deve gerar um checkout novo."
 
 ## User Scenarios & Testing
 
@@ -20,6 +20,7 @@ Como usuário autenticado que está avaliando o plano PROFISSIONAL, quero que o 
 1. **Given** uma sessão autenticada com negócio no plano Grátis, **When** o usuário clica em "Assinar PROFISSIONAL", **Then** o sistema chama o fluxo de upgrade existente e abre o checkout retornado pelo Mercado Pago em uma nova aba.
 2. **Given** que o checkout ainda está sendo criado, **When** o usuário observa o botão, **Then** o botão fica desabilitado e informa que o redirecionamento está em andamento.
 3. **Given** que o navegador bloqueia pop-ups, **When** o usuário clica no botão, **Then** o sistema informa que pop-ups precisam ser permitidos e não perde a página atual.
+4. **Given** uma sessão autenticada com uma assinatura pendente, **When** o usuário clica em "Assinar PROFISSIONAL", **Then** o sistema gera um novo checkout e o abre em uma nova aba, sem exibir a mensagem de pagamento pendente como erro final.
 
 ---
 
@@ -62,18 +63,19 @@ Como usuário autenticado, quero receber a mensagem retornada pelo billing quand
 ### Functional Requirements
 
 - **FR-001**: O sistema MUST verificar no servidor se existe uma sessão autenticada ao renderizar a página de marketing.
-- **FR-002**: Para usuário autenticado, o CTA "Assinar PROFISSIONAL" MUST iniciar o server action `startUpgrade` existente.
+- **FR-002**: Para usuário autenticado, o CTA "Assinar PROFISSIONAL" MUST iniciar o fluxo de upgrade existente e, quando houver uma assinatura pendente, MUST usar o fluxo de retry para gerar um novo checkout.
 - **FR-003**: Para usuário autenticado, o sistema MUST abrir o `initPoint` retornado pelo Mercado Pago em uma nova aba.
 - **FR-004**: O sistema MUST manter o CTA de visitantes apontando para `/cadastro`.
 - **FR-005**: Enquanto o checkout estiver sendo criado, o CTA MUST ficar desabilitado e comunicar o estado de processamento.
 - **FR-006**: Falhas retornadas pelo billing MUST ser exibidas ao usuário na página pública e não MUST redirecionar para o dashboard.
-- **FR-007**: O checkout autenticado MUST reutilizar as validações, idempotência e configuração de preço do fluxo de billing existente.
+- **FR-007**: O checkout autenticado MUST reutilizar as validações, idempotência e configuração de preço dos fluxos de billing existentes.
+- **FR-008**: Uma nova tentativa MUST continuar protegida contra duplicidade e conflitos de estado pelo server-side billing, mesmo quando o CTA for acionado repetidamente.
 
 ## Key Entities
 
 - **Sessão autenticada**: Identidade Supabase usada pelo servidor para decidir se o visitante já pode iniciar o checkout.
 - **Checkout PROFISSIONAL**: Pré-aprovação criada pelo fluxo de billing, identificada pelo `initPoint` do Mercado Pago.
-- **Resultado de upgrade**: Resultado de sucesso ou erro retornado por `startUpgrade`, incluindo mensagem para feedback da interface.
+- **Resultado de upgrade**: Resultado de sucesso ou erro retornado pelos fluxos inicial ou de retry, incluindo mensagem para feedback da interface.
 
 ## Success Criteria
 
@@ -81,12 +83,13 @@ Como usuário autenticado, quero receber a mensagem retornada pelo billing quand
 
 - **SC-001**: 100% dos cliques autenticados elegíveis no CTA iniciam diretamente o checkout do Mercado Pago sem passar por `/dashboard`.
 - **SC-002**: 100% dos cliques anônimos continuam levando a `/cadastro`.
-- **SC-003**: Falhas de checkout ficam visíveis no mesmo card em até uma resposta do server action, sem navegação incorreta.
+- **SC-003**: Falhas de checkout ficam visíveis no mesmo card em até uma resposta do fluxo de billing, sem navegação incorreta.
 - **SC-004**: O fluxo existente de assinatura e seu preço de R$ 1/mês permanecem inalterados.
+- **SC-005**: 100% dos usuários autenticados com checkout pendente que clicarem no CTA recebem a oportunidade de iniciar um checkout novo, sem precisar visitar o dashboard.
 
 ## Assumptions
 
 - A sessão autenticada e o negócio atual são resolvidos pelas funções Supabase e billing já existentes.
-- `startUpgrade` continua sendo a fonte de verdade para o preço, elegibilidade, idempotência e criação do checkout.
+- Os fluxos existentes de upgrade continuam sendo a fonte de verdade para o preço, elegibilidade, idempotência e criação do checkout.
 - A abertura em nova aba é o comportamento desejado também na página pública.
 - A configuração de `MERCADO_PAGO_ACCESS_TOKEN` já é responsabilidade do ambiente, fora do escopo desta alteração.

@@ -102,3 +102,12 @@ description: "Task list for authenticated marketing checkout"
 2. Validar US1 com teste unitário e então manter explicitamente o link anônimo de US2.
 3. Cobrir erros de US3 sem alterar `lib/billing/actions.ts`.
 4. Rodar testes, lint e typecheck; marcar os artefatos como concluídos somente após a validação.
+
+## Phase 7: Convergence
+
+**Purpose**: Fechar a lacuna descoberta após o primeiro fluxo: uma assinatura pendente precisa permitir um checkout novo pelo CTA da página pública.
+
+- [X] T014 [US1] Adicionar teste de regressão para a resposta `UPGRADE_PENDING`, verificando que o CTA chama o retry e abre o novo `initPoint` em `app/(marketing)/marketing-plan-cta.test.tsx` (US1/AC4, partial).
+- [X] T015 [US1] Atualizar `app/(marketing)/marketing-plan-cta.tsx` para chamar `retryUpgrade` quando `startUpgrade` informar checkout pendente, mantendo a abertura em nova aba e os guardrails server-side (FR-002, FR-008, partial).
+- [X] T016 [US1] Atualizar `research.md`, `plan.md` e `quickstart.md` para registrar o fallback seguro entre checkout inicial e retry (FR-007, partial).
+- [X] T017 [P] [US1] Executar testes unitários, lint, typecheck e build descritos em `specs/005-marketing-authenticated-checkout/quickstart.md` e confirmar que o preço de R$ 1/mês não foi alterado (SC-004, SC-005).

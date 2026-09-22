@@ -1,13 +1,15 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { startUpgrade } from "@/lib/billing/actions";
+import { retryUpgrade, startUpgrade } from "@/lib/billing/actions";
 import { MarketingPlanCta } from "./marketing-plan-cta";
 
 vi.mock("@/lib/billing/actions", () => ({
+  retryUpgrade: vi.fn(),
   startUpgrade: vi.fn(),
 }));
 
 const mockedStartUpgrade = vi.mocked(startUpgrade);
+const mockedRetryUpgrade = vi.mocked(retryUpgrade);
 
 describe("MarketingPlanCta", () => {
   beforeEach(() => {
@@ -47,6 +49,36 @@ describe("MarketingPlanCta", () => {
     });
     expect(open).toHaveBeenCalledWith("", "_blank");
     expect(checkoutWindow.opener).toBeNull();
+  });
+
+  it("gera um checkout novo quando já existe um pagamento pendente", async () => {
+    const checkoutWindow = {
+      close: vi.fn(),
+      location: { href: "" },
+      opener: null,
+    } as unknown as Window;
+    vi.spyOn(window, "open").mockReturnValue(checkoutWindow);
+    mockedStartUpgrade.mockResolvedValue({
+      ok: false,
+      code: "UPGRADE_PENDING",
+      message: "Você já iniciou uma assinatura. Conclua o pagamento para ativá-la.",
+    });
+    mockedRetryUpgrade.mockResolvedValue({
+      ok: true,
+      initPoint: "https://www.mercadopago.com.br/checkout/profissional-novo",
+    });
+
+    render(<MarketingPlanCta isAuthenticated label="Assinar PROFISSIONAL" />);
+    fireEvent.click(screen.getByRole("button", { name: "Assinar PROFISSIONAL" }));
+
+    await waitFor(() => {
+      expect(mockedStartUpgrade).toHaveBeenCalledOnce();
+      expect(mockedRetryUpgrade).toHaveBeenCalledOnce();
+      expect(checkoutWindow.location.href).toBe(
+        "https://www.mercadopago.com.br/checkout/profissional-novo",
+      );
+    });
+    expect(checkoutWindow.close).not.toHaveBeenCalled();
   });
 
   it("desabilita o CTA enquanto o checkout está sendo criado", async () => {

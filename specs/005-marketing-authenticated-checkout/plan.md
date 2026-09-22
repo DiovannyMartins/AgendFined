@@ -8,7 +8,7 @@
 
 ## Summary
 
-Usuários autenticados devem iniciar o checkout PROFISSIONAL diretamente pela página de marketing. A página verificará a sessão no servidor; visitantes continuarão usando o link de cadastro, enquanto usuários logados receberão um CTA client-side que chama o `startUpgrade` existente e abre o `initPoint` do Mercado Pago em nova aba.
+Usuários autenticados devem iniciar o checkout PROFISSIONAL diretamente pela página de marketing. A página verificará a sessão no servidor; visitantes continuarão usando o link de cadastro, enquanto usuários logados receberão um CTA client-side que chama o `startUpgrade` existente, usa `retryUpgrade` quando houver checkout pendente e abre o `initPoint` do Mercado Pago em nova aba.
 
 ## Technical Context
 
@@ -42,7 +42,7 @@ Usuários autenticados devem iniciar o checkout PROFISSIONAL diretamente pela p�
 
 Os princípios de arquitetura, segurança, reutilização e qualidade são atendidos:
 
-- **Pass**: reutilizar o server action de billing existente, sem duplicar preço ou lógica de Mercado Pago.
+- **Pass**: reutilizar os server actions de billing existentes, sem duplicar preço ou lógica de Mercado Pago.
 - **Pass**: manter a autorização no servidor e limitar o client component à interação e navegação.
 - **Pass**: preservar o comportamento público existente para visitantes.
 - **Pass**: adicionar testes unitários para os caminhos de CTA e executar lint/typecheck.
@@ -75,7 +75,7 @@ app/
 ├── (marketing)/
 │   ├── page.tsx                    # lê sessão no servidor
 │   ├── plans.tsx                   # escolhe CTA anônimo/autenticado
-│   └── marketing-plan-cta.tsx      # inicia checkout no cliente
+│   └── marketing-plan-cta.tsx      # inicia ou repete checkout no cliente
 └── dashboard/configuracoes/
     └── upgrade-button.tsx          # padrão existente de nova aba
 

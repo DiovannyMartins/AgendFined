@@ -45,11 +45,11 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
         ? subscription.gracePeriodEnd
         : null;
 
-  const badge = displayStatus
-    ? STATUS_BADGE[displayStatus]
-    : isPro
-      ? { label: "Ativo", variant: "default" as const }
-      : { label: "Atual", variant: "secondary" as const };
+  const badge = isPro
+    ? displayStatus
+      ? STATUS_BADGE[displayStatus]
+      : { label: "Ativo", variant: "default" as const }
+    : { label: "Atual", variant: "secondary" as const };
   // The business remains Free until the pending checkout is authorized, so
   // keep the Pro offer visible even while the owner is completing payment.
   const showProOffer = !isPro;
@@ -150,7 +150,6 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-lg font-semibold">{proInfo.name}</p>
-                  <Badge>Recomendado</Badge>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {`${proInfo.price}${proInfo.period}`} · {proInfo.description}

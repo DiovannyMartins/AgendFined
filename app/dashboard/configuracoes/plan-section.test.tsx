@@ -45,6 +45,7 @@ describe("PlanSection", () => {
     expect(screen.getByText(/R\$ 1\/mês/)).toBeInTheDocument();
     expect(screen.getByText("Relatórios", { exact: true })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Assinar PROFISSIONAL" })).toBeInTheDocument();
+    expect(screen.queryByText("Recomendado", { exact: true })).not.toBeInTheDocument();
   });
 
   it("keeps the active Pro controls without a duplicate upgrade offer", async () => {
@@ -84,6 +85,8 @@ describe("PlanSection", () => {
     render(await PlanSection({ business: { id: "biz_1", plan: "free" } }));
 
     expect(screen.getByText("Checkout não concluído", { exact: true })).toBeInTheDocument();
+    expect(screen.getByText("Atual", { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText("Pendente", { exact: true })).not.toBeInTheDocument();
     expect(screen.getByText("PROFISSIONAL", { exact: true })).toBeInTheDocument();
     expect(screen.getByText(/R\$ 1\/mês/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Fazer upgrade" })).toBeInTheDocument();

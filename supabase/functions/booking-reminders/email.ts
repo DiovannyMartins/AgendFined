@@ -1,16 +1,20 @@
-import { formatWhen } from "@/lib/format/when";
-
-type BookingConfirmation = {
-  customerName: string;
-  customerEmail: string;
-  businessName: string;
-  serviceName: string;
-  startAt: string;
-  publicCode: string;
+type ReminderCandidate = {
+  business_name: string;
+  customer_name_snapshot: string;
+  customer_email_snapshot: string;
+  service_name_snapshot: string;
+  start_at: string;
+  public_code: string;
 };
 
-type SendResult = { sent: true } | { sent: false; reason: "not_configured" | "provider_error" };
+export type ReminderEmail = {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+};
 
+const APP_TIMEZONE = "America/Sao_Paulo";
 const HTML_ENTITIES: Record<string, string> = {
   "&": "&amp;",
   "<": "&lt;",
@@ -23,19 +27,47 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => HTML_ENTITIES[character]);
 }
 
-function buildBookingConfirmationHtml(input: BookingConfirmation, formattedWhen: string): string {
-  const customerName = escapeHtml(input.customerName);
-  const businessName = escapeHtml(input.businessName);
-  const serviceName = escapeHtml(input.serviceName);
-  const publicCode = escapeHtml(input.publicCode);
-  const dateAndTime = escapeHtml(formattedWhen);
+function formatWhen(iso: string): string {
+  const parts = new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: APP_TIMEZONE,
+  }).formatToParts(new Date(iso));
+  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("day")}/${value("month")}/${value("year")} às ${value("hour")}:${value("minute")}`;
+}
 
-  return `<!DOCTYPE html>
+export function buildReminderEmail(candidate: ReminderCandidate): ReminderEmail {
+  const when = formatWhen(candidate.start_at);
+  const customerName = escapeHtml(candidate.customer_name_snapshot);
+  const businessName = escapeHtml(candidate.business_name);
+  const serviceName = escapeHtml(candidate.service_name_snapshot);
+  const dateAndTime = escapeHtml(when);
+  const publicCode = escapeHtml(candidate.public_code);
+
+  return {
+    to: candidate.customer_email_snapshot,
+    subject: `Lembrete: seu horário está confirmado — ${candidate.business_name}`,
+    text: [
+      `Olá ${candidate.customer_name_snapshot}!`,
+      "",
+      `Este é um lembrete da sua reserva confirmada em ${candidate.business_name}.`,
+      `Serviço: ${candidate.service_name_snapshot}`,
+      `Data e horário: ${when}`,
+      `Código da reserva: ${candidate.public_code}`,
+      "",
+      "Aguardamos você!",
+    ].join("\n"),
+    html: `<!DOCTYPE html>
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sua reserva foi confirmada</title>
+    <title>Lembrete da sua reserva</title>
   </head>
   <body style="margin:0;background-color:#141414;color:#eeeeee;font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background-color:#141414;">
@@ -54,9 +86,9 @@ function buildBookingConfirmationHtml(input: BookingConfirmation, formattedWhen:
             </tr>
             <tr>
               <td style="padding:36px 32px 32px;">
-                <p style="margin:0 0 12px;color:#b0b0b0;font-size:13px;line-height:20px;">CONFIRMAÇÃO DE RESERVA</p>
-                <h1 style="margin:0;color:#eeeeee;font-size:28px;font-weight:700;line-height:36px;letter-spacing:-0.6px;">Sua reserva está confirmada.</h1>
-                <p style="margin:16px 0 0;color:#b0b0b0;font-size:16px;line-height:25px;">Olá, ${customerName}! Seu horário foi reservado com sucesso.</p>
+                <p style="margin:0 0 12px;color:#b0b0b0;font-size:13px;line-height:20px;">LEMBRETE DE RESERVA</p>
+                <h1 style="margin:0;color:#eeeeee;font-size:28px;font-weight:700;line-height:36px;letter-spacing:-0.6px;">Seu horário está chegando.</h1>
+                <p style="margin:16px 0 0;color:#b0b0b0;font-size:16px;line-height:25px;">Olá, ${customerName}! Este é um lembrete da sua reserva confirmada.</p>
 
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin-top:28px;border:1px solid #333333;border-radius:9px;border-collapse:separate;background-color:#242424;">
                   <tr>
@@ -85,7 +117,7 @@ function buildBookingConfirmationHtml(input: BookingConfirmation, formattedWhen:
                   </tr>
                 </table>
 
-                <p style="margin:26px 0 0;color:#b0b0b0;font-size:14px;line-height:22px;">Guarde este e-mail para consultar os dados da reserva.</p>
+                <p style="margin:26px 0 0;color:#b0b0b0;font-size:14px;line-height:22px;">Aguardamos você! Guarde este e-mail para consultar os dados da reserva.</p>
               </td>
             </tr>
             <tr>
@@ -98,46 +130,6 @@ function buildBookingConfirmationHtml(input: BookingConfirmation, formattedWhen:
       </tr>
     </table>
   </body>
-</html>`;
-}
-
-export async function sendBookingConfirmationEmail(input: BookingConfirmation): Promise<SendResult> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM_EMAIL;
-  if (!apiKey || !from) return { sent: false, reason: "not_configured" };
-
-  const formattedWhen = formatWhen(input.startAt);
-  const text = [
-    `Olá, ${input.customerName}!`,
-    "",
-    "Sua reserva está confirmada.",
-    `Negócio: ${input.businessName}`,
-    `Serviço: ${input.serviceName}`,
-    `Data e horário: ${formattedWhen}`,
-    `Código da reserva: ${input.publicCode}`,
-    "",
-    "Guarde este e-mail para consultar os dados da reserva.",
-  ].join("\n");
-  const html = buildBookingConfirmationHtml(input, formattedWhen);
-
-  try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to: [input.customerEmail],
-        subject: "Sua reserva foi confirmada",
-        text,
-        html,
-      }),
-      signal: AbortSignal.timeout(8_000),
-    });
-    return response.ok ? { sent: true } : { sent: false, reason: "provider_error" };
-  } catch {
-    return { sent: false, reason: "provider_error" };
-  }
+</html>`,
+  };
 }

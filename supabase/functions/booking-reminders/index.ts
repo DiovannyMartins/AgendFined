@@ -21,6 +21,7 @@
 // in flight. Unmarked failures are retried by the next tick.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { buildReminderEmail } from "./email.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -39,6 +40,7 @@ type Candidate = {
   customer_email_snapshot: string | null;
   service_name_snapshot: string;
   start_at: string;
+  public_code: string;
   reminder_claim_token: string;
 };
 
@@ -54,6 +56,7 @@ function isCandidate(value: unknown): value is Candidate {
       typeof candidate.service_name_snapshot === "string" &&
       typeof candidate.start_at === "string" &&
       !Number.isNaN(new Date(candidate.start_at).getTime()) &&
+      typeof candidate.public_code === "string" &&
       typeof candidate.reminder_claim_token === "string" &&
       /^[0-9a-f-]{36}$/i.test(candidate.reminder_claim_token),
   );
@@ -62,40 +65,6 @@ function isCandidate(value: unknown): value is Candidate {
 function isDue(startAt: string, now: Date): boolean {
   const diff = new Date(startAt).getTime() - now.getTime();
   return diff > 0 && diff <= REMINDER_LEAD_MS;
-}
-
-// Mirror of lib/format/when.ts (kept in sync by
-// hand): "dd/mm/yyyy às HH:mm" em America/Sao_Paulo.
-const APP_TIMEZONE = "America/Sao_Paulo";
-
-function formatWhen(iso: string): string {
-  const parts = new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: APP_TIMEZONE,
-  }).formatToParts(new Date(iso));
-  const value = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  return `${value("day")}/${value("month")}/${value("year")} às ${value("hour")}:${value("minute")}`;
-}
-
-function buildEmail(candidate: Candidate): { to: string; subject: string; text: string } {
-  const when = formatWhen(candidate.start_at);
-  return {
-    to: candidate.customer_email_snapshot!,
-    subject: `Lembrete: seu horário está confirmado — ${candidate.business_name}`,
-    text: [
-      `Olá ${candidate.customer_name_snapshot}!`,
-      "",
-      `Este é um lembrete da sua reserva confirmada em ${candidate.business_name}.`,
-      `${candidate.service_name_snapshot} em ${when}.`,
-      "",
-      "Aguardamos você!",
-    ].join("\n"),
-  };
 }
 
 function json(body: unknown, status = 200): Response {
@@ -132,7 +101,7 @@ Deno.serve(async (req) => {
     // E-mail not wired: leave the booking unmarked so nothing is lost until it is.
     if (!RESEND_API_KEY || !RESEND_FROM_EMAIL) continue;
 
-    const email = buildEmail(candidate);
+    const email = buildReminderEmail(candidate);
     try {
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -145,6 +114,7 @@ Deno.serve(async (req) => {
           to: [email.to],
           subject: email.subject,
           text: email.text,
+          html: email.html,
         }),
       });
       if (res.ok) sentIds.push(candidate.id);

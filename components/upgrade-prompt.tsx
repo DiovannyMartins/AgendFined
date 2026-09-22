@@ -6,14 +6,14 @@ import { cn } from "@/lib/utils";
 
 // Upgrade prompt for a gated Pro feature (ADR 0008). Rendered when a Free
 // business reaches a Pro boundary (reports, reminders, waitlist management,
-// calendar export); it explains the gate and points to the plans page. The
-// actual billing/upgrade flow (Mercado Pago) is a later seam, so the CTA lands
-// on the plans section for now.
+// calendar export); it explains the gate and points to the dashboard plan
+// section. The actual billing/upgrade flow (Mercado Pago) is a later seam, so
+// the CTA lands on that section for now.
 export function UpgradePrompt({
   title = "Assine o PROFISSIONAL",
   description = "Relatórios, lembretes automáticos, gestão da lista de espera e exportação de agenda são recursos do plano PROFISSIONAL.",
   ctaLabel = "Ver planos",
-  ctaHref = "/#planos",
+  ctaHref = "/dashboard/configuracoes#plano",
 }: {
   title?: string;
   description?: string;

@@ -55,7 +55,7 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
   const showProOffer = !isPro;
 
   return (
-    <section>
+    <section id="plano">
       <h2 className="text-xl font-semibold">Plano</h2>
       <p className="mt-1 text-muted-foreground">
         Seu plano atual, os privilégios incluídos e o status da assinatura.

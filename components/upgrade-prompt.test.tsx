@@ -9,12 +9,14 @@ describe("UpgradePrompt (ADR 0008)", () => {
         title="Relatórios é um recurso PROFISSIONAL"
         description="Assine o PROFISSIONAL para ver faturamento."
         ctaLabel="Ver planos"
-        ctaHref="/#planos"
       />,
     );
 
     expect(screen.getByText("Relatórios é um recurso PROFISSIONAL")).toBeInTheDocument();
     expect(screen.getByText("Assine o PROFISSIONAL para ver faturamento.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Ver planos" })).toHaveAttribute("href", "/#planos");
+    expect(screen.getByRole("link", { name: "Ver planos" })).toHaveAttribute(
+      "href",
+      "/dashboard/configuracoes#plano",
+    );
   });
 });

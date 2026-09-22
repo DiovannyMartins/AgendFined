@@ -26,7 +26,12 @@ export default async function DashboardHome() {
               </Link>
             </p>
           </div>
-          <Link href={publicUrl} className={cn(buttonVariants({ variant: "outline" }))}>
+          <Link
+            href={publicUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(buttonVariants({ variant: "outline" }))}
+          >
             Ver página pública
           </Link>
         </div>

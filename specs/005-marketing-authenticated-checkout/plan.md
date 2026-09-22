@@ -8,7 +8,7 @@
 
 ## Summary
 
-Usuários autenticados devem iniciar o checkout PROFISSIONAL diretamente pela página de marketing. A página verificará a sessão no servidor; visitantes continuarão usando o link de cadastro, enquanto usuários logados receberão um CTA client-side que chama o `startUpgrade` existente, usa `retryUpgrade` quando houver checkout pendente e abre o `initPoint` do Mercado Pago em nova aba.
+Usuários autenticados devem iniciar o checkout PROFISSIONAL diretamente pela página de marketing. A página verificará a sessão no servidor; visitantes continuarão usando o link de cadastro, enquanto usuários logados receberão um CTA client-side que chama o `startUpgrade` existente, usa `retryUpgrade` quando houver checkout pendente e navega para o `initPoint` do Mercado Pago na mesma aba.
 
 ## Technical Context
 
@@ -32,7 +32,7 @@ Usuários autenticados devem iniciar o checkout PROFISSIONAL diretamente pela p�
 
 **Performance Goals**: O clique deve criar a aba imediatamente e concluir a navegação assim que o server action retornar; sem chamadas extras de autenticação no cliente
 
-**Constraints**: Reutilizar `startUpgrade`, manter R$ 1/mês, não confiar em estado de autenticação enviado pelo cliente, preservar o fluxo anônimo para `/cadastro`
+**Constraints**: Reutilizar `startUpgrade`/`retryUpgrade`, manter R$ 1/mês, não confiar em estado de autenticação enviado pelo cliente, preservar o fluxo anônimo para `/cadastro` e navegar na mesma aba
 
 **Scale/Scope**: Um CTA da página de marketing, uma verificação server-side e cobertura unitária dos fluxos autenticado/anônimo/erro
 
@@ -75,15 +75,16 @@ app/
 ├── (marketing)/
 │   ├── page.tsx                    # lê sessão no servidor
 │   ├── plans.tsx                   # escolhe CTA anônimo/autenticado
-│   └── marketing-plan-cta.tsx      # inicia ou repete checkout no cliente
+│   └── marketing-plan-cta.tsx      # inicia ou repete checkout na mesma aba
 └── dashboard/configuracoes/
     └── upgrade-button.tsx          # padrão existente de nova aba
 
 lib/billing/actions.ts              # server action startUpgrade reutilizado
+lib/billing/checkout-navigation.ts  # navegação do checkout na mesma aba
 tests/                              # testes unitários existentes
 ```
 
-**Structure Decision**: Aplicação Next.js existente, mantendo a leitura de sessão no Server Component da página de marketing e isolando a chamada de server action em um Client Component pequeno. Nenhum novo serviço, endpoint ou modelo de dados será criado.
+**Structure Decision**: Aplicação Next.js existente, mantendo a leitura de sessão no Server Component da página de marketing e isolando a chamada de server action e navegação na mesma aba em Client Components pequenos. Nenhum novo serviço, endpoint ou modelo de dados será criado.
 
 ## Complexity Tracking
 

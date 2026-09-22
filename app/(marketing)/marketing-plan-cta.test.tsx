@@ -1,18 +1,24 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { retryUpgrade, startUpgrade } from "@/lib/billing/actions";
+import { navigateToCheckout } from "@/lib/billing/checkout-navigation";
 import { MarketingPlanCta } from "./marketing-plan-cta";
 
 vi.mock("@/lib/billing/actions", () => ({
   retryUpgrade: vi.fn(),
   startUpgrade: vi.fn(),
 }));
+vi.mock("@/lib/billing/checkout-navigation", () => ({
+  navigateToCheckout: vi.fn(),
+}));
 
 const mockedStartUpgrade = vi.mocked(startUpgrade);
 const mockedRetryUpgrade = vi.mocked(retryUpgrade);
+const mockedNavigateToCheckout = vi.mocked(navigateToCheckout);
 
 describe("MarketingPlanCta", () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     vi.clearAllMocks();
   });
 
@@ -26,13 +32,7 @@ describe("MarketingPlanCta", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("abre o checkout do Mercado Pago em uma nova aba para usuário autenticado", async () => {
-    const checkoutWindow = {
-      close: vi.fn(),
-      location: { href: "" },
-      opener: null,
-    } as unknown as Window;
-    const open = vi.spyOn(window, "open").mockReturnValue(checkoutWindow);
+  it("navega para o checkout do Mercado Pago na mesma aba", async () => {
     mockedStartUpgrade.mockResolvedValue({
       ok: true,
       initPoint: "https://www.mercadopago.com.br/checkout/profissional",
@@ -43,21 +43,13 @@ describe("MarketingPlanCta", () => {
 
     await waitFor(() => {
       expect(mockedStartUpgrade).toHaveBeenCalledOnce();
-      expect(checkoutWindow.location.href).toBe(
-        "https://www.mercadopago.com.br/checkout/profissional",
-      );
     });
-    expect(open).toHaveBeenCalledWith("", "_blank");
-    expect(checkoutWindow.opener).toBeNull();
+    expect(mockedNavigateToCheckout).toHaveBeenCalledWith(
+      "https://www.mercadopago.com.br/checkout/profissional",
+    );
   });
 
   it("gera um checkout novo quando já existe um pagamento pendente", async () => {
-    const checkoutWindow = {
-      close: vi.fn(),
-      location: { href: "" },
-      opener: null,
-    } as unknown as Window;
-    vi.spyOn(window, "open").mockReturnValue(checkoutWindow);
     mockedStartUpgrade.mockResolvedValue({
       ok: false,
       code: "UPGRADE_PENDING",
@@ -74,21 +66,13 @@ describe("MarketingPlanCta", () => {
     await waitFor(() => {
       expect(mockedStartUpgrade).toHaveBeenCalledOnce();
       expect(mockedRetryUpgrade).toHaveBeenCalledOnce();
-      expect(checkoutWindow.location.href).toBe(
-        "https://www.mercadopago.com.br/checkout/profissional-novo",
-      );
     });
-    expect(checkoutWindow.close).not.toHaveBeenCalled();
+    expect(mockedNavigateToCheckout).toHaveBeenCalledWith(
+      "https://www.mercadopago.com.br/checkout/profissional-novo",
+    );
   });
 
   it("desabilita o CTA enquanto o checkout está sendo criado", async () => {
-    const checkoutWindow = {
-      close: vi.fn(),
-      location: { href: "" },
-      opener: null,
-    } as unknown as Window;
-    vi.spyOn(window, "open").mockReturnValue(checkoutWindow);
-
     let resolveUpgrade!: (value: Awaited<ReturnType<typeof startUpgrade>>) => void;
     mockedStartUpgrade.mockReturnValue(
       new Promise((resolve) => {
@@ -111,13 +95,7 @@ describe("MarketingPlanCta", () => {
     });
   });
 
-  it("exibe a falha do billing e fecha a aba temporária", async () => {
-    const checkoutWindow = {
-      close: vi.fn(),
-      location: { href: "" },
-      opener: null,
-    } as unknown as Window;
-    vi.spyOn(window, "open").mockReturnValue(checkoutWindow);
+  it("exibe a falha do billing e permanece na página atual", async () => {
     mockedStartUpgrade.mockResolvedValue({
       ok: false,
       code: "NOT_CONFIGURED",
@@ -132,20 +110,6 @@ describe("MarketingPlanCta", () => {
         name: "O pagamento ainda não está configurado neste ambiente.",
       }),
     ).toBeInTheDocument();
-    expect(checkoutWindow.close).toHaveBeenCalledOnce();
   });
 
-  it("informa quando o navegador bloqueia a nova aba", () => {
-    vi.spyOn(window, "open").mockReturnValue(null);
-
-    render(<MarketingPlanCta isAuthenticated label="Assinar PROFISSIONAL" />);
-    fireEvent.click(screen.getByRole("button", { name: "Assinar PROFISSIONAL" }));
-
-    expect(
-      screen.getByRole("alert", {
-        name: "Permita pop-ups para abrir o checkout em uma nova aba.",
-      }),
-    ).toBeInTheDocument();
-    expect(mockedStartUpgrade).not.toHaveBeenCalled();
-  });
 });

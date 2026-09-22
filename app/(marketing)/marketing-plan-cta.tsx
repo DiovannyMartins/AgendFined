@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { useState, useTransition } from "react";
 import { retryUpgrade, startUpgrade } from "@/lib/billing/actions";
+import { navigateToCheckout } from "@/lib/billing/checkout-navigation";
 
 const ctaClassName =
   "relative mt-7 inline-flex h-11 items-center justify-center gap-2 rounded-full bg-background px-5 text-sm font-medium text-foreground transition-all hover:scale-[1.02] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60";
@@ -31,13 +32,6 @@ export function MarketingPlanCta({
 
   function onClick() {
     setError(null);
-    const checkoutWindow = window.open("", "_blank");
-    if (!checkoutWindow) {
-      setError("Permita pop-ups para abrir o checkout em uma nova aba.");
-      return;
-    }
-
-    checkoutWindow.opener = null;
     startTransition(async () => {
       try {
         const initialResult = await startUpgrade();
@@ -46,13 +40,11 @@ export function MarketingPlanCta({
             ? await retryUpgrade()
             : initialResult;
         if (result.ok) {
-          checkoutWindow.location.href = result.initPoint;
+          navigateToCheckout(result.initPoint);
         } else {
-          checkoutWindow.close();
           setError(result.message);
         }
       } catch {
-        checkoutWindow.close();
         setError("Não foi possível iniciar o checkout. Tente novamente.");
       }
     });

@@ -12,15 +12,15 @@
 - **Rationale**: esse fluxo já aplica preço, elegibilidade do negócio, idempotência, Mercado Pago, URL de retorno e mensagens de erro. A feature não deve criar um segundo caminho de pagamento.
 - **Alternatives considered**: criar uma rota ou ação específica para marketing duplicaria regras de billing; navegar para o dashboard manteria a etapa que o usuário pediu para remover.
 
-## Decisão 3: abrir uma aba temporária antes da chamada assíncrona
+## Decisão 3: navegar na mesma aba após a chamada assíncrona
 
-- **Decision**: o Client Component abrirá `window.open("", "_blank")` de forma síncrona, redirecionando essa aba para `initPoint` quando `startUpgrade` concluir.
-- **Rationale**: navegadores bloqueiam com mais frequência uma nova aba criada somente depois de uma Promise. O padrão já está validado no botão de upgrade do dashboard.
-- **Alternatives considered**: atribuir `window.location` trocaria a página atual; abrir a URL apenas após a Promise pode ser bloqueado pelo navegador.
+- **Decision**: o Client Component atribuirá o `initPoint` à navegação da janela atual somente depois que o server action concluir.
+- **Rationale**: o usuário solicitou que os botões `Fazer upgrade` e `Assinar PROFISSIONAL` não abram nova aba. A navegação ocorre apenas com um checkout válido, e falhas permanecem na página atual.
+- **Alternatives considered**: `window.open` exigiria popup e criaria uma aba extra; redirecionar antes do retorno do server action não teria uma URL de checkout válida.
 
 ## Decisão 4: falhas permanecem no card de planos
 
-- **Decision**: falhas fecham a aba temporária e aparecem como mensagem inline no CTA.
+- **Decision**: falhas aparecem como mensagem inline no CTA e não navegam para fora da página atual.
 - **Rationale**: preserva a página de marketing e reutiliza as mensagens de domínio retornadas pelo billing para negócio ausente, ambiente não configurado ou assinatura já existente.
 - **Alternatives considered**: redirecionar ao dashboard em erro seria inesperado e não resolve a falha; usar alert nativo é menos acessível e menos consistente com a UI.
 

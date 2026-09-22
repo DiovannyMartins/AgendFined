@@ -111,3 +111,12 @@ description: "Task list for authenticated marketing checkout"
 - [X] T015 [US1] Atualizar `app/(marketing)/marketing-plan-cta.tsx` para chamar `retryUpgrade` quando `startUpgrade` informar checkout pendente, mantendo a abertura em nova aba e os guardrails server-side (FR-002, FR-008, partial).
 - [X] T016 [US1] Atualizar `research.md`, `plan.md` e `quickstart.md` para registrar o fallback seguro entre checkout inicial e retry (FR-007, partial).
 - [X] T017 [P] [US1] Executar testes unitários, lint, typecheck e build descritos em `specs/005-marketing-authenticated-checkout/quickstart.md` e confirmar que o preço de R$ 1/mês não foi alterado (SC-004, SC-005).
+
+## Phase 8: Convergence
+
+**Purpose**: Ajustar a navegação do checkout para substituir a aba atual em todos os CTAs de assinatura.
+
+- [X] T018 [US1] Atualizar os testes do CTA de marketing e dos botões do dashboard para verificar navegação na mesma aba e ausência de `window.open` em `app/(marketing)/marketing-plan-cta.test.tsx` e `app/dashboard/configuracoes/checkout-buttons.test.tsx` (US1/AC1, US1/AC3, partial).
+- [X] T019 [US1] Alterar `app/(marketing)/marketing-plan-cta.tsx`, `app/dashboard/configuracoes/upgrade-button.tsx`, `app/dashboard/configuracoes/retry-upgrade-button.tsx` e `lib/billing/checkout-navigation.ts` para navegar na aba atual sem abrir nova aba, preservando os erros inline (FR-003, FR-006, partial).
+- [X] T020 [US1] Atualizar `spec.md`, `plan.md`, `research.md` e `quickstart.md` para documentar a navegação na mesma aba (FR-003, partial).
+- [X] T021 [P] [US1] Executar testes unitários, lint, typecheck e build e confirmar que nenhum CTA de checkout usa `window.open` (SC-001, partial).

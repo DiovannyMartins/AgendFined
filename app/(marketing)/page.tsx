@@ -19,6 +19,7 @@ import { Reveal } from "@/components/reveal";
 import { Faq } from "./faq";
 import { Plans } from "./plans";
 import { Hero } from "@/components/marketing/hero";
+import { createClient } from "@/lib/supabase/server";
 
 const benefits = [
   {
@@ -84,7 +85,12 @@ const audiences = [
   { label: "Consultorias" },
 ];
 
-export default function MarketingHome() {
+export default async function MarketingHome() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
     <div className="flex flex-col">
       <Hero>
@@ -245,7 +251,7 @@ export default function MarketingHome() {
       </section>
 
       {/* Planos */}
-      <Plans />
+      <Plans isAuthenticated={Boolean(user)} />
 
       {/* Sobre */}
       <section id="sobre" className="relative overflow-hidden border-y border-border bg-muted/20">

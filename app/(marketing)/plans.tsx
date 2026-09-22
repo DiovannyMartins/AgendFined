@@ -5,6 +5,7 @@ import { Reveal } from "@/components/reveal";
 import { cn } from "@/lib/utils";
 import { PLAN_INFO } from "@/lib/plan/catalog";
 import type { Plan } from "@/lib/plan/plan";
+import { MarketingPlanCta } from "./marketing-plan-cta";
 
 const PLAN_KEYS: Plan[] = ["free", "pro"];
 
@@ -49,7 +50,7 @@ const PLAN_COPY: Record<Plan, {
   },
 };
 
-export function Plans() {
+export function Plans({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
   return (
     <section id="planos" className="relative scroll-mt-24 overflow-hidden border-y border-border bg-muted/20">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.07),transparent_38%)]" />
@@ -140,18 +141,17 @@ export function Plans() {
                     ))}
                   </ul>
 
-                  <Link
-                    href="/cadastro"
-                    className={cn(
-                      "relative mt-7 inline-flex h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium transition-all hover:scale-[1.02] active:scale-[0.98]",
-                      highlighted
-                        ? "bg-background text-foreground"
-                        : "border border-border bg-background text-foreground hover:border-foreground/30",
-                    )}
-                  >
-                    {cta}
-                    <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
-                  </Link>
+                  {highlighted ? (
+                    <MarketingPlanCta isAuthenticated={isAuthenticated} label={cta} />
+                  ) : (
+                    <Link
+                      href="/cadastro"
+                      className="relative mt-7 inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-background px-5 text-sm font-medium text-foreground transition-all hover:scale-[1.02] hover:border-foreground/30 active:scale-[0.98]"
+                    >
+                      {cta}
+                      <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
+                    </Link>
+                  )}
                   <div className={cn("mt-3 flex items-center justify-center gap-2 text-[11px]", highlighted ? "text-primary-foreground/60" : "text-muted-foreground")}>
                     <ShieldCheck className="size-3.5" />
                     Sem complicação para começar

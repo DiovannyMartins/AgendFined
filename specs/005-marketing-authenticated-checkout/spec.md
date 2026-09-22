@@ -1,0 +1,92 @@
+# Feature Specification: Checkout direto para usuários autenticados
+
+**Feature Branch**: `005-marketing-authenticated-checkout`
+**Created**: 2026-09-21
+**Status**: Draft
+**Input**: User description: "Para quem já está logado, o botão Assinar PROFISSIONAL deve abrir o Mercado Pago em vez de ir para o dashboard."
+
+## User Scenarios & Testing
+
+### User Story 1 - Assinar diretamente estando logado (Priority: P1)
+
+Como usuário autenticado que está avaliando o plano PROFISSIONAL, quero que o botão de assinatura da página pública inicie o checkout do Mercado Pago diretamente, para não passar primeiro pelo dashboard.
+
+**Why this priority**: Reduz uma etapa desnecessária no caminho de conversão e atende o fluxo explícito solicitado para usuários já autenticados.
+
+**Independent Test**: Com uma sessão autenticada e um negócio elegível, clicar em "Assinar PROFISSIONAL" deve criar o checkout pelo fluxo de billing existente e abrir o `init_point` do Mercado Pago em uma nova aba.
+
+**Acceptance Scenarios**:
+
+1. **Given** uma sessão autenticada com negócio no plano Grátis, **When** o usuário clica em "Assinar PROFISSIONAL", **Then** o sistema chama o fluxo de upgrade existente e abre o checkout retornado pelo Mercado Pago em uma nova aba.
+2. **Given** que o checkout ainda está sendo criado, **When** o usuário observa o botão, **Then** o botão fica desabilitado e informa que o redirecionamento está em andamento.
+3. **Given** que o navegador bloqueia pop-ups, **When** o usuário clica no botão, **Then** o sistema informa que pop-ups precisam ser permitidos e não perde a página atual.
+
+---
+
+### User Story 2 - Manter o fluxo de visitantes (Priority: P2)
+
+Como visitante não autenticado, quero continuar sendo direcionado para o cadastro ao clicar em "Assinar PROFISSIONAL", para criar minha conta antes de iniciar uma assinatura.
+
+**Why this priority**: Preserva o onboarding atual e evita iniciar um checkout sem identidade ou negócio associado.
+
+**Independent Test**: Com a sessão encerrada, abrir a página pública e verificar que o CTA aponta para `/cadastro`.
+
+**Acceptance Scenarios**:
+
+1. **Given** um visitante sem sessão, **When** ele clica em "Assinar PROFISSIONAL", **Then** ele é direcionado para `/cadastro`.
+
+---
+
+### User Story 3 - Exibir falhas de checkout sem navegação indevida (Priority: P3)
+
+Como usuário autenticado, quero receber a mensagem retornada pelo billing quando a assinatura não puder ser iniciada, para saber como corrigir o problema sem ser enviado para uma tela incorreta.
+
+**Why this priority**: Mantém o tratamento existente de ambiente não configurado, negócio ausente ou assinatura já ativa.
+
+**Independent Test**: Simular uma resposta de falha de `startUpgrade` e verificar que a aba temporária é fechada e a mensagem aparece no próprio card.
+
+**Acceptance Scenarios**:
+
+1. **Given** que `startUpgrade` retorna falha, **When** o usuário tenta assinar, **Then** a aba temporária é fechada e a mensagem de erro é apresentada na página pública.
+2. **Given** que o usuário já possui uma assinatura PROFISSIONAL ou não possui negócio configurado, **When** tenta iniciar o checkout, **Then** o sistema exibe a mensagem de domínio existente sem confirmar uma assinatura no navegador.
+
+### Edge Cases
+
+- O clique autenticado deve abrir uma aba em branco de forma síncrona antes da chamada assíncrona, reduzindo bloqueios de pop-up.
+- Se a aba não puder ser aberta, nenhuma chamada de checkout deve prosseguir.
+- A sessão deve ser verificada no servidor para decidir qual CTA renderizar; o navegador não deve escolher o fluxo com base em estado não confiável.
+- O fluxo de retorno do Mercado Pago continua usando o callback existente e não é alterado por esta feature.
+
+## Requirements
+
+### Functional Requirements
+
+- **FR-001**: O sistema MUST verificar no servidor se existe uma sessão autenticada ao renderizar a página de marketing.
+- **FR-002**: Para usuário autenticado, o CTA "Assinar PROFISSIONAL" MUST iniciar o server action `startUpgrade` existente.
+- **FR-003**: Para usuário autenticado, o sistema MUST abrir o `initPoint` retornado pelo Mercado Pago em uma nova aba.
+- **FR-004**: O sistema MUST manter o CTA de visitantes apontando para `/cadastro`.
+- **FR-005**: Enquanto o checkout estiver sendo criado, o CTA MUST ficar desabilitado e comunicar o estado de processamento.
+- **FR-006**: Falhas retornadas pelo billing MUST ser exibidas ao usuário na página pública e não MUST redirecionar para o dashboard.
+- **FR-007**: O checkout autenticado MUST reutilizar as validações, idempotência e configuração de preço do fluxo de billing existente.
+
+## Key Entities
+
+- **Sessão autenticada**: Identidade Supabase usada pelo servidor para decidir se o visitante já pode iniciar o checkout.
+- **Checkout PROFISSIONAL**: Pré-aprovação criada pelo fluxo de billing, identificada pelo `initPoint` do Mercado Pago.
+- **Resultado de upgrade**: Resultado de sucesso ou erro retornado por `startUpgrade`, incluindo mensagem para feedback da interface.
+
+## Success Criteria
+
+### Measurable Outcomes
+
+- **SC-001**: 100% dos cliques autenticados elegíveis no CTA iniciam diretamente o checkout do Mercado Pago sem passar por `/dashboard`.
+- **SC-002**: 100% dos cliques anônimos continuam levando a `/cadastro`.
+- **SC-003**: Falhas de checkout ficam visíveis no mesmo card em até uma resposta do server action, sem navegação incorreta.
+- **SC-004**: O fluxo existente de assinatura e seu preço de R$ 1/mês permanecem inalterados.
+
+## Assumptions
+
+- A sessão autenticada e o negócio atual são resolvidos pelas funções Supabase e billing já existentes.
+- `startUpgrade` continua sendo a fonte de verdade para o preço, elegibilidade, idempotência e criação do checkout.
+- A abertura em nova aba é o comportamento desejado também na página pública.
+- A configuração de `MERCADO_PAGO_ACCESS_TOKEN` já é responsabilidade do ambiente, fora do escopo desta alteração.

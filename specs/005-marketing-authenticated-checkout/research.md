@@ -1,0 +1,25 @@
+# Research: Checkout direto para usuários autenticados
+
+## Decisão 1: verificar a sessão no Server Component da página
+
+- **Decision**: `app/(marketing)/page.tsx` será assíncrona e consultará `createClient().auth.getUser()` no servidor antes de renderizar `Plans`.
+- **Rationale**: a decisão de mostrar o fluxo autenticado deve usar a sessão protegida pelo servidor e evitar uma troca visual ou um redirecionamento intermediário para o dashboard.
+- **Alternatives considered**: consultar auth no navegador após o carregamento adicionaria latência e permitiria renderizar inicialmente o CTA errado; usar a sessão já lida pelo layout exigiria uma nova camada de contexto entre Server Components.
+
+## Decisão 2: reutilizar `startUpgrade`
+
+- **Decision**: o CTA autenticado chamará o server action `startUpgrade` de `lib/billing/actions.ts`.
+- **Rationale**: esse fluxo já aplica preço, elegibilidade do negócio, idempotência, Mercado Pago, URL de retorno e mensagens de erro. A feature não deve criar um segundo caminho de pagamento.
+- **Alternatives considered**: criar uma rota ou ação específica para marketing duplicaria regras de billing; navegar para o dashboard manteria a etapa que o usuário pediu para remover.
+
+## Decisão 3: abrir uma aba temporária antes da chamada assíncrona
+
+- **Decision**: o Client Component abrirá `window.open("", "_blank")` de forma síncrona, redirecionando essa aba para `initPoint` quando `startUpgrade` concluir.
+- **Rationale**: navegadores bloqueiam com mais frequência uma nova aba criada somente depois de uma Promise. O padrão já está validado no botão de upgrade do dashboard.
+- **Alternatives considered**: atribuir `window.location` trocaria a página atual; abrir a URL apenas após a Promise pode ser bloqueado pelo navegador.
+
+## Decisão 4: falhas permanecem no card de planos
+
+- **Decision**: falhas fecham a aba temporária e aparecem como mensagem inline no CTA.
+- **Rationale**: preserva a página de marketing e reutiliza as mensagens de domínio retornadas pelo billing para negócio ausente, ambiente não configurado ou assinatura já existente.
+- **Alternatives considered**: redirecionar ao dashboard em erro seria inesperado e não resolve a falha; usar alert nativo é menos acessível e menos consistente com a UI.

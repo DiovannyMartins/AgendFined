@@ -156,5 +156,5 @@ MVP completo (Fases 1–9 da spec).
 
 ## Produção
 
-- **URL**: `https://agendfined.vercel.app`
+- **URL**: `https://agendfined.com.br`
 - **Supabase**: projeto `<project-ref>` (produção) — manter em config privada, não no repositório

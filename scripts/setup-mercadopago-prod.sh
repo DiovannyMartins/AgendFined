@@ -191,7 +191,7 @@ banner "Mercado Pago — assinatura PROFISSIONAL (produção)"
 # Production values land in the working env file (reference) AND must be pasted
 # into the Vercel project environment variables (Stage 4).
 ENV_FILE="${ENV_FILE:-.env.local}"
-PROD_URL="https://agendfined-liart.vercel.app"
+PROD_URL="https://agendfined.com.br"
 
 # ── Stage 1: confirmar URL de produção + ligação do repo ───────────────────
 stage "Produção: URL e ligação do repo"
@@ -260,9 +260,9 @@ else
   note "Deploy manual. Após publicar, valide o endpoint:"
 fi
 note "Teste GET (esperado 405, rota só aceita POST):"
-note "  curl -i https://agendfined-liart.vercel.app/api/webhooks/mercadopago"
+note "  curl -i https://agendfined.com.br/api/webhooks/mercadopago"
 note "Teste POST sem assinatura (esperado 503/401, fail-closed):"
-note "  curl -i -X POST https://agendfined-liart.vercel.app/api/webhooks/mercadopago?data.id=x -H 'Content-Type: application/json' -d '{\"type\":\"preapproval\",\"data\":{\"id\":\"x\"}}'"
+note "  curl -i -X POST https://agendfined.com.br/api/webhooks/mercadopago?data.id=x -H 'Content-Type: application/json' -d '{\"type\":\"preapproval\",\"data\":{\"id\":\"x\"}}'"
 note "Depois, faça o upgrade real no dashboard (Plano → Fazer upgrade) para validar o ciclo completo."
 
 finish

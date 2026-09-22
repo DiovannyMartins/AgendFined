@@ -61,11 +61,11 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
       <p className="mt-1 text-muted-foreground">
         Seu plano atual, os privilégios incluídos e o status da assinatura.
       </p>
-      <div className={showProOffer ? "mt-4 grid gap-4 lg:grid-cols-2" : "mt-4"}>
-        <div className="rounded-xl border border-border p-4">
+      <div className={showProOffer ? "mt-5 grid items-start gap-4 lg:grid-cols-2" : "mt-5"}>
+        <div className="h-fit self-start rounded-2xl border border-border/80 bg-card/50 p-5 shadow-sm transition-colors hover:border-foreground/20">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="flex size-11 items-center justify-center rounded-full bg-primary/10">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10">
                 <Crown className="size-5 text-primary" />
               </div>
               <div>
@@ -81,7 +81,7 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
             </div>
           </div>
 
-          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+          <ul className="mt-5 grid gap-2.5 sm:grid-cols-2">
             {info.features.map((feature) => (
               <li key={feature} className="flex items-center gap-2 text-sm">
                 <Check className="size-4 shrink-0 text-primary" />
@@ -150,7 +150,7 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
         </div>
 
         {showProOffer && (
-          <div className="rounded-xl border border-primary/40 bg-primary/5 p-4">
+          <div className="h-fit self-start rounded-2xl border border-primary/40 bg-primary/[0.04] p-5 shadow-sm shadow-primary/10 transition-colors hover:border-primary/60">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
@@ -163,7 +163,7 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
               <Crown className="size-5 text-primary" />
             </div>
 
-            <ul className="mt-4 grid gap-2">
+            <ul className="mt-5 grid gap-2.5">
               {proInfo.features.map((feature) => (
                 <li key={feature} className="flex items-center gap-2 text-sm">
                   <Check className="size-4 shrink-0 text-primary" />

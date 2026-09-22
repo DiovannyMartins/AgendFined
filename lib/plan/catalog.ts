@@ -36,7 +36,8 @@ export const PLAN_INFO: Record<Plan, PlanInfo> = {
     // Pago checkout; revert to "R$ 19" (CONTEXT.md + ADR 0008) before launch.
     price: "R$ 1",
     period: "/mês",
-    description: "Tudo do Grátis, mais recursos para fazer o negócio crescer.",
+    description:
+      "Inclui todos os recursos do plano Grátis, além de funcionalidades avançadas para otimizar a gestão do seu negócio.",
     features: [
       "Relatórios",
       "Lembretes automáticos",

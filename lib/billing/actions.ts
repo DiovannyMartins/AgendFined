@@ -6,6 +6,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { createMercadoPagoProvider } from "./mercado-pago";
 import { fetchCurrentSubscription } from "./get-subscription";
+import { syncReturnedSubscription } from "./return-sync";
+import { createWebhookPersistence } from "./webhook-server";
+import { revalidatePath } from "next/cache";
 import {
   startUpgrade as buildStartUpgrade,
   type StartUpgradeResult,
@@ -44,7 +47,7 @@ export async function startUpgrade(): Promise<StartUpgradeResult> {
   } = await supabase.auth.getUser();
 
   const provider = createMercadoPagoProvider({ accessToken });
-  const backUrl = `${(process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "")}/dashboard/configuracoes`;
+  const backUrl = `${(process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "")}/api/billing/return`;
   const notificationUrl = process.env.MERCADO_PAGO_NOTIFICATION_URL;
 
   return buildStartUpgrade({
@@ -147,7 +150,7 @@ export async function retryUpgrade(): Promise<RetryUpgradeResult> {
 
   const provider = createMercadoPagoProvider({ accessToken });
   const admin = createAdminClient();
-  const backUrl = `${(process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "")}/dashboard/configuracoes`;
+  const backUrl = `${(process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "")}/api/billing/return`;
   const notificationUrl = process.env.MERCADO_PAGO_NOTIFICATION_URL;
 
   return buildRetryPendingUpgrade({
@@ -199,6 +202,25 @@ export async function retryUpgrade(): Promise<RetryUpgradeResult> {
     notificationUrl,
   });
 }
+
+// Mercado Pago redirects here after checkout. The webhook remains the normal
+// lifecycle path; this authenticated read-after-write closes the return race
+// so the dashboard can show PROFISSIONAL immediately after an authorized
+// checkout without ever trusting a browser-supplied success flag.
+export async function syncCurrentSubscriptionAfterReturn(): Promise<void> {
+  const business = await getCurrentBusiness();
+  if (!business || !process.env.MERCADO_PAGO_ACCESS_TOKEN) return;
+
+  const provider = createMercadoPagoProvider({ accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN });
+  const persistence = createWebhookPersistence();
+  await syncReturnedSubscription(business.id, {
+    fetchSubscription: fetchCurrentSubscription,
+    getPreapproval: provider.getPreapproval,
+    applySnapshot: persistence.applySnapshot,
+  });
+  revalidatePath("/dashboard/configuracoes");
+}
+
 // Server action called by the "Cancelar assinatura" button. Cancels the active
 // Mercado Pago preapproval (so the owner stops being charged) and records the
 // `cancelled` status with a grace period; the downgrade cron drops the business

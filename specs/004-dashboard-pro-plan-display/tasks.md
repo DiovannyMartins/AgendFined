@@ -24,7 +24,7 @@ description: "Task list for displaying the PROFISSIONAL plan in dashboard settin
 
 **Goal**: A Grátis user sees the current plan and a complete PROFISSIONAL offer with R$ 1/month and an explicit subscription CTA.
 
-**Independent Test**: Render the settings plan section for a Grátis business without a pending checkout and assert the current badge, Pro plan name, R$ 1/month price, Pro benefits, and subscription CTA.
+**Independent Test**: Render the settings plan section for a Grátis business with and without a pending checkout and assert the current badge, Pro plan name, R$ 1/month price, Pro benefits, and state-appropriate CTA.
 
 ### Tests for User Story 1
 
@@ -32,8 +32,9 @@ description: "Task list for displaying the PROFISSIONAL plan in dashboard settin
 
 ### Implementation for User Story 1
 
-- [X] T003 [US1] Update `app/dashboard/configuracoes/plan-section.tsx` to render the current Grátis plan and a separate PROFISSIONAL offer for Grátis businesses without pending checkout, reusing `PLAN_INFO` and the existing `UpgradeButton` checkout action
+- [X] T003 [US1] Update `app/dashboard/configuracoes/plan-section.tsx` to render the current Grátis plan and a separate PROFISSIONAL offer for every Grátis business, reusing `PLAN_INFO` and the existing checkout actions
 - [X] T004 [US1] Keep the settings plan layout responsive in `app/dashboard/configuracoes/plan-section.tsx`, stacking plan cards on narrow viewports without changing subscription status, grace, retry, or cancel controls
+- [X] T010 [US1] Correct `app/dashboard/configuracoes/plan-section.tsx` and `app/dashboard/configuracoes/plan-section.test.tsx` so a Grátis business keeps the PROFISSIONAL card visible during a pending checkout and uses `Concluir pagamento` instead of starting a duplicate subscription
 
 **Checkpoint**: The Grátis settings state shows the current plan and the complete R$ 1 Pro offer, and its unit test passes.
 

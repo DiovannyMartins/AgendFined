@@ -20,7 +20,7 @@ Como proprietário de um negócio no plano Grátis, quero ver a oferta completa 
 
 **Acceptance Scenarios**:
 
-1. **Given** um negócio no plano Grátis sem checkout pendente, **When** o proprietário abre Configurações, **Then** a seção Plano mostra o Grátis identificado como atual e uma oferta separada do PROFISSIONAL.
+1. **Given** um negócio no plano Grátis, com ou sem checkout pendente, **When** o proprietário abre Configurações, **Then** a seção Plano mostra o Grátis identificado como atual e uma oferta separada do PROFISSIONAL.
 2. **Given** a oferta do PROFISSIONAL visível, **When** o proprietário a examina, **Then** ela mostra o preço de R$ 1/mês, os recursos exclusivos e uma ação com texto explícito de assinatura.
 3. **Given** um negócio no plano Grátis, **When** o proprietário seleciona a ação de assinatura do PROFISSIONAL, **Then** o sistema inicia o checkout existente e mantém mensagens amigáveis caso o checkout não possa ser criado.
 
@@ -35,11 +35,11 @@ Como proprietário que já possui o plano PROFISSIONAL, quero continuar vendo me
 **Acceptance Scenarios**:
 
 1. **Given** um negócio PROFISSIONAL com assinatura autorizada, **When** o proprietário abre Configurações, **Then** o plano PROFISSIONAL aparece como atual/ativo, com os recursos e o controle de cancelamento preservados.
-2. **Given** um negócio com checkout pendente ou período de carência, **When** o proprietário abre Configurações, **Then** os avisos e ações correspondentes continuam visíveis e não são substituídos por uma nova oferta indevida.
+2. **Given** um negócio com checkout pendente ou período de carência, **When** o proprietário abre Configurações, **Then** os avisos e ações correspondentes continuam visíveis, o card PROFISSIONAL permanece visível quando o plano atual é Grátis e não é criado um segundo checkout.
 
 ### Edge Cases
 
-- Se o plano atual for Grátis e houver checkout pendente, a tela deve priorizar a ação de retomar o checkout e não criar uma segunda oferta concorrente.
+- Se o plano atual for Grátis e houver checkout pendente, o card PROFISSIONAL deve permanecer visível, mas sua ação deve retomar o checkout existente em vez de criar uma segunda assinatura.
 - Se o plano atual for PROFISSIONAL, a oferta não deve apresentar o usuário como se ainda estivesse no Grátis nem oferecer um upgrade duplicado.
 - O preço exibido deve permanecer R$ 1/mês em todos os locais da oferta desta tela, inclusive em larguras menores.
 - Falhas do checkout devem continuar sendo comunicadas na própria seção, sem esconder os dados dos planos.
@@ -49,9 +49,9 @@ Como proprietário que já possui o plano PROFISSIONAL, quero continuar vendo me
 ### Functional Requirements
 
 - **FR-001**: A seção Plano deve apresentar o plano atual do negócio com identificação visual inequívoca de estado atual ou ativo.
-- **FR-002**: Quando o plano atual for Grátis e não houver checkout pendente, a seção deve apresentar uma oferta separada do PROFISSIONAL.
+- **FR-002**: Quando o plano atual for Grátis, independentemente de existir checkout pendente, a seção deve apresentar uma oferta separada do PROFISSIONAL.
 - **FR-003**: A oferta do PROFISSIONAL deve exibir o preço de teste de **R$ 1/mês** e seus recursos exclusivos: relatórios, lembretes automáticos, gestão da lista de espera, exportação de agenda e reservas futuras até 365 dias.
-- **FR-004**: A oferta do PROFISSIONAL deve disponibilizar uma ação claramente rotulada para assinar e essa ação deve iniciar o fluxo de checkout existente.
+- **FR-004**: A oferta do PROFISSIONAL deve disponibilizar uma ação claramente rotulada; para negócio Grátis sem checkout pendente ela inicia o checkout, e com checkout pendente ela retoma o pagamento existente.
 - **FR-005**: A seção deve continuar exibindo status, carência, retomada de checkout e cancelamento conforme o estado atual da assinatura.
 - **FR-006**: Um negócio já PROFISSIONAL não deve ver uma ação de upgrade duplicada; deve continuar vendo os controles aplicáveis à assinatura atual.
 - **FR-007**: A apresentação deve permanecer legível e utilizável em telas estreitas e largas.
@@ -67,7 +67,7 @@ Como proprietário que já possui o plano PROFISSIONAL, quero continuar vendo me
 
 ### Measurable Outcomes
 
-- **SC-001**: 100% dos negócios Grátis sem checkout pendente veem, na seção Plano, tanto o estado atual Grátis quanto a oferta PROFISSIONAL com preço e CTA de assinatura.
+- **SC-001**: 100% dos negócios Grátis veem, na seção Plano, tanto o estado atual Grátis quanto a oferta PROFISSIONAL com preço e CTA apropriado ao estado do checkout.
 - **SC-002**: Um proprietário consegue identificar o preço, pelo menos um benefício e a ação de assinatura do PROFISSIONAL sem navegar para outra página.
 - **SC-003**: 100% dos estados de assinatura já suportados (pendente, autorizada, pausada, cancelada e em carência) continuam exibindo seu status e ação correspondente.
 - **SC-004**: A oferta permanece utilizável sem rolagem horizontal em uma viewport de 320 px de largura.

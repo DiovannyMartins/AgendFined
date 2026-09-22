@@ -66,7 +66,7 @@ describe("PlanSection", () => {
     expect(screen.queryByRole("button", { name: "Assinar PROFISSIONAL" })).not.toBeInTheDocument();
   });
 
-  it("prioritizes retrying a pending checkout over showing a second Pro offer", async () => {
+  it("keeps the Pro offer visible while prioritizing the pending checkout", async () => {
     vi.mocked(getSubscription).mockResolvedValue({
       plan: "free",
       subscription: {
@@ -82,6 +82,8 @@ describe("PlanSection", () => {
     render(await PlanSection({ business: { id: "biz_1", plan: "free" } }));
 
     expect(screen.getByText("Checkout não concluído", { exact: true })).toBeInTheDocument();
+    expect(screen.getByText("PROFISSIONAL", { exact: true })).toBeInTheDocument();
+    expect(screen.getByText(/R\$ 1\/mês/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Concluir pagamento" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Assinar PROFISSIONAL" })).not.toBeInTheDocument();
   });

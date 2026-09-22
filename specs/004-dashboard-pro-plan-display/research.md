@@ -12,9 +12,9 @@
 - **Rationale**: O pedido é de apresentação e descoberta da oferta, não de um novo fluxo de cobrança. Reutilizar a ação mantém a proteção server-side e o comportamento de erro existente.
 - **Alternatives considered**: Criar link ou rota de pagamento própria foi rejeitado porque duplicaria o fluxo de billing e poderia ignorar as guardas atuais.
 
-## Decision: Exibir cards lado a lado quando houver oferta de upgrade
+## Decision: Exibir cards lado a lado para todo negócio Grátis
 
-- **Decision**: Para negócio Grátis sem checkout pendente, mostrar o Grátis como atual e o PROFISSIONAL como opção recomendada; em estados de checkout/assinatura existentes, manter a apresentação do estado atual e seus controles.
+- **Decision**: Para todo negócio Grátis, mostrar o Grátis como atual e o PROFISSIONAL como opção recomendada. Se houver checkout pendente, manter a oferta visível, mas trocar o CTA do card Pro para retomar o checkout existente.
 - **Rationale**: A comparação direta responde à dúvida do usuário sem remover o contexto do plano atual. O layout responsivo pode empilhar os cards em telas estreitas.
 - **Alternatives considered**: Mostrar somente um resumo textual do Pro foi rejeitado porque não deixa preço e benefícios suficientemente claros antes do CTA.
 

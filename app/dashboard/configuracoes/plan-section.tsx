@@ -50,7 +50,9 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
     : isPro
       ? { label: "Ativo", variant: "default" as const }
       : { label: "Atual", variant: "secondary" as const };
-  const showProOffer = !isPro && status !== "pending";
+  // The business remains Free until the pending checkout is authorized, so
+  // keep the Pro offer visible even while the owner is completing payment.
+  const showProOffer = !isPro;
 
   return (
     <section>
@@ -117,7 +119,7 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
               O link de pagamento foi criado, mas a assinatura ainda não foi autorizada. Clique abaixo para abrir um novo checkout.
             </p>
           )}
-          {status === "pending" && (
+          {status === "pending" && !showProOffer && (
             <div className="border-t border-border pt-4">
               <RetryUpgradeButton />
             </div>
@@ -168,9 +170,15 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
 
             <div className="mt-4 border-t border-primary/20 pt-4">
               <p className="text-sm text-muted-foreground">
-                Assine o PROFISSIONAL para desbloquear mais controle e automação para o seu negócio.
+                {status === "pending"
+                  ? "Conclua o pagamento para ativar o PROFISSIONAL e desbloquear mais controle e automação."
+                  : "Assine o PROFISSIONAL para desbloquear mais controle e automação para o seu negócio."}
               </p>
-              <UpgradeButton label="Assinar PROFISSIONAL" />
+              {status === "pending" ? (
+                <RetryUpgradeButton label="Concluir pagamento" />
+              ) : (
+                <UpgradeButton label="Assinar PROFISSIONAL" />
+              )}
             </div>
           </div>
         )}

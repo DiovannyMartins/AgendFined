@@ -84,7 +84,13 @@ describe("PlanSection", () => {
 
     render(await PlanSection({ business: { id: "biz_1", plan: "free" } }));
 
-    expect(screen.getByText("Checkout não concluído", { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText("Checkout não concluído", { exact: true })).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "O link de pagamento foi criado, mas a assinatura ainda não foi autorizada. Clique abaixo para abrir um novo checkout.",
+        { exact: true },
+      ),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Atual", { exact: true })).toBeInTheDocument();
     expect(screen.queryByText("Pendente", { exact: true })).not.toBeInTheDocument();
     expect(screen.getByText("PROFISSIONAL", { exact: true })).toBeInTheDocument();

@@ -86,3 +86,9 @@ description: "Task list for displaying the PROFISSIONAL plan in dashboard settin
 1. Preserve the existing billing state logic while adding the Grátis comparison view.
 2. Verify Pro and transitional states with T005/T006.
 3. Run all quality gates and the quickstart validation.
+
+## Phase 6: Convergence
+
+**Purpose**: Remover do card Grátis a mensagem de checkout pendente, que não representa o plano atual enquanto o pagamento ainda não foi autorizado.
+
+- [X] T011 [US1] Ocultar o status e a explicação de checkout pendente no card Grátis, mantendo a oferta PROFISSIONAL e sua ação de conclusão de pagamento, e atualizar `app/dashboard/configuracoes/plan-section.test.tsx` para cobrir a ausência dessa mensagem (user request, partial)

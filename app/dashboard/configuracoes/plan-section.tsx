@@ -36,6 +36,7 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
   // "pending" business never looks like it got Pro for free.
   const pendingDuringGrace = pendingGrace !== null;
   const displayStatus = pendingGrace ? pendingGrace.status : status;
+  const showSubscriptionStatus = isPro || status !== "pending";
   // Live countdown target: the pending checkout hides the grace row, so use
   // the older grace row; otherwise use the current row's own grace.
   const graceEnd =
@@ -89,35 +90,39 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
             ))}
           </ul>
 
-          <p className="mt-4 text-sm text-muted-foreground">
-            Status da assinatura:{" "}
-            <span className="font-medium text-foreground">
-              {displayStatus ? STATUS_LABEL[displayStatus] : "Sem assinatura"}
-            </span>
-          </p>
-          {pendingDuringGrace && (
-            <p className="mt-1 text-sm text-muted-foreground">
-              Novo pagamento em andamento. Você mantém o PROFISSIONAL até o fim da carência
-              {graceEnd && (
-                <>
-                  {" ("}
-                  <GraceCountdown gracePeriodEnd={graceEnd} />
-                  {")"}
-                </>
+          {showSubscriptionStatus && (
+            <>
+              <p className="mt-4 text-sm text-muted-foreground">
+                Status da assinatura:{" "}
+                <span className="font-medium text-foreground">
+                  {displayStatus ? STATUS_LABEL[displayStatus] : "Sem assinatura"}
+                </span>
+              </p>
+              {pendingDuringGrace && (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Novo pagamento em andamento. Você mantém o PROFISSIONAL até o fim da carência
+                  {graceEnd && (
+                    <>
+                      {" ("}
+                      <GraceCountdown gracePeriodEnd={graceEnd} />
+                      {")"}
+                    </>
+                  )}
+                  ; se o pagamento não for concluído, o plano volta para Grátis.
+                </p>
               )}
-              ; se o pagamento não for concluído, o plano volta para Grátis.
-            </p>
-          )}
-          {!pendingDuringGrace && graceEnd && (
-            <p className="mt-1 text-sm text-muted-foreground">
-              <GraceCountdown gracePeriodEnd={graceEnd} />
-            </p>
-          )}
+              {!pendingDuringGrace && graceEnd && (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  <GraceCountdown gracePeriodEnd={graceEnd} />
+                </p>
+              )}
 
-          {!pendingDuringGrace && status === "pending" && (
-            <p className="mt-1 text-sm text-muted-foreground">
-              O link de pagamento foi criado, mas a assinatura ainda não foi autorizada. Clique abaixo para abrir um novo checkout.
-            </p>
+              {!pendingDuringGrace && status === "pending" && (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  O link de pagamento foi criado, mas a assinatura ainda não foi autorizada. Clique abaixo para abrir um novo checkout.
+                </p>
+              )}
+            </>
           )}
           {status === "pending" && !showProOffer && (
             <div className="border-t border-border pt-4">

@@ -22,7 +22,9 @@ vi.mock("./cancel-subscription-button", () => ({
 }));
 
 vi.mock("./retry-upgrade-button", () => ({
-  RetryUpgradeButton: () => <button type="button">Concluir pagamento</button>,
+  RetryUpgradeButton: ({ label = "Concluir pagamento" }: { label?: string }) => (
+    <button type="button">{label}</button>
+  ),
 }));
 
 describe("PlanSection", () => {
@@ -84,7 +86,7 @@ describe("PlanSection", () => {
     expect(screen.getByText("Checkout não concluído", { exact: true })).toBeInTheDocument();
     expect(screen.getByText("PROFISSIONAL", { exact: true })).toBeInTheDocument();
     expect(screen.getByText(/R\$ 1\/mês/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Concluir pagamento" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fazer upgrade" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Assinar PROFISSIONAL" })).not.toBeInTheDocument();
   });
 });

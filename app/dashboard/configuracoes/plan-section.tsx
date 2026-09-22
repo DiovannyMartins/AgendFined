@@ -175,7 +175,7 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
                   : "Assine o PROFISSIONAL para desbloquear mais controle e automação para o seu negócio."}
               </p>
               {status === "pending" ? (
-                <RetryUpgradeButton label="Concluir pagamento" />
+                <RetryUpgradeButton label="Fazer upgrade" />
               ) : (
                 <UpgradeButton label="Assinar PROFISSIONAL" />
               )}

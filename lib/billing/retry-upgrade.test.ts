@@ -50,7 +50,8 @@ describe("retryPendingUpgrade with billing_attempts", () => {
   it("marks ambiguous creation and local linking failures unknown", async () => {
     const p = provider(); p.createPreapproval = vi.fn(async () => { throw new MercadoPagoAmbiguousError("timeout"); });
     const d = deps({ provider: p }); const result = await retryPendingUpgrade(d);
-    expect(result).toEqual({ ok: false, code: "PROVIDER_UNKNOWN", message: "timeout" });
+    expect(result).toEqual({ ok: false, code: "PROVIDER_UNKNOWN", message: "Não foi possível gerar um novo link de pagamento. Tente novamente." });
+    expect(JSON.stringify(result)).not.toContain("timeout");
     expect(d.finishAttempt).toHaveBeenCalledWith({ attemptId: "attempt_retry", status: "unknown" });
   });
 });

@@ -1,8 +1,8 @@
 // Public reservation code (§16). An 8-character, uppercase Crockford base32 code
 // (no 0/O, 1/I/L — unambiguous to read aloud) grouped as XXXX-XXXX for display.
 // The stored value has no hyphen; display and validation normalize on the fly.
-// It must never authorize access to customer personal data (the derived cancel
-// token is a separate capability).
+// It must never authorize a mutation or access to personal data. Customer
+// cancellation uses an independently generated private capability.
 
 export const PUBLIC_CODE_LENGTH = 8;
 

@@ -24,10 +24,12 @@ const SLOT_2 = "2099-01-06T15:00:00.000Z";
 // A slot that remains occupied for the waitlist tests (a waitlist is only for an
 // occupied slot — a free slot should just be booked).
 const SLOT_WAIT = "2099-01-06T16:00:00.000Z";
+const CANCEL_TOKEN_HASH = "f".repeat(64);
 
 async function createBookingAt(startAt: string, phone: string) {
   const { data, error } = await admin.rpc("create_booking", {
     p_business_id: businessId,
+    p_cancel_token_hash: CANCEL_TOKEN_HASH,
     p_service_id: serviceId,
     p_start_at: startAt,
     p_customer_name: "Cliente",
@@ -88,6 +90,7 @@ describe("cancel_booking_by_public_code (INC-3)", () => {
     const booking = await createBookingAt(SLOT, "+5511980000001");
     const { data, error } = await admin.rpc("cancel_booking_by_public_code", {
       p_code: booking.public_code,
+      p_cancel_token_hash: CANCEL_TOKEN_HASH,
       p_cancel_reason: "Não vou mais poder ir",
     });
     expect(error).toBeNull();
@@ -103,23 +106,46 @@ describe("cancel_booking_by_public_code (INC-3)", () => {
 
   it("rejects cancelling a booking that is no longer confirmed", async () => {
     const booking = await createBookingAt(SLOT_2, "+5511980000003");
-    await admin.rpc("cancel_booking_by_public_code", { p_code: booking.public_code });
-    const { error } = await admin.rpc("cancel_booking_by_public_code", { p_code: booking.public_code });
+    await admin.rpc("cancel_booking_by_public_code", {
+      p_code: booking.public_code,
+      p_cancel_token_hash: CANCEL_TOKEN_HASH,
+    });
+    const { error } = await admin.rpc("cancel_booking_by_public_code", {
+      p_code: booking.public_code,
+      p_cancel_token_hash: CANCEL_TOKEN_HASH,
+    });
     expect(error).not.toBeNull();
-    expect(String(error?.message).toLowerCase()).toMatch(/not_confirmed|confirm/i);
+    expect(String(error?.message)).toContain("CANCELLATION_REJECTED");
   });
 
   it("rejects cancelling a non-existent public code", async () => {
     const { error } = await admin.rpc("cancel_booking_by_public_code", {
       p_code: "ZZZZZZZZ",
+      p_cancel_token_hash: CANCEL_TOKEN_HASH,
     });
     expect(error).not.toBeNull();
-    expect(String(error?.message).toLowerCase()).toMatch(/not_found/i);
+    expect(String(error?.message)).toContain("CANCELLATION_REJECTED");
+  });
+
+  it("rejects a valid public code with the wrong private capability", async () => {
+    const booking = await createBookingAt("2099-01-06T15:30:00.000Z", "+5511980000004");
+    const { error } = await admin.rpc("cancel_booking_by_public_code", {
+      p_code: booking.public_code,
+      p_cancel_token_hash: "0".repeat(64),
+    });
+    expect(error).not.toBeNull();
+    expect(String(error?.message)).toContain("CANCELLATION_REJECTED");
+
+    const { data: row } = await admin.from("bookings").select("status").eq("id", booking.id).single();
+    expect(row?.status).toBe("confirmed");
   });
 
   it("anon CANNOT execute the cancel RPC directly", async () => {
     const anon = anonClient();
-    const { error } = await anon.rpc("cancel_booking_by_public_code", { p_code: "ZZZZZZZZ" });
+    const { error } = await anon.rpc("cancel_booking_by_public_code", {
+      p_code: "ZZZZZZZZ",
+      p_cancel_token_hash: CANCEL_TOKEN_HASH,
+    });
     expect(error).not.toBeNull();
   });
 });
@@ -208,7 +234,8 @@ describe("waitlist RLS (§13.2)", () => {
 
   it("anon cannot read the waitlist", async () => {
     const anon = anonClient();
-    const { data } = await anon.from("waitlist_entries").select("*").eq("business_id", businessId);
-    expect(data?.length ?? 0).toBe(0);
+    const { data, error } = await anon.from("waitlist_entries").select("*").eq("business_id", businessId);
+    expect(data).toBeNull();
+    expect(error).not.toBeNull();
   });
 });

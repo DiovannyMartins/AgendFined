@@ -80,7 +80,8 @@ describe("startUpgrade with billing_attempts", () => {
     } satisfies BillingProvider;
     const deps = makeDeps({ provider });
     const result = await startUpgrade(deps);
-    expect(result).toEqual({ ok: false, code: "PROVIDER_UNKNOWN", message: "timeout" });
+    expect(result).toEqual({ ok: false, code: "PROVIDER_UNKNOWN", message: "Não foi possível iniciar a assinatura. Tente novamente." });
+    expect(JSON.stringify(result)).not.toContain("timeout");
     expect(deps.finishAttempt).toHaveBeenCalledWith({ attemptId: "attempt_1", status: "unknown" });
     expect(deps.linkAttempt).not.toHaveBeenCalled();
   });
@@ -88,7 +89,8 @@ describe("startUpgrade with billing_attempts", () => {
   it("marks local linking failure unknown and never returns a checkout", async () => {
     const deps = makeDeps({ linkAttempt: vi.fn(async () => { throw new Error("database unavailable"); }) });
     const result = await startUpgrade(deps);
-    expect(result).toEqual({ ok: false, code: "SAVE_UNKNOWN", message: "database unavailable" });
+    expect(result).toEqual({ ok: false, code: "SAVE_UNKNOWN", message: "A operação de pagamento precisa de verificação. Tente novamente mais tarde." });
+    expect(JSON.stringify(result)).not.toContain("database unavailable");
     expect(deps.finishAttempt).toHaveBeenCalledWith({ attemptId: "attempt_1", status: "unknown", providerPreapprovalId: "mp_123" });
   });
 

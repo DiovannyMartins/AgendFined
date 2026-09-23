@@ -49,6 +49,7 @@ export function BookingWidget({
   const [error, setError] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileReady, setTurnstileReady] = useState(true);
+  const [turnstileRound, setTurnstileRound] = useState(0);
   const [lastAttempt, setLastAttempt] = useState<{ date: string; startTime: string } | null>(null);
   const [waitlistOffered, setWaitlistOffered] = useState(false);
   const [waitlistSubmitted, setWaitlistSubmitted] = useState<string | null>(null);
@@ -160,14 +161,18 @@ export function BookingWidget({
       cfTurnstileToken: turnstileToken || undefined,
     });
     setSubmitting(false);
-    if (result.ok && result.publicCode) {
-      router.push(`/${slug}/confirmacao?code=${result.publicCode}`);
+    if (result.ok && result.publicCode && result.cancelToken) {
+      const query = new URLSearchParams({ code: result.publicCode, cancel: result.cancelToken });
+      router.push(`/${slug}/confirmacao?${query.toString()}`);
     } else if (result.code === "slot_taken") {
       // INC-3: the slot was lost to another reservation — offer the waitlist.
       setError(result.message ?? "Esse horário não está mais disponível.");
       setLastAttempt({ date, startTime: slot });
       setWaitlistOffered(true);
       setWaitlistSubmitted(null);
+      setTurnstileToken("");
+      setTurnstileReady(!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
+      setTurnstileRound((round) => round + 1);
     } else {
       setError(result.message ?? "Não foi possível concluir a reserva.");
       setSelectedSlot(null);
@@ -364,7 +369,7 @@ export function BookingWidget({
               type="button"
               variant="outline"
               onClick={handleJoinWaitlist}
-              disabled={waitlistBusy}
+              disabled={waitlistBusy || !turnstileReady}
               className="mt-3 w-full"
             >
               {waitlistBusy ? "Entrando..." : "Entrar na lista de espera"}
@@ -401,7 +406,12 @@ export function BookingWidget({
           </label>
         </div>
 
-        <TurnstileWidget onToken={setTurnstileToken} onState={setTurnstileReady} />
+        <TurnstileWidget
+          key={turnstileRound}
+          action="booking_write"
+          onToken={setTurnstileToken}
+          onState={setTurnstileReady}
+        />
 
         <Button type="submit" className="w-full" disabled={submitting || !slot || !consent || !turnstileReady}>
           {submitting ? "Confirmando..." : "Confirmar reserva"}

@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     : "/dashboard";
 
   const supabase = await createClient();
-  let error: { message?: string } | null = null;
+  let error: { message?: string } | null = { message: "missing_auth_credential" };
   if (code) {
     ({ error } = await supabase.auth.exchangeCodeForSession(code));
   } else if (tokenHash && type) {
@@ -38,5 +38,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${trustedOrigin(origin)}${next}`);
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth`);
+  return NextResponse.redirect(`${trustedOrigin(origin)}/login?error=auth`);
 }

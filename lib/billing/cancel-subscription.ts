@@ -39,11 +39,11 @@ export async function cancelSubscription(deps: CancelSubscriptionDeps): Promise<
 
   try {
     await deps.provider.cancelPreapproval(subscription.mpPreapprovalId);
-  } catch (err) {
+  } catch {
     return {
       ok: false,
       code: "PROVIDER_ERROR",
-      message: err instanceof Error ? err.message : "Não foi possível cancelar a assinatura no provedor.",
+      message: "Não foi possível cancelar a assinatura. Tente novamente.",
     };
   }
 
@@ -55,14 +55,14 @@ export async function cancelSubscription(deps: CancelSubscriptionDeps): Promise<
         now.getTime() + (deps.graceDays ?? DEFAULT_GRACE_DAYS) * MS_PER_DAY,
       ).toISOString(),
     });
-  } catch (err) {
+  } catch {
     // The provider cancellation already succeeded. Surface the persistence
     // failure explicitly so the caller can retry/reconcile the local state;
     // do not report success while the dashboard still says authorized.
     return {
       ok: false,
       code: "SAVE_ERROR",
-      message: err instanceof Error ? err.message : "A assinatura foi cancelada, mas não foi possível atualizar o sistema.",
+      message: "A assinatura foi cancelada, mas a atualização está pendente. Contate o suporte.",
     };
   }
 

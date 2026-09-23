@@ -1,15 +1,46 @@
-// Optional Cloudflare Turnstile anti-bot gate (§17). The token is validated
-// server-side against the Turnstile API; the siteverify secret never reaches the
-// browser. Failure is fail-closed whenever TURNSTILE_SECRET_KEY is configured.
-// When the secret is not configured the feature is disabled (fail-open) so the
-// booking flow keeps working until the key is added to the server environment.
-export async function verifyTurnstile(token?: string): Promise<{ ok: boolean }> {
-  const secret = process.env.TURNSTILE_SECRET_KEY;
-  if (!secret) return { ok: true };
+export type TurnstileAction = "booking_write" | "booking_consult";
 
+type VerifyTurnstileOptions = {
+  expectedAction: TurnstileAction;
+  remoteIp?: string;
+};
+
+type TurnstileResponse = {
+  success?: boolean;
+  action?: string;
+  hostname?: string;
+  "error-codes"?: string[];
+};
+
+function configuredHostname(): string | null {
+  const configured = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+  if (!configured) return null;
+  try {
+    return new URL(configured).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+// Production is fail-closed for every missing or unverifiable binding. Local
+// development and tests may omit Turnstile entirely, but a configured verifier
+// always validates the token's action and hostname.
+export async function verifyTurnstile(
+  token: string | undefined,
+  options: VerifyTurnstileOptions,
+): Promise<{ ok: boolean }> {
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  const hostname = configuredHostname();
+  const isProduction = process.env.NODE_ENV === "production";
+
+  if (!secret || !siteKey || !hostname) {
+    return { ok: !isProduction && !secret && !siteKey };
+  }
   if (!token) return { ok: false };
 
   const body = new URLSearchParams({ secret, response: token });
+  if (options.remoteIp && options.remoteIp !== "unknown") body.set("remoteip", options.remoteIp);
 
   let response: Response;
   try {
@@ -18,12 +49,22 @@ export async function verifyTurnstile(token?: string): Promise<{ ok: boolean }> 
       body,
     });
   } catch {
-    // Provider unreachable: fail closed.
     return { ok: false };
   }
 
   if (!response.ok) return { ok: false };
 
-  const data = (await response.json()) as { success?: boolean; "error-codes"?: string[] };
-  return { ok: data.success === true };
+  let data: TurnstileResponse;
+  try {
+    data = (await response.json()) as TurnstileResponse;
+  } catch {
+    return { ok: false };
+  }
+
+  return {
+    ok:
+      data.success === true &&
+      data.action === options.expectedAction &&
+      data.hostname?.toLowerCase() === hostname,
+  };
 }

@@ -88,7 +88,7 @@ function ConsultarFormInner({ slug, onReset }: { slug: string; onReset: () => vo
             required
           />
         </div>
-        <TurnstileWidget onToken={setTurnstileToken} onState={setTurnstileReady} />
+        <TurnstileWidget action="booking_consult" onToken={setTurnstileToken} onState={setTurnstileReady} />
         <input type="hidden" name="cfTurnstileToken" value={turnstileToken} />
         {state.status === "error" && <p className="text-sm text-destructive">{state.message}</p>}
         <Button type="submit" className="w-full" disabled={pending || !turnstileReady}>

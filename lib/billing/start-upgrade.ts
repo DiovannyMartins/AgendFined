@@ -95,11 +95,11 @@ export async function startUpgrade(deps: StartUpgradeDeps): Promise<StartUpgrade
   let attempt: BillingAttempt;
   try {
     attempt = await claimAttempt({ businessId: business.id, kind: "initial", idempotencyKey });
-  } catch (err) {
+  } catch {
     return {
       ok: false,
       code: "ATTEMPT_ERROR",
-      message: err instanceof Error ? err.message : "Não foi possível iniciar a tentativa de upgrade.",
+      message: "Não foi possível iniciar a operação de pagamento. Tente novamente.",
     };
   }
 
@@ -121,11 +121,11 @@ export async function startUpgrade(deps: StartUpgradeDeps): Promise<StartUpgrade
 
   try {
     attempt = await startAttempt(attempt.id, idempotencyKey);
-  } catch (err) {
+  } catch {
     return {
       ok: false,
       code: "ATTEMPT_ERROR",
-      message: err instanceof Error ? err.message : "Não foi possível reservar a tentativa de upgrade.",
+      message: "Não foi possível iniciar a operação de pagamento. Tente novamente.",
     };
   }
 
@@ -155,13 +155,13 @@ export async function startUpgrade(deps: StartUpgradeDeps): Promise<StartUpgrade
     return {
       ok: false,
       code: ambiguous ? "PROVIDER_UNKNOWN" : "PROVIDER_ERROR",
-      message: err instanceof Error ? err.message : "Não foi possível iniciar a assinatura.",
+      message: "Não foi possível iniciar a assinatura. Tente novamente.",
     };
   }
 
   try {
     await linkAttempt({ attemptId: attempt.id, mpPreapprovalId: created.preapprovalId });
-  } catch (err) {
+  } catch {
     await finishAttempt({
       attemptId: attempt.id,
       status: "unknown",
@@ -170,7 +170,7 @@ export async function startUpgrade(deps: StartUpgradeDeps): Promise<StartUpgrade
     return {
       ok: false,
       code: "SAVE_UNKNOWN",
-      message: err instanceof Error ? err.message : "Não foi possível salvar a assinatura.",
+      message: "A operação de pagamento precisa de verificação. Tente novamente mais tarde.",
     };
   }
 

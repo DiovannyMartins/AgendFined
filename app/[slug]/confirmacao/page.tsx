@@ -4,13 +4,13 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CheckCircle2, CalendarClock } from "lucide-react";
 import { CopyCode } from "@/components/copy-code";
-import { deriveCancelToken } from "@/lib/bookings/cancel";
+import { isValidCancelToken } from "@/lib/bookings/cancel";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { CancelBooking } from "./cancel-booking";
 import { publicCodeSchema } from "@/lib/validation/schemas";
 import { enforceConsultRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 
-async function ConfirmationContent({ code, slug }: { code: string; slug: string }) {
+async function ConfirmationContent({ code, slug, cancelToken }: { code: string; slug: string; cancelToken?: string }) {
   const parsedCode = publicCodeSchema.safeParse(code);
   if (!parsedCode.success) notFound();
 
@@ -38,8 +38,6 @@ async function ConfirmationContent({ code, slug }: { code: string; slug: string 
     minute: "2-digit",
     timeZone: APP_TIMEZONE,
   }).format(new Date(booking.start_at));
-
-  const cancelToken = deriveCancelToken(process.env.CANCEL_TOKEN_SECRET ?? "", parsedCode.data);
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-lg items-center justify-center px-4 py-12">
@@ -73,7 +71,9 @@ async function ConfirmationContent({ code, slug }: { code: string; slug: string 
           <CopyCode code={parsedCode.data} />
         </div>
         <div className="mt-6 flex flex-col items-center gap-3 text-sm font-medium">
-          {cancelToken && <CancelBooking code={parsedCode.data} token={cancelToken} />}
+          {cancelToken && isValidCancelToken(cancelToken) && (
+            <CancelBooking code={parsedCode.data} token={cancelToken} />
+          )}
         </div>
         <div className="mt-6 flex flex-col gap-2 text-sm font-medium">
           <Link href={`/${slug}`} className="hover:underline">
@@ -93,15 +93,15 @@ export default async function ConfirmationPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ code?: string }>;
+  searchParams: Promise<{ code?: string; cancel?: string }>;
 }) {
   const { slug } = await params;
-  const { code } = await searchParams;
+  const { code, cancel } = await searchParams;
   if (!code) notFound();
 
   return (
     <Suspense fallback={<div className="py-24 text-center text-muted-foreground">Carregando...</div>}>
-      <ConfirmationContent code={code} slug={slug} />
+      <ConfirmationContent code={code} slug={slug} cancelToken={cancel} />
     </Suspense>
   );
 }

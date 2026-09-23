@@ -15,10 +15,8 @@ import { cancelPublicBooking, type CancelState } from "@/lib/booking/actions";
 
 const INITIAL: CancelState = { status: "idle" };
 
-// INC-3: customer self-service cancellation. The `token` is the derived
-// cancellation token computed server-side from the booking's public_code; it is
-// handed only to the holder of this confirmation screen, so the cancel action
-// never exposes customer personal data.
+// The token is an independent private capability issued once at creation. The
+// public booking code alone cannot reproduce it.
 export function CancelBooking({ code, token }: { code: string; token: string }) {
   const [state, formAction, pending] = useActionState(cancelPublicBooking, INITIAL);
 

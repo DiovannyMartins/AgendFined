@@ -1,28 +1,19 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
-// Cancellation capability for the customer flow (INC-3). The token is derived
-// from a booking's `public_code` via HMAC-SHA256 with a server-only secret, so
-// only the holder of the derived token (the confirmation screen, which already
-// holds the code) can cancel that booking. The token is never stored on the row
-// and never returned by the public lookup; it is recomputed on the server from
-// the code + secret. It encodes no personal data (§16: the public code must
-// never authorize access to customer data; the derived token is a separate
-// capability for the cancel action only).
-//
-// `deriveCancelToken` is deterministic so the confirmation page and the cancel
-// server action agree without any storage. `verifyCancelToken` is fail-closed:
-// missing secret, missing/malformed token or tampering all yield false.
+const CANCEL_TOKEN_BYTES = 32;
+const CANCEL_TOKEN_REGEX = /^[A-Za-z0-9_-]{43}$/;
 
-export function deriveCancelToken(secret: string, publicCode: string): string {
-  if (!secret) return "";
-  return createHmac("sha256", secret).update(publicCode).digest("hex");
+// The public booking code identifies a reservation but never authorizes a
+// mutation. Cancellation uses an independent 256-bit capability. Only its
+// SHA-256 digest is persisted; the raw token is issued once to the customer.
+export function generateCancelToken(): string {
+  return randomBytes(CANCEL_TOKEN_BYTES).toString("base64url");
 }
 
-export function verifyCancelToken(secret: string, publicCode: string, token: string): boolean {
-  const expected = deriveCancelToken(secret, publicCode);
-  if (!expected || !token) return false;
-  const a = Buffer.from(expected, "hex");
-  const b = Buffer.from(token, "hex");
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+export function isValidCancelToken(token: string): boolean {
+  return CANCEL_TOKEN_REGEX.test(token);
+}
+
+export function hashCancelToken(token: string): string {
+  return createHash("sha256").update(token, "utf8").digest("hex");
 }

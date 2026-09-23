@@ -211,6 +211,7 @@ describe("T03: create_booking binds to the business", () => {
   it("rejects an overlapping booking of the same business", async () => {
     const { data: first, error: e1 } = await admin.rpc("create_booking", {
       p_business_id: businessId,
+      p_cancel_token_hash: "a".repeat(64),
       p_service_id: serviceId,
       p_start_at: SLOT_B,
       p_customer_name: "Primeiro",
@@ -221,6 +222,7 @@ describe("T03: create_booking binds to the business", () => {
 
     const { error: e2 } = await admin.rpc("create_booking", {
       p_business_id: businessId,
+      p_cancel_token_hash: "a".repeat(64),
       p_service_id: serviceId,
       p_start_at: SLOT_B_OVERLAP,
       p_customer_name: "Conflito",
@@ -233,6 +235,7 @@ describe("T03: create_booking binds to the business", () => {
   it("creates a booking bound to the business, with correct snapshots and public_code", async () => {
     const { data, error } = await admin.rpc("create_booking", {
       p_business_id: businessId,
+      p_cancel_token_hash: "a".repeat(64),
       p_service_id: serviceId,
       p_start_at: "2099-03-03T10:00:00.000Z",
       p_customer_name: "Com Snapshots",

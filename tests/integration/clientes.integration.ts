@@ -68,6 +68,7 @@ afterAll(async () => {
 function createBooking(name: string, phone: string, email: string | null, startAt: string) {
   return admin.rpc("create_booking", {
     p_business_id: businessId,
+    p_cancel_token_hash: "c".repeat(64),
     p_service_id: serviceId,
     p_start_at: startAt,
     p_customer_name: name,

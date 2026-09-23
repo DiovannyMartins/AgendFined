@@ -80,6 +80,7 @@ test("public booking flow: reserve, confirm in dashboard, release on cancel", as
 
   await page.getByRole("textbox", { name: "Nome" }).fill("Cliente E2E");
   await page.getByRole("textbox", { name: "Telefone / WhatsApp" }).fill("+5511977777777");
+  await page.getByRole("textbox", { name: "E-mail para confirmação" }).fill(`cliente.${stamp}@example.com`);
   await page.getByRole("checkbox", { name: /Autorizo o tratamento dos meus dados/ }).check();
   await page.getByRole("button", { name: "Confirmar reserva" }).click();
 
@@ -89,6 +90,7 @@ test("public booking flow: reserve, confirm in dashboard, release on cancel", as
   const confUrl = new URL(page.url());
   publicCode = confUrl.searchParams.get("code")!;
   expect(publicCode).toMatch(/^[0-9A-HJKMNPQRSTVWXYZ]{8}$/);
+  expect(confUrl.searchParams.get("cancel")).toMatch(/^[A-Za-z0-9_-]{43}$/);
 
   // The reservation is bound to the business, not to any professional.
   const read = createClient(SUPABASE_URL, SUPABASE_SECRET, {

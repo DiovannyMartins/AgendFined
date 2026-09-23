@@ -5,6 +5,7 @@ import { getCurrentBusiness } from "@/lib/business/queries";
 import { createClient } from "@/lib/supabase/server";
 import { assertProPlan } from "@/lib/plan/plan";
 import { classifyOperationalError } from "@/lib/typesafe/judgments";
+import { generateCancelToken, hashCancelToken } from "@/lib/bookings/cancel";
 
 // Server actions for the waitlist management dashboard (issue #22, ADR 0008).
 // Managing the waitlist is a PROFISSIONAL feature, so both actions gate on the
@@ -12,16 +13,23 @@ import { classifyOperationalError } from "@/lib/typesafe/judgments";
 // RPCs. The public join (`joinWaitlist` in lib/booking/actions.ts) is untouched
 // and stays free.
 
-export type WaitlistActionResult = { ok: boolean; message?: string; publicCode?: string };
+export type WaitlistActionResult = {
+  ok: boolean;
+  message?: string;
+  publicCode?: string;
+  cancellationUrl?: string;
+};
 
-async function requireProBusiness(): Promise<{ ok: true } | { ok: false; message: string }> {
+async function requireProBusiness(): Promise<
+  { ok: true; slug: string } | { ok: false; message: string }
+> {
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, message: "Configure seu negócio primeiro." };
   const gate = assertProPlan(business);
   if (!gate.ok) {
     return { ok: false, message: "A gestão da lista de espera é exclusiva do plano PROFISSIONAL." };
   }
-  return { ok: true };
+  return { ok: true, slug: business.slug };
 }
 
 export async function notifyWaitlistEntry(
@@ -72,7 +80,11 @@ export async function convertWaitlistEntry(
   if (!gate.ok) return gate;
 
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("convert_waitlist_entry", { p_entry_id: id });
+  const cancelToken = generateCancelToken();
+  const { data, error } = await supabase.rpc("convert_waitlist_entry", {
+    p_entry_id: id,
+    p_cancel_token_hash: hashCancelToken(cancelToken),
+  });
   if (error) {
     const msg = String(error.message ?? "");
     if (/WAITLIST_PRO_REQUIRED/i.test(msg)) {
@@ -105,5 +117,10 @@ export async function convertWaitlistEntry(
 
   revalidatePath("/dashboard/lista-de-espera");
   revalidatePath("/dashboard/agenda");
-  return { ok: true, publicCode: data?.public_code };
+  const query = new URLSearchParams({ code: data!.public_code, cancel: cancelToken });
+  return {
+    ok: true,
+    publicCode: data!.public_code,
+    cancellationUrl: `/${encodeURIComponent(gate.slug)}/confirmacao?${query.toString()}`,
+  };
 }

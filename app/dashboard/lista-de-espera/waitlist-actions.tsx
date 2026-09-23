@@ -48,6 +48,15 @@ function ConvertForm({ id }: { id: string }) {
       {state.publicCode && (
         <p className="mt-1 text-xs text-emerald-600">Reserva criada: {state.publicCode}</p>
       )}
+      {state.cancellationUrl && (
+        <a
+          className="mt-1 block text-xs text-primary underline"
+          href={state.cancellationUrl}
+          rel="noreferrer"
+        >
+          Abrir confirmação privada
+        </a>
+      )}
       {state.ok === false && <p className="mt-1 text-xs text-destructive">{state.message}</p>}
     </form>
   );

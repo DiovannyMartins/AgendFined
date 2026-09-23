@@ -59,8 +59,8 @@ export async function retryPendingUpgrade(deps: RetryUpgradeDeps): Promise<Retry
       expectedSubscriptionId: existing.subscriptionId,
       idempotencyKey,
     });
-  } catch (err) {
-    return { ok: false, code: "ATTEMPT_ERROR", message: err instanceof Error ? err.message : "Não foi possível iniciar o retry." };
+  } catch {
+    return { ok: false, code: "ATTEMPT_ERROR", message: "Não foi possível iniciar a operação de pagamento. Tente novamente." };
   }
 
   if (attempt.kind !== "retry" || attempt.idempotencyKey !== idempotencyKey) {
@@ -80,12 +80,12 @@ export async function retryPendingUpgrade(deps: RetryUpgradeDeps): Promise<Retry
       expectedSubscriptionId: existing.subscriptionId,
       expectedMpPreapprovalId: existing.mpPreapprovalId,
     });
-  } catch (err) {
+  } catch {
     // The reservation is only useful while the expected pending subscription
     // still exists. If the CAS rejects it, release the reservation so a stale
     // retry cannot strand the business in "billing in progress" forever.
     await deps.finishAttempt({ attemptId: attempt.id, status: "failed" }).catch(() => undefined);
-    return { ok: false, code: "RETRY_SUBSCRIPTION_CONFLICT", message: err instanceof Error ? err.message : "A assinatura pendente foi alterada." };
+    return { ok: false, code: "RETRY_SUBSCRIPTION_CONFLICT", message: "A assinatura pendente mudou. Atualize a página e tente novamente." };
   }
   if (attempt.status !== "creating") {
     return { ok: false, code: "UPGRADE_IN_PROGRESS", message: "O retry já está em andamento." };
@@ -106,19 +106,19 @@ export async function retryPendingUpgrade(deps: RetryUpgradeDeps): Promise<Retry
     return {
       ok: false,
       code: ambiguous ? "PROVIDER_UNKNOWN" : "PROVIDER_ERROR",
-      message: err instanceof Error ? err.message : "Não foi possível gerar um novo link de pagamento.",
+      message: "Não foi possível gerar um novo link de pagamento. Tente novamente.",
     };
   }
 
   try {
     await deps.linkAttempt({ attemptId: attempt.id, mpPreapprovalId: created.preapprovalId });
-  } catch (err) {
+  } catch {
     await deps.finishAttempt({
       attemptId: attempt.id,
       status: "unknown",
       providerPreapprovalId: created.preapprovalId,
     }).catch(() => undefined);
-    return { ok: false, code: "SAVE_UNKNOWN", message: err instanceof Error ? err.message : "Não foi possível salvar a nova assinatura." };
+    return { ok: false, code: "SAVE_UNKNOWN", message: "A operação de pagamento precisa de verificação. Tente novamente mais tarde." };
   }
 
   return { ok: true, initPoint: created.initPoint };

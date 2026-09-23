@@ -107,6 +107,7 @@ export type Database = {
           business_id: string
           cancel_reason: string | null
           cancel_reason_category: string | null
+          cancel_token_hash: string | null
           created_at: string
           customer_email_snapshot: string | null
           customer_id: string
@@ -133,6 +134,7 @@ export type Database = {
           business_id: string
           cancel_reason?: string | null
           cancel_reason_category?: string | null
+          cancel_token_hash?: string | null
           created_at?: string
           customer_email_snapshot?: string | null
           customer_id: string
@@ -159,6 +161,7 @@ export type Database = {
           business_id?: string
           cancel_reason?: string | null
           cancel_reason_category?: string | null
+          cancel_token_hash?: string | null
           created_at?: string
           customer_email_snapshot?: string | null
           customer_id?: string
@@ -531,7 +534,7 @@ export type Database = {
     }
     Functions: {
       cancel_booking_by_public_code: {
-        Args: { p_cancel_reason?: string; p_code: string }
+        Args: { p_cancel_reason?: string; p_cancel_token_hash: string; p_code: string }
         Returns: {
           business_id: string
           cancel_reason: string | null
@@ -568,7 +571,7 @@ export type Database = {
         Returns: boolean
       }
       convert_waitlist_entry: {
-        Args: { p_entry_id: string }
+        Args: { p_cancel_token_hash: string; p_entry_id: string }
         Returns: {
           business_id: string
           cancel_reason: string | null
@@ -603,6 +606,7 @@ export type Database = {
       create_booking: {
         Args: {
           p_business_id: string
+          p_cancel_token_hash: string
           p_customer_email?: string
           p_customer_name: string
           p_customer_note?: string

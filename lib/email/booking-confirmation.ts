@@ -7,6 +7,7 @@ type BookingConfirmation = {
   serviceName: string;
   startAt: string;
   publicCode: string;
+  confirmationUrl: string;
 };
 
 type SendResult = { sent: true } | { sent: false; reason: "not_configured" | "provider_error" };
@@ -28,6 +29,7 @@ function buildBookingConfirmationHtml(input: BookingConfirmation, formattedWhen:
   const businessName = escapeHtml(input.businessName);
   const serviceName = escapeHtml(input.serviceName);
   const publicCode = escapeHtml(input.publicCode);
+  const confirmationUrl = escapeHtml(input.confirmationUrl);
   const dateAndTime = escapeHtml(formattedWhen);
 
   return `<!DOCTYPE html>
@@ -85,7 +87,14 @@ function buildBookingConfirmationHtml(input: BookingConfirmation, formattedWhen:
                   </tr>
                 </table>
 
-                <p style="margin:26px 0 0;color:#b0b0b0;font-size:14px;line-height:22px;">Guarde este e-mail para consultar os dados da reserva.</p>
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:26px;border-collapse:collapse;">
+                  <tr>
+                    <td style="border-radius:8px;background-color:#ffffff;">
+                      <a href="${confirmationUrl}" style="display:inline-block;padding:12px 18px;color:#111111;font-size:14px;font-weight:700;text-decoration:none;">Abrir confirmação privada</a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:18px 0 0;color:#b0b0b0;font-size:14px;line-height:22px;">Guarde este e-mail. O link privado permite consultar e cancelar a reserva.</p>
               </td>
             </tr>
             <tr>
@@ -115,8 +124,9 @@ export async function sendBookingConfirmationEmail(input: BookingConfirmation): 
     `Serviço: ${input.serviceName}`,
     `Data e horário: ${formattedWhen}`,
     `Código da reserva: ${input.publicCode}`,
+    `Confirmação privada: ${input.confirmationUrl}`,
     "",
-    "Guarde este e-mail para consultar os dados da reserva.",
+    "Guarde este e-mail. O link privado permite consultar e cancelar a reserva.",
   ].join("\n");
   const html = buildBookingConfirmationHtml(input, formattedWhen);
 

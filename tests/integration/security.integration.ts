@@ -33,6 +33,7 @@ const SLOT_2 = "2099-02-01T11:00:00.000Z";
 function bookingArgs(businessId: string, serviceId: string, startAt = SLOT_1, phone?: string) {
   return {
     p_business_id: businessId,
+    p_cancel_token_hash: "d".repeat(64),
     p_service_id: serviceId,
     p_start_at: startAt,
     p_customer_name: "Cliente Teste",
@@ -247,26 +248,30 @@ describe("RLS isolation User A vs User B (§35)", () => {
 describe("anon data exposure (§36)", () => {
   it("anon cannot read customers", async () => {
     const anon = anonClient();
-    const { data } = await anon.from("customers").select("*").eq("business_id", businessA);
-    expect(data?.length ?? 0).toBe(0);
+    const { data, error } = await anon.from("customers").select("*").eq("business_id", businessA);
+    expect(data).toBeNull();
+    expect(error).not.toBeNull();
   });
 
   it("anon cannot read bookings", async () => {
     const anon = anonClient();
-    const { data } = await anon.from("bookings").select("*").eq("business_id", businessA);
-    expect(data?.length ?? 0).toBe(0);
+    const { data, error } = await anon.from("bookings").select("*").eq("business_id", businessA);
+    expect(data).toBeNull();
+    expect(error).not.toBeNull();
   });
 
   it("anon cannot read availability", async () => {
     const anon = anonClient();
-    const { data } = await anon.from("availability").select("*").eq("business_id", businessA);
-    expect(data?.length ?? 0).toBe(0);
+    const { data, error } = await anon.from("availability").select("*").eq("business_id", businessA);
+    expect(data).toBeNull();
+    expect(error).not.toBeNull();
   });
 
   it("anon cannot read availability_blocks", async () => {
     const anon = anonClient();
-    const { data } = await anon.from("availability_blocks").select("*").eq("business_id", businessA);
-    expect(data?.length ?? 0).toBe(0);
+    const { data, error } = await anon.from("availability_blocks").select("*").eq("business_id", businessA);
+    expect(data).toBeNull();
+    expect(error).not.toBeNull();
   });
 
   it("anon can read an active business only through the minimal public RPC", async () => {
@@ -282,8 +287,9 @@ describe("anon data exposure (§36)", () => {
 
   it("anon cannot read services through PostgREST base tables", async () => {
     const anon = anonClient();
-    const { data: svc } = await anon.from("services").select("*").eq("id", inactiveServiceA);
-    expect(svc?.length ?? 0).toBe(0);
+    const { data: svc, error: serviceError } = await anon.from("services").select("*").eq("id", inactiveServiceA);
+    expect(svc).toBeNull();
+    expect(serviceError).not.toBeNull();
     const { data: publicServices, error } = await anon.rpc("get_public_services", { p_business_id: businessA });
     expect(error).toBeNull();
     expect(publicServices?.some((service) => service.id === activeServiceA)).toBe(true);
@@ -295,6 +301,23 @@ describe("anon data exposure (§36)", () => {
       "name",
       "price_cents",
     ]);
+  });
+
+  it("denies the remaining typed protected base tables instead of returning an empty success", async () => {
+    const anon = anonClient();
+    const results = await Promise.all([
+      anon.from("profiles").select("id").limit(1),
+      anon.from("businesses").select("id").limit(1),
+      anon.from("booking_rate_limits").select("key").limit(1),
+      anon.from("waitlist_entries").select("id").limit(1),
+      anon.from("subscriptions").select("id").limit(1),
+      anon.from("billing_attempts").select("id").limit(1),
+    ]);
+
+    for (const result of results) {
+      expect(result.data).toBeNull();
+      expect(result.error).not.toBeNull();
+    }
   });
 });
 
@@ -325,6 +348,7 @@ describe("public lookup goes through the server layer (§16) and returns no PII"
     expect(row?.[0]).not.toHaveProperty("customer_name_snapshot");
     expect(row?.[0]).not.toHaveProperty("customer_phone_snapshot");
     expect(row?.[0]).not.toHaveProperty("customer_email_snapshot");
+    expect(row?.[0]).not.toHaveProperty("cancel_token_hash");
     expect(row?.[0]).not.toHaveProperty("owner_id");
   });
 });

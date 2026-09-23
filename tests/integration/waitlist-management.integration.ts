@@ -62,6 +62,7 @@ async function createService(businessId: string, name: string): Promise<string> 
 async function createBookingAt(businessId: string, serviceId: string, startAt: string, phone: string) {
   const { data, error } = await admin.rpc("create_booking", {
     p_business_id: businessId,
+    p_cancel_token_hash: "e".repeat(64),
     p_service_id: serviceId,
     p_start_at: startAt,
     p_customer_name: "Cliente",
@@ -118,6 +119,7 @@ beforeAll(async () => {
   // Free the SLOT_CONVERT slot so the convert RPC can create a booking there.
   const { error: cancelErr } = await admin.rpc("cancel_booking_by_public_code", {
     p_code: convertBooking.public_code,
+    p_cancel_token_hash: "e".repeat(64),
   });
   expect(cancelErr).toBeNull();
 
@@ -212,7 +214,10 @@ describe("issue #22: owner-scoped notify/convert RPCs", () => {
       .single();
     expect(entry).toBeTruthy();
 
-    const { data, error } = await pro.rpc("convert_waitlist_entry", { p_entry_id: entry!.id });
+    const { data, error } = await pro.rpc("convert_waitlist_entry", {
+      p_entry_id: entry!.id,
+      p_cancel_token_hash: "f".repeat(64),
+    });
     expect(error).toBeNull();
     expect(data?.status).toBe("confirmed");
     expect(data?.customer_phone_snapshot).toBe("+5511982220004");
@@ -240,7 +245,10 @@ describe("issue #22: owner-scoped notify/convert RPCs", () => {
     expect(notify.error).not.toBeNull();
     expect(String(notify.error?.message)).toMatch(/NOT_OWNER|NOT_FOUND/i);
 
-    const convert = await outsider.rpc("convert_waitlist_entry", { p_entry_id: entry!.id });
+    const convert = await outsider.rpc("convert_waitlist_entry", {
+      p_entry_id: entry!.id,
+      p_cancel_token_hash: "f".repeat(64),
+    });
     expect(convert.error).not.toBeNull();
     expect(String(convert.error?.message)).toMatch(/NOT_OWNER|NOT_FOUND/i);
   });
@@ -259,7 +267,10 @@ describe("issue #22: owner-scoped notify/convert RPCs", () => {
     expect(notify.error).not.toBeNull();
     expect(String(notify.error?.message)).toMatch(/PRO_REQUIRED/i);
 
-    const convert = await free.rpc("convert_waitlist_entry", { p_entry_id: entry!.id });
+    const convert = await free.rpc("convert_waitlist_entry", {
+      p_entry_id: entry!.id,
+      p_cancel_token_hash: "f".repeat(64),
+    });
     expect(convert.error).not.toBeNull();
     expect(String(convert.error?.message)).toMatch(/PRO_REQUIRED/i);
   });
@@ -269,7 +280,10 @@ describe("issue #22: owner-scoped notify/convert RPCs", () => {
     const anon = anonClient();
     const notify = await anon.rpc("notify_waitlist_entry", { p_entry_id: "00000000-0000-0000-0000-000000000000" });
     expect(notify.error).not.toBeNull();
-    const convert = await anon.rpc("convert_waitlist_entry", { p_entry_id: "00000000-0000-0000-0000-000000000000" });
+    const convert = await anon.rpc("convert_waitlist_entry", {
+      p_entry_id: "00000000-0000-0000-0000-000000000000",
+      p_cancel_token_hash: "f".repeat(64),
+    });
     expect(convert.error).not.toBeNull();
   });
 });

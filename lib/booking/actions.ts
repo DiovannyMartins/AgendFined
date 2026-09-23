@@ -7,7 +7,7 @@ import {
   toConsultState,
   type ConsultState,
 } from "@/lib/bookings/lookup";
-import { verifyCancelToken } from "@/lib/bookings/cancel";
+import { generateCancelToken, hashCancelToken, isValidCancelToken } from "@/lib/bookings/cancel";
 import { isWaitlistEligible, parseWaitlistInput } from "@/lib/waitlist/waitlist";
 import {
   computeAvailableSlots,
@@ -30,7 +30,13 @@ import {
   classifyOperationalError,
 } from "@/lib/typesafe/judgments";
 
-export type ActionResult = { ok: boolean; code?: string; message?: string; publicCode?: string };
+export type ActionResult = {
+  ok: boolean;
+  code?: string;
+  message?: string;
+  publicCode?: string;
+  cancelToken?: string;
+};
 
 type ServerClient = ReturnType<typeof createAdminClient>;
 
@@ -123,6 +129,7 @@ export async function createBooking(input: {
   }
 
   // Remote re-reads the service and enforces the overlap constraint (§11.4).
+  const cancelToken = generateCancelToken();
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("create_booking", {
     p_business_id: business.id,
@@ -132,6 +139,7 @@ export async function createBooking(input: {
     p_customer_phone: parsed.data.customerPhone,
     p_customer_email: parsed.data.customerEmail,
     p_customer_note: parsed.data.customerNote || undefined,
+    p_cancel_token_hash: hashCancelToken(cancelToken),
   });
 
   if (error) {
@@ -161,6 +169,7 @@ export async function createBooking(input: {
       serviceName: service.name,
       startAt: startAtIso,
       publicCode: data.public_code,
+      confirmationUrl: buildPrivateConfirmationUrl(input.slug, data.public_code, cancelToken),
     });
     if (!emailResult.sent) {
       console.error("booking_confirmation_email_failed", {
@@ -184,7 +193,9 @@ export async function createBooking(input: {
     }
   }
 
-  return { ok: true, publicCode: data?.public_code };
+  return data?.public_code
+    ? { ok: true, publicCode: data.public_code, cancelToken }
+    : { ok: false, code: "db_error", message: "Não foi possível concluir a reserva. Tente novamente." };
 }
 
 // Public consultation of a reservation by its public code. Uses the server-only
@@ -216,14 +227,17 @@ export async function consultBooking(
     return { status: "error", code: "NOT_FOUND", message: "Nenhuma reserva encontrada com esse código." };
   }
 
-  const gate = await verifyTurnstile(turnstileToken || undefined);
+  const ip = await getClientIp();
+  const gate = await verifyTurnstile(turnstileToken || undefined, {
+    expectedAction: "booking_consult",
+    remoteIp: ip,
+  });
   if (!gate.ok) {
     return { status: "error", code: "CAPTCHA", message: "Verificação humana falhou. Tente novamente." };
   }
 
   const supabase = createAdminClient();
 
-  const ip = await getClientIp();
   let allowed: boolean;
   try {
     allowed = await enforceConsultRateLimit(supabase, ip);
@@ -251,12 +265,9 @@ export async function consultBooking(
   return toConsultState(result);
 }
 
-// Self-service cancellation (INC-3). The caller must present the token derived
-// from the booking's public_code (HMAC-SHA256 with CANCEL_TOKEN_SECRET); the
-// public lookup never returns it, so possession is the proof of the customer's
-// own reservation. The RPC performs the atomic confirmed -> cancelled transition
-// (service_role-only), which also frees the slot for a new reservation. Gated by
-// the same fail-closed per-IP consultation limit as the lookup flow.
+// Self-service cancellation requires the independent private capability issued
+// at booking creation. The database stores only its digest and performs the
+// digest check plus confirmed -> cancelled transition atomically.
 export type CancelState =
   | { status: "idle" }
   | { status: "done" }
@@ -271,18 +282,7 @@ export async function cancelPublicBooking(
   const reason = String(formData.get("cancelReason") ?? "").trim() || undefined;
 
   const parsed = publicCodeSchema.safeParse(code);
-  if (!parsed.success) {
-    return { status: "error", code: "NOT_FOUND", message: "Informe um código de reserva válido." };
-  }
-
-  const secret = process.env.CANCEL_TOKEN_SECRET ?? "";
-  if (!verifyCancelToken(secret, parsed.data, token)) {
-    return {
-      status: "error",
-      code: "INVALID_TOKEN",
-      message: "Você precisa abrir a confirmação desta reserva para cancelá-la.",
-    };
-  }
+  if (!parsed.success || !isValidCancelToken(token)) return cancellationRejected();
 
   const supabase = createAdminClient();
 
@@ -303,26 +303,11 @@ export async function cancelPublicBooking(
 
   const { error } = await supabase.rpc("cancel_booking_by_public_code", {
     p_code: parsed.data,
+    p_cancel_token_hash: hashCancelToken(token),
     p_cancel_reason: reason,
   });
 
-  if (error) {
-    const msg = String(error.message ?? "");
-    if (/BOOKING_NOT_FOUND/i.test(msg)) {
-      return { status: "error", code: "NOT_FOUND", message: "Reserva não encontrada." };
-    }
-    if (/BOOKING_NOT_CONFIRMED/i.test(msg)) {
-      return { status: "error", code: "NOT_CONFIRMED", message: "Esta reserva já não pode ser cancelada." };
-    }
-    const judgment = await classifyOperationalError("cancel_public_booking", msg);
-    if (judgment?.category === "not_found" && judgment.confidence >= 0.8) {
-      return { status: "error", code: "NOT_FOUND", message: "Reserva não encontrada." };
-    }
-    if (judgment?.category === "invalid_state" && judgment.confidence >= 0.8) {
-      return { status: "error", code: "NOT_CONFIRMED", message: "Esta reserva já não pode ser cancelada." };
-    }
-    return { status: "error", code: "DB_ERROR", message: "Não foi possível cancelar. Tente novamente." };
-  }
+  if (error) return cancellationRejected();
 
   if (reason) {
     const judgment = await classifyCancellationReason(reason);
@@ -342,6 +327,28 @@ export async function cancelPublicBooking(
   }
 
   return { status: "done" };
+}
+
+function cancellationRejected(): CancelState {
+  return {
+    status: "error",
+    code: "INVALID_TOKEN",
+    message: "Não foi possível cancelar esta reserva.",
+  };
+}
+
+function buildPrivateConfirmationUrl(slug: string, publicCode: string, cancelToken: string): string {
+  const configured = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  let baseUrl: URL;
+  try {
+    baseUrl = new URL(configured);
+  } catch {
+    baseUrl = new URL("http://localhost:3000");
+  }
+  const url = new URL(`/${encodeURIComponent(slug)}/confirmacao`, baseUrl);
+  url.searchParams.set("code", publicCode);
+  url.searchParams.set("cancel", cancelToken);
+  return url.toString();
 }
 
 // Waitlist join (INC-3). When a customer's preferred slot is already occupied
@@ -424,7 +431,11 @@ async function resolvePublicBusinessAndRateLimit(
 ): Promise<{ ok: true; supabase: ServerClient; business: ResolvedBusiness } | { ok: false; result: ActionResult }> {
   const supabase = createAdminClient();
 
-  const gate = await verifyTurnstile(cfTurnstileToken);
+  const ip = await getClientIp();
+  const gate = await verifyTurnstile(cfTurnstileToken, {
+    expectedAction: "booking_write",
+    remoteIp: ip,
+  });
   if (!gate.ok) {
     return { ok: false, result: { ok: false, code: "captcha_failed", message: "Verificação humana falhou. Tente novamente." } };
   }
@@ -442,7 +453,6 @@ async function resolvePublicBusinessAndRateLimit(
 
   // Rate limit before expensive work, keyed on IP+business and a business-wide
   // aggregate (never only on the customer phone).
-  const ip = await getClientIp();
   const allowed = await enforceRateLimit(supabase, ip, business.id);
   if (!allowed) {
     return {

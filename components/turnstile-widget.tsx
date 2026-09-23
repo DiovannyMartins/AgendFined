@@ -12,6 +12,7 @@ declare global {
           callback: (token: string) => void;
           "expired-callback": () => void;
           "error-callback": () => void;
+          action?: string;
           theme?: "light" | "dark" | "auto";
         },
       ) => string;
@@ -84,9 +85,11 @@ function loadTurnstile(): Promise<void> {
 export const TurnstileWidget = memo(function TurnstileWidget({
   onToken,
   onState,
+  action,
 }: {
   onToken: (token: string) => void;
   onState?: (ready: boolean) => void;
+  action: "booking_write" | "booking_consult";
 }) {
   const sitekey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -117,6 +120,7 @@ export const TurnstileWidget = memo(function TurnstileWidget({
       try {
         const id = window.turnstile.render(el, {
           sitekey,
+          action,
           // Site is dark-only (see globals.css :root), so render the challenge
           // in dark to match the background instead of defaulting to light.
           theme: "dark",
@@ -176,7 +180,7 @@ export const TurnstileWidget = memo(function TurnstileWidget({
         }
       }
     };
-  }, [sitekey, onToken, onState, retry]);
+  }, [sitekey, onToken, onState, action, retry]);
 
   // Retry: bump the counter to re-run the effect (re-render the challenge). If
   // the script failed to load we also clear the cached promise via the

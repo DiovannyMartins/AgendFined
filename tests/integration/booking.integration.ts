@@ -82,6 +82,7 @@ describe("createBooking RPC (§11.4)", () => {
   it("creates a valid booking with snapshots", async () => {
     const { data, error } = await admin.rpc("create_booking", {
       p_business_id: businessId,
+      p_cancel_token_hash: "b".repeat(64),
       p_service_id: serviceId,
       p_start_at: slot,
       p_customer_name: "Maria",
@@ -101,6 +102,7 @@ describe("createBooking RPC (§11.4)", () => {
     const overlapSlot = "2099-01-05T14:15:00.000Z"; // overlaps the 14:00-14:30 booking
     const { error } = await admin.rpc("create_booking", {
       p_business_id: businessId,
+      p_cancel_token_hash: "b".repeat(64),
       p_service_id: serviceId,
       p_start_at: overlapSlot,
       p_customer_name: "João",
@@ -114,6 +116,7 @@ describe("createBooking RPC (§11.4)", () => {
     // A start in the far past must be rejected by the RPC even with min_notice=0.
     const { error } = await admin.rpc("create_booking", {
       p_business_id: businessId,
+      p_cancel_token_hash: "b".repeat(64),
       p_service_id: serviceId,
       p_start_at: "2020-01-01T00:00:00.000Z",
       p_customer_name: "João",
@@ -126,6 +129,7 @@ describe("createBooking RPC (§11.4)", () => {
   it("public lookup exposes only non-personal data and no status (§16)", async () => {
     const { data: booking } = await admin.rpc("create_booking", {
       p_business_id: businessId,
+      p_cancel_token_hash: "b".repeat(64),
       p_service_id: serviceId,
       p_start_at: "2099-01-05T14:30:00.000Z",
       p_customer_name: "Cliente Sigiloso",
@@ -217,6 +221,7 @@ describe("block vs future booking conflict (§9.4)", () => {
     // the bookings trigger must reject a booking that falls inside the block.
     const { error } = await admin.rpc("create_booking", {
       p_business_id: businessId,
+      p_cancel_token_hash: "b".repeat(64),
       p_service_id: serviceId,
       p_start_at: "2099-01-07T10:30:00.000Z",
       p_customer_name: "Outro Cliente",

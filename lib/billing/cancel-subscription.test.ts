@@ -77,7 +77,8 @@ describe("cancelSubscription (US16)", () => {
     });
     const result = await cancelSubscription(deps);
 
-    expect(result).toEqual({ ok: false, code: "PROVIDER_ERROR", message: "Mercado Pago preapproval cancel failed (400)" });
+    expect(result).toEqual({ ok: false, code: "PROVIDER_ERROR", message: "Não foi possível cancelar a assinatura. Tente novamente." });
+    expect(JSON.stringify(result)).not.toContain("Mercado Pago preapproval cancel failed");
   });
 
   it("honours a configurable grace period", async () => {
@@ -99,6 +100,7 @@ describe("cancelSubscription (US16)", () => {
 
     const result = await cancelSubscription(deps);
 
-    expect(result).toEqual({ ok: false, code: "SAVE_ERROR", message: "database unavailable" });
+    expect(result).toEqual({ ok: false, code: "SAVE_ERROR", message: "A assinatura foi cancelada, mas a atualização está pendente. Contate o suporte." });
+    expect(JSON.stringify(result)).not.toContain("database unavailable");
   });
 });

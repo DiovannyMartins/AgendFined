@@ -31,4 +31,4 @@
 
 ## Notes
 
-- A implementação deve preservar o fluxo de checkout e o valor de teste de R$ 1.
+- A implementação deve preservar o fluxo de checkout e o valor de teste de R$ 19.

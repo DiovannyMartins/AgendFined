@@ -14,6 +14,8 @@ import {
   type ReportBooking,
   type ReportBusiness,
 } from "@/lib/reports/reports";
+import { prepareAiBudget, recordAiUsage } from "@/lib/security/usage";
+import { classifyReportInsight } from "@/lib/typesafe/judgments";
 
 export type { BillingReportResult };
 
@@ -40,5 +42,23 @@ export async function getBillingReport(
   const getBusiness = deps?.getBusiness ?? getCurrentBusiness;
   const fetchBookings = deps?.fetchBookings ?? fetchOwnerBookings;
   const business = await getBusiness();
-  return buildBillingReportResult(business, fetchBookings, rangeKey);
+  if (!business || deps) return buildBillingReportResult(business, fetchBookings, rangeKey);
+
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData.user?.id;
+  if (!userId) return { status: "no_business" };
+
+  let aiAllowed = false;
+  if (process.env.TYPESAFE_API_KEY?.trim()) {
+    aiAllowed = await prepareAiBudget(userId, business.id, "reportInsight");
+  }
+
+  return buildBillingReportResult(business, fetchBookings, rangeKey, {
+    classifyInsight: aiAllowed
+      ? (report) => classifyReportInsight(report, {
+          onUsage: (usage) => recordAiUsage(userId, "reportInsight", usage),
+        })
+      : async () => null,
+  });
 }

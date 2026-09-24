@@ -36,13 +36,13 @@ describe("PlanSection", () => {
     });
   });
 
-  it("shows the current Free plan and the Pro offer with the test price", async () => {
+  it("shows the current Free plan and the Pro offer with the configured price", async () => {
     render(await PlanSection({ business: { id: "biz_1", plan: "free" } }));
 
     expect(screen.getByText("Grátis", { exact: true })).toBeInTheDocument();
     expect(screen.getByText("Atual", { exact: true })).toBeInTheDocument();
     expect(screen.getByText("PROFISSIONAL", { exact: true })).toBeInTheDocument();
-    expect(screen.getByText(/R\$ 1\/mês/)).toBeInTheDocument();
+    expect(screen.getByText(/R\$ 19,00/)).toBeInTheDocument();
     expect(screen.getByText("Relatórios", { exact: true })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Assinar PROFISSIONAL" })).toBeInTheDocument();
     expect(screen.queryByText("Recomendado", { exact: true })).not.toBeInTheDocument();
@@ -94,7 +94,7 @@ describe("PlanSection", () => {
     expect(screen.getByText("Atual", { exact: true })).toBeInTheDocument();
     expect(screen.queryByText("Pendente", { exact: true })).not.toBeInTheDocument();
     expect(screen.getByText("PROFISSIONAL", { exact: true })).toBeInTheDocument();
-    expect(screen.getByText(/R\$ 1\/mês/)).toBeInTheDocument();
+    expect(screen.getByText(/R\$ 19,00/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Fazer upgrade" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Assinar PROFISSIONAL" })).not.toBeInTheDocument();
   });

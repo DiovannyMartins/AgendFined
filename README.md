@@ -33,7 +33,7 @@ Plataforma SaaS de agendamento online para profissionais e pequenos negócios. O
 - **Fuso fixo America/Sao_Paulo**: datas armazenadas em UTC e exibidas no horário de Brasília.
 - **Anti-bot**: gate de Cloudflare Turnstile no fluxo público de reserva.
 - **Histórico estável**: snapshots de serviço (nome, preço, duração) preservam o histórico da reserva.
-- **Plano PROFISSIONAL (R$ 1/mês, Mercado Pago)**: relatórios, lembretes automáticos, gestão da lista de espera e exportação da agenda (Google Calendar/.ics). O plano Grátis contém o núcleo completo de agendamento.
+- **Plano PROFISSIONAL (R$ 19/mês, Mercado Pago)**: relatórios, lembretes automáticos, gestão da lista de espera e exportação da agenda (Google Calendar/.ics). O plano Grátis contém o núcleo completo de agendamento.
 
 > Especificação de produto e implementação: `documento-projeto.md` (fonte de verdade do MVP).
 
@@ -123,6 +123,15 @@ supabase gen types typescript --db-url "<db-url>" --schema public > lib/supabase
 ## Variáveis de ambiente
 
 Copie `.env.example` para `.env.local` e preencha:
+
+Para configurar os secrets sem expô-los no terminal, execute o wizard interativo:
+
+```bash
+bash scripts/security-release-wizard.sh
+```
+
+O wizard grava apenas em `.env` (ignorado pelo Git), orienta a configuração de
+Supabase, Mercado Pago, Resend, TypeSafe e Vercel, e não envia secrets para o repositório.
 
 | Variável | Exposição | Uso |
 | --- | --- | --- |

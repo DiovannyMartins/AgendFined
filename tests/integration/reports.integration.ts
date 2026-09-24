@@ -13,7 +13,7 @@ const stamp = Date.now().toString().slice(-8);
 const EMAIL = `relatorio.${stamp}@agendfined.dev`;
 const OUTSIDER_EMAIL = `relatorio-out.${stamp}@agendfined.dev`;
 const PRO_EMAIL = `relatorio-pro.${stamp}@agendfined.dev`;
-const PASSWORD = "senha12345";
+const PASSWORD = process.env.INTEGRATION_TEST_PASSWORD ?? `Test-${stamp}-aA1!`;
 
 // A fixed past window so the report math is independent of the run clock.
 const FROM = "2099-05-01T00:00:00.000Z";

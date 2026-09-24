@@ -9,7 +9,7 @@ import { buildCustomerHistory, filterCustomers } from "@/lib/customers/history";
 // test:integration (Node 22+). Requires .env.local with valid keys.
 const stamp = Date.now().toString().slice(-8);
 const EMAIL = `clientes.${stamp}@agendfined.dev`;
-const PASSWORD = "senha12345";
+const PASSWORD = process.env.INTEGRATION_TEST_PASSWORD ?? `Test-${stamp}-aA1!`;
 const DISPLAY_NAME = "Dona Ana";
 
 const PHONE_ELI = "+5511911110001";

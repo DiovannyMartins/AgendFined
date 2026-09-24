@@ -184,100 +184,89 @@ finish() {
 # Replace the example below. Set TOTAL_STAGES to match the stages you write.
 # ──────────────────────────────────────────────────────────────────────────
 
-TOTAL_STAGES=4
+TOTAL_STAGES=7
+ENV_FILE="${ENV_FILE:-.env.local}"
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$REPO_ROOT"
+banner "AgendFined security release"
 
-cli_path() {
-  if [[ "$1" != /* && "$1" != [A-Za-z]:* ]]; then
-    printf '%s' "$1"
-    return
-  fi
-  if command -v cygpath >/dev/null 2>&1; then
-    cygpath -w "$1"
-  else
-    printf '%s' "$1"
-  fi
-}
+stage "Supabase: server configuration"
+say "Configure the local server environment without exposing credentials in the terminal log."
+open_url "https://supabase.com/dashboard/projects"
+step "Open the project used by this checkout and confirm the security migration is applied."
+step "In Project Settings → API, copy the project URL and publishable key."
+ask NEXT_PUBLIC_SUPABASE_URL "Project URL:"
+ask NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY "Publishable key:"
+step "Copy the Secret key (sb_secret_..., formerly service_role) only from the server-side secret area. Never paste it into chat or a NEXT_PUBLIC variable."
+ask_secret SUPABASE_SERVICE_ROLE_KEY "Secret key (sb_secret_...):"
+[[ -z "$NEXT_PUBLIC_SUPABASE_URL" ]] || write_env NEXT_PUBLIC_SUPABASE_URL "$NEXT_PUBLIC_SUPABASE_URL"
+[[ -z "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" ]] || write_env NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+[[ -z "$SUPABASE_SERVICE_ROLE_KEY" ]] || write_env SUPABASE_SERVICE_ROLE_KEY "$SUPABASE_SERVICE_ROLE_KEY"
+step "In the Edge Function environment, configure the same server-only keys required by the reminder job."
+pause "After saving the Supabase secrets, press Enter"
 
-TEMP_ENV_FILE=""
-TEMP_CRON_SQL=""
-cleanup() {
-  [[ -z "$TEMP_ENV_FILE" ]] || rm -f "$TEMP_ENV_FILE"
-  [[ -z "$TEMP_CRON_SQL" ]] || rm -f "$TEMP_CRON_SQL"
-}
-trap cleanup EXIT
+stage "Mercado Pago: checkout and alerts"
+say "Configure the server-authoritative price, webhook verification, and billing alert."
+open_url "https://www.mercadopago.com/developers/panel"
+step "Open the production application (or the test application for local work)."
+step "Copy the access token from the server credentials area."
+ask_secret MERCADO_PAGO_ACCESS_TOKEN "Access token:"
+step "In Webhooks, configure /api/webhooks/mercadopago for subscription_preapproval and copy the signing secret."
+ask_secret MERCADO_PAGO_WEBHOOK_SECRET "Webhook secret:"
+ask MERCADO_PAGO_NOTIFICATION_URL "Public webhook URL:"
+ask MERCADO_PAGO_PRO_AMOUNT_CENTS "PRO price in cents [1900]:"
+[[ -z "$MERCADO_PAGO_ACCESS_TOKEN" ]] || write_env MERCADO_PAGO_ACCESS_TOKEN "$MERCADO_PAGO_ACCESS_TOKEN"
+[[ -z "$MERCADO_PAGO_WEBHOOK_SECRET" ]] || write_env MERCADO_PAGO_WEBHOOK_SECRET "$MERCADO_PAGO_WEBHOOK_SECRET"
+[[ -z "$MERCADO_PAGO_NOTIFICATION_URL" ]] || write_env MERCADO_PAGO_NOTIFICATION_URL "$MERCADO_PAGO_NOTIFICATION_URL"
+[[ -z "$MERCADO_PAGO_PRO_AMOUNT_CENTS" ]] || write_env MERCADO_PAGO_PRO_AMOUNT_CENTS "$MERCADO_PAGO_PRO_AMOUNT_CENTS"
+step "Configure the provider's billing/spend notifications for the account and webhook failures."
+pause "After saving Mercado Pago settings, press Enter"
 
-banner "AgendFined · lembretes de reserva"
-
-stage "Resend: credenciais de envio"
-say "As credenciais serão usadas apenas durante este wizard e enviadas diretamente ao Supabase."
+stage "Resend: email delivery"
+say "Configure booking confirmation delivery and the reminder function secret."
 open_url "https://resend.com/api-keys"
-step "No Resend, copie uma API key com permissão de envio."
-ask_secret RESEND_API_KEY "API key do Resend:"
-step "Informe o remetente verificado no Resend, por exemplo AgendFined <reservas@seudominio.com>."
-ask RESEND_FROM_EMAIL "Remetente verificado:"
-if [[ -z "$RESEND_API_KEY" || -z "$RESEND_FROM_EMAIL" ]]; then
-  warn "A API key e o remetente são obrigatórios."
-  exit 1
-fi
-REMINDER_CRON_SECRET="$(_existing REMINDER_CRON_SECRET || true)"
-if [[ -n "$REMINDER_CRON_SECRET" ]]; then
-  note "Reutilizando o segredo do cron já salvo; ele não será exibido."
-elif command -v openssl >/dev/null 2>&1; then
-  REMINDER_CRON_SECRET="$(openssl rand -hex 32)"
-  note "Segredo do cron gerado localmente; ele não será exibido."
-else
-  ask_secret REMINDER_CRON_SECRET "Gere e informe um segredo forte para o cron:"
-fi
+step "Create or copy a server-only API key with the minimum scope needed to send booking emails."
+ask_secret RESEND_API_KEY "Resend API key:"
+ask RESEND_FROM_EMAIL "Verified sender email:"
+ask_secret REMINDER_CRON_SECRET "Reminder dispatch shared secret:"
+[[ -z "$RESEND_API_KEY" ]] || write_env RESEND_API_KEY "$RESEND_API_KEY"
+[[ -z "$RESEND_FROM_EMAIL" ]] || write_env RESEND_FROM_EMAIL "$RESEND_FROM_EMAIL"
+[[ -z "$REMINDER_CRON_SECRET" ]] || write_env REMINDER_CRON_SECRET "$REMINDER_CRON_SECRET"
+step "Set the same reminder secret in the Supabase Edge Function and scheduler configuration."
+pause "After saving email settings, press Enter"
 
-stage "Supabase: secrets e Edge Function"
-TEMP_ENV_FILE="$(mktemp .reminder-secrets.XXXXXX)"
-printf 'REMINDER_CRON_SECRET=%s\nRESEND_API_KEY=%s\nRESEND_FROM_EMAIL=%s\n' \
-  "$REMINDER_CRON_SECRET" "$RESEND_API_KEY" "$RESEND_FROM_EMAIL" > "$TEMP_ENV_FILE"
-step "Configurando os três secrets no projeto Supabase vinculado."
-npx supabase secrets set --env-file "$(cli_path "$TEMP_ENV_FILE")"
-step "Publicando a Edge Function booking-reminders."
-npx supabase functions deploy booking-reminders --no-verify-jwt --use-api
-rm -f "$TEMP_ENV_FILE"
-TEMP_ENV_FILE=""
+stage "TypeSafe: AI budget"
+say "Enable optional AI features with a server-only key and provider billing limits."
+step "Open the TypeSafe provider dashboard for this account and create/copy a server API key."
+ask_secret TYPESAFE_API_KEY "TypeSafe API key:"
+[[ -z "$TYPESAFE_API_KEY" ]] || write_env TYPESAFE_API_KEY "$TYPESAFE_API_KEY"
+step "Configure the provider's billing alert and a hard spending cap if the account supports it."
+pause "After saving the TypeSafe settings, press Enter"
 
-stage "Supabase: pg_cron"
-SUPABASE_URL=""
-if [[ -f "$REPO_ROOT/.env.local" ]]; then
-  SUPABASE_URL="$(grep -E '^NEXT_PUBLIC_SUPABASE_URL=' "$REPO_ROOT/.env.local" | tail -n1 | cut -d= -f2-)"
-fi
-if [[ -z "$SUPABASE_URL" ]]; then
-  ask SUPABASE_URL "URL do projeto Supabase:"
-fi
-SUPABASE_URL="${SUPABASE_URL%/}"
-if [[ -z "$SUPABASE_URL" ]]; then
-  warn "A URL do projeto Supabase é obrigatória."
-  exit 1
-fi
-TEMP_CRON_SQL="$(mktemp .reminder-cron.XXXXXX)"
-cat > "$TEMP_CRON_SQL" <<SQL
-select cron.unschedule('booking-reminders');
-select cron.schedule(
-  'booking-reminders',
-  '*/30 * * * *',
-  'select set_config(''app.reminder_cron_url'', ''${SUPABASE_URL}/functions/v1/booking-reminders'', false); select set_config(''app.reminder_cron_secret'', ''${REMINDER_CRON_SECRET}'', false); select public.process_booking_reminders();'
-);
-select jobname, schedule, active
-from cron.job
-where jobname = 'booking-reminders';
-SQL
-step "Atualizando o job booking-reminders para executar a cada 30 minutos."
-npx supabase db query --linked --file "$(cli_path "$TEMP_CRON_SQL")"
-rm -f "$TEMP_CRON_SQL"
-TEMP_CRON_SQL=""
+stage "Secret rotation"
+say "Revoke credentials that may have appeared in old Git history and issue fresh values."
+step "Rotate any Supabase service-role, Mercado Pago, Resend, TypeSafe, webhook, or scheduler secret that was ever committed."
+step "Reset any shared demo or integration account that used an old test password."
+step "Do not rewrite Git history unless the repository owner explicitly approves that destructive operation."
+pause "After completing secret rotation, press Enter"
 
-stage "Verificação"
-step "Confirmando que os secrets existem sem imprimir seus valores."
-npx supabase secrets list
-step "Confirmando o job do pg_cron sem mostrar o comando que contém o segredo."
-npx supabase db query --linked "select jobname, schedule, active from cron.job where jobname = 'booking-reminders';"
-note "A verificação não dispara e-mails imediatamente; os próximos ticks processarão reservas elegíveis."
+stage "Deployment: production variables"
+say "Copy the server-only values from this local file into the hosting provider's encrypted environment settings."
+open_url "https://vercel.com/dashboard"
+step "Select the production project and add the variables from .env.example for Production."
+step "Never add SUPABASE_SERVICE_ROLE_KEY, TYPESAFE_API_KEY, access tokens, or webhook secrets as NEXT_PUBLIC variables."
+step "Set APP_URL and MERCADO_PAGO_NOTIFICATION_URL to the final HTTPS domain."
+step "Redeploy after saving variables; do not commit .env.local."
+pause "After the production redeploy, press Enter"
+
+stage "Final verification"
+step "Run the local checks against the configured environment."
+npx vitest run --project unit
+npm run lint
+npm run typecheck
+npm run build
+step "Run the Node 22 integration suite against the linked Supabase project when the environment is available."
+note "Command: npm run test:integration"
+note "The wizard does not execute integration tests automatically because they can mutate the linked project."
+# ──────────────────────────────────────────────────────────────────────────
 
 finish

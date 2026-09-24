@@ -102,6 +102,36 @@ export type Database = {
         }
         Relationships: []
       }
+      security_usage_daily: {
+        Row: {
+          category: string
+          input_tokens: number
+          output_tokens: number
+          request_count: number
+          subject_id: string
+          updated_at: string
+          usage_date: string
+        }
+        Insert: {
+          category: string
+          input_tokens?: number
+          output_tokens?: number
+          request_count?: number
+          subject_id: string
+          updated_at?: string
+          usage_date?: string
+        }
+        Update: {
+          category?: string
+          input_tokens?: number
+          output_tokens?: number
+          request_count?: number
+          subject_id?: string
+          updated_at?: string
+          usage_date?: string
+        }
+        Relationships: []
+      }
       bookings: {
         Row: {
           business_id: string
@@ -851,6 +881,24 @@ export type Database = {
       set_booking_reminders_sent: {
         Args: { p_booking_ids: string[]; p_claim_tokens?: string[] }
         Returns: number
+      }
+      consume_security_usage_budget: {
+        Args: {
+          p_category: string
+          p_request_limit?: number
+          p_subject_id: string
+          p_token_limit?: number
+        }
+        Returns: boolean
+      }
+      record_security_usage: {
+        Args: {
+          p_category: string
+          p_input_tokens: number
+          p_output_tokens: number
+          p_subject_id: string
+        }
+        Returns: undefined
       }
     }
     Enums: {

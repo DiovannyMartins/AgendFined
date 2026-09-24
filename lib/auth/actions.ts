@@ -1,8 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { emailSchema, loginSchema, signupSchema } from "@/lib/validation/schemas";
+import { enforceAuthRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 
 export type ActionResult<T = undefined> =
   | { ok: true; data: T }
@@ -13,6 +15,15 @@ const genericError = (message: string): { ok: false; code: string; message: stri
   code: "UNEXPECTED_ERROR",
   message,
 });
+
+async function authRateLimit(action: "login" | "signup" | "passwordReset", email: string) {
+  try {
+    const admin = createAdminClient();
+    return await enforceAuthRateLimit(admin, await getClientIp(), action, email);
+  } catch {
+    return null;
+  }
+}
 
 export async function signup(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();
@@ -28,6 +39,11 @@ export async function signup(_prev: ActionResult, formData: FormData): Promise<A
       message: "Revise os campos destacados.",
       fieldErrors: parsed.error.flatten().fieldErrors,
     };
+  }
+
+  const allowed = await authRateLimit("signup", parsed.data.email);
+  if (allowed !== true) {
+    return { ok: false, code: allowed === false ? "RATE_LIMITED" : "RATE_LIMIT_UNAVAILABLE", message: "Muitas tentativas. Tente novamente mais tarde." };
   }
 
   const { error } = await supabase.auth.signUp({
@@ -59,6 +75,11 @@ export async function login(_prev: ActionResult, formData: FormData): Promise<Ac
     return { ok: false, code: "VALIDATION", message: "Preencha e-mail e senha.", fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
+  const allowed = await authRateLimit("login", parsed.data.email);
+  if (allowed !== true) {
+    return { ok: false, code: allowed === false ? "RATE_LIMITED" : "RATE_LIMIT_UNAVAILABLE", message: "Muitas tentativas. Tente novamente mais tarde." };
+  }
+
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) {
     return {
@@ -87,6 +108,11 @@ export async function requestPasswordReset(_prev: ActionResult, formData: FormDa
   const parsedEmail = emailSchema.safeParse(email);
   if (!parsedEmail.success || !origin) {
     return { ok: false, code: "VALIDATION", message: "Informe um e-mail válido.", fieldErrors: {} };
+  }
+
+  const allowed = await authRateLimit("passwordReset", parsedEmail.data);
+  if (allowed !== true) {
+    return { ok: false, code: allowed === false ? "RATE_LIMITED" : "RATE_LIMIT_UNAVAILABLE", message: "Muitas tentativas. Tente novamente mais tarde." };
   }
 
   // Route the recovery callback through the existing code-exchange handler so the

@@ -185,13 +185,14 @@ export async function buildBillingReportResult(
   business: ReportBusiness | null,
   fetchBookings: FetchReportBookings,
   rangeKey?: string,
+  options?: { classifyInsight?: (report: BillingReport) => Promise<ReportInsight | null> },
 ): Promise<BillingReportResult> {
   const { key, range } = resolveRange(rangeKey);
   const gated = await runProGated(business, (businessId) => fetchBookings(businessId, range));
   if (gated.status !== "ok") return gated;
 
   const report = buildBillingReport(gated.data, range);
-  const insight = await classifyReportInsight(report);
+  const insight = await (options?.classifyInsight ?? ((value: BillingReport) => classifyReportInsight(value)))(report);
   return insight && insight.confidence >= 0.7
     ? { status: "ok", key, range, report, insight }
     : { status: "ok", key, range, report };

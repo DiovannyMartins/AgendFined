@@ -3,6 +3,7 @@
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 
 export function formatWhen(iso: string, _timezone?: string): string {
+  void _timezone;
   const parts = new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
     month: "2-digit",

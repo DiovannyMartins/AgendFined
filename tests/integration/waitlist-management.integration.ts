@@ -16,7 +16,7 @@ const stamp = Date.now().toString().slice(-8);
 const FREE_EMAIL = `wl-free.${stamp}@agendfined.dev`;
 const PRO_EMAIL = `wl-pro.${stamp}@agendfined.dev`;
 const OUTSIDER_EMAIL = `wl-out.${stamp}@agendfined.dev`;
-const PASSWORD = "senha12345";
+const PASSWORD = process.env.INTEGRATION_TEST_PASSWORD ?? `Test-${stamp}-aA1!`;
 
 const SLOT = "2099-01-07T14:00:00.000Z";
 const SLOT_CONVERT = "2099-01-07T15:00:00.000Z";

@@ -8,7 +8,7 @@
 
 ## Summary
 
-Exibir duas ofertas na seção de configurações quando o negócio estiver no Grátis: o plano atual Grátis e o plano PROFISSIONAL com R$ 1/mês, benefícios e uma ação de assinatura. A implementação reutilizará o catálogo de planos, o componente de checkout e os controles de estado já presentes, separando a apresentação da oferta do estado atual sem alterar regras de billing.
+Exibir duas ofertas na seção de configurações quando o negócio estiver no Grátis: o plano atual Grátis e o plano PROFISSIONAL com R$ 19/mês, benefícios e uma ação de assinatura. A implementação reutilizará o catálogo de planos, o componente de checkout e os controles de estado já presentes, separando a apresentação da oferta do estado atual sem alterar regras de billing.
 
 ## Technical Context
 
@@ -32,7 +32,7 @@ Exibir duas ofertas na seção de configurações quando o negócio estiver no G
 
 **Performance Goals**: A seção deve renderizar junto com a página de configurações sem nova consulta de dados além das já necessárias para o estado de assinatura.
 
-**Constraints**: Manter o preço de teste R$ 1/mês; preservar checkout, status, carência e cancelamento; não introduzir dependências ou alterações de banco.
+**Constraints**: Manter o preço de teste R$ 19/mês; preservar checkout, status, carência e cancelamento; não introduzir dependências ou alterações de banco.
 
 **Scale/Scope**: Uma seção do dashboard e seus testes; catálogo compartilhado já existente; sem mudança na landing page.
 

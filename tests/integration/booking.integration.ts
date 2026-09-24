@@ -6,7 +6,7 @@ import { adminClient, anonClientForUser, retryOnFk } from "./index";
 const stamp = Date.now().toString().slice(-8);
 const EMAIL = `teste.${stamp}@agendfined.dev`;
 const OTHER_EMAIL = `outro.${stamp}@agendfined.dev`;
-const PASSWORD = "senha12345";
+const PASSWORD = process.env.INTEGRATION_TEST_PASSWORD ?? `Test-${stamp}-aA1!`;
 
 let admin: ReturnType<typeof adminClient>;
 let ownerId = "";

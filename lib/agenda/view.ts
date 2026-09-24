@@ -56,7 +56,7 @@ function minutesToTime(totalMinutes: number): string {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-const dateKeyFormatter = (_tz?: string) =>
+const dateKeyFormatter = () =>
   new Intl.DateTimeFormat("en-CA", {
     year: "numeric",
     month: "2-digit",
@@ -66,12 +66,14 @@ const dateKeyFormatter = (_tz?: string) =>
 
 // The local calendar date ("YYYY-MM-DD") on which a UTC instant falls.
 export function bookingLocalDate(iso: string, _tz?: string): string {
+  void _tz;
   return dateKeyFormatter().format(new Date(iso));
 }
 
 // The local wall-clock "HH:MM" of a UTC instant (used to place a booking
 // on the day grid's time rows).
 export function bookingLocalTime(iso: string, _tz?: string): string {
+  void _tz;
   return new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
     minute: "2-digit",

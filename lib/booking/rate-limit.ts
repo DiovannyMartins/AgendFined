@@ -1,3 +1,5 @@
+import "server-only";
+import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database-types";
@@ -32,6 +34,17 @@ export const PUBLIC_READ_RATE_LIMIT = {
   customerSearchPerIpBusiness: { limit: 60, windowSeconds: 60 * 15 },
 } as const;
 
+export const AUTH_RATE_LIMIT = {
+  login: { perIp: 12, perEmail: 6, windowSeconds: 15 * 60 },
+  signup: { perIp: 5, perEmail: 3, windowSeconds: 60 * 60 },
+  passwordReset: { perIp: 5, perEmail: 3, windowSeconds: 60 * 60 },
+} as const;
+
+export const AI_RATE_LIMIT = {
+  waitlistPriority: { limit: 20, windowSeconds: 60 * 60 },
+  reportInsight: { limit: 20, windowSeconds: 60 * 60 },
+} as const;
+
 function isValidIp(value: string): boolean {
   if (value.length === 0 || value.length > 64 || value.includes(",")) return false;
   if (/^(?:\d{1,3}\.){3}\d{1,3}$/.test(value)) {
@@ -47,6 +60,36 @@ export async function getClientIp(): Promise<string> {
   // otherwise bypass an IP-based limiter by choosing a new first value.
   const realIp = h.get("x-real-ip")?.trim();
   return realIp && isValidIp(realIp) ? realIp : "unknown";
+}
+
+function hashIdentifier(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 32);
+}
+
+export async function enforceAuthRateLimit(
+  supabase: ServerClient,
+  ip: string,
+  action: keyof typeof AUTH_RATE_LIMIT,
+  email: string,
+): Promise<boolean> {
+  const config = AUTH_RATE_LIMIT[action];
+  return enforceWindows(supabase, [
+    { key: `auth:${action}|ip:${ip}`, limit: config.perIp, windowSeconds: config.windowSeconds },
+    { key: `auth:${action}|email:${hashIdentifier(email)}`, limit: config.perEmail, windowSeconds: config.windowSeconds },
+  ]);
+}
+
+export async function enforceAiRateLimit(
+  supabase: ServerClient,
+  userId: string,
+  businessId: string,
+  action: keyof typeof AI_RATE_LIMIT,
+): Promise<boolean> {
+  const config = AI_RATE_LIMIT[action];
+  return enforceWindows(supabase, [
+    { key: `ai:${action}|user:${userId}`, limit: config.limit, windowSeconds: config.windowSeconds },
+    { key: `ai:${action}|business:${businessId}`, limit: config.limit * 2, windowSeconds: config.windowSeconds },
+  ]);
 }
 
 export function buildRateKeys(ip: string, businessId: string) {

@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enforceServiceSearchRateLimit, getClientIp } from "@/lib/booking/rate-limit";
+import { z } from "zod";
 
 type ServiceSearchOption = {
   id: string;
@@ -16,8 +17,9 @@ export async function suggestService(
   description: string,
   businessId: string,
 ): Promise<{ serviceId: string; confidence: number } | null> {
-  const query = description.trim().toLocaleLowerCase();
-  if (!query || query.length > 200) return null;
+  const parsed = z.object({ description: z.string().trim().min(1).max(200), businessId: z.string().uuid() }).safeParse({ description, businessId });
+  if (!parsed.success) return null;
+  const query = parsed.data.description.toLocaleLowerCase();
 
   let supabase: ReturnType<typeof createAdminClient>;
   try {

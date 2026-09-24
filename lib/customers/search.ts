@@ -5,12 +5,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { buildCustomerHistory } from "@/lib/customers/history";
 import { enforceCustomerSearchRateLimit, getClientIp } from "@/lib/booking/rate-limit";
+import { z } from "zod";
 
 export async function semanticSearchCustomers(
   query: string,
 ): Promise<{ ids: string[]; confidence: number } | null> {
-  const boundedQuery = query.trim();
-  if (!boundedQuery || boundedQuery.length > 100) return null;
+  const parsedQuery = z.string().trim().min(1).max(100).safeParse(query);
+  if (!parsedQuery.success) return null;
+  const boundedQuery = parsedQuery.data;
 
   const business = await getCurrentBusiness();
   if (!business) return null;

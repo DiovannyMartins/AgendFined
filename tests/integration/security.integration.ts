@@ -4,7 +4,7 @@ import { adminClient, anonClient, anonClientForUser } from "./index";
 // Security regression suite (§57). Runs against the real project. Requires
 // .env.local with valid keys and the 0013 migration applied.
 const stamp = Date.now().toString().slice(-8);
-const PASSWORD = "senha12345";
+const PASSWORD = process.env.INTEGRATION_TEST_PASSWORD ?? `Test-${stamp}-aA1!`;
 
 // businesses.owner_id is UNIQUE (one business per owner), so each business gets
 // its own owner user to exercise cross-business and cross-user isolation.

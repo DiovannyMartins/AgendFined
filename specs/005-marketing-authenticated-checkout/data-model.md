@@ -17,5 +17,5 @@ Esta feature não cria entidades persistentes nem altera o schema. Ela compõe d
 ## Checkout PROFISSIONAL
 
 - **Persistência**: continua sendo criado e controlado pelo fluxo de billing atual, incluindo tentativa/idempotência e assinatura Mercado Pago.
-- **Preço**: permanece definido pelo billing/catalog existente em R$ 1/mês; nenhum valor é recebido do navegador.
+- **Preço**: permanece definido pelo billing/catalog existente em R$ 19/mês; nenhum valor é recebido do navegador.
 - **Retorno**: continua usando o callback atual do Mercado Pago.

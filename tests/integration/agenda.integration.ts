@@ -9,7 +9,7 @@ import { adminClient, retryOnFk } from "./index";
 // valid keys.
 const stamp = Date.now().toString().slice(-8);
 const EMAIL = `agenda.${stamp}@agendfined.dev`;
-const PASSWORD = "senha12345";
+const PASSWORD = process.env.INTEGRATION_TEST_PASSWORD ?? `Test-${stamp}-aA1!`;
 const DISPLAY_NAME = "Dona Ana";
 
 // Far-future instants; a fresh business means no cross-run collisions.

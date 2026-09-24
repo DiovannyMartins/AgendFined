@@ -32,7 +32,7 @@ Usuários autenticados devem iniciar o checkout PROFISSIONAL diretamente pela p�
 
 **Performance Goals**: O clique deve criar a aba imediatamente e concluir a navegação assim que o server action retornar; sem chamadas extras de autenticação no cliente
 
-**Constraints**: Reutilizar `startUpgrade`/`retryUpgrade`, manter R$ 1/mês, não confiar em estado de autenticação enviado pelo cliente, preservar o fluxo anônimo para `/cadastro` e navegar na mesma aba
+**Constraints**: Reutilizar `startUpgrade`/`retryUpgrade`, manter R$ 19/mês, não confiar em estado de autenticação enviado pelo cliente, preservar o fluxo anônimo para `/cadastro` e navegar na mesma aba
 
 **Scale/Scope**: Um CTA da página de marketing, uma verificação server-side e cobertura unitária dos fluxos autenticado/anônimo/erro
 

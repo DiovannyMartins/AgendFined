@@ -16,6 +16,7 @@ import {
 } from "@/lib/waitlist/manage";
 import type { WaitlistStatus } from "@/lib/waitlist/waitlist";
 import { scoreWaitlistPriority } from "@/lib/typesafe/judgments";
+import { prepareAiBudget, recordAiUsage } from "@/lib/security/usage";
 
 type GetBusiness = () => Promise<WaitlistManagementBusiness | null>;
 
@@ -54,7 +55,17 @@ export async function getWaitlistManagement(
   const result = await buildWaitlistManagementResult(business, fetchEntries);
   if (result.status !== "ok") return result;
 
-  const priority = await scoreWaitlistPriority(
+  let aiAllowed = false;
+  let userId: string | null = null;
+  if (!deps) {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getUser();
+    userId = data.user?.id ?? null;
+    aiAllowed = Boolean(userId && business && await prepareAiBudget(userId, business.id, "waitlistPriority"));
+  }
+
+  const priority = aiAllowed && userId
+    ? await scoreWaitlistPriority(
     result.entries.map((entry) => ({
       id: entry.id,
       serviceName: entry.service_name,
@@ -62,7 +73,9 @@ export async function getWaitlistManagement(
       createdAt: entry.created_at,
       status: entry.status,
     })),
-  );
+    { onUsage: (usage) => recordAiUsage(userId!, "waitlistPriority", usage) },
+  )
+    : new Map();
   if (priority.size === 0) return result;
 
   const entries = result.entries

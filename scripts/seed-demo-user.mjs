@@ -33,7 +33,8 @@ const admin = createClient(supabaseUrl, serviceRoleKey, {
 });
 
 const DEMO_EMAIL = "demo.local@agendfined.invalid";
-const DEMO_PASSWORD = "AgendFinedLocalDemo123!";
+const DEMO_PASSWORD = process.env.LOCAL_DEMO_PASSWORD;
+if (!DEMO_PASSWORD) throw new Error("LOCAL_DEMO_PASSWORD não está definida em .env.local.");
 const DEMO_PROFILE_NAME = "Demo Barber";
 const DEMO_BUSINESS_ID = "10000000-0000-0000-0000-000000000001";
 const DEMO_BUSINESS_SLUG = "barbearia-demo";

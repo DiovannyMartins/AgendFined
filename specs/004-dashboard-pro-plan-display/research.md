@@ -3,7 +3,7 @@
 ## Decision: Reutilizar o catálogo canônico de planos
 
 - **Decision**: Usar `PLAN_INFO` como fonte única para nome, preço, período e recursos de Grátis e PROFISSIONAL.
-- **Rationale**: O catálogo já é compartilhado pela landing page e pelo billing, evitando divergência; ele já mantém o PROFISSIONAL em `R$ 1` para validação do checkout.
+- **Rationale**: O catálogo já é compartilhado pela landing page e pelo billing, evitando divergência; ele já mantém o PROFISSIONAL em `R$ 19` para validação do checkout.
 - **Alternatives considered**: Duplicar os dados dentro da seção de configurações foi rejeitado por poder exibir preço ou benefícios diferentes do checkout.
 
 ## Decision: Manter o checkout e os estados de assinatura existentes

@@ -20,6 +20,11 @@ const contentSecurityPolicy = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  productionBrowserSourceMaps: false,
+  enablePrerenderSourceMaps: false,
+  experimental: {
+    serverSourceMaps: false,
+  },
   async headers() {
     return [
       {

@@ -45,6 +45,7 @@ export function minutesToTime(totalMinutes: number): string {
 }
 
 function tzOffsetMinutes(_timezone: string, utcMs: number): number {
+  void _timezone;
   const timezone = APP_TIMEZONE;
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
@@ -89,6 +90,7 @@ export function generateSlotStartTimes(
 }
 
 export function toLocalDate(date: Date, _timezone?: string): string {
+  void _timezone;
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: APP_TIMEZONE,
     year: "numeric",
@@ -109,6 +111,7 @@ export function isWithinWindow(date: string, rules: BusinessRules, now: Date): b
 }
 
 export function zonedTimeToUtcMs(date: string, time: string, _timezone?: string): number {
+  void _timezone;
   const [y, m, d] = date.split("-").map(Number);
   const [hh, mm] = time.split(":").map(Number);
   // UTC instant whose local (em America/Sao_Paulo) wall-clock reading equals date+time.
@@ -121,12 +124,14 @@ export function zonedTimeToUtcMs(date: string, time: string, _timezone?: string)
 }
 
 export function zonedTimeToUtc(date: string, time: string, _timezone?: string): string {
+  void _timezone;
   return new Date(zonedTimeToUtcMs(date, time)).toISOString();
 }
 
 // Inclusive start / exclusive end of the local calendar day `date`,
 // expressed as UTC instants.
 export function localDayRangeUtc(date: string, _timezone?: string): { start: string; end: string } {
+  void _timezone;
   const startMs = zonedTimeToUtcMs(date, "00:00");
   const [y, m, d] = date.split("-").map(Number);
   const next = new Date(Date.UTC(y, m - 1, d + 1));
@@ -139,6 +144,7 @@ export function localDayRangeUtc(date: string, _timezone?: string): { start: str
 // Mirrors JS Date.getDay()+1, which is the convention the availability form
 // exposes (1 - Domingo, 2 - Segunda, ... 7 - Sábado).
 export function weekdayOf(date: string, _timezone?: string): number {
+  void _timezone;
   const short = new Intl.DateTimeFormat("en-US", { timeZone: APP_TIMEZONE, weekday: "short" }).format(
     new Date(`${date}T12:00:00Z`),
   );

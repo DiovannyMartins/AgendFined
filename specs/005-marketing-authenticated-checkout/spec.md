@@ -84,7 +84,7 @@ Como usuário autenticado, quero receber a mensagem retornada pelo billing quand
 - **SC-001**: 100% dos cliques autenticados elegíveis no CTA navegam diretamente para o checkout do Mercado Pago na mesma aba, sem passar por `/dashboard`.
 - **SC-002**: 100% dos cliques anônimos continuam levando a `/cadastro`.
 - **SC-003**: Falhas de checkout ficam visíveis no mesmo card em até uma resposta do fluxo de billing, sem navegação incorreta.
-- **SC-004**: O fluxo existente de assinatura e seu preço de R$ 1/mês permanecem inalterados.
+- **SC-004**: O fluxo existente de assinatura e seu preço de R$ 19/mês permanecem inalterados.
 - **SC-005**: 100% dos usuários autenticados com checkout pendente que clicarem no CTA recebem a oportunidade de iniciar um checkout novo, sem precisar visitar o dashboard.
 
 ## Assumptions

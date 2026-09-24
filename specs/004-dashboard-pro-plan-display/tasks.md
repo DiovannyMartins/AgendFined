@@ -22,13 +22,13 @@ description: "Task list for displaying the PROFISSIONAL plan in dashboard settin
 
 ## Phase 3: User Story 1 - Conhecer e assinar o plano PROFISSIONAL (Priority: P1) 🎯 MVP
 
-**Goal**: A Grátis user sees the current plan and a complete PROFISSIONAL offer with R$ 1/month and an explicit subscription CTA.
+**Goal**: A Grátis user sees the current plan and a complete PROFISSIONAL offer with R$ 19/month and an explicit subscription CTA.
 
-**Independent Test**: Render the settings plan section for a Grátis business with and without a pending checkout and assert the current badge, Pro plan name, R$ 1/month price, Pro benefits, and state-appropriate CTA.
+**Independent Test**: Render the settings plan section for a Grátis business with and without a pending checkout and assert the current badge, Pro plan name, R$ 19/month price, Pro benefits, and state-appropriate CTA.
 
 ### Tests for User Story 1
 
-- [X] T002 [P] [US1] Add a unit test for the Grátis settings state in `app/dashboard/configuracoes/plan-section.test.tsx`, covering the current Grátis card, separate PROFISSIONAL offer, `R$ 1/mês`, Pro benefits, and `Assinar PROFISSIONAL` CTA
+- [X] T002 [P] [US1] Add a unit test for the Grátis settings state in `app/dashboard/configuracoes/plan-section.test.tsx`, covering the current Grátis card, separate PROFISSIONAL offer, `R$ 19/mês`, Pro benefits, and `Assinar PROFISSIONAL` CTA
 
 ### Implementation for User Story 1
 
@@ -36,7 +36,7 @@ description: "Task list for displaying the PROFISSIONAL plan in dashboard settin
 - [X] T004 [US1] Keep the settings plan layout responsive in `app/dashboard/configuracoes/plan-section.tsx`, stacking plan cards on narrow viewports without changing subscription status, grace, retry, or cancel controls
 - [X] T010 [US1] Correct `app/dashboard/configuracoes/plan-section.tsx` and `app/dashboard/configuracoes/plan-section.test.tsx` so a Grátis business keeps the PROFISSIONAL card visible during a pending checkout and uses `Concluir pagamento` instead of starting a duplicate subscription
 
-**Checkpoint**: The Grátis settings state shows the current plan and the complete R$ 1 Pro offer, and its unit test passes.
+**Checkpoint**: The Grátis settings state shows the current plan and the complete R$ 19 Pro offer, and its unit test passes.
 
 ## Phase 4: User Story 2 - Entender o plano já contratado (Priority: P2)
 
@@ -79,7 +79,7 @@ description: "Task list for displaying the PROFISSIONAL plan in dashboard settin
 1. Complete T001.
 2. Write T002 and confirm it fails for the current single-plan implementation.
 3. Complete T003 and T004.
-4. Run the US1 test and validate that a Grátis user sees the R$ 1 Pro offer and CTA.
+4. Run the US1 test and validate that a Grátis user sees the R$ 19 Pro offer and CTA.
 
 ### Incremental Delivery
 

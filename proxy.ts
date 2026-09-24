@@ -8,8 +8,15 @@ const PROTECTED_PREFIXES = ["/dashboard"];
 const AUTH_ROUTES = ["/login", "/cadastro", "/recuperar-senha"];
 
 export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  if (
+    /^\/(?:\.git|\.env|\.next|node_modules)(?:\/|$)/i.test(pathname) ||
+    pathname.endsWith(".map")
+  ) {
+    return new NextResponse(null, { status: 404 });
+  }
+
   const { supabaseResponse, user } = await updateSession(request);
-  const { pathname } = request.nextUrl;
 
   const isProtected = PROTECTED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),

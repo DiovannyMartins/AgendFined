@@ -7,7 +7,7 @@ Não há entidades novas nem alterações de banco para esta feature. A implemen
 - **Fonte**: catálogo compartilhado de planos.
 - **Valores**: `free` e `pro`.
 - **Atributos exibidos**: nome, preço, período, descrição e lista de recursos.
-- **Regra**: o preço exibido para `pro` nesta feature é `R$ 1` por `mês`.
+- **Regra**: o preço exibido para `pro` nesta feature é `R$ 19` por `mês`.
 
 ## Negócio
 

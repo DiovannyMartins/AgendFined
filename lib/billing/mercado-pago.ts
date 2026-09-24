@@ -1,11 +1,12 @@
 // Mercado Pago provider implementation (ADR 0008). Behind the `BillingProvider`
 // seam; nothing outside `lib/billing/` imports this directly. Creates a
-// recurring preapproval (temporary R$ 1 test price, see SUBSCRIPTION_TERMS TODO)
+// recurring preapproval using the server-only configured plan price.
 // and returns its `init_point`. The access
 // token is TEST-* in sandbox (dev) and APP_USR-* in production; the API base
 // stays the same. `apiBaseUrl` is injectable so the unit tests can point at a
 // stub server or stub `fetch` without a real network call.
 import type { BillingPlan } from "./types";
+import { getProPriceCents } from "@/lib/plan/catalog";
 import type {
   BillingProvider,
   CreatePreapprovalInput,
@@ -27,11 +28,9 @@ export class MercadoPagoAmbiguousError extends Error {
 
 // The recurring subscription terms per plan. Only the PROFISSIONAL plan
 // is sold as a subscription; a `free` plan has no preapproval, so it is rejected.
-// TODO(test-price): amount is a temporary R$ 1 test price while validating the
-// Mercado Pago checkout; revert to 19 (CONTEXT.md + ADR 0008) before launch.
 const SUBSCRIPTION_TERMS: Record<BillingPlan, { amount: number; label: string } | null> = {
   free: null,
-  pro: { amount: 1, label: "PROFISSIONAL" },
+  pro: { amount: getProPriceCents() / 100, label: "PROFISSIONAL" },
 };
 
 export interface MercadoPagoConfig {

@@ -33,7 +33,7 @@ export function ClientsList({
       return;
     }
     startSemanticSearch(async () => {
-      const result = await semanticSearchCustomers(history, trimmed);
+      const result = await semanticSearchCustomers(trimmed);
       setSemanticIds(result ? new Set(result.ids) : null);
     });
   }

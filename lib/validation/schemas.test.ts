@@ -4,6 +4,7 @@ import {
   bookingSchema,
   businessSchema,
   loginSchema,
+  publicAvailabilitySchema,
   publicCodeSchema,
   serviceSchema,
   signupSchema,
@@ -143,6 +144,23 @@ describe("publicCodeSchema", () => {
 
   it("rejects an empty code", () => {
     expect(publicCodeSchema.safeParse("").success).toBe(false);
+  });
+});
+
+describe("publicAvailabilitySchema", () => {
+  const valid = {
+    businessId: "550e8400-e29b-41d4-a716-446655440000",
+    serviceId: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+    date: "2026-09-23",
+  };
+
+  it("accepts a valid public availability request", () => {
+    expect(publicAvailabilitySchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("rejects impossible calendar dates and invalid ids", () => {
+    expect(publicAvailabilitySchema.safeParse({ ...valid, date: "2026-02-30" }).success).toBe(false);
+    expect(publicAvailabilitySchema.safeParse({ ...valid, businessId: "not-an-id" }).success).toBe(false);
   });
 });
 

@@ -61,7 +61,6 @@ export async function getWaitlistManagement(
       startAt: entry.start_at,
       createdAt: entry.created_at,
       status: entry.status,
-      hasEmail: Boolean(entry.customer_email),
     })),
   );
   if (priority.size === 0) return result;

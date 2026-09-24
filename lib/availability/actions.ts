@@ -3,12 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { availabilitySchema } from "@/lib/validation/schemas";
+import { availabilitySchema, publicAvailabilitySchema } from "@/lib/validation/schemas";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { getEffectiveBookingWindowDays } from "@/lib/plan/plan";
 import type { ActionResult } from "@/lib/business/actions";
 import { computeAvailableSlots, isWithinWindow, localDayRangeUtc, overlaps, toUtcRange, weekdayOf } from "@/lib/booking/availability";
 import type { UtcRange } from "@/lib/booking/availability";
+import { enforceAvailabilityRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 
 export type { ActionResult };
 
@@ -218,9 +219,22 @@ export async function getSlotsForDate(
   serviceId: string,
   date: string,
 ): Promise<{ available: string[]; error?: string }> {
+  const parsed = publicAvailabilitySchema.safeParse({ businessId, serviceId, date });
+  if (!parsed.success) return { available: [], error: "validation" };
+
   // Public booking flow reads blocks and bookings of any business; anonymous RLS
   // would block that, so we use the server-only admin client for these reads.
   const supabase = createAdminClient();
+  let allowed: boolean;
+  try {
+    allowed = await enforceAvailabilityRateLimit(supabase, await getClientIp(), businessId);
+  } catch {
+    // A failed limiter must fail closed: otherwise the privileged reads below
+    // become an unauthenticated high-volume database oracle.
+    return { available: [], error: "rate_limited" };
+  }
+  if (!allowed) return { available: [], error: "rate_limited" };
+
   const { data: business, error: businessError } = await supabase
     .from("businesses")
     .select("id, is_active, slot_interval_minutes, min_notice_minutes, booking_window_days, plan")

@@ -84,7 +84,7 @@ export function BookingWidget({
     setServiceSearchMessage(null);
     const result = await suggestService(
       description,
-      services.map(({ id, name, description: serviceText }) => ({ id, name, description: serviceText })),
+      businessId,
     );
     setServiceSearchBusy(false);
     if (!result) {
@@ -119,6 +119,8 @@ export function BookingWidget({
         setAvailabilityError(
           res.error === "db_error"
             ? "Não foi possível carregar os horários. Tente novamente."
+            : res.error === "rate_limited"
+              ? "Muitas consultas. Aguarde alguns minutos e tente novamente."
             : res.error === "booking_window"
               ? "Esta data está fora da janela de reservas do negócio. Escolha outra."
             : res.error

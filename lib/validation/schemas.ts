@@ -120,6 +120,19 @@ export const publicBookingSchema = bookingSchema.extend({
 });
 export type PublicBookingInput = z.infer<typeof publicBookingSchema>;
 
+export const publicAvailabilitySchema = z.object({
+  businessId: z.string().uuid(),
+  serviceId: z.string().uuid(),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida.")
+    .refine((value) => {
+      const [year, month, day] = value.split("-").map(Number);
+      const parsed = new Date(Date.UTC(year, month - 1, day));
+      return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+    }, "Data inválida."),
+});
+
 export const bookingStatusSchema = z.enum(["confirmed", "completed", "cancelled", "no_show"]);
 export type BookingStatus = z.infer<typeof bookingStatusSchema>;
 

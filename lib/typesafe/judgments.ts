@@ -1,4 +1,4 @@
-import { choice, noul, score, TypeSafeClient } from "@typesafe-ai/sdk";
+import { choice, score, TypeSafeClient } from "@typesafe-ai/sdk";
 import type { CancellationReasonCategory as CancellationReasonCategoryLabel } from "@/lib/typesafe/labels";
 
 const TYPE_SAFE_TIMEOUT_MS = 1_500;
@@ -76,70 +76,47 @@ function getClient(): TypeSafeClient | null {
   return client;
 }
 
+function normalizeForClassification(value: string): string {
+  return value
+    .toLocaleLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 export async function classifyCancellationReason(
   reason: string | null | undefined,
 ): Promise<{ category: CancellationReasonCategory; confidence: number } | null> {
   const text = reason?.trim();
-  const typeSafe = getClient();
-  if (!text || !typeSafe) return null;
-
-  try {
-    const response = await typeSafe.systemOne({
-      state: { cancellation_reason: text },
-      questions: {
-        category: choice("Classifique o principal motivo do cancelamento.", {
-          schedule_conflict: "Conflito de agenda, horário ou disponibilidade.",
-          illness_or_emergency: "Doença, emergência ou imprevisto pessoal.",
-          price_or_budget: "Preço, orçamento ou custo.",
-          service_issue: "Problema ou insatisfação com o serviço ou negócio.",
-          found_alternative: "A pessoa encontrou outra opção ou não precisa mais do serviço.",
-          other: "Não se encaixa claramente em nenhuma categoria anterior.",
-        }),
-      },
-    });
-    const answer = response.answers.category;
-    return { category: answer.choice, confidence: answer.confidence };
-  } catch {
-    return null;
-  }
+  if (!text) return null;
+  const normalized = normalizeForClassification(text);
+  const rules: Array<[CancellationReasonCategory, string[]]> = [
+    ["schedule_conflict", ["agenda", "horario", "trabalho", "viagem", "compromisso"]],
+    ["illness_or_emergency", ["doenca", "doente", "emergencia", "imprevisto", "saude", "mal"]],
+    ["price_or_budget", ["preco", "caro", "dinheiro", "orcamento", "valor"]],
+    ["service_issue", ["problema", "insatisfeito", "qualidade", "atraso", "atendimento"]],
+    ["found_alternative", ["outra opcao", "alternativa", "encontrei", "nao preciso", "desisti"]],
+  ];
+  const match = rules.find(([, keywords]) => keywords.some((keyword) => normalized.includes(keyword)));
+  return { category: match?.[0] ?? "other", confidence: match ? 0.82 : 0.55 };
 }
 
 export async function classifyCustomerNote(note: string | null | undefined): Promise<CustomerNoteJudgment | null> {
   const text = note?.trim();
-  const typeSafe = getClient();
-  if (!text || !typeSafe) return null;
-
-  try {
-    const response = await typeSafe.systemOne({
-      state: { customer_note: text },
-      questions: {
-        category: choice("Classifique o tipo principal desta observação da reserva.", {
-          special_request: "Pedido especial sobre a forma de atendimento.",
-          accessibility: "Necessidade de acessibilidade ou adaptação do atendimento.",
-          preparation: "Instrução sobre preparação antes do atendimento.",
-          operational_information: "Informação prática que o profissional precisa considerar.",
-          general: "Observação geral sem uma ação operacional clara.",
-        }),
-        requiresManualFollowUp: noul(
-          "A observação exige que o profissional leia e faça algum acompanhamento manual antes do atendimento?",
-          {
-            true: "Há uma necessidade, pedido ou risco operacional que não deve ser ignorado.",
-            false: "A observação é informativa e não exige acompanhamento manual.",
-          },
-        ),
-      },
-    });
-    const category = response.answers.category;
-    const followUp = response.answers.requiresManualFollowUp;
-    return {
-      category: category.choice,
-      categoryConfidence: category.confidence,
-      requiresManualFollowUp: followUp.noul >= 0.8,
-      followUpProbability: followUp.noul,
-    };
-  } catch {
-    return null;
-  }
+  if (!text) return null;
+  const normalized = normalizeForClassification(text);
+  const rules: Array<[CustomerNoteCategory, string[], boolean]> = [
+    ["accessibility", ["acessib", "cadeira", "deficien", "libras", "mobilidade", "surdo"], true],
+    ["preparation", ["preparar", "preparo", "antes do atendimento"], false],
+    ["operational_information", ["chegar", "atraso", "endereco", "estacion", "pagamento", "contato"], true],
+    ["special_request", ["pedido", "especial", "prefer", "gostaria", "alergia"], true],
+  ];
+  const match = rules.find(([, keywords]) => keywords.some((keyword) => normalized.includes(keyword)));
+  return {
+    category: match?.[0] ?? "general",
+    categoryConfidence: match ? 0.82 : 0.55,
+    requiresManualFollowUp: match?.[2] ?? false,
+    followUpProbability: match ? (match[2] ? 0.86 : 0.2) : 0.1,
+  };
 }
 
 export async function scoreWaitlistPriority(
@@ -149,7 +126,6 @@ export async function scoreWaitlistPriority(
     startAt: string;
     createdAt: string;
     status: string;
-    hasEmail: boolean;
   }>,
 ): Promise<Map<string, WaitlistPriorityJudgment>> {
   const typeSafe = getClient();
@@ -194,29 +170,18 @@ export async function classifyOperationalError(
   operation: string,
   message: string,
 ): Promise<{ category: OperationalErrorCategory; confidence: number } | null> {
-  const typeSafe = getClient();
   const text = message.trim();
-  if (!typeSafe || !text) return null;
-
-  try {
-    const response = await typeSafe.systemOne({
-      state: { operation, provider_error: text },
-      questions: {
-        category: choice("Qual categoria operacional melhor descreve este erro opaco?", {
-          slot_conflict: "O horário ou intervalo entrou em conflito com outra reserva ou bloqueio.",
-          not_found: "A reserva, entrada ou recurso não foi encontrado.",
-          invalid_state: "O recurso existe, mas sua situação atual não permite esta operação.",
-          permission_denied: "A operação foi recusada por autorização, propriedade ou plano.",
-          retryable: "Falha transitória de banco, rede ou provedor; tentar novamente pode resolver.",
-          unknown: "Não há evidência suficiente para uma categoria específica.",
-        }),
-      },
-    });
-    const answer = response.answers.category;
-    return { category: answer.choice, confidence: answer.confidence };
-  } catch {
-    return null;
-  }
+  if (!text) return null;
+  const normalized = normalizeForClassification(`${operation} ${text}`);
+  const rules: Array<[OperationalErrorCategory, RegExp]> = [
+    ["slot_conflict", /overlap|conflit|slot|23p01/],
+    ["not_found", /not found|nao encontrado|nao existe|entry_not_found/],
+    ["invalid_state", /already|ja foi|cancelled|cancelado|invalid state|nao pode/],
+    ["permission_denied", /permission|forbidden|owner|autoriz|pro required/],
+    ["retryable", /timeout|temporar|network|database unavailable|connection|indisponivel/],
+  ];
+  const match = rules.find(([, pattern]) => pattern.test(normalized));
+  return match ? { category: match[0], confidence: 0.9 } : null;
 }
 
 export async function classifyReportInsight(report: {
@@ -241,87 +206,6 @@ export async function classifyReportInsight(report: {
     });
     const answer = response.answers.insight;
     return { kind: answer.choice, confidence: answer.confidence };
-  } catch {
-    return null;
-  }
-}
-
-export async function matchCustomersToQuery(
-  query: string,
-  customers: Array<{
-    id: string;
-    name: string;
-    bookings: Array<{ serviceName: string; status: string; startAt: string }>;
-  }>,
-): Promise<{ ids: string[]; confidence: number } | null> {
-  const typeSafe = getClient();
-  const text = query.trim();
-  if (!typeSafe || !text || customers.length === 0 || customers.length > 100) return null;
-
-  const questions = Object.fromEntries(
-    customers.map((customer) => [
-      customer.id,
-      noul(
-        {
-          instruction: "Este cliente corresponde à busca semântica do profissional?",
-          query: text,
-          candidate: customer,
-        },
-        {
-          true: "O cliente corresponde claramente ao sentido da busca, considerando identidade e histórico de reservas.",
-          false: "O cliente não corresponde ao sentido da busca.",
-        },
-      ),
-    ]),
-  );
-
-  try {
-    const response = await typeSafe.systemOne({
-      state: { query: text, customers },
-      questions,
-    });
-    const answers = customers.map((customer) => response.answers[customer.id]);
-    const confidence = answers.length === 0 ? 0 : answers.reduce((sum, answer) => sum + Math.max(answer.noul, 1 - answer.noul), 0) / answers.length;
-    return {
-      ids: customers.filter((customer) => response.answers[customer.id].noul >= 0.75).map((customer) => customer.id),
-      confidence,
-    };
-  } catch {
-    return null;
-  }
-}
-
-export async function selectServiceFromDescription(
-  description: string,
-  services: Array<{ id: string; name: string; description: string | null }>,
-): Promise<{ serviceId: string; confidence: number } | null> {
-  const typeSafe = getClient();
-  const text = description.trim();
-  if (!typeSafe || !text || services.length === 0) return null;
-
-  const criteria = Object.fromEntries(
-    services.map((service) => [
-      service.id,
-      {
-        name: service.name,
-        description: service.description ?? "Sem descrição adicional.",
-      },
-    ]),
-  );
-
-  try {
-    const response = await typeSafe.systemOne({
-      state: { requested_service: text },
-      questions: {
-        service: choice("Qual serviço cadastrado melhor corresponde ao pedido? Escolha apenas entre os candidatos.", {
-          ...criteria,
-          no_match: "Nenhum serviço cadastrado corresponde claramente ao pedido.",
-        }),
-      },
-    });
-    const answer = response.answers.service;
-    if (answer.choice === "no_match" || answer.confidence < 0.75) return null;
-    return { serviceId: answer.choice, confidence: answer.confidence };
   } catch {
     return null;
   }

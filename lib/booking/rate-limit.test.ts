@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   CONSULT_RATE_LIMIT,
+  PUBLIC_READ_RATE_LIMIT,
   RATE_LIMIT,
+  buildAvailabilityRateKeys,
   buildRateKeys,
+  buildServiceSearchRateKeys,
   enforceConsultRateLimit,
   enforceRateLimit,
 } from "@/lib/booking/rate-limit";
@@ -32,6 +35,22 @@ describe("buildRateKeys (§16)", () => {
   it("uses the documented default limits", () => {
     expect(RATE_LIMIT.perIpPerBusiness.limit).toBe(8);
     expect(RATE_LIMIT.perBusiness.limit).toBe(60);
+  });
+});
+
+describe("public read rate-limit keys", () => {
+  it("keeps availability limits separate and scoped by IP/business", () => {
+    expect(buildAvailabilityRateKeys("1.2.3.4", "biz-1")).toEqual([
+      { key: "ip:1.2.3.4|availability", ...PUBLIC_READ_RATE_LIMIT.availabilityPerIp },
+      { key: "ip:1.2.3.4|business:biz-1|availability", ...PUBLIC_READ_RATE_LIMIT.availabilityPerIpBusiness },
+    ]);
+  });
+
+  it("keeps service search limits separate from booking limits", () => {
+    expect(buildServiceSearchRateKeys("1.2.3.4", "biz-1")).toEqual([
+      { key: "ip:1.2.3.4|service-search", ...PUBLIC_READ_RATE_LIMIT.serviceSearchPerIp },
+      { key: "business:biz-1|service-search", ...PUBLIC_READ_RATE_LIMIT.serviceSearchPerBusiness },
+    ]);
   });
 });
 

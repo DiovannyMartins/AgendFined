@@ -42,17 +42,21 @@ no servidor.
   foram aplicadas ao projeto vinculado e a suíte de integração passou (87 testes).
 - Cloudflare: o certificado Universal do domínio está ativo. O modo SSL/TLS é
   **Completo (estrito)**, **Sempre usar HTTPS** está ativo e a versão mínima é
-  TLS 1.2. O CNAME `@` está em **Somente DNS**; por isso, o WAF da Cloudflare
-  ainda não recebe o tráfego da aplicação.
+  TLS 1.2. O CNAME `@` está **Com proxy** e o conjunto gerenciado gratuito do
+  WAF está sempre ativo. O domínio respondeu com `Server: cloudflare`, HTTP
+  redirecionou para HTTPS, `/login` respondeu 200 e `/dashboard` redirecionou
+  para login.
 - Vercel: o projeto Hobby guarda chaves privadas como variáveis Secret; o
   firewall básico e os logs de acesso estão ativos. A fonte HTTP Better Stack
   `AgendFined Vercel` foi criada e `BETTERSTACK_SOURCE_TOKEN` está salvo como
-  Secret de produção. O envio depende da publicação do código desta branch.
+  Secret de produção. O deploy `0f31a6a` ficou pronto, e a Better Stack recebeu
+  evento `http.request` com método e caminho, sem query string.
 - GitHub: `SUPABASE_BACKUP_DB_URL` e `BACKUP_ENCRYPTION_KEY` estão em Actions
   Secrets. A credencial de backup é somente leitura para `public`, com
   `BYPASSRLS` para o dump completo das tabelas da aplicação. Um dump de teste
-  criptografado foi criado e verificado localmente. O agendamento passa a rodar
-  após a publicação do workflow na branch padrão.
+  criptografado foi criado e verificado localmente. A primeira execução manual
+  do workflow (`36083817594`) passou e enviou o artifact cifrado
+  `agendfined-db-36083817594`, com expiração em 25/10/2026.
 
 ## Configuração externa necessária
 
@@ -60,25 +64,27 @@ no servidor.
    proteção contra senhas vazadas se o plano permitir. Fazer um ensaio manual
    com TOTP e os três papéis em um negócio de teste antes de depender desses
    controles para usuários finais.
-2. **Cloudflare:** após publicar o suporte a `CF-Connecting-IP`, ativar o proxy
-   do CNAME `@` para que as regras do WAF recebam tráfego. O certificado da
-   origem Vercel deve continuar válido em modo **Full (strict)**. Testar
-   HTTP→HTTPS, login e uma reserva legítima após a troca do DNS.
-   O HSTS já está configurado em `next.config.ts`.
-   Confirmar nos logs se `x-real-ip` identifica um IP da Cloudflare; o código
-   confia em `CF-Connecting-IP` somente nesse caso. Atualizar a lista de faixas
-   oficiais da Cloudflare quando ela mudar.
-3. **Vercel:** publicar o código para iniciar o envio de logs e verificar um
-   evento de acesso e um de auditoria na Better Stack. O plano Hobby não oferece
-   Log Drains; por isso o envio é feito pela própria aplicação. Revisar quem
-   pode editar Secrets. Não registrar URLs completas, tokens ou dados de clientes.
+2. **Cloudflare:** testar uma reserva legítima após a troca do DNS e confirmar
+   nos logs se `x-real-ip` identifica um IP da Cloudflare; o código confia em
+   `CF-Connecting-IP` somente nesse caso. Atualizar a lista de faixas oficiais
+   da Cloudflare quando ela mudar. O HSTS já está em `next.config.ts`.
+3. **Vercel:** gerar um evento de auditoria de teste e verificar sua chegada na
+   Better Stack. O plano Hobby não oferece Log Drains; o envio é feito pela
+   própria aplicação. Revisar quem pode editar Secrets. Não registrar URLs
+   completas, tokens ou dados de clientes.
 4. **Backup:** o workflow `database-backup.yml` gera um dump diário de `public`
    às 03:17 UTC, comprime e cifra com AES-256-GCM sem gravar SQL em claro e
-   retém o artifact por 30 dias. Executar `workflow_dispatch` após a publicação
-   e confirmar o artifact e o passo de verificação. Meta inicial: RPO de 24 horas
+   retém o artifact por 30 dias. A primeira execução manual e o artifact foram
+   confirmados; acompanhar a primeira execução agendada. Meta inicial: RPO de 24 horas
    e RTO de 8 horas, sujeitos ao primeiro ensaio de restauração trimestral.
    Guardar a chave de recuperação em um gerenciador de senhas fora do GitHub e
    deste computador; o Secret do GitHub não pode ser revelado depois da gravação.
+   Nesta estação Windows, a cópia local da chave está protegida com DPAPI para
+   o usuário atual em `.backup-local/` (ignorado pelo Git). Executar
+   `pwsh -NoProfile -File scripts/backup/copy-local-recovery-key.ps1`
+   copia **somente** a chave AES para a área de transferência; colá-la no
+   gerenciador de senhas e limpar a área de transferência em seguida. A cópia
+   DPAPI não substitui um cofre fora deste computador.
 
 ### Recuperação do backup externo
 

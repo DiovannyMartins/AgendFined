@@ -40,6 +40,10 @@ no servidor.
   caracteres salvo em Auth. O projeto está no plano Free e não oferece backups
   agendados no painel. As migrações `20261001000000` e `20261001000001`
   foram aplicadas ao projeto vinculado e a suíte de integração passou (87 testes).
+  Em 25/09/2026, um teste adicional com cinco contas descartáveis verificou
+  na Data API os papéis `admin`, `editor` e `user`, o isolamento de um usuário
+  externo, o bloqueio da sessão AAL1 após cadastrar TOTP e a retomada do acesso
+  depois do desafio AAL2. O teste passou e removeu as contas e o negócio criados.
   Os dois tokens temporários usados na implantação foram revogados; o token
   anterior do proprietário foi preservado.
 - Cloudflare: o certificado Universal do domínio está ativo. O modo SSL/TLS é
@@ -63,13 +67,20 @@ no servidor.
   claro. A primeira execução agendada (`36115156477`) também passou e gerou
   artifact com 30 dias de retenção. Ela começou às 08:50 UTC, depois do horário
   nominal de 03:17 UTC; o agendamento do GitHub pode atrasar.
+  Em 25/09/2026, o artifact manual foi autenticado novamente e o SQL foi
+  analisado em memória: 14 tabelas `public`, incluindo 3 negócios, 16 reservas
+  e 3 clientes. Nenhum SQL em claro foi gravado em disco. A carga em um banco
+  isolado ainda não foi executada: o Docker Desktop desta estação falhou ao
+  iniciar o mecanismo Linux por erro de acesso a `sailor-ingest.sock`, inclusive
+  após reinicialização sem apagar volumes. Integridade do artifact está
+  confirmada; integridade de uma restauração e RTO ainda não estão confirmados.
 
 ## Configuração externa necessária
 
 1. **Supabase:** conferir os logs de auditoria do Supabase Auth e ativar a
-   proteção contra senhas vazadas se o plano permitir. Fazer um ensaio manual
-   com TOTP e os três papéis em um negócio de teste antes de depender desses
-   controles para usuários finais.
+   proteção contra senhas vazadas se o plano permitir. O teste automatizado de
+   TOTP e dos três papéis passou com contas descartáveis; uma revisão manual da
+   interface por um usuário final ainda é recomendada.
 2. **Cloudflare:** testar uma reserva legítima após a troca do DNS e confirmar
    nos logs se `x-real-ip` identifica um IP da Cloudflare; o código confia em
    `CF-Connecting-IP` somente nesse caso. Atualizar a lista de faixas oficiais
@@ -83,7 +94,7 @@ no servidor.
    retém o artifact por 30 dias. As primeiras execuções manual e agendada
    passaram, e o artifact manual foi baixado e autenticado. Meta inicial: RPO de
    24 horas e RTO de 8 horas, ainda sem garantia pelo atraso observado no
-   agendamento e sujeitos ao primeiro ensaio de restauração trimestral.
+   agendamento e porque falta carregar o artifact em um banco isolado.
    Guardar a chave de recuperação em um gerenciador de senhas ou em papel,
    fora do GitHub e deste computador; o Secret do GitHub não pode ser revelado
    depois da gravação. O proprietário confirmou uma cópia em papel em

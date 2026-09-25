@@ -8,6 +8,7 @@ import {
   publicCodeSchema,
   serviceSchema,
   signupSchema,
+  passwordSchema,
 } from "@/lib/validation/schemas";
 
 describe("businessSchema", () => {
@@ -85,8 +86,16 @@ describe("signupSchema", () => {
 
   it("accepts valid signup", () => {
     expect(
-      signupSchema.safeParse({ displayName: "João", email: "a@b.com", password: "12345678" }).success,
+      signupSchema.safeParse({ displayName: "João", email: "a@b.com", password: "uma senha longa e única 2026" }).success,
     ).toBe(true);
+  });
+});
+
+describe("passwordSchema", () => {
+  it("requires 15 characters with letters and digits", () => {
+    expect(passwordSchema.safeParse("12345678").success).toBe(false);
+    expect(passwordSchema.safeParse("uma senha longa e única").success).toBe(false);
+    expect(passwordSchema.safeParse("uma senha longa e única 2026").success).toBe(true);
   });
 });
 

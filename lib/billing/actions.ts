@@ -27,7 +27,7 @@ import {
 // dev). Reads `MERCADO_PAGO_ACCESS_TOKEN`; when unset it fails closed with a
 // friendly message rather than attempting a real call.
 export async function startUpgrade(): Promise<StartUpgradeResult> {
-  const business = await getCurrentBusiness();
+  const business = await getCurrentBusiness("admin");
   if (!business) {
     return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio antes de assinar." };
   }
@@ -129,7 +129,7 @@ export async function startUpgrade(): Promise<StartUpgradeResult> {
 // returns the new `init_point` for the client to redirect to. Reads
 // `MERCADO_PAGO_ACCESS_TOKEN`; when unset it fails closed.
 export async function retryUpgrade(): Promise<RetryUpgradeResult> {
-  const business = await getCurrentBusiness();
+  const business = await getCurrentBusiness("admin");
   if (!business) {
     return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio antes de assinar." };
   }
@@ -208,7 +208,7 @@ export async function retryUpgrade(): Promise<RetryUpgradeResult> {
 // so the dashboard can show PROFISSIONAL immediately after an authorized
 // checkout without ever trusting a browser-supplied success flag.
 export async function syncCurrentSubscriptionAfterReturn(): Promise<void> {
-  const business = await getCurrentBusiness();
+  const business = await getCurrentBusiness("admin");
   if (!business || !process.env.MERCADO_PAGO_ACCESS_TOKEN) return;
 
   const provider = createMercadoPagoProvider({ accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN });
@@ -227,7 +227,7 @@ export async function syncCurrentSubscriptionAfterReturn(): Promise<void> {
 // to Free once the grace passes. Reads `MERCADO_PAGO_ACCESS_TOKEN`; when unset it
 // fails closed.
 export async function cancelSubscription(): Promise<CancelSubscriptionResult> {
-  const business = await getCurrentBusiness();
+  const business = await getCurrentBusiness("admin");
   if (!business) {
     return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio antes de gerenciar a assinatura." };
   }

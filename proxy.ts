@@ -1,5 +1,6 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextFetchEvent, type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
+import { sendSecurityLog } from "@/lib/security/betterstack";
 
 const PROTECTED_PREFIXES = ["/dashboard"];
 // /redefinir-senha is deliberately NOT in AUTH_ROUTES: it must remain reachable
@@ -7,8 +8,14 @@ const PROTECTED_PREFIXES = ["/dashboard"];
 // proxy would bounce them to /dashboard before they can set a new password.
 const AUTH_ROUTES = ["/login", "/cadastro", "/recuperar-senha"];
 
-export async function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest, event: NextFetchEvent) {
   const pathname = request.nextUrl.pathname;
+  // Log path only: query strings may contain booking codes or OAuth tokens.
+  if (process.env.NODE_ENV === "production") {
+    const entry = { event: "http.request", method: request.method, path: pathname, at: new Date().toISOString() };
+    console.info(JSON.stringify(entry));
+    event.waitUntil(sendSecurityLog(entry));
+  }
   if (
     /^\/(?:\.git|\.env|\.next|node_modules)(?:\/|$)/i.test(pathname) ||
     pathname.endsWith(".map")

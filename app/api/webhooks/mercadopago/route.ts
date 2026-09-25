@@ -9,8 +9,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifyMercadoPagoWebhookSignature } from "@/lib/billing/webhook-signature";
 import { runMercadoPagoWebhook } from "@/lib/billing/webhook-server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { enforceApiRateLimit, getClientIpFromHeaders } from "@/lib/booking/rate-limit";
 
 export async function POST(request: NextRequest) {
+  try {
+    const allowed = await enforceApiRateLimit(createAdminClient(), getClientIpFromHeaders(request.headers), "webhook");
+    if (!allowed) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
+  } catch {
+    return NextResponse.json({ error: "rate_limit_unavailable" }, { status: 503 });
+  }
   const secret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
   if (!secret) {
     return NextResponse.json({ error: "webhook_not_configured" }, { status: 503 });

@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { passwordSchema } from "@/lib/validation/schemas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,7 @@ import { updatePassword, type ActionResult } from "@/lib/auth/actions";
 
 const INITIAL: ActionResult = { ok: true, data: undefined };
 
-const schema = z.object({ password: z.string().min(8, "A senha deve ter pelo menos 8 caracteres.") });
+const schema = z.object({ password: passwordSchema });
 type Values = z.infer<typeof schema>;
 
 export function UpdatePasswordForm() {
@@ -70,7 +71,7 @@ export function UpdatePasswordForm() {
                 id="password"
                 type="password"
                 autoComplete="new-password"
-                minLength={8}
+                minLength={15}
                 {...register("password")}
               />
               {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}

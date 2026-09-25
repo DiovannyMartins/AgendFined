@@ -41,7 +41,7 @@ export async function createService(
     };
   }
 
-  const business = await getCurrentBusiness();
+  const business = await getCurrentBusiness("editor");
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
 
   const supabase = await createClient();
@@ -77,7 +77,7 @@ export async function updateService(
     };
   }
 
-  const business = await getCurrentBusiness();
+  const business = await getCurrentBusiness("editor");
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
 
   const supabase = await createClient();
@@ -104,7 +104,7 @@ export async function updateService(
 }
 
 export async function toggleService(id: string, isActive: boolean): Promise<ActionResult> {
-  const business = await getCurrentBusiness();
+  const business = await getCurrentBusiness("editor");
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
 
   const supabase = await createClient();
@@ -123,7 +123,7 @@ export async function toggleService(id: string, isActive: boolean): Promise<Acti
 }
 
 export async function deleteService(id: string): Promise<ActionResult> {
-  const business = await getCurrentBusiness();
+  const business = await getCurrentBusiness("editor");
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
 
   const admin = createAdminClient();

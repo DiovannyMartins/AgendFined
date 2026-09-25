@@ -31,7 +31,7 @@ export async function setAvailability(
     };
   }
 
-  const business = await getCurrentBusiness();
+  const business = await getCurrentBusiness("editor");
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
 
   const supabase = await createClient();
@@ -87,7 +87,7 @@ export async function updateAvailability(
     };
   }
 
-  const business = await getCurrentBusiness();
+  const business = await getCurrentBusiness("editor");
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
 
   const supabase = await createClient();
@@ -130,7 +130,7 @@ export async function updateAvailability(
 }
 
 export async function deleteAvailability(id: string): Promise<ActionResult> {
-  const business = await getCurrentBusiness();
+  const business = await getCurrentBusiness("editor");
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
   const supabase = await createClient();
   const { error, data } = await supabase
@@ -161,7 +161,7 @@ export async function createBlock(
     return { ok: false, code: "VALIDATION", message: "O fim deve ser depois do início." };
   }
 
-  const business = await getCurrentBusiness();
+  const business = await getCurrentBusiness("editor");
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
 
   const supabase = await createClient();
@@ -199,7 +199,7 @@ export async function createBlock(
 }
 
 export async function deleteBlock(id: string): Promise<ActionResult> {
-  const business = await getCurrentBusiness();
+  const business = await getCurrentBusiness("editor");
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
   const supabase = await createClient();
   const { error, data } = await supabase

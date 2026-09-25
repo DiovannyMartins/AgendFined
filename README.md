@@ -1,5 +1,7 @@
 # AgendFined
 
+> Configuração de MFA, RBAC e controles de produção: [docs/security-rollout.md](docs/security-rollout.md).
+
 Plataforma SaaS de agendamento online para profissionais e pequenos negócios. O profissional configura seu negócio, serviços e disponibilidade; clientes reservam serviços pela página pública, sem precisar de conta.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white)

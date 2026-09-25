@@ -1,6 +1,8 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { isIP } from "node:net";
 import { headers } from "next/headers";
+import ipaddr from "ipaddr.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database-types";
 
@@ -38,6 +40,7 @@ export const AUTH_RATE_LIMIT = {
   login: { perIp: 12, perEmail: 6, windowSeconds: 15 * 60 },
   signup: { perIp: 5, perEmail: 3, windowSeconds: 60 * 60 },
   passwordReset: { perIp: 5, perEmail: 3, windowSeconds: 60 * 60 },
+  mfaVerify: { perUser: 10, windowSeconds: 15 * 60 },
 } as const;
 
 export const AI_RATE_LIMIT = {
@@ -45,12 +48,38 @@ export const AI_RATE_LIMIT = {
   reportInsight: { limit: 20, windowSeconds: 60 * 60 },
 } as const;
 
+export const API_RATE_LIMIT = {
+  webhook: { limit: 120, windowSeconds: 15 * 60 },
+  billingReturn: { limit: 30, windowSeconds: 15 * 60 },
+  reconciliation: { limit: 30, windowSeconds: 15 * 60 },
+} as const;
+
 function isValidIp(value: string): boolean {
-  if (value.length === 0 || value.length > 64 || value.includes(",")) return false;
-  if (/^(?:\d{1,3}\.){3}\d{1,3}$/.test(value)) {
-    return value.split(".").every((part) => Number(part) >= 0 && Number(part) <= 255);
-  }
-  return /^[0-9a-fA-F:]+$/.test(value) && value.includes(":");
+  return value.length <= 64 && isIP(value) !== 0;
+}
+
+// Published by Cloudflare at https://www.cloudflare.com/ips/ . Only trust
+// CF-Connecting-IP when Vercel's canonical peer IP is in these ranges.
+const cloudflareCidrs = [
+  "173.245.48.0/20", "103.21.244.0/22", "103.22.200.0/22", "103.31.4.0/22",
+  "141.101.64.0/18", "108.162.192.0/18", "190.93.240.0/20", "188.114.96.0/20",
+  "197.234.240.0/22", "198.41.128.0/17", "162.158.0.0/15", "104.16.0.0/13",
+  "104.24.0.0/14", "172.64.0.0/13", "131.0.72.0/22",
+  "2400:cb00::/32", "2606:4700::/32", "2803:f800::/32", "2405:b500::/32",
+  "2405:8100::/32", "2a06:98c0::/29", "2c0f:f248::/32",
+].map((cidr) => ipaddr.parseCIDR(cidr));
+
+function isCloudflareIp(value: string): boolean {
+  if (!isValidIp(value)) return false;
+  const bytes = ipaddr.process(value).toByteArray();
+  return cloudflareCidrs.some(([network, bits]) => {
+    const prefix = network.toByteArray();
+    if (bytes.length !== prefix.length) return false;
+    const whole = Math.floor(bits / 8);
+    const remaining = bits % 8;
+    if (bytes.some((byte, index) => index < whole && byte !== prefix[index])) return false;
+    return remaining === 0 || (bytes[whole] >> (8 - remaining)) === (prefix[whole] >> (8 - remaining));
+  });
 }
 
 export async function getClientIp(): Promise<string> {
@@ -58,8 +87,14 @@ export async function getClientIp(): Promise<string> {
   // Only use the canonical single-hop header populated by the deployment
   // proxy. Do not trust X-Forwarded-For: a direct client can forge it and
   // otherwise bypass an IP-based limiter by choosing a new first value.
+  return getClientIpFromHeaders(h);
+}
+
+export function getClientIpFromHeaders(h: Pick<Headers, "get">): string {
   const realIp = h.get("x-real-ip")?.trim();
-  return realIp && isValidIp(realIp) ? realIp : "unknown";
+  if (!realIp || !isValidIp(realIp)) return "unknown";
+  const visitorIp = h.get("cf-connecting-ip")?.trim();
+  return isCloudflareIp(realIp) && visitorIp && isValidIp(visitorIp) ? visitorIp : realIp;
 }
 
 function hashIdentifier(value: string): string {
@@ -69,13 +104,31 @@ function hashIdentifier(value: string): string {
 export async function enforceAuthRateLimit(
   supabase: ServerClient,
   ip: string,
-  action: keyof typeof AUTH_RATE_LIMIT,
+  action: "login" | "signup" | "passwordReset",
   email: string,
 ): Promise<boolean> {
   const config = AUTH_RATE_LIMIT[action];
   return enforceWindows(supabase, [
     { key: `auth:${action}|ip:${ip}`, limit: config.perIp, windowSeconds: config.windowSeconds },
     { key: `auth:${action}|email:${hashIdentifier(email)}`, limit: config.perEmail, windowSeconds: config.windowSeconds },
+  ]);
+}
+
+export async function enforceMfaRateLimit(supabase: ServerClient, userId: string): Promise<boolean> {
+  const config = AUTH_RATE_LIMIT.mfaVerify;
+  return enforceWindows(supabase, [
+    { key: `auth:mfa|user:${userId}`, limit: config.perUser, windowSeconds: config.windowSeconds },
+  ]);
+}
+
+export async function enforceApiRateLimit(
+  supabase: ServerClient,
+  ip: string,
+  route: keyof typeof API_RATE_LIMIT,
+): Promise<boolean> {
+  const config = API_RATE_LIMIT[route];
+  return enforceWindows(supabase, [
+    { key: `api:${route}|ip:${ip}`, limit: config.limit, windowSeconds: config.windowSeconds },
   ]);
 }
 

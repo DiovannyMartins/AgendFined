@@ -34,7 +34,7 @@ no servidor.
   de gestão da lista de espera conferem MFA e papel dentro do banco. As ações
   que usam chave de serviço exigem o papel correspondente antes de acessar os dados.
 
-## Estado externo verificado em 24/09/2026
+## Estado externo verificado em 25/09/2026
 
 - Supabase: TOTP habilitado, sessão AAL1 limitada a 15 minutos e mínimo de 15
   caracteres salvo em Auth. O projeto está no plano Free e não oferece backups
@@ -58,7 +58,11 @@ no servidor.
   `BYPASSRLS` para o dump completo das tabelas da aplicação. Um dump de teste
   criptografado foi criado e verificado localmente. A primeira execução manual
   do workflow (`36083817594`) passou e enviou o artifact cifrado
-  `agendfined-db-36083817594`, com expiração em 25/10/2026.
+  `agendfined-db-36083817594`, com expiração em 25/10/2026. O artifact foi
+  baixado do GitHub e autenticado com a chave de recuperação, sem salvar SQL em
+  claro. A primeira execução agendada (`36115156477`) também passou e gerou
+  artifact com 30 dias de retenção. Ela começou às 08:50 UTC, depois do horário
+  nominal de 03:17 UTC; o agendamento do GitHub pode atrasar.
 
 ## Configuração externa necessária
 
@@ -76,9 +80,10 @@ no servidor.
    completas, tokens ou dados de clientes.
 4. **Backup:** o workflow `database-backup.yml` gera um dump diário de `public`
    às 03:17 UTC, comprime e cifra com AES-256-GCM sem gravar SQL em claro e
-   retém o artifact por 30 dias. A primeira execução manual e o artifact foram
-   confirmados; acompanhar a primeira execução agendada. Meta inicial: RPO de 24 horas
-   e RTO de 8 horas, sujeitos ao primeiro ensaio de restauração trimestral.
+   retém o artifact por 30 dias. As primeiras execuções manual e agendada
+   passaram, e o artifact manual foi baixado e autenticado. Meta inicial: RPO de
+   24 horas e RTO de 8 horas, ainda sem garantia pelo atraso observado no
+   agendamento e sujeitos ao primeiro ensaio de restauração trimestral.
    Guardar a chave de recuperação em um gerenciador de senhas ou em papel,
    fora do GitHub e deste computador; o Secret do GitHub não pode ser revelado
    depois da gravação. O proprietário confirmou uma cópia em papel em

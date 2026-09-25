@@ -44,6 +44,9 @@ next-env.d.ts
 # supabase cli
 /supabase/.temp/
 
+# local encrypted backup recovery material (Windows DPAPI)
+/.backup-local/
+
 # dev logs
 debug.log
 .dev.log

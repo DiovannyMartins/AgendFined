@@ -65,7 +65,6 @@ begin
     array['services','services'],
     array['availability','availability'],
     array['availability_blocks','blocks'],
-    array['professionals','professionals'],
     array['customers','customers'],
     array['bookings','bookings']
   ] loop

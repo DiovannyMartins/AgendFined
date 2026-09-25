@@ -21,13 +21,16 @@ no servidor.
   mecanismo. As rotas API de webhook, retorno de cobrança e reconciliação têm
   limites por IP. Webhook e cron também exigem assinatura ou segredo próprio.
 - Logs: o proxy registra método e caminho sem query string em produção; ações
-  de autenticação registram eventos JSON sem e-mail, senha ou código TOTP.
+  de autenticação e gestão da equipe registram eventos JSON sem e-mail, senha
+  ou código TOTP. A aplicação envia esses eventos diretamente à fonte HTTP
+  Better Stack. O token fica como Secret de produção na Vercel; uma falha de
+  ingestão não interrompe a requisição do cliente.
 - RBAC: a migração `20261001000001_business_rbac.sql` cria membros por negócio
   com papéis `admin`, `editor` e `user`. O dono mantém poderes de administrador.
   Administradores gerem membros e cobrança; editores podem alterar agenda,
   serviços, reservas e lista de espera; usuários têm acesso de leitura. A
   configuração de equipe aceita o ID de uma conta já criada. A RLS protege o
-  acesso direto à Data API, inclusive profissionais; as funções privilegiadas
+  acesso direto à Data API; as funções privilegiadas
   de gestão da lista de espera conferem MFA e papel dentro do banco. As ações
   que usam chave de serviço exigem o papel correspondente antes de acessar os dados.
 
@@ -35,26 +38,28 @@ no servidor.
 
 - Supabase: TOTP habilitado, sessão AAL1 limitada a 15 minutos e mínimo de 15
   caracteres salvo em Auth. O projeto está no plano Free e não oferece backups
-  agendados no painel. As duas migrações deste rollout ainda precisam ser
-  aplicadas antes da publicação do código.
+  agendados no painel. As migrações `20261001000000` e `20261001000001`
+  foram aplicadas ao projeto vinculado e a suíte de integração passou (87 testes).
 - Cloudflare: o certificado Universal do domínio está ativo. O modo SSL/TLS é
   **Completo (estrito)**, **Sempre usar HTTPS** está ativo e a versão mínima é
   TLS 1.2. O CNAME `@` está em **Somente DNS**; por isso, o WAF da Cloudflare
   ainda não recebe o tráfego da aplicação.
-- Vercel: o projeto Hobby já guarda as chaves privadas como variáveis Secret nos
-  ambientes configurados; o firewall básico e os logs de acesso estão ativos.
-  A fonte Better Stack/Logtail ainda não está conectada.
+- Vercel: o projeto Hobby guarda chaves privadas como variáveis Secret; o
+  firewall básico e os logs de acesso estão ativos. A fonte HTTP Better Stack
+  `AgendFined Vercel` foi criada e `BETTERSTACK_SOURCE_TOKEN` está salvo como
+  Secret de produção. O envio depende da publicação do código desta branch.
+- GitHub: `SUPABASE_BACKUP_DB_URL` e `BACKUP_ENCRYPTION_KEY` estão em Actions
+  Secrets. A credencial de backup é somente leitura para `public`, com
+  `BYPASSRLS` para o dump completo das tabelas da aplicação. Um dump de teste
+  criptografado foi criado e verificado localmente. O agendamento passa a rodar
+  após a publicação do workflow na branch padrão.
 
 ## Configuração externa necessária
 
-1. **Supabase:** aplicar as migrações pendentes com
-   `npx supabase db push --linked` usando uma conta autorizada. Antes de publicar
-   o novo código, conferir `supabase migration list --linked` e testar login,
-   ativação TOTP, novo login,
-   acesso direto à Data API com token `aal1` e `aal2` e os três papéis em um
-   negócio de teste. Em Auth > Security,
-   ativar proteção contra senhas vazadas se o plano permitir. Conferir os logs
-   de auditoria do Supabase Auth.
+1. **Supabase:** conferir os logs de auditoria do Supabase Auth e ativar a
+   proteção contra senhas vazadas se o plano permitir. Fazer um ensaio manual
+   com TOTP e os três papéis em um negócio de teste antes de depender desses
+   controles para usuários finais.
 2. **Cloudflare:** após publicar o suporte a `CF-Connecting-IP`, ativar o proxy
    do CNAME `@` para que as regras do WAF recebam tráfego. O certificado da
    origem Vercel deve continuar válido em modo **Full (strict)**. Testar
@@ -63,28 +68,53 @@ no servidor.
    Confirmar nos logs se `x-real-ip` identifica um IP da Cloudflare; o código
    confia em `CF-Connecting-IP` somente nesse caso. Atualizar a lista de faixas
    oficiais da Cloudflare quando ela mudar.
-3. **Vercel:** revisar permissões de quem pode editar variáveis. Rotacionar
-   qualquer segredo que tenha sido exposto e fazer novo deploy. Configurar o
-   Log Drain da Vercel para uma fonte Better Stack/Logtail para logs de acesso
-   e de aplicação; não registrar URLs completas, senhas, tokens ou dados de
-   clientes em eventos de aplicação.
-4. **Backup:** confirmar o plano Supabase. Pro/Team/Enterprise têm backup diário
-   automático; verificar retenção no painel e considerar PITR se o RPO exigido
-   for menor que um dia. Definir responsável, RPO/RTO, cópia fora do projeto e
-   ensaio de restauração trimestral em projeto isolado. Meta inicial: RPO de
-   24 horas e RTO de 8 horas, sujeitos à medição no primeiro ensaio. Backups do banco não
-   incluem objetos do Storage; incluí-los no procedimento se Storage for usado.
+3. **Vercel:** publicar o código para iniciar o envio de logs e verificar um
+   evento de acesso e um de auditoria na Better Stack. O plano Hobby não oferece
+   Log Drains; por isso o envio é feito pela própria aplicação. Revisar quem
+   pode editar Secrets. Não registrar URLs completas, tokens ou dados de clientes.
+4. **Backup:** o workflow `database-backup.yml` gera um dump diário de `public`
+   às 03:17 UTC, comprime e cifra com AES-256-GCM sem gravar SQL em claro e
+   retém o artifact por 30 dias. Executar `workflow_dispatch` após a publicação
+   e confirmar o artifact e o passo de verificação. Meta inicial: RPO de 24 horas
+   e RTO de 8 horas, sujeitos ao primeiro ensaio de restauração trimestral.
+   Guardar a chave de recuperação em um gerenciador de senhas fora do GitHub e
+   deste computador; o Secret do GitHub não pode ser revelado depois da gravação.
 
-## Decisões de produto ainda necessárias
+### Recuperação do backup externo
 
-- **AES-256:** segredos de aplicação pertencem ao Vercel Environment Variables,
-  que são criptografados em repouso. Dados pesquisáveis de clientes exigem um
-  plano próprio de criptografia de aplicação, busca e migração dos dados
-  existentes. Hash de senha é função do Supabase Auth.
-- **Rotação de senha a cada 90 dias:** a NIST SP 800-63B atual recomenda
-  explicitamente não exigir trocas periódicas sem evidência de comprometimento.
-  A política proposta é senha longa, bloqueio de senhas vazadas, MFA e troca
-  obrigatória quando houver comprometimento.
+1. Em GitHub Actions, baixar o artifact `agendfined-db-<run_id>` de uma execução
+   concluída. Obter a chave AES de 64 caracteres hexadecimais do gerenciador de
+   senhas. O arquivo cifrado sozinho não permite recuperar dados.
+2. Criar um projeto Supabase **isolado** e aplicar as migrações do repositório.
+   Nunca restaurar primeiro em produção. O projeto de destino precisa ter
+   PostgreSQL 17 e espaço suficiente para os dados.
+3. Passar a chave somente pelo ambiente `BACKUP_ENCRYPTION_KEY`. Usar
+   `node scripts/backup/decrypt-file.mjs <arquivo>.aes256gcm --verify` para
+   validar autenticação e integridade. Para restaurar, usar o modo de saída
+   do mesmo script e enviar o SQL descomprimido diretamente ao `psql`, sem
+   arquivo em claro. Desativar triggers durante a carga com conta administrativa,
+   pois `businesses` e `subscriptions` têm chaves estrangeiras circulares.
+4. Conferir contagens de linhas, login, isolamento RLS, cobrança e reservas;
+   medir o tempo real antes de declarar a meta RTO cumprida.
+
+**Limite da cópia:** a conta somente leitura autorizada não recebe `USAGE` no
+esquema `auth` nem `SELECT` em `storage.migrations` no Supabase hospedado. O
+artifact cobre as tabelas `public`. Não recupera senhas/contas do Supabase Auth,
+metadados do Storage nem arquivos dos buckets. Para recuperação completa,
+contratar backups gerenciados do Supabase ou estabelecer um mecanismo adicional
+com permissões específicas e aprovação separada. Atualmente não há objetos em
+Storage, mas o cadastro de usuários exigiria recriação após perda total do
+projeto Supabase.
+
+## Decisões de produto
+
+- **AES-256:** a pedido do proprietário, a cifra de aplicação cobre backups;
+  segredos ficam no Vercel Env Manager e GitHub Actions Secrets. Os dados
+  pesquisáveis de clientes não são cifrados por coluna. Hash de senha é função
+  do Supabase Auth.
+- **Rotação de senha a cada 90 dias:** o proprietário dispensou essa exigência.
+  A política usa senha longa, MFA e troca obrigatória quando houver
+  comprometimento.
 
 ## Referências
 

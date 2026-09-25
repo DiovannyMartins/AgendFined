@@ -1,4 +1,6 @@
 import "server-only";
+import { after } from "next/server";
+import { sendSecurityLog } from "@/lib/security/betterstack";
 
 type SecurityEvent =
   | "auth.signup"
@@ -10,10 +12,17 @@ type SecurityEvent =
   | "auth.mfa_enrollment_started"
   | "auth.mfa_verified"
   | "auth.mfa_verification_failed"
-  | "auth.mfa_removed";
+  | "auth.mfa_removed"
+  | "team.member_role_set"
+  | "team.member_removed";
 
-// Structured stdout is collected by Vercel and can be sent to Better Stack
-// using a Log Drain. Never include credentials, codes, QR secrets, or emails.
-export function auditSecurityEvent(event: SecurityEvent, actorId?: string) {
-  console.info(JSON.stringify({ event, actorId: actorId ?? null, at: new Date().toISOString() }));
+// Never include credentials, codes, QR secrets, emails, or full request URLs.
+export function auditSecurityEvent(
+  event: SecurityEvent,
+  actorId?: string,
+  details: Record<string, string> = {},
+) {
+  const entry = { event, actorId: actorId ?? null, ...details, at: new Date().toISOString() };
+  console.info(JSON.stringify(entry));
+  after(() => sendSecurityLog(entry));
 }

@@ -26,7 +26,7 @@ declare
 begin
   foreach table_name in array array[
     'profiles', 'businesses', 'services', 'availability',
-    'availability_blocks', 'professionals', 'customers', 'bookings',
+    'availability_blocks', 'customers', 'bookings',
     'waitlist_entries', 'subscriptions'
   ] loop
     execute format(

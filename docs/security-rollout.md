@@ -40,6 +40,8 @@ no servidor.
   caracteres salvo em Auth. O projeto está no plano Free e não oferece backups
   agendados no painel. As migrações `20261001000000` e `20261001000001`
   foram aplicadas ao projeto vinculado e a suíte de integração passou (87 testes).
+  Os dois tokens temporários usados na implantação foram revogados; o token
+  anterior do proprietário foi preservado.
 - Cloudflare: o certificado Universal do domínio está ativo. O modo SSL/TLS é
   **Completo (estrito)**, **Sempre usar HTTPS** está ativo e a versão mínima é
   TLS 1.2. O CNAME `@` está **Com proxy** e o conjunto gerenciado gratuito do
@@ -77,20 +79,23 @@ no servidor.
    retém o artifact por 30 dias. A primeira execução manual e o artifact foram
    confirmados; acompanhar a primeira execução agendada. Meta inicial: RPO de 24 horas
    e RTO de 8 horas, sujeitos ao primeiro ensaio de restauração trimestral.
-   Guardar a chave de recuperação em um gerenciador de senhas fora do GitHub e
-   deste computador; o Secret do GitHub não pode ser revelado depois da gravação.
+   Guardar a chave de recuperação em um gerenciador de senhas ou em papel,
+   fora do GitHub e deste computador; o Secret do GitHub não pode ser revelado
+   depois da gravação. O proprietário confirmou uma cópia em papel em
+   24/09/2026; o arquivo temporário legível foi apagado.
    Nesta estação Windows, a cópia local da chave está protegida com DPAPI para
    o usuário atual em `.backup-local/` (ignorado pelo Git). Executar
    `pwsh -NoProfile -File scripts/backup/copy-local-recovery-key.ps1`
-   copia **somente** a chave AES para a área de transferência; colá-la no
-   gerenciador de senhas e limpar a área de transferência em seguida. A cópia
-   DPAPI não substitui um cofre fora deste computador.
+   copia **somente** a chave AES para a área de transferência, caso seja
+   necessário guardá-la novamente em um cofre. Limpar a área de transferência
+   em seguida. A cópia DPAPI não substitui a folha guardada fora deste computador.
 
 ### Recuperação do backup externo
 
 1. Em GitHub Actions, baixar o artifact `agendfined-db-<run_id>` de uma execução
-   concluída. Obter a chave AES de 64 caracteres hexadecimais do gerenciador de
-   senhas. O arquivo cifrado sozinho não permite recuperar dados.
+   concluída. Obter a chave AES de 64 caracteres hexadecimais da folha de
+   recuperação guardada pelo proprietário. O arquivo cifrado sozinho não
+   permite recuperar dados.
 2. Criar um projeto Supabase **isolado** e aplicar as migrações do repositório.
    Nunca restaurar primeiro em produção. O projeto de destino precisa ter
    PostgreSQL 17 e espaço suficiente para os dados.

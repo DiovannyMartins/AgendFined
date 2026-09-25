@@ -76,7 +76,7 @@ export function SignupForm() {
                 id="password"
                 type="password"
                 autoComplete="new-password"
-                minLength={8}
+                minLength={15}
                 {...register("password")}
               />
               {errors.password && (

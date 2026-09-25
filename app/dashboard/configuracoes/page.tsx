@@ -4,12 +4,20 @@ import { AvailabilityForm, AvailabilityRow } from "./availability-form";
 import { PlanSection } from "./plan-section";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
+import { getCurrentBusinessRole } from "@/lib/business/queries";
+import { TeamManagement } from "./team-management";
 
 export default async function ConfiguracoesPage() {
   const business = await getCurrentBusiness();
   if (!business) redirect("/dashboard/setup");
 
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const role = await getCurrentBusinessRole();
+  const { data: members } = role === "admin"
+    ? await supabase.from("business_memberships").select("user_id, role").eq("business_id", business.id)
+    : { data: [] };
   const { data: availability } = await supabase
     .from("availability")
     .select("*")
@@ -19,9 +27,17 @@ export default async function ConfiguracoesPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-10">
-      <BusinessForm initial={business} />
+      {user?.id === business.owner_id && <BusinessForm initial={business} />}
 
-      <PlanSection business={{ id: business.id, plan: business.plan }} />
+      {role === "admin" && <PlanSection business={{ id: business.id, plan: business.plan }} />}
+
+      {user && role && <TeamManagement userId={user.id} role={role} members={members ?? []} />}
+
+      <section className="space-y-2">
+        <h2 className="text-xl font-semibold">Segurança da conta</h2>
+        <p className="text-muted-foreground">Ative a autenticação em duas etapas com um aplicativo autenticador.</p>
+        <Link href="/mfa" className="inline-block text-sm underline">Configurar autenticação em duas etapas</Link>
+      </section>
 
       <section>
         <h2 className="text-xl font-semibold">Disponibilidade recorrente</h2>
@@ -29,18 +45,22 @@ export default async function ConfiguracoesPage() {
           Defina as faixas de atendimento por dia da semana, em hora local do negócio.
         </p>
         <div className="mt-4 rounded-xl border border-border p-4">
-          <AvailabilityForm />
+          {role !== "user" && <AvailabilityForm />}
         </div>
         {availability && availability.length > 0 && (
           <div className="mt-4 space-y-2">
             {availability.map((row) => (
-              <AvailabilityRow
-                key={row.id}
-                id={row.id}
-                weekday={row.weekday}
-                startTime={row.start_time}
-                endTime={row.end_time}
-              />
+              role === "user" ? (
+                <p key={row.id} className="text-sm">Dia {row.weekday}: {row.start_time}–{row.end_time}</p>
+              ) : (
+                <AvailabilityRow
+                  key={row.id}
+                  id={row.id}
+                  weekday={row.weekday}
+                  startTime={row.start_time}
+                  endTime={row.end_time}
+                />
+              )
             ))}
           </div>
         )}

@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { runBoundedReconciliation } from "@/lib/billing/reconciliation-runner";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { enforceApiRateLimit, getClientIpFromHeaders } from "@/lib/booking/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -15,6 +17,12 @@ function authorized(request: NextRequest): boolean {
 
 async function run(request: NextRequest) {
   if (!authorized(request)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  try {
+    const allowed = await enforceApiRateLimit(createAdminClient(), getClientIpFromHeaders(request.headers), "reconciliation");
+    if (!allowed) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
+  } catch {
+    return NextResponse.json({ error: "rate_limit_unavailable" }, { status: 503 });
+  }
   const startedAt = Date.now();
   console.info(JSON.stringify({ event: "reconciliation_http_started" }));
   try {

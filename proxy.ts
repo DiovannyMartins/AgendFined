@@ -9,6 +9,10 @@ const AUTH_ROUTES = ["/login", "/cadastro", "/recuperar-senha"];
 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  // Log path only: query strings may contain booking codes or OAuth tokens.
+  if (process.env.NODE_ENV === "production") {
+    console.info(JSON.stringify({ event: "http.request", method: request.method, path: pathname, at: new Date().toISOString() }));
+  }
   if (
     /^\/(?:\.git|\.env|\.next|node_modules)(?:\/|$)/i.test(pathname) ||
     pathname.endsWith(".map")

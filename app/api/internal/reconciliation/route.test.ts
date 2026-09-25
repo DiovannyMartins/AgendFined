@@ -3,6 +3,11 @@ import { NextRequest } from "next/server";
 
 const { run } = vi.hoisted(() => ({ run: vi.fn(async () => []) }));
 vi.mock("@/lib/billing/reconciliation-runner", () => ({ runBoundedReconciliation: run }));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
+vi.mock("@/lib/booking/rate-limit", () => ({
+  enforceApiRateLimit: async () => true,
+  getClientIpFromHeaders: () => "127.0.0.1",
+}));
 import { GET, POST } from "./route";
 
 function request(method: string, authorization?: string) {

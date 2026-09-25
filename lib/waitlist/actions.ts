@@ -23,7 +23,7 @@ export type WaitlistActionResult = {
 async function requireProBusiness(): Promise<
   { ok: true; slug: string } | { ok: false; message: string }
 > {
-  const business = await getCurrentBusiness();
+  const business = await getCurrentBusiness("editor");
   if (!business) return { ok: false, message: "Configure seu negócio primeiro." };
   const gate = assertProPlan(business);
   if (!gate.ok) {

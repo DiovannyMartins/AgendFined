@@ -7,10 +7,16 @@ export const loginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
+export const passwordSchema = z.string()
+  .min(15, "A senha deve ter pelo menos 15 caracteres.")
+  .max(128, "Senha muito longa.")
+  .regex(/[A-Za-z]/, "Inclua pelo menos uma letra.")
+  .regex(/[0-9]/, "Inclua pelo menos um número.");
+
 export const signupSchema = z.object({
   displayName: z.string().trim().min(2, "Informe seu nome.").max(100, "Nome muito longo."),
   email: z.string().trim().max(254).email("Informe um e-mail válido."),
-  password: z.string().min(8, "A senha deve ter pelo menos 8 caracteres.").max(128, "Senha muito longa."),
+  password: passwordSchema,
 });
 export type SignupInput = z.infer<typeof signupSchema>;
 

@@ -7,6 +7,8 @@ import {
   buildRateKeys,
   buildServiceSearchRateKeys,
   enforceConsultRateLimit,
+  enforceApiRateLimit,
+  getClientIpFromHeaders,
   enforceRateLimit,
 } from "@/lib/booking/rate-limit";
 import type { Database } from "@/lib/supabase/database-types";
@@ -35,6 +37,44 @@ describe("buildRateKeys (§16)", () => {
   it("uses the documented default limits", () => {
     expect(RATE_LIMIT.perIpPerBusiness.limit).toBe(8);
     expect(RATE_LIMIT.perBusiness.limit).toBe(60);
+  });
+});
+
+describe("API throttling", () => {
+  it("ignores client-supplied forwarded chains and accepts only a canonical IP", () => {
+    const forged = new Headers({ "x-forwarded-for": "203.0.113.1" });
+    expect(getClientIpFromHeaders(forged)).toBe("unknown");
+    expect(getClientIpFromHeaders(new Headers({ "x-real-ip": "192.0.2.5" }))).toBe("192.0.2.5");
+  });
+
+  it("uses Cloudflare's visitor IP only when the Vercel peer belongs to Cloudflare", () => {
+    expect(getClientIpFromHeaders(new Headers({
+      "x-real-ip": "104.16.42.1",
+      "cf-connecting-ip": "203.0.113.42",
+    }))).toBe("203.0.113.42");
+    expect(getClientIpFromHeaders(new Headers({
+      "x-real-ip": "2606:4700::1234",
+      "cf-connecting-ip": "2001:db8::1",
+    }))).toBe("2001:db8::1");
+    expect(getClientIpFromHeaders(new Headers({
+      "x-real-ip": "198.51.100.5",
+      "cf-connecting-ip": "203.0.113.42",
+    }))).toBe("198.51.100.5");
+    expect(getClientIpFromHeaders(new Headers({
+      "x-real-ip": "104.16.42.1",
+      "cf-connecting-ip": "bad,203.0.113.42",
+    }))).toBe("104.16.42.1");
+  });
+
+  it("uses a dedicated per-route counter and denies an exhausted window", async () => {
+    const rpc = vi.fn(async () => ({ data: false, error: null }));
+    const client = { rpc } as unknown as SupabaseClient<Database>;
+    await expect(enforceApiRateLimit(client, "192.0.2.5", "webhook")).resolves.toBe(false);
+    expect(rpc).toHaveBeenCalledWith("check_booking_rate_limit", {
+      p_key: "api:webhook|ip:192.0.2.5",
+      p_limit: 120,
+      p_window_seconds: 900,
+    });
   });
 });
 

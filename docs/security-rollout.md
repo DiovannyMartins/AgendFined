@@ -111,8 +111,10 @@ no servidor.
    o plano Pro e não pode ser ligada no plano Free atual. O teste automatizado
    de TOTP e dos três papéis passou com contas descartáveis; uma revisão manual
    da interface por um usuário final ainda é recomendada.
-2. **Cloudflare:** testar uma reserva legítima após a troca do DNS e confirmar
-   nos logs se `x-real-ip` identifica um IP da Cloudflare; o código confia em
+2. **Cloudflare:** em 26/09, uma reserva legítima em `barbearia-teste` passou
+   pelo Turnstile, mostrou a confirmação, foi cancelada e o horário de 10:30
+   voltou a aparecer disponível. Confirmar nos logs se `x-real-ip` identifica
+   um IP da Cloudflare; o código confia em
    `CF-Connecting-IP` somente nesse caso. Atualizar a lista de faixas oficiais
    da Cloudflare quando ela mudar. O HSTS já está em `next.config.ts`.
 3. **Vercel:** eventos de acesso e auditoria chegaram à Better Stack em teste.

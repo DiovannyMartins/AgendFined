@@ -7,7 +7,7 @@ import { CalendarDays, CalendarClock, Download } from "lucide-react";
 import { toLocalDate } from "@/lib/booking/availability";
 import { filterAgenda } from "@/lib/agenda/view";
 import { getGcalExport } from "@/lib/gcal/get-export";
-import { isUpcomingConfirmed, type GcalExportBooking } from "@/lib/gcal/export";
+import { isUpcomingConfirmed } from "@/lib/gcal/export";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
 import { AgendaView } from "./agenda-view";
 
@@ -19,7 +19,7 @@ export default async function AgendaPage() {
   const [{ data: bookings }, { data: availability }] = await Promise.all([
     supabase
       .from("bookings")
-      .select("*")
+      .select("id, start_at, end_at, status, service_name_snapshot, duration_minutes_snapshot, customer_name_snapshot, customer_phone_snapshot, public_code, cancel_reason, cancel_reason_category, customer_note_requires_follow_up")
       .eq("business_id", business.id)
       .order("start_at", { ascending: true }),
     supabase
@@ -44,7 +44,7 @@ export default async function AgendaPage() {
   // them to the gate boundary instead of re-fetching.
   const exportResult = await getGcalExport({
     getBusiness: async () => business,
-    fetchBookings: async () => list as unknown as GcalExportBooking[],
+    fetchBookings: async () => list,
   });
 
   return (

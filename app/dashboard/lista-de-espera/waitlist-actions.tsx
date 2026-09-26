@@ -4,18 +4,18 @@ import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Bell, CalendarPlus } from "lucide-react";
 import { convertWaitlistEntry, notifyWaitlistEntry, type WaitlistActionResult } from "@/lib/waitlist/actions";
-import type { ManageWaitlistEntry } from "@/lib/waitlist/manage";
+import type { WaitlistStatus } from "@/lib/waitlist/waitlist";
 
 const INITIAL: WaitlistActionResult = { ok: true };
 
-export function WaitlistActions({ entry }: { entry: ManageWaitlistEntry }) {
-  const canAct = entry.status === "pending" || entry.status === "notified";
+export function WaitlistActions({ id, status }: { id: string; status: WaitlistStatus }) {
+  const canAct = status === "pending" || status === "notified";
   if (!canAct) return null;
 
   return (
     <div className="flex items-center gap-2">
-      <NotifyForm id={entry.id} />
-      <ConvertForm id={entry.id} />
+      <NotifyForm id={id} />
+      <ConvertForm id={id} />
     </div>
   );
 }

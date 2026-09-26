@@ -21,10 +21,21 @@ import { getBookingWindowLimitDays, type Plan } from "@/lib/plan/plan";
 
 const INITIAL: ActionResultState = { ok: true, data: undefined };
 
+type BusinessFormInitial = {
+  name: string;
+  slug: string;
+  phone: string;
+  slotIntervalMinutes: number;
+  minNoticeMinutes: number;
+  bookingWindowDays: number;
+  description: string | null;
+  plan: Plan;
+};
+
 export function BusinessForm({
   initial,
 }: {
-  initial?: Partial<Record<string, unknown>> | null;
+  initial?: BusinessFormInitial | null;
 }) {
   const router = useRouter();
   const [state, setState] = useState<ActionResultState>(INITIAL);

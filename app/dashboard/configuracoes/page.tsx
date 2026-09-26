@@ -20,7 +20,18 @@ export default async function ConfiguracoesPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-10">
-      <BusinessForm initial={business} />
+      <BusinessForm
+        initial={{
+          name: business.name,
+          slug: business.slug,
+          phone: business.phone,
+          slotIntervalMinutes: business.slot_interval_minutes,
+          minNoticeMinutes: business.min_notice_minutes,
+          bookingWindowDays: business.booking_window_days,
+          description: business.description,
+          plan: business.plan,
+        }}
+      />
 
       <PlanSection business={{ id: business.id, plan: business.plan }} />
 

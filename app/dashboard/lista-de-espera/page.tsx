@@ -78,7 +78,7 @@ function EntriesList({ entries }: { entries: ManageWaitlistEntry[] }) {
                 </p>
               )}
             </div>
-            <WaitlistActions entry={entry} />
+            <WaitlistActions id={entry.id} status={entry.status} />
           </div>
         );
       })}

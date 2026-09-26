@@ -63,7 +63,8 @@ no servidor.
   nem senha. A sessão existente do proprietário não foi encerrada.
 - GitHub: `SUPABASE_BACKUP_DB_URL` e `BACKUP_ENCRYPTION_KEY` estão em Actions
   Secrets. A credencial de backup é somente leitura para `public`, com
-  `BYPASSRLS` para o dump completo das tabelas da aplicação. Um dump de teste
+  `BYPASSRLS` para o dump completo das tabelas da aplicação, e pode executar
+  apenas a função privada de exportação Auth. Um dump de teste
   criptografado foi criado e verificado localmente. A primeira execução manual
   do workflow (`36083817594`) passou e enviou o artifact cifrado
   `agendfined-db-36083817594`, com expiração em 25/10/2026. O artifact foi
@@ -95,6 +96,12 @@ no servidor.
   `auth.mfa_factors` sem dar acesso direto ao esquema `auth`. O artifact Auth é
   cifrado separadamente com a mesma chave AES-256-GCM; a cópia `public` e a Auth
   ficam juntas na execução do workflow.
+  Em 26/09, a migração foi aplicada em produção: a credencial de backup pode
+  executar a função, mas segue sem acesso direto ao esquema `auth`. O workflow
+  na branch principal (`36223595065`) terminou com os dois arquivos cifrados.
+  O artifact de teste anterior (`36223394589`) foi autenticado com a chave e
+  mostrou 11 usuários, 11 identidades e 0 fatores, sem gravar SQL em claro.
+  O watchdog executado manualmente (`36210920600`) também passou.
 
 ## Configuração externa necessária
 
@@ -104,8 +111,10 @@ no servidor.
    o plano Pro e não pode ser ligada no plano Free atual. O teste automatizado
    de TOTP e dos três papéis passou com contas descartáveis; uma revisão manual
    da interface por um usuário final ainda é recomendada.
-2. **Cloudflare:** testar uma reserva legítima após a troca do DNS e confirmar
-   nos logs se `x-real-ip` identifica um IP da Cloudflare; o código confia em
+2. **Cloudflare:** em 26/09, uma reserva legítima em `barbearia-teste` passou
+   pelo Turnstile, mostrou a confirmação, foi cancelada e o horário de 10:30
+   voltou a aparecer disponível. Confirmar nos logs se `x-real-ip` identifica
+   um IP da Cloudflare; o código confia em
    `CF-Connecting-IP` somente nesse caso. Atualizar a lista de faixas oficiais
    da Cloudflare quando ela mudar. O HSTS já está em `next.config.ts`.
 3. **Vercel:** eventos de acesso e auditoria chegaram à Better Stack em teste.
@@ -160,9 +169,8 @@ no servidor.
    dono de um usuário externo com identidades simuladas. Ao usar um projeto
    local com `auto_expose_new_tables = false`, conferir os `GRANT` de Data API
    além da RLS; o laboratório exigiu uma concessão de `SELECT` em
-   `public.businesses` para `authenticated` nesse teste. Recriar contas Auth por
-   processo separado antes de testar login, cobrança e reservas com usuários
-   reais. Para artifacts posteriores à implantação da exportação Auth, restaurar
+   `public.businesses` para `authenticated` nesse teste. Para artifacts
+   posteriores à implantação da exportação Auth, restaurar
    primeiro `public` e depois o arquivo `agendfined-auth-<run_id>.sql.gz.aes256gcm`
    com o mesmo script, acrescentando `auth` como terceiro argumento. A segunda
    carga exige `auth.users`, `auth.identities` e `auth.mfa_factors` vazias no

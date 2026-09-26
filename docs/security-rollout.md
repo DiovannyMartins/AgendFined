@@ -56,7 +56,11 @@ no servidor.
   firewall básico e os logs de acesso estão ativos. A fonte HTTP Better Stack
   `AgendFined Vercel` foi criada e `BETTERSTACK_SOURCE_TOKEN` está salvo como
   Secret de produção. O deploy `0f31a6a` ficou pronto, e a Better Stack recebeu
-  evento `http.request` com método e caminho, sem query string.
+  evento `http.request` com método e caminho, sem query string. Em 25/09/2026,
+  um login inválido com dados descartáveis, feito na URL isolada do deploy de
+  produção, retornou o erro esperado e gerou `auth.login_failed` na fonte.
+  O JSON recebido tinha apenas `event`, `actorId: null` e horário, sem e-mail
+  nem senha. A sessão existente do proprietário não foi encerrada.
 - GitHub: `SUPABASE_BACKUP_DB_URL` e `BACKUP_ENCRYPTION_KEY` estão em Actions
   Secrets. A credencial de backup é somente leitura para `public`, com
   `BYPASSRLS` para o dump completo das tabelas da aplicação. Um dump de teste
@@ -69,32 +73,45 @@ no servidor.
   nominal de 03:17 UTC; o agendamento do GitHub pode atrasar.
   Em 25/09/2026, o artifact manual foi autenticado novamente e o SQL foi
   analisado em memória: 14 tabelas `public`, incluindo 3 negócios, 16 reservas
-  e 3 clientes. Nenhum SQL em claro foi gravado em disco. A carga em um banco
-  isolado ainda não foi executada: o Docker Desktop desta estação falhou ao
-  iniciar o mecanismo Linux por erro de acesso a `sailor-ingest.sock`, inclusive
-  após reinicialização sem apagar volumes. Integridade do artifact está
-  confirmada; integridade de uma restauração e RTO ainda não estão confirmados.
+  e 3 clientes. Nenhum SQL em claro foi gravado em disco. O Docker Desktop
+  voltou a iniciar após a remoção, com ele parado, de cinco sockets temporários
+  AF_UNIX obsoletos. Nenhum volume ou imagem foi apagado.
+  O mesmo artifact foi carregado em uma segunda instância Supabase local com
+  PostgreSQL 17 e as 63 migrações atuais. As contagens das 14 tabelas coincidiram
+  com as do dump. Das 17 chaves estrangeiras verificadas, nenhuma referência
+  entre tabelas `public` ficou órfã; três perfis referenciam contas ausentes em
+  `auth.users`, que está fora do escopo do artifact. Um ensaio repetido, com
+  reset da instância isolada, migrações, carga e conferência de contagens levou
+  36,1 segundos. Esse tempo não inclui baixar o artifact, obter a chave,
+  provisionar um novo host, recuperar Auth ou restaurar o tráfego da aplicação.
+  Uma consulta RLS com identidade simulada retornou 1 negócio para o dono e 0
+  para um usuário externo. O laboratório usa `auto_expose_new_tables = false`;
+  foi necessário conceder `SELECT` em `public.businesses` a `authenticated`
+  somente no laboratório para reproduzir o acesso da Data API hospedada.
 
 ## Configuração externa necessária
 
-1. **Supabase:** conferir os logs de auditoria do Supabase Auth e ativar a
-   proteção contra senhas vazadas se o plano permitir. O teste automatizado de
-   TOTP e dos três papéis passou com contas descartáveis; uma revisão manual da
-   interface por um usuário final ainda é recomendada.
+1. **Supabase:** os logs de auditoria do Auth foram consultados no Logs Explorer;
+   os eventos do desafio TOTP estavam presentes. A gravação duplicada na tabela
+   do banco permanece desligada. A proteção nativa contra senhas vazadas exige
+   o plano Pro e não pode ser ligada no plano Free atual. O teste automatizado
+   de TOTP e dos três papéis passou com contas descartáveis; uma revisão manual
+   da interface por um usuário final ainda é recomendada.
 2. **Cloudflare:** testar uma reserva legítima após a troca do DNS e confirmar
    nos logs se `x-real-ip` identifica um IP da Cloudflare; o código confia em
    `CF-Connecting-IP` somente nesse caso. Atualizar a lista de faixas oficiais
    da Cloudflare quando ela mudar. O HSTS já está em `next.config.ts`.
-3. **Vercel:** gerar um evento de auditoria de teste e verificar sua chegada na
-   Better Stack. O plano Hobby não oferece Log Drains; o envio é feito pela
-   própria aplicação. Revisar quem pode editar Secrets. Não registrar URLs
+3. **Vercel:** eventos de acesso e auditoria chegaram à Better Stack em teste.
+   O plano Hobby não oferece Log Drains; o envio é feito pela própria aplicação.
+   Revisar periodicamente quem pode editar Secrets. Não registrar URLs
    completas, tokens ou dados de clientes.
 4. **Backup:** o workflow `database-backup.yml` gera um dump diário de `public`
    às 03:17 UTC, comprime e cifra com AES-256-GCM sem gravar SQL em claro e
    retém o artifact por 30 dias. As primeiras execuções manual e agendada
-   passaram, e o artifact manual foi baixado e autenticado. Meta inicial: RPO de
-   24 horas e RTO de 8 horas, ainda sem garantia pelo atraso observado no
-   agendamento e porque falta carregar o artifact em um banco isolado.
+   passaram, e o artifact manual foi restaurado em um banco isolado. Meta inicial:
+   RPO de 24 horas e RTO de 8 horas. O RPO não é garantido pelo atraso observado
+   no agendamento; o tempo de 36,1 segundos é apenas do ensaio local com o
+   artifact pequeno e não comprova o RTO de uma recuperação integral.
    Guardar a chave de recuperação em um gerenciador de senhas ou em papel,
    fora do GitHub e deste computador; o Secret do GitHub não pode ser revelado
    depois da gravação. O proprietário confirmou uma cópia em papel em
@@ -115,14 +132,24 @@ no servidor.
 2. Criar um projeto Supabase **isolado** e aplicar as migrações do repositório.
    Nunca restaurar primeiro em produção. O projeto de destino precisa ter
    PostgreSQL 17 e espaço suficiente para os dados.
-3. Passar a chave somente pelo ambiente `BACKUP_ENCRYPTION_KEY`. Usar
-   `node scripts/backup/decrypt-file.mjs <arquivo>.aes256gcm --verify` para
-   validar autenticação e integridade. Para restaurar, usar o modo de saída
-   do mesmo script e enviar o SQL descomprimido diretamente ao `psql`, sem
-   arquivo em claro. Desativar triggers durante a carga com conta administrativa,
-   pois `businesses` e `subscriptions` têm chaves estrangeiras circulares.
-4. Conferir contagens de linhas, login, isolamento RLS, cobrança e reservas;
-   medir o tempo real antes de declarar a meta RTO cumprida.
+3. Passar a chave somente pelo ambiente `BACKUP_ENCRYPTION_KEY`. Validar com
+   `node scripts/backup/decrypt-file.mjs <arquivo>.aes256gcm --verify`. Na
+   instância local descartável cujo contêiner se chama
+   `supabase_db_af-restore-<nome>`, executar
+   `node scripts/backup/restore-to-local-docker.mjs <arquivo>.aes256gcm supabase_db_af-restore-<nome>`.
+   O utilitário autentica a cifra e o gzip, exige tabelas vazias, usa uma
+   transação e envia SQL diretamente ao `psql` sem arquivo em claro. Ele aceita
+   apenas nomes de contêiner com esse prefixo; nunca o banco normal `projeto`.
+   A carga usa `supabase_admin` com triggers temporariamente desativadas na
+   sessão, pois `businesses` e `subscriptions` têm chaves estrangeiras circulares.
+4. Conferir contagens e referências de todas as tabelas. No ensaio de 25/09,
+   as 14 contagens coincidiram, as 17 FKs foram verificadas e a RLS isolou o
+   dono de um usuário externo com identidades simuladas. Ao usar um projeto
+   local com `auto_expose_new_tables = false`, conferir os `GRANT` de Data API
+   além da RLS; o laboratório exigiu uma concessão de `SELECT` em
+   `public.businesses` para `authenticated` nesse teste. Recriar contas Auth por
+   processo separado antes de testar login, cobrança e reservas com usuários
+   reais. Medir o tempo total antes de declarar o RTO cumprido.
 
 **Limite da cópia:** a conta somente leitura autorizada não recebe `USAGE` no
 esquema `auth` nem `SELECT` em `storage.migrations` no Supabase hospedado. O

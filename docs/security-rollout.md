@@ -34,7 +34,7 @@ no servidor.
   de gestão da lista de espera conferem MFA e papel dentro do banco. As ações
   que usam chave de serviço exigem o papel correspondente antes de acessar os dados.
 
-## Estado externo verificado em 25/09/2026
+## Estado externo verificado até 26/09/2026
 
 - Supabase: TOTP habilitado, sessão AAL1 limitada a 15 minutos e mínimo de 15
   caracteres salvo em Auth. O projeto está no plano Free e não oferece backups
@@ -102,6 +102,18 @@ no servidor.
   O artifact de teste anterior (`36223394589`) foi autenticado com a chave e
   mostrou 11 usuários, 11 identidades e 0 fatores, sem gravar SQL em claro.
   O watchdog executado manualmente (`36210920600`) também passou.
+  Em 26/09, um segundo backup (`36224671337`) incluiu uma conta descartável
+  criada em produção com senha e TOTP. Os arquivos `public` e Auth foram
+  restaurados juntos em outro projeto Supabase local isolado: 3 negócios,
+  17 reservas, 4 clientes, 12 usuários, 12 identidades e 1 fator. As 17
+  referências verificadas não ficaram órfãs. A conta restaurada entrou com
+  sua senha original, respondeu ao desafio do **mesmo fator TOTP** e chegou
+  a AAL2. A conta descartável foi apagada de produção (11 contas restantes),
+  suas credenciais locais foram removidas, e o volume do laboratório com os
+  dados restaurados foi descartado. Um novo backup na branch principal
+  (`36225009148`) passou após a limpeza; seu arquivo Auth foi autenticado em
+  memória e contém 11 usuários, 11 identidades, nenhum fator e nenhuma conta
+  do ensaio.
 
 ## Configuração externa necessária
 
@@ -113,9 +125,12 @@ no servidor.
    da interface por um usuário final ainda é recomendada.
 2. **Cloudflare:** em 26/09, uma reserva legítima em `barbearia-teste` passou
    pelo Turnstile, mostrou a confirmação, foi cancelada e o horário de 10:30
-   voltou a aparecer disponível. Confirmar nos logs se `x-real-ip` identifica
-   um IP da Cloudflare; o código confia em
-   `CF-Connecting-IP` somente nesse caso. Atualizar a lista de faixas oficiais
+   voltou a aparecer disponível. O contador `booking_rate_limits` daquela
+   reserva guardou um IP de visitante válido, sem usar `unknown` nem uma faixa
+   da Cloudflare; o teste não registrou nem exibiu o endereço. A implementação
+   confia em `CF-Connecting-IP` somente quando `x-real-ip` está nas faixas da
+   Cloudflare. As listas IPv4 e IPv6 do código foram comparadas às listas
+   oficiais em 26/09. Atualizar essas faixas
    da Cloudflare quando ela mudar. O HSTS já está em `next.config.ts`.
 3. **Vercel:** eventos de acesso e auditoria chegaram à Better Stack em teste.
    O plano Hobby não oferece Log Drains; o envio é feito pela própria aplicação.
@@ -131,8 +146,10 @@ no servidor.
    verifica a cada seis horas se existe uma execução bem-sucedida iniciada há
    menos de 18 horas; se não, falha e sinaliza o atraso no GitHub Actions.
    Ele também depende do agendador do GitHub e não substitui um segundo provedor
-   de monitoramento. O tempo de 36,1 segundos é apenas do ensaio local com o
-   artifact pequeno e não comprova o RTO de uma recuperação integral.
+   de monitoramento. O ensaio local de 26/09 comprovou login e MFA após a
+   restauração completa, mas não incluiu provisionar um novo host, recuperar a
+   chave de papel nem mudar o tráfego; portanto ainda não comprova o RTO de
+   uma recuperação integral.
    Guardar a chave de recuperação em um gerenciador de senhas ou em papel,
    fora do GitHub e deste computador; o Secret do GitHub não pode ser revelado
    depois da gravação. O proprietário confirmou uma cópia em papel em
@@ -181,11 +198,11 @@ no servidor.
 nem `SELECT` direto em suas tabelas. A função privada expõe somente contas,
 identidades e fatores TOTP; não inclui sessões, tokens transitórios, OAuth,
 SCIM nem configuração do projeto. Hashes de senha e IDs podem ser recuperados;
-sessões antigas deverão ser refeitas no novo projeto. O segredo TOTP pode
-depender da chave de criptografia do projeto Supabase: o teste local comprovou a
-restauração dos bytes, mas o desafio com autenticador real em **outro** projeto
-ainda precisa ser ensaiado. Se isso falhar, os usuários deverão cadastrar novo
-fator MFA. A chave de serviço da API não equivale a um dump completo do Auth.
+sessões antigas deverão ser refeitas no novo projeto. Em 26/09, um fator TOTP
+descartável criado em produção foi restaurado e desafiado com sucesso em outro
+projeto local. Isso comprova o fluxo nesta configuração e versão; repetir o
+ensaio após mudanças de versão ou de configuração do Supabase Auth. A chave de
+serviço da API não equivale a um dump completo do Auth.
 Em 25/09/2026, o painel mostrava 11 contas Auth e nenhum bucket no Storage.
 Se um bucket for criado, copiar também os **objetos** pelo Storage API ou S3;
 backup SQL sozinho guarda apenas metadados. O procedimento atual não protege

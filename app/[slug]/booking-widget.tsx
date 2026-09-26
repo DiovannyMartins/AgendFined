@@ -221,7 +221,7 @@ export function BookingWidget({
   const slot = selectedSlot;
 
   return (
-    <div className="mx-auto max-w-2xl rounded-2xl border border-border bg-background p-4 shadow-sm sm:p-6">
+    <div className="mx-auto max-w-2xl rounded-2xl border border-border bg-background p-6 shadow-sm">
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-2">
           <Label htmlFor="service">Escolha o serviço</Label>
@@ -263,18 +263,15 @@ export function BookingWidget({
           )}
         </div>
 
-        <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-4 sm:p-5">
-          <div className="space-y-1">
-            <Label htmlFor="date" className="text-base font-semibold">Escolha a data</Label>
-            <p className="text-sm text-muted-foreground">Selecione o dia do seu atendimento.</p>
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="date">Escolha a data</Label>
           <Input
             id="date"
             type="date"
             value={date}
             min={minDate}
             onChange={(e) => handleDateChange(e.target.value)}
-            className="h-12 min-h-12 cursor-pointer px-4 text-base font-medium [color-scheme:dark] sm:h-11 sm:min-h-11"
+            className="[color-scheme:dark]"
           />
         </div>
 

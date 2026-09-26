@@ -88,6 +88,9 @@ no servidor.
   para um usuário externo. O laboratório usa `auto_expose_new_tables = false`;
   foi necessário conceder `SELECT` em `public.businesses` a `authenticated`
   somente no laboratório para reproduzir o acesso da Data API hospedada.
+  Em 25/09, o painel mostrava 11 contas Auth e nenhum bucket de arquivos no
+  Storage. A cópia `public` preserva os IDs associados aos dados do negócio,
+  mas não preserva as contas para login.
 
 ## Configuração externa necessária
 
@@ -105,12 +108,16 @@ no servidor.
    O plano Hobby não oferece Log Drains; o envio é feito pela própria aplicação.
    Revisar periodicamente quem pode editar Secrets. Não registrar URLs
    completas, tokens ou dados de clientes.
-4. **Backup:** o workflow `database-backup.yml` gera um dump diário de `public`
-   às 03:17 UTC, comprime e cifra com AES-256-GCM sem gravar SQL em claro e
+4. **Backup:** o workflow `database-backup.yml` gera dumps de `public` às
+   03:17, 09:17, 15:17 e 21:17 UTC, comprime e cifra com AES-256-GCM sem gravar SQL em claro e
    retém o artifact por 30 dias. As primeiras execuções manual e agendada
    passaram, e o artifact manual foi restaurado em um banco isolado. Meta inicial:
    RPO de 24 horas e RTO de 8 horas. O RPO não é garantido pelo atraso observado
-   no agendamento; o tempo de 36,1 segundos é apenas do ensaio local com o
+   no agendamento. Um workflow independente, `database-backup-watchdog.yml`,
+   verifica a cada seis horas se existe uma execução bem-sucedida iniciada há
+   menos de 18 horas; se não, falha e sinaliza o atraso no GitHub Actions.
+   Ele também depende do agendador do GitHub e não substitui um segundo provedor
+   de monitoramento. O tempo de 36,1 segundos é apenas do ensaio local com o
    artifact pequeno e não comprova o RTO de uma recuperação integral.
    Guardar a chave de recuperação em um gerenciador de senhas ou em papel,
    fora do GitHub e deste computador; o Secret do GitHub não pode ser revelado
@@ -156,9 +163,15 @@ esquema `auth` nem `SELECT` em `storage.migrations` no Supabase hospedado. O
 artifact cobre as tabelas `public`. Não recupera senhas/contas do Supabase Auth,
 metadados do Storage nem arquivos dos buckets. Para recuperação completa,
 contratar backups gerenciados do Supabase ou estabelecer um mecanismo adicional
-com permissões específicas e aprovação separada. Atualmente não há objetos em
-Storage, mas o cadastro de usuários exigiria recriação após perda total do
-projeto Supabase.
+com permissões específicas e aprovação separada. O Supabase documenta a
+migração das tabelas `auth` com hashes de senha; isso exige uma credencial capaz
+de ler o esquema inteiro e um ensaio próprio em projeto isolado. A chave de
+serviço da API não equivale a um dump completo do Auth. Em 25/09/2026, o painel
+mostrava 11 contas Auth e nenhum bucket de arquivos no Storage. Se um bucket for
+criado, copiar também os **objetos** pelo Storage API ou S3; backup SQL sozinho
+guarda apenas metadados. Sem backup Auth, a perda total do projeto exige recriar
+contas, redefinir senhas e reconciliar os novos IDs com as referências
+restauradas em `public`.
 
 ## Decisões de produto
 
@@ -176,6 +189,9 @@ projeto Supabase.
 - https://supabase.com/docs/guides/auth/password-security
 - https://supabase.com/docs/guides/auth/audit-logs
 - https://supabase.com/docs/guides/platform/backups
+- https://supabase.com/docs/guides/troubleshooting/migrating-auth-users-between-projects
+- https://supabase.com/docs/guides/storage/management/download-objects
+- https://docs.github.com/en/actions/how-tos/troubleshoot-workflows
 - https://developers.cloudflare.com/ssl/origin-configuration/ssl-modes/full-strict/
 - https://developers.cloudflare.com/ssl/edge-certificates/additional-options/always-use-https/
 - https://vercel.com/docs/environment-variables/manage-across-environments

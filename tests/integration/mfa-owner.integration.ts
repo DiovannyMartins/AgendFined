@@ -51,12 +51,9 @@ afterAll(async () => {
   if (errors.length) throw new Error(`Test cleanup failed: ${errors.join("; ")}`);
 });
 
-describe("MFA and business RBAC with disposable accounts", () => {
-  it("enforces admin, editor, user and AAL2 at the Data API", async () => {
+describe("MFA and owner-only business access with disposable accounts", () => {
+  it("allows the owner, isolates another user, and requires AAL2 after TOTP enrollment", async () => {
     const owner = await createUser("owner");
-    const teamAdmin = await createUser("admin");
-    const editor = await createUser("editor");
-    const reader = await createUser("reader");
     const outsider = await createUser("outsider");
 
     const { data: business, error: businessError } = await admin.from("businesses").insert({
@@ -76,37 +73,19 @@ describe("MFA and business RBAC with disposable accounts", () => {
     }).select("id").single();
     if (serviceError || !service) throw serviceError;
 
-    const membership = await admin.from("business_memberships").insert([
-      { business_id: businessId, user_id: teamAdmin.id, role: "admin" },
-      { business_id: businessId, user_id: editor.id, role: "editor" },
-      { business_id: businessId, user_id: reader.id, role: "user" },
-    ]);
-    if (membership.error) throw membership.error;
-
     const ownerClient = await anonClientForUser(owner.email, password);
-    const adminClient = await anonClientForUser(teamAdmin.email, password);
-    const editorClient = await anonClientForUser(editor.email, password);
-    const readerClient = await anonClientForUser(reader.email, password);
     const outsiderClient = await anonClientForUser(outsider.email, password);
 
-    const ownerCanSee = await ownerClient.from("business_memberships").select("user_id").eq("business_id", businessId);
+    const ownerCanSee = await ownerClient.from("services").select("id").eq("id", service.id);
     expect(ownerCanSee.error).toBeNull();
-    expect(ownerCanSee.data).toHaveLength(3);
-    const readerCanSee = await readerClient.from("services").select("id").eq("id", service.id);
-    expect(readerCanSee.data).toHaveLength(1);
+    expect(ownerCanSee.data).toHaveLength(1);
     const outsiderCannotSee = await outsiderClient.from("services").select("id").eq("id", service.id);
     expect(outsiderCannotSee.data).toHaveLength(0);
-
-    const readerCannotEdit = await readerClient.from("services").update({ name: "Reader changed" }).eq("id", service.id).select("id");
-    expect(readerCannotEdit.data).toHaveLength(0);
-    const editorCanEdit = await editorClient.from("services").update({ name: "Editor changed" }).eq("id", service.id).select("id");
-    expect(editorCanEdit.error).toBeNull();
-    expect(editorCanEdit.data).toHaveLength(1);
-    const editorCannotManageMembers = await editorClient.from("business_memberships").update({ role: "admin" }).eq("user_id", reader.id).select("user_id");
-    expect(editorCannotManageMembers.data).toHaveLength(0);
-    const adminCanManageMembers = await adminClient.from("business_memberships").update({ role: "editor" }).eq("user_id", reader.id).select("user_id");
-    expect(adminCanManageMembers.error).toBeNull();
-    expect(adminCanManageMembers.data).toHaveLength(1);
+    const outsiderCannotEdit = await outsiderClient.from("services").update({ name: "Unauthorized" }).eq("id", service.id).select("id");
+    expect(outsiderCannotEdit.data).toHaveLength(0);
+    const ownerCanEdit = await ownerClient.from("services").update({ name: "Owner changed" }).eq("id", service.id).select("id");
+    expect(ownerCanEdit.error).toBeNull();
+    expect(ownerCanEdit.data).toHaveLength(1);
 
     const enrolled = await ownerClient.auth.mfa.enroll({ factorType: "totp" });
     if (enrolled.error || !enrolled.data) throw enrolled.error;

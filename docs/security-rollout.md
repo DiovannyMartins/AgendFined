@@ -1,7 +1,6 @@
 # Implantação dos controles de segurança
 
-Este projeto usa Supabase Auth/Postgres e Vercel. Cada negócio tem um dono;
-outros usuários podem receber papéis por negócio. A aplicação já usa RLS, limites de taxa compartilhados no
+Este projeto usa Supabase Auth/Postgres e Vercel. Cada negócio é gerenciado somente pelo seu dono. A aplicação usa RLS, limites de taxa compartilhados no
 Postgres, Turnstile para reservas públicas, HSTS/CSP e chave de serviço apenas
 no servidor.
 
@@ -25,16 +24,15 @@ no servidor.
   ou código TOTP. A aplicação envia esses eventos diretamente à fonte HTTP
   Better Stack. O token fica como Secret de produção na Vercel; uma falha de
   ingestão não interrompe a requisição do cliente.
-- RBAC: a migração `20261001000001_business_rbac.sql` cria membros por negócio
-  com papéis `admin`, `editor` e `user`. O dono mantém poderes de administrador.
-  Administradores gerem cobrança; editores podem alterar agenda,
-  serviços, reservas e lista de espera; usuários têm acesso de leitura. A
-  seção Equipe e as ações de gestão de membros foram retiradas enquanto esse
-  recurso não faz parte do produto. Em 26/09/2026, não havia membros ativos em
-  produção. A RLS protege o
-  acesso direto à Data API; as funções privilegiadas
-  de gestão da lista de espera conferem MFA e papel dentro do banco. As ações
-  que usam chave de serviço exigem o papel correspondente antes de acessar os dados.
+- Acesso por proprietário: a migração `20261003000000_remove_business_memberships.sql`
+  elimina os papéis e cadastros de membros e restaura as políticas de dono nas
+  tabelas do negócio. A RLS protege o acesso direto à Data API; as funções
+  privilegiadas de gestão da lista de espera conferem MFA e propriedade dentro
+  do banco. As ações que usam chave de serviço verificam o dono antes de
+  acessar os dados. Em 26/09/2026, a migração passou no banco local isolado e
+  foi aplicada em produção; uma consulta confirmou que a tabela, o tipo e as
+  políticas de membros desapareceram. Um teste de integração com contas
+  descartáveis confirmou acesso do dono, isolamento de outro usuário e MFA.
 
 ## Estado externo verificado até 26/09/2026
 
@@ -42,10 +40,8 @@ no servidor.
   caracteres salvo em Auth. O projeto está no plano Free e não oferece backups
   agendados no painel. As migrações `20261001000000` e `20261001000001`
   foram aplicadas ao projeto vinculado e a suíte de integração passou (87 testes).
-  Em 25/09/2026, um teste adicional com cinco contas descartáveis verificou
-  na Data API os papéis `admin`, `editor` e `user`, o isolamento de um usuário
-  externo, o bloqueio da sessão AAL1 após cadastrar TOTP e a retomada do acesso
-  depois do desafio AAL2. O teste passou e removeu as contas e o negócio criados.
+  Em 25/09/2026, um teste anterior com contas descartáveis verificou o
+  isolamento na Data API e o bloqueio da sessão AAL1 após cadastrar TOTP.
   Os dois tokens temporários usados na implantação foram revogados; o token
   anterior do proprietário foi preservado.
 - Cloudflare: o certificado Universal do domínio está ativo. O modo SSL/TLS é
@@ -123,7 +119,7 @@ no servidor.
    os eventos do desafio TOTP estavam presentes. A gravação duplicada na tabela
    do banco permanece desligada. A proteção nativa contra senhas vazadas exige
    o plano Pro e não pode ser ligada no plano Free atual. O teste automatizado
-   de TOTP e dos três papéis passou com contas descartáveis; uma revisão manual
+   de TOTP e acesso do proprietário passou com contas descartáveis; uma revisão manual
    da interface por um usuário final ainda é recomendada.
 2. **Cloudflare:** em 26/09, uma reserva legítima em `barbearia-teste` passou
    pelo Turnstile, mostrou a confirmação, foi cancelada e o horário de 10:30

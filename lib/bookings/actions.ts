@@ -24,7 +24,7 @@ export async function updateBookingStatus(
   }
   if (cancelReasonValue.length > 500) return { ok: false, message: "O motivo do cancelamento é muito longo." };
 
-  const business = await getCurrentBusiness("editor");
+  const business = await getCurrentBusiness();
   if (!business) return { ok: false, message: "Configure seu negócio primeiro." };
 
   const supabase = await createClient();

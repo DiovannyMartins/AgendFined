@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { BusinessForm } from "./business-form";
 import { AvailabilityForm, AvailabilityRow } from "./availability-form";
 import { PlanSection } from "./plan-section";
-import { getCurrentBusiness, getCurrentBusinessRole } from "@/lib/business/queries";
+import { getCurrentBusiness } from "@/lib/business/queries";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 
@@ -11,8 +11,6 @@ export default async function ConfiguracoesPage() {
   if (!business) redirect("/dashboard/setup");
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const role = await getCurrentBusinessRole();
   const { data: availability } = await supabase
     .from("availability")
     .select("*")
@@ -22,9 +20,9 @@ export default async function ConfiguracoesPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-10">
-      {user?.id === business.owner_id && <BusinessForm initial={business} />}
+      <BusinessForm initial={business} />
 
-      {role === "admin" && <PlanSection business={{ id: business.id, plan: business.plan }} />}
+      <PlanSection business={{ id: business.id, plan: business.plan }} />
 
       <section className="space-y-2">
         <h2 className="text-xl font-semibold">Segurança da conta</h2>
@@ -38,22 +36,18 @@ export default async function ConfiguracoesPage() {
           Defina as faixas de atendimento por dia da semana, em hora local do negócio.
         </p>
         <div className="mt-4 rounded-xl border border-border p-4">
-          {role !== "user" && <AvailabilityForm />}
+          <AvailabilityForm />
         </div>
         {availability && availability.length > 0 && (
           <div className="mt-4 space-y-2">
             {availability.map((row) => (
-              role === "user" ? (
-                <p key={row.id} className="text-sm">Dia {row.weekday}: {row.start_time}–{row.end_time}</p>
-              ) : (
-                <AvailabilityRow
-                  key={row.id}
-                  id={row.id}
-                  weekday={row.weekday}
-                  startTime={row.start_time}
-                  endTime={row.end_time}
-                />
-              )
+              <AvailabilityRow
+                key={row.id}
+                id={row.id}
+                weekday={row.weekday}
+                startTime={row.start_time}
+                endTime={row.end_time}
+              />
             ))}
           </div>
         )}

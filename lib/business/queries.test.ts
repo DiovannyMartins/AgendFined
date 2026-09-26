@@ -1,44 +1,38 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { state } = vi.hoisted(() => ({
-  state: { owned: null as { id: string } | null, membership: null as { business_id: string; role: "admin" | "editor" | "user" } | null },
+  state: { user: { id: "user-1" } as { id: string } | null, owned: null as { id: string } | null, tables: [] as string[] },
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
-    auth: { getUser: async () => ({ data: { user: { id: "user-1" } } }) },
-    from: (table: string) => ({
-      select: () => ({
-        eq: (column: string) => ({
-          maybeSingle: async () => ({
-            data: table === "business_memberships" ? state.membership
-              : column === "owner_id" ? state.owned
-                : { id: "business-1" },
-          }),
-        }),
-      }),
-    }),
+    auth: { getUser: async () => ({ data: { user: state.user } }) },
+    from: (table: string) => {
+      state.tables.push(table);
+      return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: state.owned }) }) }) };
+    },
   }),
 }));
 
 import { getCurrentBusiness } from "./queries";
 
-describe("business role guard", () => {
-  beforeEach(() => { state.owned = null; state.membership = null; });
+describe("business owner access", () => {
+  beforeEach(() => { state.user = { id: "user-1" }; state.owned = null; state.tables = []; });
 
-  it("keeps the existing owner an admin", async () => {
+  it("returns the owner's business", async () => {
     state.owned = { id: "business-1" };
-    expect((await getCurrentBusiness("admin"))?.id).toBe("business-1");
+    expect((await getCurrentBusiness())?.id).toBe("business-1");
+    expect(state.tables).toEqual(["businesses"]);
   });
 
-  it("lets an editor read but denies admin actions", async () => {
-    state.membership = { business_id: "business-1", role: "editor" };
-    expect((await getCurrentBusiness("user"))?.id).toBe("business-1");
-    expect(await getCurrentBusiness("admin")).toBeNull();
+  it("returns no business to another authenticated user", async () => {
+    expect(await getCurrentBusiness()).toBeNull();
+    expect(state.tables).toEqual(["businesses"]);
   });
 
-  it("denies writes to a read-only member", async () => {
-    state.membership = { business_id: "business-1", role: "user" };
-    expect(await getCurrentBusiness("editor")).toBeNull();
+  it("does not query businesses without a session", async () => {
+    state.user = null;
+    expect(await getCurrentBusiness()).toBeNull();
+    expect(state.tables).toEqual([]);
   });
 });

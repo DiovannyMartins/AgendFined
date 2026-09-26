@@ -26,7 +26,7 @@ if (verified.error || verified.status !== 0) {
 
 const emptyQuery = scope === "auth"
   ? "select (select count(*) from auth.users) + (select count(*) from auth.identities) + (select count(*) from auth.mfa_factors);"
-  : "select (select count(*) from public.availability) + (select count(*) from public.availability_blocks) + (select count(*) from public.billing_attempts) + (select count(*) from public.billing_reconciliation_claims) + (select count(*) from public.booking_rate_limits) + (select count(*) from public.bookings) + (select count(*) from public.business_memberships) + (select count(*) from public.businesses) + (select count(*) from public.customers) + (select count(*) from public.profiles) + (select count(*) from public.security_usage_daily) + (select count(*) from public.services) + (select count(*) from public.subscriptions) + (select count(*) from public.waitlist_entries);";
+  : "select (select count(*) from public.availability) + (select count(*) from public.availability_blocks) + (select count(*) from public.billing_attempts) + (select count(*) from public.billing_reconciliation_claims) + (select count(*) from public.booking_rate_limits) + (select count(*) from public.bookings) + (select count(*) from public.businesses) + (select count(*) from public.customers) + (select count(*) from public.profiles) + (select count(*) from public.security_usage_daily) + (select count(*) from public.services) + (select count(*) from public.subscriptions) + (select count(*) from public.waitlist_entries);";
 const empty = spawnSync("docker", [
   "exec", container, "psql", "-U", "supabase_admin", "-d", "postgres", "-Atc",
   emptyQuery,

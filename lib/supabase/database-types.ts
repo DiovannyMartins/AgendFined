@@ -297,35 +297,6 @@ export type Database = {
           },
         ]
       }
-      business_memberships: {
-        Row: {
-          business_id: string
-          user_id: string
-          role: Database["public"]["Enums"]["business_role"]
-          created_at: string
-        }
-        Insert: {
-          business_id: string
-          user_id: string
-          role: Database["public"]["Enums"]["business_role"]
-          created_at?: string
-        }
-        Update: {
-          business_id?: string
-          user_id?: string
-          role?: Database["public"]["Enums"]["business_role"]
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "business_memberships_business_id_fkey"
-            columns: ["business_id"]
-            isOneToOne: false
-            referencedRelation: "businesses"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       customers: {
         Row: {
           business_id: string
@@ -935,7 +906,6 @@ export type Database = {
       billing_attempt_kind: "initial" | "retry"
       billing_attempt_status: "reserved" | "creating" | "unknown" | "linked" | "failed" | "ambiguous"
       business_plan: "free" | "pro"
-      business_role: "admin" | "editor" | "user"
       subscription_status: "pending" | "authorized" | "paused" | "cancelled"
     }
     CompositeTypes: {
@@ -1068,7 +1038,6 @@ export const Constants = {
       billing_attempt_kind: ["initial", "retry"],
       billing_attempt_status: ["reserved", "creating", "unknown", "linked", "failed", "ambiguous"],
       business_plan: ["free", "pro"],
-      business_role: ["admin", "editor", "user"],
       subscription_status: ["pending", "authorized", "paused", "cancelled"],
     },
   },

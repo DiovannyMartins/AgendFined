@@ -89,8 +89,12 @@ no servidor.
   foi necessário conceder `SELECT` em `public.businesses` a `authenticated`
   somente no laboratório para reproduzir o acesso da Data API hospedada.
   Em 25/09, o painel mostrava 11 contas Auth e nenhum bucket de arquivos no
-  Storage. A cópia `public` preserva os IDs associados aos dados do negócio,
-  mas não preserva as contas para login.
+  Storage. A migração `20261002000000_auth_backup_export.sql` cria a função
+  privada `backup_internal.export_auth_sql()`, executável apenas pela credencial
+  de backup. Ela entrega SQL de dados para `auth.users`, `auth.identities` e
+  `auth.mfa_factors` sem dar acesso direto ao esquema `auth`. O artifact Auth é
+  cifrado separadamente com a mesma chave AES-256-GCM; a cópia `public` e a Auth
+  ficam juntas na execução do workflow.
 
 ## Configuração externa necessária
 
@@ -108,7 +112,8 @@ no servidor.
    O plano Hobby não oferece Log Drains; o envio é feito pela própria aplicação.
    Revisar periodicamente quem pode editar Secrets. Não registrar URLs
    completas, tokens ou dados de clientes.
-4. **Backup:** o workflow `database-backup.yml` gera dumps de `public` às
+4. **Backup:** o workflow `database-backup.yml` gera dumps de `public` e das
+   contas Auth às
    03:17, 09:17, 15:17 e 21:17 UTC, comprime e cifra com AES-256-GCM sem gravar SQL em claro e
    retém o artifact por 30 dias. As primeiras execuções manual e agendada
    passaram, e o artifact manual foi restaurado em um banco isolado. Meta inicial:
@@ -135,7 +140,8 @@ no servidor.
 1. Em GitHub Actions, baixar o artifact `agendfined-db-<run_id>` de uma execução
    concluída. Obter a chave AES de 64 caracteres hexadecimais da folha de
    recuperação guardada pelo proprietário. O arquivo cifrado sozinho não
-   permite recuperar dados.
+   permite recuperar dados. O artifact contém arquivos separados para `public`
+   e Auth; os dois devem vir da **mesma execução**.
 2. Criar um projeto Supabase **isolado** e aplicar as migrações do repositório.
    Nunca restaurar primeiro em produção. O projeto de destino precisa ter
    PostgreSQL 17 e espaço suficiente para os dados.
@@ -156,22 +162,26 @@ no servidor.
    além da RLS; o laboratório exigiu uma concessão de `SELECT` em
    `public.businesses` para `authenticated` nesse teste. Recriar contas Auth por
    processo separado antes de testar login, cobrança e reservas com usuários
-   reais. Medir o tempo total antes de declarar o RTO cumprido.
+   reais. Para artifacts posteriores à implantação da exportação Auth, restaurar
+   primeiro `public` e depois o arquivo `agendfined-auth-<run_id>.sql.gz.aes256gcm`
+   com o mesmo script, acrescentando `auth` como terceiro argumento. A segunda
+   carga exige `auth.users`, `auth.identities` e `auth.mfa_factors` vazias no
+   destino. Testar login com uma conta descartável e o fluxo MFA antes de
+   redirecionar o tráfego. Medir o tempo total antes de declarar o RTO cumprido.
 
-**Limite da cópia:** a conta somente leitura autorizada não recebe `USAGE` no
-esquema `auth` nem `SELECT` em `storage.migrations` no Supabase hospedado. O
-artifact cobre as tabelas `public`. Não recupera senhas/contas do Supabase Auth,
-metadados do Storage nem arquivos dos buckets. Para recuperação completa,
-contratar backups gerenciados do Supabase ou estabelecer um mecanismo adicional
-com permissões específicas e aprovação separada. O Supabase documenta a
-migração das tabelas `auth` com hashes de senha; isso exige uma credencial capaz
-de ler o esquema inteiro e um ensaio próprio em projeto isolado. A chave de
-serviço da API não equivale a um dump completo do Auth. Em 25/09/2026, o painel
-mostrava 11 contas Auth e nenhum bucket de arquivos no Storage. Se um bucket for
-criado, copiar também os **objetos** pelo Storage API ou S3; backup SQL sozinho
-guarda apenas metadados. Sem backup Auth, a perda total do projeto exige recriar
-contas, redefinir senhas e reconciliar os novos IDs com as referências
-restauradas em `public`.
+**Limite da cópia:** a credencial de backup não recebe `USAGE` no esquema `auth`
+nem `SELECT` direto em suas tabelas. A função privada expõe somente contas,
+identidades e fatores TOTP; não inclui sessões, tokens transitórios, OAuth,
+SCIM nem configuração do projeto. Hashes de senha e IDs podem ser recuperados;
+sessões antigas deverão ser refeitas no novo projeto. O segredo TOTP pode
+depender da chave de criptografia do projeto Supabase: o teste local comprovou a
+restauração dos bytes, mas o desafio com autenticador real em **outro** projeto
+ainda precisa ser ensaiado. Se isso falhar, os usuários deverão cadastrar novo
+fator MFA. A chave de serviço da API não equivale a um dump completo do Auth.
+Em 25/09/2026, o painel mostrava 11 contas Auth e nenhum bucket no Storage.
+Se um bucket for criado, copiar também os **objetos** pelo Storage API ou S3;
+backup SQL sozinho guarda apenas metadados. O procedimento atual não protege
+arquivos de Storage nem a configuração de Auth do painel.
 
 ## Decisões de produto
 

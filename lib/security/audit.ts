@@ -12,9 +12,7 @@ type SecurityEvent =
   | "auth.mfa_enrollment_started"
   | "auth.mfa_verified"
   | "auth.mfa_verification_failed"
-  | "auth.mfa_removed"
-  | "team.member_role_set"
-  | "team.member_removed";
+  | "auth.mfa_removed";
 
 // Never include credentials, codes, QR secrets, emails, or full request URLs.
 export function auditSecurityEvent(

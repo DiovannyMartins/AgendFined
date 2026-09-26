@@ -21,15 +21,17 @@ no servidor.
   mecanismo. As rotas API de webhook, retorno de cobrança e reconciliação têm
   limites por IP. Webhook e cron também exigem assinatura ou segredo próprio.
 - Logs: o proxy registra método e caminho sem query string em produção; ações
-  de autenticação e gestão da equipe registram eventos JSON sem e-mail, senha
+  de autenticação registram eventos JSON sem e-mail, senha
   ou código TOTP. A aplicação envia esses eventos diretamente à fonte HTTP
   Better Stack. O token fica como Secret de produção na Vercel; uma falha de
   ingestão não interrompe a requisição do cliente.
 - RBAC: a migração `20261001000001_business_rbac.sql` cria membros por negócio
   com papéis `admin`, `editor` e `user`. O dono mantém poderes de administrador.
-  Administradores gerem membros e cobrança; editores podem alterar agenda,
+  Administradores gerem cobrança; editores podem alterar agenda,
   serviços, reservas e lista de espera; usuários têm acesso de leitura. A
-  configuração de equipe aceita o ID de uma conta já criada. A RLS protege o
+  seção Equipe e as ações de gestão de membros foram retiradas enquanto esse
+  recurso não faz parte do produto. Em 26/09/2026, não havia membros ativos em
+  produção. A RLS protege o
   acesso direto à Data API; as funções privilegiadas
   de gestão da lista de espera conferem MFA e papel dentro do banco. As ações
   que usam chave de serviço exigem o papel correspondente antes de acessar os dados.

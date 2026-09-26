@@ -2,11 +2,9 @@ import { redirect } from "next/navigation";
 import { BusinessForm } from "./business-form";
 import { AvailabilityForm, AvailabilityRow } from "./availability-form";
 import { PlanSection } from "./plan-section";
-import { getCurrentBusiness } from "@/lib/business/queries";
+import { getCurrentBusiness, getCurrentBusinessRole } from "@/lib/business/queries";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { getCurrentBusinessRole } from "@/lib/business/queries";
-import { TeamManagement } from "./team-management";
 
 export default async function ConfiguracoesPage() {
   const business = await getCurrentBusiness();
@@ -15,9 +13,6 @@ export default async function ConfiguracoesPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const role = await getCurrentBusinessRole();
-  const { data: members } = role === "admin"
-    ? await supabase.from("business_memberships").select("user_id, role").eq("business_id", business.id)
-    : { data: [] };
   const { data: availability } = await supabase
     .from("availability")
     .select("*")
@@ -30,8 +25,6 @@ export default async function ConfiguracoesPage() {
       {user?.id === business.owner_id && <BusinessForm initial={business} />}
 
       {role === "admin" && <PlanSection business={{ id: business.id, plan: business.plan }} />}
-
-      {user && role && <TeamManagement userId={user.id} role={role} members={members ?? []} />}
 
       <section className="space-y-2">
         <h2 className="text-xl font-semibold">Segurança da conta</h2>

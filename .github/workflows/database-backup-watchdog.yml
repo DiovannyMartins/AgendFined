@@ -1,0 +1,39 @@
+name: Check Supabase backup freshness
+
+on:
+  schedule:
+    - cron: "43 0,6,12,18 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if no successful backup started in 18 hours
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest=$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow database-backup.yml \
+            --status success \
+            --limit 1 \
+            --json createdAt \
+            --jq '.[0].createdAt // empty')
+
+          if [ -z "$latest" ]; then
+            echo "::error::No successful encrypted database backup found."
+            exit 1
+          fi
+
+          age_seconds=$(( $(date -u +%s) - $(date -u -d "$latest" +%s) ))
+          echo "Latest successful backup started at $latest ($(( age_seconds / 3600 )) hours ago)."
+
+          if [ "$age_seconds" -gt 64800 ]; then
+            echo "::error::Latest successful backup is older than 18 hours. Check the backup workflow and artifact."
+            exit 1
+          fi

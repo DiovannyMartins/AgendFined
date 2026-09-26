@@ -39,6 +39,17 @@ jobs:
             public.ecr.aws/supabase/postgres:17.6.1.166 \
             sh -c 'exec pg_dump --dbname="$SUPABASE_BACKUP_DB_URL" --data-only --no-owner --no-privileges --schema=public'
           node scripts/backup/decrypt-file.mjs "backup/agendfined-${GITHUB_RUN_ID}.sql.gz.aes256gcm" --verify
+      - name: Stream Auth accounts into AES-256-GCM
+        env:
+          SUPABASE_BACKUP_DB_URL: ${{ secrets.SUPABASE_BACKUP_DB_URL }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+        run: |
+          node scripts/backup/encrypt-command.mjs "backup/agendfined-auth-${GITHUB_RUN_ID}.sql.gz.aes256gcm" -- \
+            docker run --rm -e SUPABASE_BACKUP_DB_URL \
+            -e PGOPTIONS='-c default_transaction_read_only=on' \
+            public.ecr.aws/supabase/postgres:17.6.1.166 \
+            sh -c 'exec psql "$SUPABASE_BACKUP_DB_URL" -X -A -t -v ON_ERROR_STOP=1 -c "select * from backup_internal.export_auth_sql()"'
+          node scripts/backup/decrypt-file.mjs "backup/agendfined-auth-${GITHUB_RUN_ID}.sql.gz.aes256gcm" --verify
       - name: Upload encrypted backup
         uses: actions/upload-artifact@v4
         with:

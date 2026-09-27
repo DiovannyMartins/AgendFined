@@ -12,6 +12,39 @@ import { runMercadoPagoWebhook } from "@/lib/billing/webhook-server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enforceApiRateLimit, getClientIpFromHeaders } from "@/lib/booking/rate-limit";
 
+const MAX_WEBHOOK_BODY_BYTES = 32 * 1024;
+
+async function readJsonBody(request: Request): Promise<{ type?: string; data?: { id?: string } }> {
+  const contentLength = request.headers.get("content-length");
+  if (contentLength && (!/^\d+$/.test(contentLength) || Number(contentLength) > MAX_WEBHOOK_BODY_BYTES)) {
+    throw new Error("PAYLOAD_TOO_LARGE");
+  }
+
+  if (!request.body) throw new Error("INVALID_PAYLOAD");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_WEBHOOK_BODY_BYTES) throw new Error("PAYLOAD_TOO_LARGE");
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return JSON.parse(new TextDecoder().decode(bytes)) as { type?: string; data?: { id?: string } };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const allowed = await enforceApiRateLimit(createAdminClient(), getClientIpFromHeaders(request.headers), "webhook");
@@ -30,7 +63,7 @@ export async function POST(request: NextRequest) {
 
   let body: { type?: string; data?: { id?: string } };
   try {
-    body = await request.json();
+    body = await readJsonBody(request);
   } catch {
     return NextResponse.json({ error: "invalid_payload" }, { status: 400 });
   }

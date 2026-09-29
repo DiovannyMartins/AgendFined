@@ -6,47 +6,61 @@ export default function PrivacidadePage() {
   return (
     <article className="space-y-6">
       <h1 className="text-3xl font-semibold">Política de Privacidade</h1>
-      <p className="text-sm text-muted-foreground">Última atualização: 29 de agosto de 2026</p>
+      <p className="text-sm text-muted-foreground">Última atualização: 28 de setembro de 2026</p>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-medium">1. Quais dados coletamos</h2>
+        <h2 className="text-xl font-medium">1. Quem somos e quais dados coletamos</h2>
         <p>
-          Coletamos apenas os dados necessários para operar o serviço: nome, telefone/WhatsApp,
-          e-mail (opcional) e observação (opcional) no momento da reserva. O profissional informa
-          os dados do seu negócio (nome, endereço público, contato e configurações de agenda).
+          O AgendFined está em fase de estruturação e ainda não possui CNPJ constituído. O canal
+          oficial é reservas@agendfined.com.br. Podemos tratar nome, telefone/WhatsApp, e-mail,
+          observações da reserva, dados do negócio, credenciais, IP, informações do dispositivo e
+          registros técnicos de segurança. Não solicitamos dados sensíveis para o uso normal.
+        </p>
+        <p>
+          Para fins da LGPD, o AgendFined atua como controlador dos dados tratados para operar a
+          plataforma. O profissional também pode ser controlador dos dados de seus próprios clientes.
         </p>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-medium">2. Como usamos seus dados</h2>
+        <h2 className="text-xl font-medium">2. Finalidades e bases legais</h2>
         <p>
-          Usamos os dados para criar e gerenciar reservas, exibir o painel do profissional e
-          operar a página pública de agendamento. Não vendemos, alugamos ou compartilhamos seus
-          dados com terceiros para fins de marketing.
+          Usamos os dados para contas, autenticação, reservas, confirmações, lembretes, suporte,
+          pagamentos, segurança e cumprimento de obrigações legais. As bases legais podem incluir
+          execução de contrato, obrigação legal, exercício regular de direitos e legítimo interesse.
+          Quando houver consentimento, ele será específico e poderá ser revogado.
         </p>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-medium">3. Segurança</h2>
+        <h2 className="text-xl font-medium">3. Compartilhamento, retenção e cookies</h2>
         <p>
-          Os dados de clientes e reservas são isolados por negócio e protegidos por políticas de
-          segurança no banco de dados. Dados pessoais de clientes nunca são expostos publicamente.
+          Não vendemos dados. Compartilhamos o mínimo necessário com Supabase (banco e autenticação),
+          Resend (e-mails), Mercado Pago (pagamentos), Vercel (hospedagem) e autoridades quando
+          exigido. Alguns operadores podem processar dados fora do Brasil, com salvaguardas legais.
+          Guardamos dados pelo tempo necessário ao serviço, à segurança e às obrigações legais,
+          eliminando ou anonimizando-os depois. Usamos cookies essenciais de sessão e segurança,
+          sem cookies de publicidade comportamental nesta versão.
         </p>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-medium">4. Seus direitos</h2>
+        <h2 className="text-xl font-medium">4. Segurança e seus direitos</h2>
         <p>
-          Em conformidade com a LGPD, você pode solicitar acessar, corrigir ou excluir seus dados
-          pessoais. Entre em contato conosco para exercer seus direitos.
+          Adotamos controle de acesso, autenticação, isolamento por negócio e proteção de
+          credenciais. Você pode solicitar confirmação, acesso, correção, anonimização, bloqueio,
+          eliminação, portabilidade quando regulamentada, informações sobre compartilhamento,
+          revogação do consentimento e revisão de decisões automatizadas, quando aplicável. Podemos
+          confirmar sua identidade para proteger os dados.
         </p>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-medium">5. Contato</h2>
+        <h2 className="text-xl font-medium">5. Contato e alterações</h2>
         <p>
-          Em caso de dúvidas sobre esta política, entre em contato pelo e-mail
-          suporte@agendfined.app.
+          Para exercer direitos ou tirar dúvidas, escreva para reservas@agendfined.com.br. Em caso
+          de incidente relevante, adotaremos as comunicações exigidas. Esta política pode ser
+          atualizada e a versão vigente permanecerá publicada nesta página.
         </p>
       </section>
     </article>

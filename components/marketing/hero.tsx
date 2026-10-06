@@ -1,17 +1,16 @@
 "use client";
 
 import type Hls from "hls.js";
-import { motion, useReducedMotion } from "motion/react";
 import { ArrowRight, Play, Sparkles } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const videoSrc =
   "https://stream.mux.com/T6oQJQ02cQ6N01TR6iHwZkKFkbepS34dkkIc9iukgy400g.m3u8";
 
 export function Hero({ children }: { children?: React.ReactNode }) {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = usePrefersReducedMotion();
 
   return (
     <section id="top" className="relative isolate min-h-[calc(100svh-1px)] scroll-mt-20 overflow-hidden bg-black text-white">
@@ -23,54 +22,36 @@ export function Hero({ children }: { children?: React.ReactNode }) {
       <div className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-48 bg-gradient-to-b from-transparent to-background" />
 
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center px-4 pb-16 pt-32 text-center sm:pt-40 lg:px-6">
-        <motion.div
-          initial={false}
-          animate={{ opacity: 1, y: 0 }}
-          transition={reduceMotion ? { duration: 0 } : { duration: 0.6 }}
+        <div
           className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm text-white/80 backdrop-blur-md"
         >
           <Sparkles className="size-3.5 text-white" />
           Reservas online para profissionais
-        </motion.div>
+        </div>
 
-        <motion.p
-          initial={false}
-          animate={{ opacity: 1, y: 0 }}
-          transition={reduceMotion ? { duration: 0 } : { duration: 0.6, delay: 0.1 }}
+        <p
           className="mt-9 font-display text-3xl leading-[1.1] text-white sm:text-5xl lg:text-[48px]"
         >
           Sua agenda trabalhando por você
-        </motion.p>
+        </p>
 
-        <motion.h1
-          initial={false}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={reduceMotion ? { duration: 0 } : { duration: 0.6, delay: 0.2 }}
+        <h1
           className="mt-4 max-w-5xl text-balance text-6xl font-semibold leading-[0.9] tracking-tighter text-transparent [background-image:linear-gradient(to_bottom,#fff_0%,#fff_52%,#a7a7a7_100%)] bg-clip-text sm:text-8xl lg:text-[136px]"
         >
           24 horas por dia
-        </motion.h1>
+        </h1>
 
-        <motion.p
-          initial={false}
-          animate={{ opacity: 0.72 }}
-          transition={reduceMotion ? { duration: 0 } : { duration: 0.6, delay: 0.4 }}
-          className="mx-auto mt-8 max-w-xl text-pretty text-lg leading-[1.65] text-white sm:text-[20px]"
+        <p
+          className="mx-auto mt-8 max-w-xl text-pretty text-lg leading-[1.65] text-white/70 sm:text-[20px]"
         >
           Receba reservas online, organize seus horários e ofereça uma
           experiência mais profissional aos seus clientes.
-        </motion.p>
+        </p>
 
-        <motion.div
-          initial={false}
-          animate={{ opacity: 1, y: 0 }}
-          transition={reduceMotion ? { duration: 0 } : { duration: 0.5, delay: 0.6 }}
+        <div
           className="mt-9 flex flex-col items-center gap-4 sm:flex-row sm:gap-6"
         >
-          <motion.div
-            whileHover={reduceMotion ? undefined : { scale: 1.05 }}
-            whileTap={reduceMotion ? undefined : { scale: 0.98 }}
-          >
+          <div>
             <Link
               href="/cadastro"
               className="group relative inline-flex items-center gap-4 overflow-hidden rounded-full bg-white py-2 pl-6 pr-2 text-lg font-medium text-[#111] shadow-[0_0_0_rgba(255,255,255,0)] transition-shadow hover:shadow-[0_0_28px_rgba(255,255,255,0.25)]"
@@ -81,7 +62,7 @@ export function Hero({ children }: { children?: React.ReactNode }) {
                 <ArrowRight className="size-5" />
               </span>
             </Link>
-          </motion.div>
+          </div>
 
           <Link
             href="/#como-funciona"
@@ -91,24 +72,34 @@ export function Hero({ children }: { children?: React.ReactNode }) {
             Ver como funciona
             <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
           </Link>
-        </motion.div>
+        </div>
 
         {children ? (
-          <motion.div
-            initial={false}
-            animate={{ opacity: 1, y: 0 }}
-            transition={reduceMotion ? { duration: 0 } : { duration: 0.7, delay: 0.8 }}
-            className="mt-16 w-full max-w-3xl text-left"
-          >
+          <div className="mt-16 w-full max-w-3xl text-left">
             {children}
-          </motion.div>
+          </div>
         ) : null}
       </div>
     </section>
   );
 }
 
-function HeroVideo({ reduceMotion }: { reduceMotion: boolean | null }) {
+function usePrefersReducedMotion() {
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduceMotion(mediaQuery.matches);
+
+    update();
+    mediaQuery.addEventListener("change", update);
+    return () => mediaQuery.removeEventListener("change", update);
+  }, []);
+
+  return reduceMotion;
+}
+
+function HeroVideo({ reduceMotion }: { reduceMotion: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {

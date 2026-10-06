@@ -7,7 +7,7 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' blob: data: https://www.google-analytics.com",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "connect-src 'self' https://challenges.cloudflare.com https://*.mux.com https://*.supabase.co wss://*.supabase.co https://www.google-analytics.com https://analytics.google.com",
+  "connect-src 'self' https://challenges.cloudflare.com https://*.mux.com https://*.supabase.co wss://*.supabase.co https://*.google-analytics.com https://analytics.google.com",
   "frame-src https://challenges.cloudflare.com",
   "media-src 'self' blob: https://*.mux.com",
   "worker-src 'self' blob:",

@@ -58,7 +58,12 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - name: Refresh backup freshness heartbeat
-        if: ${{ success() && secrets.BETTERSTACK_BACKUP_HEARTBEAT_URL != '' }}
+        if: ${{ success() }}
         env:
           BETTERSTACK_BACKUP_HEARTBEAT_URL: ${{ secrets.BETTERSTACK_BACKUP_HEARTBEAT_URL }}
-        run: curl --fail --max-time 20 --silent --show-error "$BETTERSTACK_BACKUP_HEARTBEAT_URL"
+        run: |
+          if [ -n "$BETTERSTACK_BACKUP_HEARTBEAT_URL" ]; then
+            curl --fail --max-time 20 --silent --show-error "$BETTERSTACK_BACKUP_HEARTBEAT_URL"
+          else
+            echo "BETTERSTACK_BACKUP_HEARTBEAT_URL is not configured; skipping heartbeat."
+          fi

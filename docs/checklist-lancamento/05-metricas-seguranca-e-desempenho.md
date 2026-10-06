@@ -83,7 +83,7 @@ Medir o comportamento do site, proteger os dados e confirmar que a aplicação s
 - `npm run lint`, `npm run typecheck` e `npx vitest run --project unit` aprovados; 42 arquivos e 299 testes unitários passaram.
 - `npm run build` aprovado com Next.js 16.3.3; as 26 páginas foram geradas sem erro.
 - Runbook de operação, backup, rollback e manutenção registrado em `docs/checklist-lancamento/operacao-pos-lancamento.md`.
-- `npm run check:launch -- --production` confirmou as variáveis configuradas, mas não alcançou `/`, `/robots.txt` ou `/sitemap.xml` por falha de rede; o segredo do scheduler de reconciliação também permanece ausente.
+- `npm run check:launch -- --production` passou nas variáveis, `/`, `/robots.txt`, `/sitemap.xml`, CSP e referência canônica; houve apenas o aviso de que o segredo do scheduler de reconciliação não está configurado.
 - PageSpeed foi repetido em produção após a última otimização: desempenho mobile 76, LCP 4,4 s, FCP 2,7 s, TBT 240 ms, CLS 0,037, acessibilidade 96, boas práticas 92 e SEO 100. O relatório ainda apontou 298 KiB de JavaScript não usado e 5 tarefas longas.
 - O sitemap `https://agendfined.com.br/sitemap.xml` respondeu HTTP 200 com XML válido e foi reenviado no Search Console em 6 de outubro de 2026; o Google ainda está processando a leitura.
 - O workflow manual de backup #42 concluiu com sucesso no GitHub Actions em 38 s, publicou um artefato e renovou o heartbeat. O Better Stack mostra `AgendFined backup freshness` como `Up`, esperado a cada 18 horas, com último heartbeat recente.

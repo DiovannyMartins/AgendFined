@@ -23,11 +23,9 @@ const requiredEnvironment = [
   "RESEND_API_KEY",
   "RESEND_FROM_EMAIL",
   "REMINDER_CRON_SECRET",
-  "CANCEL_TOKEN_SECRET",
   "MERCADO_PAGO_ACCESS_TOKEN",
   "MERCADO_PAGO_WEBHOOK_SECRET",
   "MERCADO_PAGO_NOTIFICATION_URL",
-  "RECONCILIATION_CRON_SECRET",
   "NEXT_PUBLIC_GA_MEASUREMENT_ID",
 ];
 
@@ -54,6 +52,12 @@ for (const key of requiredEnvironment) {
   if (process.env[key]?.trim()) pass(`environment ${key} is configured`);
   else if (productionCheck) fail(`environment ${key} is missing`);
   else warn(`environment ${key} is missing (required only for --production)`);
+}
+
+if (process.env.CRON_SECRET?.trim() || process.env.RECONCILIATION_CRON_SECRET?.trim()) {
+  pass("environment reconciliation scheduler secret is configured");
+} else {
+  warn("environment reconciliation scheduler secret is not configured; enable it before scheduling /api/internal/reconciliation");
 }
 
 if (productionCheck && process.env.APP_URL && !/^https:\/\//i.test(process.env.APP_URL)) {

@@ -27,10 +27,10 @@ export default async function ClientesPage() {
   const history = buildCustomerHistory(customers ?? [], bookings ?? []);
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Clientes</h1>
-        <p className="mt-1 text-muted-foreground">
+        <h1 className="text-3xl font-semibold tracking-tight">Clientes</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
           Busque por nome, telefone ou e-mail e veja o histórico de reservas de cada pessoa.
         </p>
       </div>

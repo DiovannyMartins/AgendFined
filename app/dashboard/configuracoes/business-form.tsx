@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { upsertBusiness, type ActionResultState } from "@/lib/business/actions";
 import { businessFormSchema, type BusinessFormValues } from "@/lib/validation/schemas";
 import { getBookingWindowLimitDays, type Plan } from "@/lib/plan/plan";
+import { trackAnalyticsEvent } from "@/lib/analytics";
 
 const INITIAL: ActionResultState = { ok: true, data: undefined };
 
@@ -77,6 +78,7 @@ export function BusinessForm({
       setState(result);
       setSubmitted(true);
       if (result.ok && creating) {
+        trackAnalyticsEvent("business_created", { method: "dashboard_form" });
         router.push("/dashboard");
       }
     });
@@ -108,7 +110,7 @@ export function BusinessForm({
               <Label htmlFor="slug">Endereço público (slug)</Label>
               <Input id="slug" placeholder="minha-barbearia" autoComplete="off" {...register("slug")} />
               <p className="text-xs text-muted-foreground">
-                Apenas minúsculas, números e hífen. Seu link: agendfined.app/{slug || "seu-slug"}
+                Apenas minúsculas, números e hífen. Seu link: agendfined.com.br/{slug || "seu-slug"}
               </p>
               {(errors.slug || fieldErrors.slug) && (
                 <p className="text-sm text-destructive">

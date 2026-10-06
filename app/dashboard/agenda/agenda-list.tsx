@@ -44,18 +44,20 @@ export function AgendaList({
   }, [bookings, query]);
 
   return (
-    <div className="mt-8">
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
+    <div className="mt-2">
+      <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold tracking-tight">
         <CalendarDays className="size-5 text-primary" /> Todas as reservas
       </h2>
 
-      <div className="relative mb-4 max-w-sm">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="relative mb-4 w-full sm:max-w-sm">
+        <span className="pointer-events-none absolute left-0 top-0 flex h-9 items-center pl-3">
+          <Search className="size-4 text-muted-foreground" />
+        </span>
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Buscar por código, nome, telefone ou serviço"
-          className="pl-9"
+          className="h-9 pl-10 leading-none"
           autoComplete="off"
         />
       </div>
@@ -83,7 +85,7 @@ export function AgendaList({
             return (
               <div
                 key={booking.id}
-                className="flex flex-col gap-4 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-3 rounded-xl border border-border bg-card/30 p-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">

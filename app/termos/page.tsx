@@ -12,7 +12,7 @@ export default function TermosPage() {
         <h2 className="text-xl font-medium">1. Identificação e aceitação</h2>
         <p>
           O AgendFined está em fase de estruturação e ainda não possui CNPJ constituído. O canal
-          oficial é reservas@agendfined.com.br. Ao criar uma conta ou usar o serviço, você concorda
+          oficial é agendfined@outlook.com. Ao criar uma conta ou usar o serviço, você concorda
           com estes Termos e com a Política de Privacidade.
         </p>
       </section>
@@ -71,7 +71,7 @@ export default function TermosPage() {
         <h2 className="text-xl font-medium">7. Lei aplicável e contato</h2>
         <p>
           Estes Termos são regidos pelas leis brasileiras. Dúvidas, solicitações e notificações:
-          reservas@agendfined.com.br. As partes buscarão resolver questões por esse canal antes de
+          agendfined@outlook.com. As partes buscarão resolver questões por esse canal antes de
           qualquer medida judicial, quando possível.
         </p>
       </section>

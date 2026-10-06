@@ -31,8 +31,6 @@ describe("AgendaView list view", () => {
     render(
       <AgendaView
         bookings={[onDay, offDay]}
-        availability={[]}
-        slotIntervalMinutes={30}
       />,
     );
 
@@ -47,8 +45,6 @@ describe("AgendaView list view", () => {
     render(
       <AgendaView
         bookings={[onDay, offDay]}
-        availability={[]}
-        slotIntervalMinutes={30}
       />,
     );
 
@@ -66,8 +62,6 @@ describe("AgendaView list view", () => {
     render(
       <AgendaView
         bookings={[onDay, offDay]}
-        availability={[]}
-        slotIntervalMinutes={30}
       />,
     );
 

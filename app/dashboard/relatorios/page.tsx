@@ -27,11 +27,11 @@ export default async function RelatoriosPage({
   if (result.status === "no_business") redirect("/dashboard/setup");
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Relatórios</h1>
-          <p className="mt-1 text-muted-foreground">
+          <h1 className="text-3xl font-semibold tracking-tight">Relatórios</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
             Faturamento, serviços mais vendidos e taxas de cancelamento e no-show.
           </p>
         </div>

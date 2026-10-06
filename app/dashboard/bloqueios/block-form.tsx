@@ -17,11 +17,11 @@ export function BlockForm() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="startAt">Início</Label>
-          <Input id="startAt" name="startAt" type="datetime-local" required />
+          <Input id="startAt" name="startAt" type="datetime-local" required className="[color-scheme:dark]" />
         </div>
         <div className="space-y-2">
           <Label htmlFor="endAt">Fim</Label>
-          <Input id="endAt" name="endAt" type="datetime-local" required />
+          <Input id="endAt" name="endAt" type="datetime-local" required className="[color-scheme:dark]" />
         </div>
       </div>
       <div className="space-y-2">

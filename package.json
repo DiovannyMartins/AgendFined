@@ -13,6 +13,7 @@
     "seed:local": "node scripts/seed-demo-user.mjs",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "check:launch": "node scripts/verify-launch.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run --project integration",

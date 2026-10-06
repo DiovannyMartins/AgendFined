@@ -12,13 +12,13 @@ export default async function BloqueiosPage() {
     .order("start_at", { ascending: false });
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <h1 className="text-2xl font-semibold">Bloqueios</h1>
-      <p className="mt-1 text-muted-foreground">
+    <div className="space-y-6">
+      <h1 className="text-3xl font-semibold tracking-tight">Bloqueios</h1>
+      <p className="max-w-2xl text-sm text-muted-foreground">
         Bloqueie períodos para pausas, férias e exceções. Os horários bloqueados não aparecem para reserva.
       </p>
 
-      <div className="mt-6 rounded-xl border border-border p-4">
+      <div className="rounded-xl border border-border bg-card/40 p-4">
         <BlockForm />
       </div>
 

@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { signup, type ActionResult } from "@/lib/auth/actions";
 import { signupSchema, type SignupInput } from "@/lib/validation/schemas";
+import { trackAnalyticsEvent } from "@/lib/analytics";
 
 const INITIAL: ActionResult = { ok: true, data: undefined };
 
@@ -30,6 +31,7 @@ export function SignupForm() {
       const result = await signup(INITIAL, fd);
       setState(result);
       setSubmitted(true);
+      if (result.ok) trackAnalyticsEvent("sign_up", { method: "email" });
     });
   }
 

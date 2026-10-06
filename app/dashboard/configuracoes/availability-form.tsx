@@ -55,11 +55,11 @@ export function AvailabilityForm() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="startTime">Início</Label>
-          <Input id="startTime" name="startTime" type="time" defaultValue="08:00" required />
+          <Input id="startTime" name="startTime" type="time" defaultValue="08:00" required className="[color-scheme:dark]" />
         </div>
         <div className="space-y-2">
           <Label htmlFor="endTime">Fim</Label>
-          <Input id="endTime" name="endTime" type="time" defaultValue="18:00" required />
+          <Input id="endTime" name="endTime" type="time" defaultValue="18:00" required className="[color-scheme:dark]" />
         </div>
       </div>
       {!state.ok && <p className="text-sm text-destructive">{state.message}</p>}
@@ -160,6 +160,7 @@ export function AvailabilityRow({
             id={`startTime-${id}`}
             name="startTime"
             type="time"
+            className="[color-scheme:dark]"
             defaultValue={short(startTime)}
             required
           />
@@ -170,6 +171,7 @@ export function AvailabilityRow({
             id={`endTime-${id}`}
             name="endTime"
             type="time"
+            className="[color-scheme:dark]"
             defaultValue={short(endTime)}
             required
           />

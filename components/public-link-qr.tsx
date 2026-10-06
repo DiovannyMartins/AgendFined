@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Renders the business's public booking link as a scannable QR code (INC-4).
@@ -36,8 +37,50 @@ export function PublicLinkQR({
       size={size}
       level="M"
       marginSize={1}
+      id={`public-link-qr-${slug}`}
       title={`Endereço público: ${origin}/${slug}`}
       className={cn("rounded-lg bg-white p-2", className)}
     />
+  );
+}
+
+export function DownloadPublicLinkQRButton({ slug }: { slug: string }) {
+  function downloadQrCode() {
+    const svg = document.getElementById(`public-link-qr-${slug}`);
+    if (!svg) return;
+
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 800;
+      canvas.height = 800;
+      const context = canvas.getContext("2d");
+      if (!context) return;
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `${slug}-qr-code.png`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      }, "image/png");
+    };
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgData)}`;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={downloadQrCode}
+      className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+    >
+      <Download className="size-3.5" />
+      Baixar QR Code
+    </button>
   );
 }

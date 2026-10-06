@@ -38,17 +38,17 @@ export default async function ServicosPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Serviços</h1>
-          <p className="mt-1 text-muted-foreground">Gerencie o que seu negócio oferece.</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Serviços</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Gerencie o que seu negócio oferece.</p>
         </div>
         <ServiceForm />
       </div>
 
       {list.length === 0 ? (
-        <Card className="mt-8">
+        <Card>
           <CardHeader className="items-center text-center">
             <Sparkles className="size-8 text-muted-foreground" />
             <CardTitle className="mt-3">Nenhum serviço ainda</CardTitle>
@@ -58,7 +58,7 @@ export default async function ServicosPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="mt-8 space-y-3">
+        <div className="space-y-3">
           {list.map((service) => (
             <div
               key={service.id}

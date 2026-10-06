@@ -16,17 +16,11 @@ export default async function AgendaPage() {
   if (!business) redirect("/dashboard/setup");
 
   const supabase = await createClient();
-  const [{ data: bookings }, { data: availability }] = await Promise.all([
-    supabase
+  const { data: bookings } = await supabase
       .from("bookings")
       .select("id, start_at, end_at, status, service_name_snapshot, duration_minutes_snapshot, customer_name_snapshot, customer_phone_snapshot, public_code, cancel_reason, cancel_reason_category, customer_note_requires_follow_up")
       .eq("business_id", business.id)
-      .order("start_at", { ascending: true }),
-    supabase
-      .from("availability")
-      .select("weekday, start_time, end_time")
-      .eq("business_id", business.id),
-  ]);
+      .order("start_at", { ascending: true });
 
   const list = bookings ?? [];
   const now = new Date();
@@ -48,11 +42,11 @@ export default async function AgendaPage() {
   });
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Reservas</h1>
-          <p className="mt-1 text-muted-foreground">Acompanhe e gerencie seus atendimentos.</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Reservas</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Acompanhe e gerencie seus atendimentos.</p>
         </div>
         {exportResult.status === "ok" && exportResult.count > 0 && (
           <a
@@ -74,7 +68,7 @@ export default async function AgendaPage() {
         />
       )}
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -103,8 +97,6 @@ export default async function AgendaPage() {
 
       <AgendaView
         bookings={list}
-        availability={availability ?? []}
-        slotIntervalMinutes={business.slot_interval_minutes}
       />
     </div>
   );

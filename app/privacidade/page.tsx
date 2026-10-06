@@ -12,7 +12,7 @@ export default function PrivacidadePage() {
         <h2 className="text-xl font-medium">1. Quem somos e quais dados coletamos</h2>
         <p>
           O AgendFined está em fase de estruturação e ainda não possui CNPJ constituído. O canal
-          oficial é reservas@agendfined.com.br. Podemos tratar nome, telefone/WhatsApp, e-mail,
+          oficial é agendfined@outlook.com. Podemos tratar nome, telefone/WhatsApp, e-mail,
           observações da reserva, dados do negócio, credenciais, IP, informações do dispositivo e
           registros técnicos de segurança. Não solicitamos dados sensíveis para o uso normal.
         </p>
@@ -58,7 +58,7 @@ export default function PrivacidadePage() {
       <section className="space-y-3">
         <h2 className="text-xl font-medium">5. Contato e alterações</h2>
         <p>
-          Para exercer direitos ou tirar dúvidas, escreva para reservas@agendfined.com.br. Em caso
+          Para exercer direitos ou tirar dúvidas, escreva para agendfined@outlook.com. Em caso
           de incidente relevante, adotaremos as comunicações exigidas. Esta política pode ser
           atualizada e a versão vigente permanecerá publicada nesta página.
         </p>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, CalendarRange, List, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,25 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  filterAgenda,
-  type AgendaBooking,
-  type AvailabilityRow,
-} from "@/lib/agenda/view";
+import { filterAgenda, type AgendaBooking } from "@/lib/agenda/view";
 import type { BookingStatus } from "@/lib/bookings/transitions";
 import { STATUS_LABEL } from "@/lib/bookings/status";
 import { toLocalDate } from "@/lib/booking/availability";
 import { AgendaList } from "./agenda-list";
-import { AgendaGrid } from "./agenda-grid";
-
-type ViewMode = "list" | "day" | "week";
 type StatusFilter = BookingStatus | "";
-
-const VIEWS: { mode: ViewMode; label: string; icon: typeof List }[] = [
-  { mode: "list", label: "Lista", icon: List },
-  { mode: "day", label: "Dia", icon: CalendarDays },
-  { mode: "week", label: "Semana", icon: CalendarRange },
-];
 
 const STATUS_ITEMS: Record<string, string> = {
   "": "Todos os status",
@@ -44,14 +31,9 @@ function shiftDays(key: string, delta: number): string {
 
 export function AgendaView({
   bookings,
-  availability,
-  slotIntervalMinutes,
 }: {
   bookings: AgendaBooking[];
-  availability: AvailabilityRow[];
-  slotIntervalMinutes: number;
 }) {
-  const [view, setView] = useState<ViewMode>("list");
   // The date is an optional filter. `null` means "all dates", so the list
   // ("Todas as reservas") shows every reservation until a date is picked.
   const [dateFilter, setDateFilter] = useState<string | null>(null);
@@ -82,69 +64,60 @@ export function AgendaView({
     [filtered, dateFilter],
   );
 
-  const dateStep = view === "week" ? 7 : 1;
+  const dateStep = 1;
 
   return (
-    <div className="mt-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
+    <div className="mt-8 space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
           <CalendarDays className="size-5 text-primary" /> Agenda
         </h2>
-        <div className="flex items-center gap-2">
-          {VIEWS.map(({ mode, label, icon: Icon }) => (
-            <Button
-              key={mode}
-              size="sm"
-              variant={view === mode ? "default" : "outline"}
-              onClick={() => setView(mode)}
-            >
-              <Icon className="size-4" />
-              {label}
-            </Button>
-          ))}
-        </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-1">
+      <div className="grid gap-2 rounded-xl border border-border bg-card/30 p-3 sm:flex sm:flex-wrap sm:items-center">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="grid grid-cols-[2rem_minmax(0,1fr)_2rem] items-center gap-1 sm:flex">
+            <Button
+              size="sm"
+              variant="outline"
+              aria-label="Anterior"
+              onClick={() => setDateFilter(shiftDays(anchorDate, -dateStep))}
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
+            <Input
+              type="date"
+              value={dateFilter ?? ""}
+              onChange={(e) => setDateFilter(e.target.value || null)}
+              className="w-full min-w-0 sm:w-40"
+              style={{ colorScheme: "dark" }}
+              aria-label="Data"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              aria-label="Próxima"
+              onClick={() => setDateFilter(shiftDays(anchorDate, dateStep))}
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
           <Button
             size="sm"
             variant="outline"
-            aria-label="Anterior"
-            onClick={() => setDateFilter(shiftDays(anchorDate, -dateStep))}
+            className="border-border bg-card/40"
+            onClick={() => setDateFilter(todayKey)}
           >
-            <ChevronLeft className="size-4" />
-          </Button>
-          <Input
-            type="date"
-            value={dateFilter ?? ""}
-            onChange={(e) => setDateFilter(e.target.value || null)}
-            className="w-40"
-            aria-label="Data"
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            aria-label="Próxima"
-            onClick={() => setDateFilter(shiftDays(anchorDate, dateStep))}
-          >
-            <ChevronRight className="size-4" />
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setDateFilter(todayKey)}>
             Hoje
           </Button>
-          <Button
-            size="sm"
-            variant={dateFilter ? "outline" : "default"}
-            onClick={() => setDateFilter(null)}
-          >
+          <Button size="sm" variant={dateFilter ? "outline" : "default"} onClick={() => setDateFilter(null)}>
             Todas as datas
           </Button>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <Select value={status} onValueChange={(v) => setStatus((v ?? "") as StatusFilter)} items={STATUS_ITEMS}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -160,17 +133,7 @@ export function AgendaView({
       </div>
 
       <div className="mt-4">
-        {view === "list" ? (
-          <AgendaList bookings={listBookings} />
-        ) : (
-          <AgendaGrid
-            view={view}
-            dateKey={anchorDate}
-            slotIntervalMinutes={slotIntervalMinutes}
-            availability={availability}
-            filtered={filtered}
-          />
-        )}
+        <AgendaList bookings={listBookings} />
       </div>
     </div>
   );

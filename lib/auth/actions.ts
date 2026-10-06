@@ -97,7 +97,9 @@ export async function login(_prev: ActionResult, formData: FormData): Promise<Ac
   const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if (assuranceError) return genericError("Não foi possível verificar a segurança da sessão.");
   auditSecurityEvent("auth.login");
-  redirect(assurance.nextLevel === "aal2" && assurance.currentLevel !== "aal2" ? "/mfa" : safeNext);
+  const redirectPath = assurance.nextLevel === "aal2" && assurance.currentLevel !== "aal2" ? "/mfa" : safeNext;
+  const separator = redirectPath.includes("?") ? "&" : "?";
+  redirect(`${redirectPath}${separator}login=1`);
 }
 
 export async function logout() {

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles, CalendarDays, Blocks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCurrentBusiness } from "@/lib/business/queries";
-import { PublicLinkQR } from "@/components/public-link-qr";
+import { DownloadPublicLinkQRButton, PublicLinkQR } from "@/components/public-link-qr";
 
 export default async function DashboardHome() {
   const business = await getCurrentBusiness();
@@ -14,15 +14,15 @@ export default async function DashboardHome() {
   const publicUrl = `/${business.slug}`;
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="space-y-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-4">
           <div>
-            <h1 className="text-2xl font-semibold">{business.name}</h1>
-            <p className="mt-1 text-muted-foreground">
+            <h1 className="text-3xl font-semibold tracking-tight">{business.name}</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
               Seu link público:{" "}
               <Link href={publicUrl} className="font-medium text-foreground hover:underline">
-                agendfined.app/{business.slug}
+                agendfined.com.br/{business.slug}
               </Link>
             </p>
           </div>
@@ -35,18 +35,23 @@ export default async function DashboardHome() {
             Ver página pública
           </Link>
         </div>
-        <div className="flex items-center gap-4 rounded-xl border border-border p-4">
-          <PublicLinkQR slug={business.slug} size={112} />
-          <div className="max-w-[220px]">
-            <p className="text-sm font-medium">QR Code do seu link</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Escaneie com a câmera do celular para abrir sua página pública de reservas.
+        <div className="flex items-center gap-4 rounded-2xl border border-border bg-card/40 p-3 sm:min-w-[340px] sm:p-4">
+          <div className="shrink-0 rounded-xl bg-white p-1.5 shadow-sm">
+            <PublicLinkQR slug={business.slug} size={104} className="rounded-md bg-transparent p-0" />
+          </div>
+          <div className="min-w-0">
+            <p className="mt-1 text-sm font-medium">Seu QR Code</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Aponte a câmera do celular para abrir sua página de reservas.
             </p>
+            <div className="mt-2">
+              <DownloadPublicLinkQRButton slug={business.slug} />
+            </div>
           </div>
         </div>
       </header>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-3">
         {[
           {
             href: "/dashboard/servicos",

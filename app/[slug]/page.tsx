@@ -1,8 +1,41 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { BookingWidget } from "./booking-widget";
 import { CalendarClock } from "lucide-react";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.rpc("get_public_business", { p_slug: slug });
+    const business = data?.[0];
+    if (!business) {
+      return { title: "Página não encontrada — AgendFined", robots: { index: false, follow: false } };
+    }
+
+    const description = business.description ?? `Agende seu horário com ${business.name} online.`;
+    return {
+      title: `${business.name} — AgendFined`,
+      description,
+      alternates: { canonical: `/${encodeURIComponent(slug)}` },
+      openGraph: {
+        type: "website",
+        title: `${business.name} — AgendFined`,
+        description,
+        url: `https://agendfined.com.br/${encodeURIComponent(slug)}`,
+      },
+    };
+  } catch {
+    return { title: "Agendamento online — AgendFined" };
+  }
+}
 
 export default async function PublicPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -42,7 +75,6 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
             durationMinutes: s.duration_minutes,
             priceCents: s.price_cents,
           }))}
-          semanticServiceSearchEnabled={Boolean(process.env.TYPESAFE_API_KEY)}
         />
 
         <p className="mt-6 text-center text-sm text-muted-foreground">

@@ -23,6 +23,7 @@ Plataforma SaaS de agendamento online para profissionais e pequenos negócios. O
 - [Variáveis de ambiente](#variveis-de-ambiente)
 - [Principais decisões técnicas](#principais-decisoes-tecnicas)
 - [Deploy](#deploy)
+- [Operação de produção](docs/operacao-producao.md)
 - [Estado](#estado)
 - [Produção](#producao)
 
@@ -142,6 +143,7 @@ Supabase, Mercado Pago, Resend, TypeSafe e Vercel, e não envia secrets para o r
 | `SUPABASE_SERVICE_ROLE_KEY` | Somente Server | Operações públicas controladas (`sb_secret_...`) |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Client | Site key pública do Cloudflare Turnstile (`0x...`) |
 | `TURNSTILE_SECRET_KEY` | Somente Server | Secret do Turnstile (`0x...`); ambas as chaves juntas ou nenhuma |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Client | ID público do Google Analytics 4 (`G-...`) |
 | `APP_URL` | Somente Server | URL base para redirects de e-mail (preferido) |
 | `NEXT_PUBLIC_APP_URL` | Client/Server | Fallback; use `APP_URL` no servidor |
 | `TYPESAFE_API_KEY` | Somente Server | Chave opcional para classificações de cancelamento, observações e triagem da lista de espera |
@@ -160,6 +162,8 @@ Supabase, Mercado Pago, Resend, TypeSafe e Vercel, e não envia secrets para o r
 ## Deploy
 
 Ver documentação da [Vercel](https://vercel.com/docs). Configure as variáveis de ambiente na Vercel (sem a service role no bundle) e adicione a URL de produção na config do Supabase.
+
+O procedimento completo de publicação, smoke test, Vercel, Supabase, Mercado Pago e Resend está em [docs/operacao-producao.md](docs/operacao-producao.md). Depois de cada deploy, execute `npm run check:launch -- --production`.
 
 ## Estado
 

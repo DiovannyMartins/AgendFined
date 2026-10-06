@@ -51,7 +51,9 @@ export function ClientsList({
   return (
     <div className="mt-6">
       <div className="relative mb-4 max-w-sm">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <span className="pointer-events-none absolute left-0 top-0 flex h-9 items-center pl-3">
+          <Search className="size-4 text-muted-foreground" />
+        </span>
         <Input
           value={query}
           onChange={(e) => {
@@ -65,7 +67,7 @@ export function ClientsList({
             }
           }}
           placeholder="Buscar por nome, telefone ou e-mail"
-          className="pl-9"
+          className="h-9 pl-10 leading-none"
           autoComplete="off"
         />
         <p className="mt-1 text-xs text-muted-foreground">

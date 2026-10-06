@@ -18,10 +18,10 @@ export default async function ListaEsperaPage() {
   });
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Lista de espera</h1>
-        <p className="mt-1 text-muted-foreground">
+        <h1 className="text-3xl font-semibold tracking-tight">Lista de espera</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
           Clientes que aguardam um horário ocupado e que você pode notificar ou converter em reserva.
         </p>
       </div>

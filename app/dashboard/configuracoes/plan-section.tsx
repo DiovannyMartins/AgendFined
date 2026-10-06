@@ -57,26 +57,28 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
 
   return (
     <section id="plano">
-      <h2 className="text-xl font-semibold">Plano</h2>
-      <p className="mt-1 text-muted-foreground">
+      <h2 className="text-2xl font-semibold tracking-tight">Plano</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
         Seu plano atual, os privilégios incluídos e o status da assinatura.
       </p>
-      <div className={showProOffer ? "mt-5 grid items-start gap-4 lg:grid-cols-2" : "mt-5"}>
-        <div className="h-fit self-start rounded-2xl border border-border/80 bg-card/50 p-5 shadow-sm transition-colors hover:border-foreground/20">
+      <div className={showProOffer ? "mt-6 grid items-start gap-5 lg:grid-cols-2" : "mt-6"}>
+        <div className="h-fit self-start rounded-xl border border-border bg-card/30 p-6 transition-colors hover:border-foreground/20">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                <Crown className="size-5 text-primary" />
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                <Crown className="size-4 text-muted-foreground" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-lg font-semibold">{info.name}</p>
                   <Badge variant={badge.variant}>{badge.label}</Badge>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {info.price}
-                  {info.period} · {info.description}
-                </p>
+                <div className="mt-2">
+                  <p className="text-xl font-semibold tracking-tight">
+                    {info.price}<span className="ml-1 text-xs font-normal text-muted-foreground">{info.period}</span>
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">{info.description}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -150,15 +152,18 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
         </div>
 
         {showProOffer && (
-          <div className="h-fit self-start rounded-2xl border border-primary/40 bg-primary/[0.04] p-5 shadow-sm shadow-primary/10 transition-colors hover:border-primary/60">
+          <div className="h-fit self-start rounded-xl border border-primary/40 bg-primary/[0.04] p-6 transition-colors hover:border-primary/60">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-lg font-semibold">{proInfo.name}</p>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {`${proInfo.price}${proInfo.period}`} · {proInfo.description}
-                </p>
+                <div className="mt-2">
+                  <p className="text-xl font-semibold tracking-tight">
+                    {proInfo.price}<span className="ml-1 text-xs font-normal text-muted-foreground">{proInfo.period}</span>
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">{proInfo.description}</p>
+                </div>
               </div>
               <Crown className="size-5 text-primary" />
             </div>

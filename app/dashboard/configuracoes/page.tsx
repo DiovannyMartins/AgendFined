@@ -19,7 +19,7 @@ export default async function ConfiguracoesPage() {
     .order("start_time", { ascending: true });
 
   return (
-    <div className="mx-auto max-w-3xl space-y-10">
+    <div className="max-w-3xl space-y-10">
       <BusinessForm
         initial={{
           name: business.name,

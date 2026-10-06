@@ -17,10 +17,13 @@ export function GoogleAnalytics() {
       <Script id="google-analytics" strategy="afterInteractive">
         {`
           window.dataLayer = window.dataLayer || [];
-          function gtag(){window.dataLayer.push(Array.from(arguments));}
+          function gtag(){window.dataLayer.push(arguments);}
           window.gtag = gtag;
           gtag('js', new Date());
-          gtag('config', '${validMeasurementId}', { anonymize_ip: true });
+          gtag('config', '${validMeasurementId}', {
+            anonymize_ip: true,
+            send_page_view: true
+          });
         `}
       </Script>
     </>

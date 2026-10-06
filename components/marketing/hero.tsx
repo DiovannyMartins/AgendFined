@@ -1,6 +1,6 @@
 "use client";
 
-import Hls from "hls.js";
+import type Hls from "hls.js";
 import { motion, useReducedMotion } from "motion/react";
 import { ArrowRight, Play, Sparkles } from "lucide-react";
 import Image from "next/image";
@@ -116,21 +116,33 @@ function HeroVideo({ reduceMotion }: { reduceMotion: boolean | null }) {
     if (!video || reduceMotion) return;
 
     let hls: Hls | undefined;
+    let cancelled = false;
     const playVideo = () => {
       video.play().catch(() => undefined);
     };
 
-    if (Hls.isSupported()) {
-      hls = new Hls({ enableWorker: true });
-      hls.loadSource(videoSrc);
-      hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, playVideo);
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = videoSrc;
-      video.addEventListener("loadedmetadata", playVideo, { once: true });
-    }
+    const startVideo = async () => {
+      const { default: HlsImplementation } = await import("hls.js");
+      if (cancelled) return;
+
+      if (HlsImplementation.isSupported()) {
+        hls = new HlsImplementation({ enableWorker: true });
+        hls.loadSource(videoSrc);
+        hls.attachMedia(video);
+        hls.on(HlsImplementation.Events.MANIFEST_PARSED, playVideo);
+      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = videoSrc;
+        video.addEventListener("loadedmetadata", playVideo, { once: true });
+      }
+    };
+
+    const startTimer = window.setTimeout(() => {
+      void startVideo();
+    }, 1500);
 
     return () => {
+      cancelled = true;
+      window.clearTimeout(startTimer);
       hls?.destroy();
       video.removeEventListener("loadedmetadata", playVideo);
     };
@@ -139,10 +151,11 @@ function HeroVideo({ reduceMotion }: { reduceMotion: boolean | null }) {
   return (
     <div className="pointer-events-none absolute inset-0 -z-20 overflow-hidden bg-black">
       <Image
-        src="/images/hero.png"
+        src="/images/hero.webp"
         alt=""
         fill
         priority
+        fetchPriority="high"
         className="object-cover"
         sizes="100vw"
       />
@@ -151,10 +164,11 @@ function HeroVideo({ reduceMotion }: { reduceMotion: boolean | null }) {
           ref={videoRef}
           aria-hidden="true"
           autoPlay
+          preload="none"
           muted
           loop
           playsInline
-          poster="/images/hero.png"
+          poster="/images/hero.webp"
           className="absolute inset-0 size-full object-cover opacity-60 grayscale saturate-0"
         />
       )}

@@ -43,6 +43,11 @@ export const AUTH_RATE_LIMIT = {
   mfaVerify: { perUser: 10, windowSeconds: 15 * 60 },
 } as const;
 
+export const INTEREST_RATE_LIMIT = {
+  perIp: { limit: 5, windowSeconds: 60 * 60 },
+  perEmail: { limit: 3, windowSeconds: 60 * 60 },
+} as const;
+
 export const AI_RATE_LIMIT = {
   waitlistPriority: { limit: 20, windowSeconds: 60 * 60 },
   reportInsight: { limit: 20, windowSeconds: 60 * 60 },
@@ -111,6 +116,17 @@ export async function enforceAuthRateLimit(
   return enforceWindows(supabase, [
     { key: `auth:${action}|ip:${ip}`, limit: config.perIp, windowSeconds: config.windowSeconds },
     { key: `auth:${action}|email:${hashIdentifier(email)}`, limit: config.perEmail, windowSeconds: config.windowSeconds },
+  ]);
+}
+
+export async function enforceInterestRateLimit(
+  supabase: ServerClient,
+  ip: string,
+  email: string,
+): Promise<boolean> {
+  return enforceWindows(supabase, [
+    { key: `interest:ip:${ip}`, ...INTEREST_RATE_LIMIT.perIp },
+    { key: `interest:email:${hashIdentifier(email)}`, ...INTEREST_RATE_LIMIT.perEmail },
   ]);
 }
 

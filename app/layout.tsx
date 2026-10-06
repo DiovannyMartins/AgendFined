@@ -18,14 +18,14 @@ export const metadata: Metadata = {
     description:
       "Receba agendamentos online, organize seus horários e ofereça uma experiência mais profissional aos seus clientes.",
     url: "https://agendfined.com.br",
-    images: [{ url: "/images/hero.png", width: 1600, height: 900, alt: "AgendFined" }],
+    images: [{ url: "/images/hero.webp", width: 1600, height: 900, alt: "AgendFined" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "AgendFined — Agendamentos online para profissionais",
     description:
       "Receba agendamentos online, organize seus horários e ofereça uma experiência mais profissional aos seus clientes.",
-    images: ["/images/hero.png"],
+    images: ["/images/hero.webp"],
   },
 };
 

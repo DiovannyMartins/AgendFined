@@ -10,44 +10,55 @@ const AUTH_ROUTES = ["/login", "/cadastro", "/recuperar-senha"];
 
 export async function proxy(request: NextRequest, event: NextFetchEvent) {
   const pathname = request.nextUrl.pathname;
-  // Log path only: query strings may contain booking codes or OAuth tokens.
-  if (process.env.NODE_ENV === "production") {
-    const entry = { event: "http.request", method: request.method, path: pathname, at: new Date().toISOString() };
-    console.info(JSON.stringify(entry));
-    event.waitUntil(sendSecurityLog(entry));
-  }
+  let response: NextResponse;
   if (
     /^\/(?:\.git|\.env|\.next|node_modules)(?:\/|$)/i.test(pathname) ||
     pathname.endsWith(".map")
   ) {
-    return new NextResponse(null, { status: 404 });
+    response = new NextResponse(null, { status: 404 });
+  } else {
+    const { supabaseResponse, user } = await updateSession(request);
+
+    const isProtected = PROTECTED_PREFIXES.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    );
+
+    if (isProtected && !user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("next", pathname);
+      response = NextResponse.redirect(url);
+    } else {
+      const isAuthRoute = AUTH_ROUTES.some(
+        (route) => pathname === route || pathname.startsWith(`${route}/`),
+      );
+
+      if (isAuthRoute && user) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/dashboard";
+        url.search = "";
+        response = NextResponse.redirect(url);
+      } else {
+        response = supabaseResponse;
+      }
+    }
   }
 
-  const { supabaseResponse, user } = await updateSession(request);
-
-  const isProtected = PROTECTED_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
-
-  if (isProtected && !user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
+  // Log path and status only: query strings may contain booking codes or OAuth
+  // tokens. The numeric status enables a Better Stack alert for HTTP 5xx.
+  if (process.env.NODE_ENV === "production") {
+    const entry = {
+      event: "http.request",
+      method: request.method,
+      path: pathname,
+      status: response.status,
+      at: new Date().toISOString(),
+    };
+    console.info(JSON.stringify(entry));
+    event.waitUntil(sendSecurityLog(entry));
   }
 
-  const isAuthRoute = AUTH_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`),
-  );
-
-  if (isAuthRoute && user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    url.search = "";
-    return NextResponse.redirect(url);
-  }
-
-  return supabaseResponse;
+  return response;
 }
 
 export const config = {

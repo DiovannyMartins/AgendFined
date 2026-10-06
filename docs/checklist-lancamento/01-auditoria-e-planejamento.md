@@ -141,7 +141,7 @@ Decisão de posicionamento: lançar o núcleo simples para um negócio por profi
 - **P1 — contatos separados por finalidade:** `reservas@agendfined.com.br` é o remetente automático de confirmações e lembretes via Resend e já funciona em produção; `agendfined@outlook.com` é o suporte. A confirmação da posse da caixa de suporte ainda é operacional.
 - **P1 — SEO externo pendente:** metadata, canonical, Open Graph, `sitemap.xml`, `robots.txt` e noindex foram implementados; ainda falta enviar o sitemap ao Search Console e concluir a auditoria externa.
 - **P1 — métricas configuradas:** o Google Analytics foi integrado sem PII, com o ID `G-92YJVL0YB0`, eventos agregados, variável de Production cadastrada na Vercel e script validado em produção; falta confirmar um evento em DebugView/tempo real.
-- **P1 — suporte operacional mínimo:** o suporte foi definido como `agendfined@outlook.com` e o widget agora abre o cliente de e-mail padrão; ainda falta confirmar posse da caixa, SLA e procedimento de atendimento.
+- **P1 — suporte operacional mínimo:** a caixa `agendfined@outlook.com` foi confirmada e o widget abre o cliente de e-mail padrão; SLA e responsável ficam fora do escopo.
 - **P1 — QA de lançamento:** a matriz E2E desktop/mobile passou para landing, auth, legais, SEO, 404 e redirecionamentos; o fluxo de reserva E2E local continua dependente de seed/escrita no Supabase remoto.
 - **P2 — conteúdo visual:** a interface usa ícones e uma prévia de produto, sem evidência de imagens comerciais, depoimentos aprovados ou materiais de marca finais.
 
@@ -156,7 +156,7 @@ Decisão de posicionamento: lançar o núcleo simples para um negócio por profi
 | F1-005 | P0 | Produto/Conteúdo | revisão jurídica | Termos, Privacidade, preço do PROFISSIONAL, contato e afirmação sobre CNPJ aprovados |
 | F1-006 | P1 | Engenharia/SEO | F1-001 | metadata, Open Graph, sitemap, robots e regra de noindex para privado/dados sensíveis definidos e testados |
 | F1-007 | P1 | Produto/Engenharia | política de privacidade aprovada | eventos de cadastro, setup, compartilhamento e reserva definidos; analytics não coleta dados pessoais |
-| F1-008 | P1 | Suporte | caixa de e-mail e SLA | endereço de suporte testado, responsável definido e resposta padrão disponível |
+| F1-008 | P1 | Suporte | caixa de e-mail | endereço `agendfined@outlook.com` confirmado e widget apontando para ele |
 | F1-009 | P1 | Engenharia/QA | ambiente publicado | baseline de carregamento, erros, reserva e webhook registrado para rollback |
 | F1-010 | P2 | Produto/Design | F1-001 | conteúdo final, imagens/depoimentos aprovados e revisão visual desktop/mobile concluída |
 
@@ -184,5 +184,5 @@ Decisão de posicionamento: lançar o núcleo simples para um negócio por profi
 
 **Verificações desta execução:** produção acessível em `https://agendfined.com.br`; landing, login, cadastro, privacidade, termos e 404 verificados visualmente no domínio publicado; o responsável confirmou em produção reserva pública, consulta, cancelamento, confirmações e lembretes; o projeto e o domínio foram verificados na Vercel; a aplicação AgendFined foi localizada no painel do Mercado Pago; o ID do Analytics foi cadastrado na Vercel para Production; `npm run lint` passou; `npm run typecheck` passou; `npx vitest run --project unit` passou com 42 arquivos e 299 testes; E2E local de landing, autenticação, páginas legais e redirecionamento do painel passou em desktop e mobile.
 
-**Pendências externas:** validar um evento do Analytics em DebugView/tempo real, enviar o sitemap ao Search Console, confirmar a posse da caixa de suporte e o procedimento de atendimento, registrar uma medição de performance, concluir o smoke test completo em produção e autorizar a divulgação. A versão atual já está publicada; o Resend e o envio de confirmações/lembretes já funcionam em produção; a data, o domínio e os textos legais foram aprovados pelo responsável.
+**Pendências externas:** validar um evento do Analytics em DebugView/tempo real, corrigir a leitura do sitemap no Search Console, registrar uma medição de performance, concluir o smoke test completo em produção e autorizar a divulgação. A versão atual já está publicada; o Resend e o envio de confirmações/lembretes já funcionam em produção; a caixa de suporte e o Instagram foram confirmados; SLA e responsável não fazem parte do escopo.
 

@@ -19,6 +19,7 @@ import { Reveal } from "@/components/reveal";
 import { Faq } from "./faq";
 import { Plans } from "./plans";
 import { Hero } from "@/components/marketing/hero";
+import { InterestForm } from "@/components/marketing/interest-form";
 import { createClient } from "@/lib/supabase/server";
 
 const benefits = [
@@ -338,6 +339,21 @@ export default async function MarketingHome() {
             </div>
           </div>
         </Reveal>
+      </section>
+
+      <section id="lista-de-interesse" className="border-y border-border bg-muted/20 px-4 py-20 lg:px-6 md:py-24">
+        <div className="mx-auto max-w-3xl text-center">
+          <Badge variant="secondary" className="mb-5 rounded-full px-3.5 text-sm">
+            Fique por dentro
+          </Badge>
+          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Quer saber quando o AgendFined estiver pronto?</h2>
+          <p className="mx-auto mt-4 max-w-xl leading-relaxed text-muted-foreground">
+            Deixe seu e-mail para receber uma confirmação e novidades relevantes sobre o lançamento. Sem campanhas recorrentes sem nova autorização.
+          </p>
+          <div className="mt-8">
+            <InterestForm />
+          </div>
+        </div>
       </section>
     </div>
   );

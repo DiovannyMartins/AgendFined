@@ -26,9 +26,9 @@ export default function PrivacidadePage() {
         <h2 className="text-xl font-medium">2. Finalidades e bases legais</h2>
         <p>
           Usamos os dados para contas, autenticação, reservas, confirmações, lembretes, suporte,
-          pagamentos, segurança e cumprimento de obrigações legais. As bases legais podem incluir
-          execução de contrato, obrigação legal, exercício regular de direitos e legítimo interesse.
-          Quando houver consentimento, ele será específico e poderá ser revogado.
+          pagamentos, segurança, responder inscrições de interesse e cumprimento de obrigações legais.
+          As bases legais podem incluir execução de contrato, obrigação legal, exercício regular de
+          direitos e legítimo interesse. Quando houver consentimento, ele será específico e poderá ser revogado.
         </p>
       </section>
 
@@ -39,8 +39,9 @@ export default function PrivacidadePage() {
           Resend (e-mails), Mercado Pago (pagamentos), Vercel (hospedagem) e autoridades quando
           exigido. Alguns operadores podem processar dados fora do Brasil, com salvaguardas legais.
           Guardamos dados pelo tempo necessário ao serviço, à segurança e às obrigações legais,
-          eliminando ou anonimizando-os depois. Usamos cookies essenciais de sessão e segurança,
-          sem cookies de publicidade comportamental nesta versão.
+          eliminando ou anonimizando-os depois. Inscrições de interesse são encaminhadas ao canal
+          de suporte e não entram em campanhas recorrentes sem nova autorização. Usamos cookies
+          essenciais de sessão e segurança, sem cookies de publicidade comportamental nesta versão.
         </p>
       </section>
 

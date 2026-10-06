@@ -1,0 +1,56 @@
+# Operação pós-lançamento
+
+Runbook local para o lançamento de 1º de dezembro de 2026. Não contém secrets e não executa alterações
+em Vercel, Supabase, Resend, Mercado Pago ou DNS.
+
+## Indicadores e limites
+
+| Indicador | Limite inicial | Ação |
+| --- | --- | --- |
+| Disponibilidade da home, `/robots.txt` e `/sitemap.xml` | HTTP 200 | Abrir incidente e verificar o último deploy |
+| Erros 5xx | Qualquer aumento sustentado por 5 minutos | Pausar divulgação e avaliar rollback |
+| LCP mobile da home | até 2,5 s | Investigar imagens, vídeo, fontes e JavaScript |
+| CLS mobile da home | até 0,1 | Verificar dimensões de imagens e fontes |
+| Reserva pública com erro | Qualquer falha reproduzível | Verificar Supabase, Turnstile, Resend e logs sem expor dados |
+| Backup | Execução e retenção conforme o plano contratado | Confirmar no painel do provedor e registrar evidência |
+
+## Rotina
+
+- **A cada deploy:** executar `npm run lint`, `npm run typecheck`, `npx vitest run --project unit` e os E2E
+  afetados; executar `npm run check:launch -- --production` a partir de uma rede com acesso ao domínio.
+- **Semanal:** verificar a home, login, cadastro, uma página pública de reserva, confirmação, consulta,
+  cancelamento, `robots.txt`, `sitemap.xml` e os eventos agregados do Analytics.
+- **Mensal:** revisar dependências, headers, CSP, rotas privadas, acessibilidade por teclado e conteúdo legal.
+- **Trimestral:** testar restauração de backup em ambiente isolado, revisar contatos de emergência e repetir
+  a medição de performance desktop/mobile.
+
+## Backup e restauração
+
+1. Confirmar no painel do provedor o backup automático, a retenção e o horário da última execução.
+2. Restaurar uma cópia em ambiente isolado, nunca sobre a produção.
+3. Validar autenticação, disponibilidade, reserva, consulta e cancelamento com dados de teste.
+4. Registrar data, responsável, versão do schema e resultado; remover o ambiente de teste conforme a política.
+
+Essa rotina depende de acesso ao provedor e de uma decisão sobre retenção. A restauração não deve ser feita
+com dados reais neste repositório.
+
+## Incidente e rollback
+
+1. Registrar horário, URL afetada, status HTTP e digest do erro; não registrar tokens ou dados do cliente.
+2. Verificar logs e o último deploy conhecido.
+3. Se o problema veio do último deploy, solicitar rollback pela hospedagem e pausar mudanças concorrentes.
+4. Revalidar os fluxos principais e comunicar o responsável pelo lançamento.
+5. Após a recuperação, abrir uma tarefa com causa, impacto e prevenção.
+
+## Aprovações externas pendentes
+
+- Confirmar backup/restauração e retenção.
+- Ligar o alerta de erros 5xx aos logs que publicam o status HTTP após o próximo deploy.
+- Ligar o alerta de backup acima de 18 horas ao watchdog/heartbeat.
+
+## Monitoramento configurado
+
+- Better Stack Uptime: monitor `AgendFined produção` (ID `5024662`) para `https://agendfined.com.br`.
+- Frequência: 3 minutos; confirmação de falha: 5 minutos; recuperação: 3 minutos.
+- Canal configurado: e-mail para a conta `diovannydev@gmail.com`.
+- A fonte Better Stack Telemetry `AgendFined Vercel` permanece ativa para logs.

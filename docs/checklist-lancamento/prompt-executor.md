@@ -17,7 +17,6 @@ Existe uma documentação de planejamento em:
 - docs/checklist-lancamento/03-seo-e-acessibilidade.md
 - docs/checklist-lancamento/04-conversao-e-comunicacao.md
 - docs/checklist-lancamento/05-metricas-seguranca-e-desempenho.md
-- docs/checklist-lancamento/06-internacionalizacao.md
 
 Use esses arquivos como plano de execução. Não invente requisitos fora do escopo sem avisar.
 
@@ -98,14 +97,6 @@ Para cada fase:
 - Confirme backup e restauração sem expor dados.
 - Prepare monitoramento, limites de alerta, rollback e plano de manutenção.
 - Não altere DNS, Vercel, Supabase ou Google Analytics sem autorização.
-
-### Fase 6 — Internacionalização
-
-- Pergunte quais idiomas e países serão atendidos se essa informação não existir.
-- Separe textos traduzíveis da lógica.
-- Proponha a estratégia de rotas e SEO internacional.
-- Não traduza textos legais ou conteúdo comercial sem aprovação.
-- Teste formatos de data, hora, moeda, números, emails e páginas de erro.
 
 ## Formato obrigatório do relatório de cada fase
 

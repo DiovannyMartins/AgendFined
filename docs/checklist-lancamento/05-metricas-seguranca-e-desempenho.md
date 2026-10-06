@@ -4,19 +4,21 @@
 
 Medir o comportamento do site, proteger os dados e confirmar que a aplicação suporta o lançamento com desempenho aceitável.
 
+**Status da fase:** parcial — aplicação, domínio, SSL, analytics, logs e controles locais estão preparados; DebugView, sitemap e parte dos alertas ainda precisam de confirmação operacional.
+
 ## Itens relacionados
 
-- [ ] 2. Verificar velocidade do site antes do lançamento
+- [~] 2. Verificar velocidade do site antes do lançamento — checklist e limites registrados; falta executar Lighthouse/PageSpeed em ambiente acessível.
 - [x] 15. Integrar web analytics
 - [x] 16. Confirmar domínio
 - [x] 23. Conectar ou transferir domínio
 - [x] 40. Publicar o site
-- [ ] 41. Fazer backup
+- [!] 41. Fazer backup — depende do painel do provedor e de autorização para testar restauração em ambiente isolado.
 - [x] 43. Verificar SSL
 - [~] 45. Verificar análises
-- [ ] 46. Testar velocidade em produção
-- [ ] 48. Criar monitoramento de desempenho
-- [ ] 50. Criar plano de manutenção
+- [!] 46. Testar velocidade em produção — depende de acesso a uma ferramenta de medição externa e da URL publicada.
+- [~] 48. Criar monitoramento de desempenho — monitor de disponibilidade ativo no Better Stack; alertas de 5xx e frescor do backup ainda dependem de integração adicional.
+- [~] 50. Criar plano de manutenção — runbook local registrado; o SLA de suporte está fora do escopo.
 
 ## Instruções de desempenho
 
@@ -79,6 +81,12 @@ Medir o comportamento do site, proteger os dados e confirmar que a aplicação s
 - Aplicação AgendFined visível no painel de integrações do Mercado Pago.
 - ID do Analytics cadastrado na Vercel como configuração de Production.
 - `npm run lint`, `npm run typecheck` e `npx vitest run --project unit` aprovados; 42 arquivos e 299 testes unitários passaram.
+- `npm run build` aprovado com Next.js 16.3.3; as 26 páginas foram geradas sem erro.
+- Runbook de operação, backup, rollback e manutenção registrado em `docs/checklist-lancamento/operacao-pos-lancamento.md`.
+- `npm run check:launch -- --production` confirmou as variáveis configuradas, mas não alcançou `/`, `/robots.txt` ou `/sitemap.xml` por falha de rede; o segredo do scheduler de reconciliação também permanece ausente.
+- PageSpeed foi executado; DebugView não recebeu eventos; backup e retenção têm evidência externa.
+- Better Stack Telemetry mantém a fonte `AgendFined Vercel` ativa. O monitor de disponibilidade `AgendFined produção` (ID `5024662`) foi criado para `https://agendfined.com.br`, com checagem a cada 3 minutos, confirmação após 5 minutos de falha e e-mail para `diovannydev@gmail.com`.
+- O alerta de erros 5xx depende de uma implantação que publique o status HTTP nos logs e da validação do novo campo no schema da fonte; o alerta de backup acima de 18 horas ainda precisa ser ligado ao watchdog/heartbeat.
 
 ## Critério de conclusão
 

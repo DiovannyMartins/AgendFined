@@ -11,6 +11,16 @@ test("landing page shows hero and CTAs", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("landing page exposes a usable keyboard skip link", async ({ page }) => {
+  await page.goto("/");
+
+  const skipLink = page.getByRole("link", { name: "Pular para o conteúdo" });
+  await skipLink.focus();
+  await expect(skipLink).toBeFocused();
+  await skipLink.press("Enter");
+  await expect(page.locator("#main-content")).toBeVisible();
+});
+
 test("landing shows the two plans with price and privileges", async ({ page }) => {
   await page.goto("/");
   await expect(

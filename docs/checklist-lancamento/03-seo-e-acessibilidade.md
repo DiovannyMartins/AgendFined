@@ -4,14 +4,16 @@
 
 Permitir que mecanismos de busca encontrem o site e garantir que pessoas com diferentes necessidades consigam navegar e usar suas funções principais.
 
+**Status da fase:** parcial — SEO técnico e verificações E2E passaram; Search Console e auditoria completa de acessibilidade ainda estão pendentes.
+
 ## Itens relacionados
 
 - [x] 21. Otimizar SEO on-page
-- [ ] 22. Criar links para redes sociais
-- [~] 32. Auditar acessibilidade
+- [x] 22. Criar links para redes sociais — Instagram: `https://www.instagram.com/agendfined/`.
+- [~] 32. Auditar acessibilidade — skip link e foco da home cobertos por E2E; falta auditoria automatizada completa e leitor de tela.
 - [x] 36. Publicar política de privacidade
-- [ ] 37. Planejar SEO off-page
-- [ ] 44. Enviar site para indexação
+- [x] 37. Planejar SEO off-page — plano local registrado em `docs/checklist-lancamento/seo-off-page.md`.
+- [!] 44. Enviar site para indexação — depende de acesso e aprovação no Google Search Console.
 
 ## Instruções de SEO
 
@@ -58,4 +60,6 @@ As páginas públicas devem possuir metadados coerentes, sitemap enviado e nenhu
 - Skip links foram adicionados ao marketing, autenticação e dashboard.
 - Os testes E2E de SEO passaram em desktop e mobile.
 - Pendente: enviar o sitemap ao Google Search Console e concluir auditoria manual/automatizada completa de acessibilidade.
+- O plano de SEO off-page foi registrado sem criar perfis, publicar links ou executar campanhas externas.
+- A execução focada de E2E confirmou os endpoints públicos, canonical, metadata e `noindex` em desktop e mobile.
 

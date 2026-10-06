@@ -2,7 +2,7 @@ const INGESTING_HOST = "s2774229.us-west-2a.betterstackdata.com";
 
 // Better Stack accepts one JSON object per request. Keep the source token only
 // in server-side environment variables; never put it in a URL or client bundle.
-export async function sendSecurityLog(entry: Record<string, string | null>): Promise<void> {
+export async function sendSecurityLog(entry: Record<string, string | number | null>): Promise<void> {
   const token = process.env.BETTERSTACK_SOURCE_TOKEN;
   if (!token || process.env.NODE_ENV !== "production") return;
 

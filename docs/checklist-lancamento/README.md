@@ -9,7 +9,6 @@ Este diretório descreve como revisar e preparar o AgendFined para o lançamento
 3. [Fase 3 — SEO e acessibilidade](./03-seo-e-acessibilidade.md)
 4. [Fase 4 — Conversão e comunicação](./04-conversao-e-comunicacao.md)
 5. [Fase 5 — Métricas, segurança e desempenho](./05-metricas-seguranca-e-desempenho.md)
-6. [Fase 6 — Internacionalização](./06-internacionalizacao.md)
 
 ## Regra de execução
 

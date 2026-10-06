@@ -46,7 +46,7 @@ com dados reais neste repositório.
 
 - Confirmar um hit do Google Analytics no DebugView/tempo real; a tag foi encontrada, mas a sessão do Tag Assistant não mostrou hit enviado.
 - Aguardar o processamento do sitemap reenviado no Search Console; o endpoint público responde HTTP 200 e XML válido.
-- Repetir a restauração isolada no próximo ciclo operacional; nesta execução a restauração anterior foi revisada e os dois artefatos criptografados foram verificados com sucesso.
+- O drill isolado do GitHub Actions `37418154732` concluiu com sucesso: restaurou os dumps público e Auth em banco descartável e validou 3 businesses, 19 bookings, 5 customers, 13 usuários Auth, 0 tabelas públicas sem RLS e 15 FKs.
 
 ## Monitoramento configurado
 

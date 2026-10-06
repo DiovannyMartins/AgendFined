@@ -4,19 +4,19 @@
 
 Medir o comportamento do site, proteger os dados e confirmar que a aplicação suporta o lançamento com desempenho aceitável.
 
-**Status da fase:** parcial — aplicação, domínio, SSL, sitemap, logs, backup e alertas operacionais têm evidência; o Analytics ainda não confirmou um hit no DebugView/tempo real e o LCP mobile continua acima do limite.
+**Status da fase:** parcial — aplicação, domínio, SSL, logs, backup, restauração isolada e alertas operacionais têm evidência; o Search Console ainda não concluiu a leitura do sitemap, o Analytics ainda não confirmou um hit no DebugView/tempo real e o LCP mobile continua acima do limite.
 
 ## Itens relacionados
 
-- [~] 2. Verificar velocidade do site antes do lançamento — PageSpeed foi repetido em produção; o LCP mobile caiu de aproximadamente 13,6 s para 6,5 s, mas ainda está acima do limite de 2,5 s.
+- [~] 2. Verificar velocidade do site antes do lançamento — PageSpeed foi repetido em produção; o LCP mobile caiu de aproximadamente 13,6 s para 4,4 s e o desempenho subiu para 76, mas ainda está acima do limite de 2,5 s.
 - [x] 15. Integrar web analytics
 - [x] 16. Confirmar domínio
 - [x] 23. Conectar ou transferir domínio
 - [x] 40. Publicar o site
-- [~] 41. Fazer backup — workflow manual concluído com artefato e retenção de 30 dias; restauração isolada tem evidência registrada anteriormente e a verificação criptográfica foi repetida nesta execução.
+- [x] 41. Fazer backup — workflow manual concluído com artefato e retenção de 30 dias; o drill isolado do GitHub Actions restaurou os dumps público e Auth em banco descartável e validou dados, RLS e FKs.
 - [x] 43. Verificar SSL
 - [!] 45. Verificar análises — Tag Assistant encontrou `G-92YJVL0YB0`, mas a sessão mostrou que nenhum hit foi enviado.
-- [~] 46. Testar velocidade em produção — PageSpeed mobile: desempenho 67, acessibilidade 96, boas práticas 92, SEO 100, CLS 0,037, LCP 6,5 s.
+- [~] 46. Testar velocidade em produção — PageSpeed mobile: desempenho 76, acessibilidade 96, boas práticas 92, SEO 100, CLS 0,037, LCP 4,4 s.
 - [x] 48. Criar monitoramento de desempenho — monitor de disponibilidade, alerta 5xx e heartbeat de backup ativo no Better Stack.
 - [~] 50. Criar plano de manutenção — runbook local registrado; o SLA de suporte está fora do escopo.
 
@@ -40,7 +40,7 @@ Medir o comportamento do site, proteger os dados e confirmar que a aplicação s
 ### Implementação registrada
 
 - ID informado pelo responsável: `G-92YJVL0YB0`.
-- O carregamento está condicionado a `NEXT_PUBLIC_GA_MEASUREMENT_ID` e usa `afterInteractive`.
+- O carregamento está condicionado a `NEXT_PUBLIC_GA_MEASUREMENT_ID`; a fila inline e o carregador assíncrono seguem o snippet oficial do Google.
 - A CSP foi ajustada para permitir o Google Tag e os endpoints de coleta.
 - Eventos agregados implementados: `sign_up`, `login`, `business_created` e `booking_complete`.
 - Nenhum evento envia e-mail, telefone, nome, código de reserva ou identificador de usuário.
@@ -84,9 +84,10 @@ Medir o comportamento do site, proteger os dados e confirmar que a aplicação s
 - `npm run build` aprovado com Next.js 16.3.3; as 26 páginas foram geradas sem erro.
 - Runbook de operação, backup, rollback e manutenção registrado em `docs/checklist-lancamento/operacao-pos-lancamento.md`.
 - `npm run check:launch -- --production` confirmou as variáveis configuradas, mas não alcançou `/`, `/robots.txt` ou `/sitemap.xml` por falha de rede; o segredo do scheduler de reconciliação também permanece ausente.
-- PageSpeed foi repetido em produção após a última otimização: desempenho mobile 67, LCP 6,5 s, CLS 0,037, acessibilidade 96, boas práticas 92 e SEO 100. O relatório apontou 352 KiB de JavaScript não usado e 3 tarefas longas.
+- PageSpeed foi repetido em produção após a última otimização: desempenho mobile 76, LCP 4,4 s, FCP 2,7 s, TBT 240 ms, CLS 0,037, acessibilidade 96, boas práticas 92 e SEO 100. O relatório ainda apontou 298 KiB de JavaScript não usado e 5 tarefas longas.
 - O sitemap `https://agendfined.com.br/sitemap.xml` respondeu HTTP 200 com XML válido e foi reenviado no Search Console em 6 de outubro de 2026; o Google ainda está processando a leitura.
 - O workflow manual de backup #42 concluiu com sucesso no GitHub Actions em 38 s, publicou um artefato e renovou o heartbeat. O Better Stack mostra `AgendFined backup freshness` como `Up`, esperado a cada 18 horas, com último heartbeat recente.
+- O workflow de drill isolado `37418154732` concluiu com sucesso em 1m36s: restaurou 3 businesses, 19 bookings, 5 customers e 13 usuários Auth; encontrou 0 tabelas públicas sem RLS e 15 FKs.
 - O alerta de erros 5xx foi salvo no Better Stack para a fonte `AgendFined Vercel`, usando consulta Log SQL, limiar acima de zero, janela de 5 minutos, confirmação de 5 minutos e recuperação de 5 minutos.
 - Better Stack Telemetry mantém a fonte `AgendFined Vercel` ativa. O monitor de disponibilidade `AgendFined produção` (ID `5024662`) foi criado para `https://agendfined.com.br`, com checagem a cada 3 minutos, confirmação após 5 minutos de falha e e-mail para `diovannydev@gmail.com`.
 - A CSP publicada permite os endpoints regionais do Google Analytics; ainda é necessário confirmar um hit real no DebugView/tempo real.

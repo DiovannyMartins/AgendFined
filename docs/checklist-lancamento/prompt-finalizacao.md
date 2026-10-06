@@ -33,8 +33,8 @@ Não criar, restaurar ou executar internacionalização. A fase de internacional
 - O fluxo E2E completo de reserva depende do seed remoto do Supabase e precisa ser executado com o ambiente correto ou documentado como bloqueado.
 - Acessibilidade ainda não tem auditoria automatizada completa nem teste com leitor de tela.
 - O Analytics está integrado e a tag foi encontrada pelo Tag Assistant, mas a sessão de depuração ainda mostra que nenhum hit foi enviado.
-- PageSpeed foi repetido em produção; o LCP mobile caiu para 6,5 s, mas continua acima do limite e requer nova otimização.
-- O workflow manual de backup, a retenção de 30 dias, a verificação criptográfica e o heartbeat de 18 horas têm evidência; a restauração isolada possui registro anterior e deve ser repetida no próximo ciclo.
+- PageSpeed foi repetido em produção; o LCP mobile caiu para 4,4 s, mas continua acima do limite de 2,5 s e requer nova otimização.
+- O workflow manual de backup, a retenção de 30 dias, a verificação criptográfica, o heartbeat de 18 horas e o drill de restauração isolada no GitHub Actions têm evidência.
 - O monitor de disponibilidade, o alerta de 5xx e o heartbeat de frescor do backup estão ativos no Better Stack.
 - Não existe newsletter/formulário de captação por email; o `/cadastro` usa Supabase Auth.
 - O Instagram oficial foi fornecido: `https://www.instagram.com/agendfined/`.

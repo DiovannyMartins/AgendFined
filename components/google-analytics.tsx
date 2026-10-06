@@ -14,8 +14,10 @@ export function GoogleAnalytics() {
         src={`https://www.googletagmanager.com/gtag/js?id=${validMeasurementId}`}
         strategy="afterInteractive"
       />
-      <Script id="google-analytics" strategy="beforeInteractive">
-        {`
+      <script
+        id="google-analytics"
+        dangerouslySetInnerHTML={{
+          __html: `
           window.dataLayer = window.dataLayer || [];
           function gtag(){window.dataLayer.push(arguments);}
           window.gtag = gtag;
@@ -24,8 +26,9 @@ export function GoogleAnalytics() {
             anonymize_ip: true,
             send_page_view: true
           });
-        `}
-      </Script>
+        `,
+        }}
+      />
     </>
   );
 }

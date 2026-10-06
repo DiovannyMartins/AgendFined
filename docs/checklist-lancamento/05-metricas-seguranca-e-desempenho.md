@@ -43,7 +43,8 @@ Medir o comportamento do site, proteger os dados e confirmar que a aplicação s
 - Eventos agregados implementados: `sign_up`, `login`, `business_created` e `booking_complete`.
 - Nenhum evento envia e-mail, telefone, nome, código de reserva ou identificador de usuário.
 - A variável `NEXT_PUBLIC_GA_MEASUREMENT_ID` foi cadastrada na Vercel para Production.
-- Pendente: publicar o código em produção e validar recebimento em DebugView/tempo real do Google Analytics.
+- O código está publicado em produção e o carregamento do Google Analytics foi validado no HTML/CSP do domínio oficial.
+- Pendente: confirmar o recebimento de um evento em DebugView/tempo real do Google Analytics.
 
 ## Instruções de domínio e segurança
 

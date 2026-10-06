@@ -6,6 +6,8 @@ Entender o estado atual do site, definir o escopo do lançamento e transformar a
 
 **Status da fase:** concluída em 4 de outubro de 2026.
 
+A conclusão desta fase registra a auditoria, o escopo, as decisões e o plano de ação. Ela não significa que todas as atividades operacionais do lançamento estejam encerradas; as pendências externas abaixo continuam controladas nas fases correspondentes.
+
 ## Itens relacionados
 
 - [x] 1. Analisar o que precisa ser alterado — auditoria registrada e inconsistência de domínio corrigida no código.
@@ -70,7 +72,7 @@ O lançamento avaliado é o MVP do AgendFined: uma plataforma em pt-BR para um p
 | Conta | `/redefinir-senha` | Definir nova senha após callback; CTA: salvar senha | Implementada; fluxo depende de configuração externa do Supabase |
 | Segurança | `/mfa` | Configurar/verificar autenticação em dois fatores | Implementada; acessível a usuário autenticado |
 | Onboarding | `/dashboard/setup` | Cadastrar o negócio antes de usar o painel; CTA: salvar negócio | Implementada; destino quando não há negócio |
-| Operação privada | `/dashboard` | Exibir resumo e link público do negócio; CTA: ver/compartilhar página pública | Implementada; há inconsistência de domínio no texto exibido |
+| Operação privada | `/dashboard` | Exibir resumo e link público do negócio; CTA: ver/compartilhar página pública | Implementada; usa o domínio oficial `agendfined.com.br` |
 | Operação privada | `/dashboard/servicos` | Cadastrar e gerenciar serviços; CTA: criar/editar/desativar | Implementada |
 | Operação privada | `/dashboard/agenda` | Acompanhar reservas e exportar agenda; CTA: gerenciar status/exportar `.ics` | Implementada; exportação é gated pelo plano PROFISSIONAL |
 | Operação privada | `/dashboard/clientes` | Consultar clientes e histórico; CTA: pesquisar/abrir histórico | Implementada |
@@ -133,12 +135,12 @@ Decisão de posicionamento: lançar o núcleo simples para um negócio por profi
 
 ### Problemas e riscos encontrados
 
-- **P1 — publicação da correção:** os textos do painel, formulário e suporte foram corrigidos para o domínio oficial e o canal `agendfined@outlook.com`; é necessário publicar a versão atual antes da divulgação.
+- **P1 — publicação da correção:** os textos do painel, formulário e suporte foram corrigidos para o domínio oficial e o canal `agendfined@outlook.com`; a versão atual foi publicada na produção em 5 de outubro de 2026.
 - **P1 — lançamento operacional:** a aplicação está em produção e os fluxos públicos principais foram confirmados; registrar evidências de domínio, callback de autenticação, webhook do Mercado Pago e cron de reconciliação durante as fases de segurança e publicação. O cron de lembretes já é indicado pelo funcionamento dos lembretes.
 - **P1 — aprovação comercial/legal registrada:** o responsável aprovou os textos atuais de Termos e Privacidade para o lançamento; permanece recomendável revisão jurídica profissional quando houver disponibilidade.
-- **P1 — contatos separados por finalidade:** `reservas@agendfined.com.br` é o remetente automático de confirmações e lembretes via Resend e já funciona em produção; `agendfined@outlook.com` é o suporte. A versão corrigida das páginas legais e do widget precisa ser publicada.
+- **P1 — contatos separados por finalidade:** `reservas@agendfined.com.br` é o remetente automático de confirmações e lembretes via Resend e já funciona em produção; `agendfined@outlook.com` é o suporte. A confirmação da posse da caixa de suporte ainda é operacional.
 - **P1 — SEO externo pendente:** metadata, canonical, Open Graph, `sitemap.xml`, `robots.txt` e noindex foram implementados; ainda falta enviar o sitemap ao Search Console e concluir a auditoria externa.
-- **P1 — métricas configuradas aguardando publicação:** o Google Analytics foi integrado sem PII, com o ID `G-92YJVL0YB0`, eventos agregados e variável de Production cadastrada na Vercel; falta publicar a versão e validar o recebimento no painel.
+- **P1 — métricas configuradas:** o Google Analytics foi integrado sem PII, com o ID `G-92YJVL0YB0`, eventos agregados, variável de Production cadastrada na Vercel e script validado em produção; falta confirmar um evento em DebugView/tempo real.
 - **P1 — suporte operacional mínimo:** o suporte foi definido como `agendfined@outlook.com` e o widget agora abre o cliente de e-mail padrão; ainda falta confirmar posse da caixa, SLA e procedimento de atendimento.
 - **P1 — QA de lançamento:** a matriz E2E desktop/mobile passou para landing, auth, legais, SEO, 404 e redirecionamentos; o fluxo de reserva E2E local continua dependente de seed/escrita no Supabase remoto.
 - **P2 — conteúdo visual:** a interface usa ícones e uma prévia de produto, sem evidência de imagens comerciais, depoimentos aprovados ou materiais de marca finais.
@@ -182,5 +184,5 @@ Decisão de posicionamento: lançar o núcleo simples para um negócio por profi
 
 **Verificações desta execução:** produção acessível em `https://agendfined.com.br`; landing, login, cadastro, privacidade, termos e 404 verificados visualmente no domínio publicado; o responsável confirmou em produção reserva pública, consulta, cancelamento, confirmações e lembretes; o projeto e o domínio foram verificados na Vercel; a aplicação AgendFined foi localizada no painel do Mercado Pago; o ID do Analytics foi cadastrado na Vercel para Production; `npm run lint` passou; `npm run typecheck` passou; `npx vitest run --project unit` passou com 42 arquivos e 299 testes; E2E local de landing, autenticação, páginas legais e redirecionamento do painel passou em desktop e mobile.
 
-**Pendências externas:** publicar a versão atual, validar Analytics em DebugView/tempo real, enviar o sitemap ao Search Console, confirmar a caixa de suporte e os detalhes operacionais de Vercel/Supabase/Mercado Pago/Resend, concluir revisão de performance e autorizar a divulgação. O Resend e o envio de confirmações/lembretes já funcionam em produção; a data, o domínio e os textos legais foram aprovados pelo responsável.
+**Pendências externas:** validar um evento do Analytics em DebugView/tempo real, enviar o sitemap ao Search Console, confirmar a posse da caixa de suporte e o procedimento de atendimento, registrar uma medição de performance, concluir o smoke test completo em produção e autorizar a divulgação. A versão atual já está publicada; o Resend e o envio de confirmações/lembretes já funcionam em produção; a data, o domínio e os textos legais foram aprovados pelo responsável.
 

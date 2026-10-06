@@ -32,10 +32,10 @@ Não criar, restaurar ou executar internacionalização. A fase de internacional
 - O runner E2E terminou com cenários `ok`, mas não encerrou sozinho. Investigue processos abertos, handles, servidor dev e configuração do Playwright.
 - O fluxo E2E completo de reserva depende do seed remoto do Supabase e precisa ser executado com o ambiente correto ou documentado como bloqueado.
 - Acessibilidade ainda não tem auditoria automatizada completa nem teste com leitor de tela.
-- O Analytics está integrado, mas falta provar que um evento chegou no Google Analytics.
-- PageSpeed já foi executado em produção; ainda falta corrigir os gargalos comprovados.
-- Backup e retenção têm evidência externa; a restauração isolada tem registro anterior, mas não foi repetida nesta sessão.
-- O monitor de disponibilidade Better Stack está ativo para a produção; alertas de 5xx e frescor do backup ainda dependem de integração adicional.
+- O Analytics está integrado e a tag foi encontrada pelo Tag Assistant, mas a sessão de depuração ainda mostra que nenhum hit foi enviado.
+- PageSpeed foi repetido em produção; o LCP mobile caiu para 6,5 s, mas continua acima do limite e requer nova otimização.
+- O workflow manual de backup, a retenção de 30 dias, a verificação criptográfica e o heartbeat de 18 horas têm evidência; a restauração isolada possui registro anterior e deve ser repetida no próximo ciclo.
+- O monitor de disponibilidade, o alerta de 5xx e o heartbeat de frescor do backup estão ativos no Better Stack.
 - Não existe newsletter/formulário de captação por email; o `/cadastro` usa Supabase Auth.
 - O Instagram oficial foi fornecido: `https://www.instagram.com/agendfined/`.
 - A posse do suporte `agendfined@outlook.com` foi confirmada; responsável e SLA estão fora do escopo.
@@ -84,12 +84,12 @@ Não criar, restaurar ou executar internacionalização. A fase de internacional
 3. Rode `npm run check:launch -- --production` com Node 22+ e registre o resultado sem expor secrets.
 4. Confirme que a CSP permite somente os hosts necessários para Analytics, Turnstile, Supabase e vídeo.
 5. Confirme que Analytics não envia PII e que eventos usam nomes e parâmetros esperados.
-6. Se houver acesso autorizado ao Google Analytics, valide pelo menos um evento em DebugView ou tempo real. Caso contrário, registre o bloqueio.
+6. Se houver acesso autorizado ao Google Analytics, valide pelo menos um evento em DebugView ou tempo real. Se a tag for encontrada mas nenhum hit aparecer, registre o bloqueio e investigue a coleta antes de concluir.
 7. Execute Lighthouse/PageSpeed para home, login e uma página pública. Registre LCP, CLS, performance, acessibilidade, SEO e boas práticas.
 8. Corrija apenas gargalos comprovados e repita a medição.
 9. Verifique HTTPS, certificado, HSTS, headers, cookies, CSP, `X-Frame-Options` e ausência de secrets no bundle.
-10. Não declare backup concluído apenas porque existem scripts. Confirme backup, retenção e restauração em ambiente isolado, ou marque como bloqueado.
-11. Não declare monitoramento concluído apenas porque existe um runbook. Confirme alertas ativos ou registre o provedor e a configuração que ainda falta.
+10. Não declare backup concluído apenas porque existem scripts. Confirme backup, retenção e restauração em ambiente isolado, ou marque como parcial quando a restauração precisar ser repetida.
+11. Não declare monitoramento concluído apenas porque existe um runbook. Confirme o monitor, o alerta 5xx e o heartbeat ativos ou registre a configuração que ainda falta.
 12. Atualize o runbook com comandos reais, responsáveis, limites, rollback e contatos somente quando essas informações forem confirmadas.
 
 ## Validação final obrigatória

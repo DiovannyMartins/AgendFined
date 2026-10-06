@@ -4,20 +4,20 @@
 
 Medir o comportamento do site, proteger os dados e confirmar que a aplicação suporta o lançamento com desempenho aceitável.
 
-**Status da fase:** parcial — aplicação, domínio, SSL, analytics, logs e controles locais estão preparados; DebugView, sitemap e parte dos alertas ainda precisam de confirmação operacional.
+**Status da fase:** parcial — aplicação, domínio, SSL, sitemap, logs, backup e alertas operacionais têm evidência; o Analytics ainda não confirmou um hit no DebugView/tempo real e o LCP mobile continua acima do limite.
 
 ## Itens relacionados
 
-- [~] 2. Verificar velocidade do site antes do lançamento — checklist e limites registrados; falta executar Lighthouse/PageSpeed em ambiente acessível.
+- [~] 2. Verificar velocidade do site antes do lançamento — PageSpeed foi repetido em produção; o LCP mobile caiu de aproximadamente 13,6 s para 6,5 s, mas ainda está acima do limite de 2,5 s.
 - [x] 15. Integrar web analytics
 - [x] 16. Confirmar domínio
 - [x] 23. Conectar ou transferir domínio
 - [x] 40. Publicar o site
-- [!] 41. Fazer backup — depende do painel do provedor e de autorização para testar restauração em ambiente isolado.
+- [~] 41. Fazer backup — workflow manual concluído com artefato e retenção de 30 dias; restauração isolada tem evidência registrada anteriormente e a verificação criptográfica foi repetida nesta execução.
 - [x] 43. Verificar SSL
-- [~] 45. Verificar análises
-- [!] 46. Testar velocidade em produção — depende de acesso a uma ferramenta de medição externa e da URL publicada.
-- [~] 48. Criar monitoramento de desempenho — monitor de disponibilidade ativo no Better Stack; alertas de 5xx e frescor do backup ainda dependem de integração adicional.
+- [!] 45. Verificar análises — Tag Assistant encontrou `G-92YJVL0YB0`, mas a sessão mostrou que nenhum hit foi enviado.
+- [~] 46. Testar velocidade em produção — PageSpeed mobile: desempenho 67, acessibilidade 96, boas práticas 92, SEO 100, CLS 0,037, LCP 6,5 s.
+- [x] 48. Criar monitoramento de desempenho — monitor de disponibilidade, alerta 5xx e heartbeat de backup ativo no Better Stack.
 - [~] 50. Criar plano de manutenção — runbook local registrado; o SLA de suporte está fora do escopo.
 
 ## Instruções de desempenho
@@ -46,7 +46,7 @@ Medir o comportamento do site, proteger os dados e confirmar que a aplicação s
 - Nenhum evento envia e-mail, telefone, nome, código de reserva ou identificador de usuário.
 - A variável `NEXT_PUBLIC_GA_MEASUREMENT_ID` foi cadastrada na Vercel para Production.
 - O código está publicado em produção e o carregamento do Google Analytics foi validado no HTML/CSP do domínio oficial.
-- Pendente: confirmar o recebimento de um evento em DebugView/tempo real do Google Analytics.
+- O Tag Assistant encontrou a tag `G-92YJVL0YB0`, mas exibiu “Esta tag não enviou nenhum hit”; a confirmação de evento permanece bloqueada até o Google Analytics receber um hit.
 
 ## Instruções de domínio e segurança
 
@@ -84,9 +84,12 @@ Medir o comportamento do site, proteger os dados e confirmar que a aplicação s
 - `npm run build` aprovado com Next.js 16.3.3; as 26 páginas foram geradas sem erro.
 - Runbook de operação, backup, rollback e manutenção registrado em `docs/checklist-lancamento/operacao-pos-lancamento.md`.
 - `npm run check:launch -- --production` confirmou as variáveis configuradas, mas não alcançou `/`, `/robots.txt` ou `/sitemap.xml` por falha de rede; o segredo do scheduler de reconciliação também permanece ausente.
-- PageSpeed foi executado; DebugView não recebeu eventos; backup e retenção têm evidência externa.
+- PageSpeed foi repetido em produção após a última otimização: desempenho mobile 67, LCP 6,5 s, CLS 0,037, acessibilidade 96, boas práticas 92 e SEO 100. O relatório apontou 352 KiB de JavaScript não usado e 3 tarefas longas.
+- O sitemap `https://agendfined.com.br/sitemap.xml` respondeu HTTP 200 com XML válido e foi reenviado no Search Console em 6 de outubro de 2026; o Google ainda está processando a leitura.
+- O workflow manual de backup #42 concluiu com sucesso no GitHub Actions em 38 s, publicou um artefato e renovou o heartbeat. O Better Stack mostra `AgendFined backup freshness` como `Up`, esperado a cada 18 horas, com último heartbeat recente.
+- O alerta de erros 5xx foi salvo no Better Stack para a fonte `AgendFined Vercel`, usando consulta Log SQL, limiar acima de zero, janela de 5 minutos, confirmação de 5 minutos e recuperação de 5 minutos.
 - Better Stack Telemetry mantém a fonte `AgendFined Vercel` ativa. O monitor de disponibilidade `AgendFined produção` (ID `5024662`) foi criado para `https://agendfined.com.br`, com checagem a cada 3 minutos, confirmação após 5 minutos de falha e e-mail para `diovannydev@gmail.com`.
-- O alerta de erros 5xx depende de uma implantação que publique o status HTTP nos logs e da validação do novo campo no schema da fonte; o alerta de backup acima de 18 horas ainda precisa ser ligado ao watchdog/heartbeat.
+- A CSP publicada permite os endpoints regionais do Google Analytics; ainda é necessário confirmar um hit real no DebugView/tempo real.
 
 ## Critério de conclusão
 

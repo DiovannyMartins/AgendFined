@@ -44,9 +44,9 @@ com dados reais neste repositório.
 
 ## Aprovações externas pendentes
 
-- Confirmar backup/restauração e retenção.
-- Ligar o alerta de erros 5xx aos logs que publicam o status HTTP após o próximo deploy.
-- Ligar o alerta de backup acima de 18 horas ao watchdog/heartbeat.
+- Confirmar um hit do Google Analytics no DebugView/tempo real; a tag foi encontrada, mas a sessão do Tag Assistant não mostrou hit enviado.
+- Aguardar o processamento do sitemap reenviado no Search Console; o endpoint público responde HTTP 200 e XML válido.
+- Repetir a restauração isolada no próximo ciclo operacional; nesta execução a restauração anterior foi revisada e os dois artefatos criptografados foram verificados com sucesso.
 
 ## Monitoramento configurado
 
@@ -54,3 +54,5 @@ com dados reais neste repositório.
 - Frequência: 3 minutos; confirmação de falha: 5 minutos; recuperação: 3 minutos.
 - Canal configurado: e-mail para a conta `diovannydev@gmail.com`.
 - A fonte Better Stack Telemetry `AgendFined Vercel` permanece ativa para logs.
+- Alerta 5xx: consulta Log SQL na fonte `AgendFined Vercel`, disparo quando a porcentagem de respostas 5xx fica acima de zero por 5 minutos, com recuperação após 5 minutos.
+- Heartbeat de backup: `AgendFined backup freshness`, esperado a cada 18 horas, e-mail para a conta `diovannydev@gmail.com`; o workflow de backup renova o heartbeat após publicar o artefato.

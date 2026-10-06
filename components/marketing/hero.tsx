@@ -24,7 +24,7 @@ export function Hero({ children }: { children?: React.ReactNode }) {
 
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center px-4 pb-16 pt-32 text-center sm:pt-40 lg:px-6">
         <motion.div
-          initial={reduceMotion ? false : { opacity: 0, y: 20 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={reduceMotion ? { duration: 0 } : { duration: 0.6 }}
           className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm text-white/80 backdrop-blur-md"
@@ -34,7 +34,7 @@ export function Hero({ children }: { children?: React.ReactNode }) {
         </motion.div>
 
         <motion.p
-          initial={reduceMotion ? false : { opacity: 0, y: 20 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={reduceMotion ? { duration: 0 } : { duration: 0.6, delay: 0.1 }}
           className="mt-9 font-display text-3xl leading-[1.1] text-white sm:text-5xl lg:text-[48px]"
@@ -43,7 +43,7 @@ export function Hero({ children }: { children?: React.ReactNode }) {
         </motion.p>
 
         <motion.h1
-          initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
+          initial={false}
           animate={{ opacity: 1, scale: 1 }}
           transition={reduceMotion ? { duration: 0 } : { duration: 0.6, delay: 0.2 }}
           className="mt-4 max-w-5xl text-balance text-6xl font-semibold leading-[0.9] tracking-tighter text-transparent [background-image:linear-gradient(to_bottom,#fff_0%,#fff_52%,#a7a7a7_100%)] bg-clip-text sm:text-8xl lg:text-[136px]"
@@ -52,7 +52,7 @@ export function Hero({ children }: { children?: React.ReactNode }) {
         </motion.h1>
 
         <motion.p
-          initial={reduceMotion ? false : { opacity: 0 }}
+          initial={false}
           animate={{ opacity: 0.72 }}
           transition={reduceMotion ? { duration: 0 } : { duration: 0.6, delay: 0.4 }}
           className="mx-auto mt-8 max-w-xl text-pretty text-lg leading-[1.65] text-white sm:text-[20px]"
@@ -62,7 +62,7 @@ export function Hero({ children }: { children?: React.ReactNode }) {
         </motion.p>
 
         <motion.div
-          initial={reduceMotion ? false : { opacity: 0, y: 20 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={reduceMotion ? { duration: 0 } : { duration: 0.5, delay: 0.6 }}
           className="mt-9 flex flex-col items-center gap-4 sm:flex-row sm:gap-6"
@@ -95,7 +95,7 @@ export function Hero({ children }: { children?: React.ReactNode }) {
 
         {children ? (
           <motion.div
-            initial={reduceMotion ? false : { opacity: 0, y: 28 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={reduceMotion ? { duration: 0 } : { duration: 0.7, delay: 0.8 }}
             className="mt-16 w-full max-w-3xl text-left"

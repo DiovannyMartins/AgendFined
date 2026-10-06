@@ -1,5 +1,3 @@
-import Script from "next/script";
-
 const measurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 const validMeasurementId = measurementId && /^G-[A-Z0-9]+$/i.test(measurementId)
   ? measurementId
@@ -10,9 +8,9 @@ export function GoogleAnalytics() {
 
   return (
     <>
-      <Script
+      <script
         src={`https://www.googletagmanager.com/gtag/js?id=${validMeasurementId}`}
-        strategy="afterInteractive"
+        async
       />
       <script
         id="google-analytics"

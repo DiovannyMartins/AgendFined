@@ -29,7 +29,7 @@ export async function sendInterestSubmissionEmails(email: string): Promise<SendR
         `E-mail: ${email}`,
         "",
         "A pessoa autorizou o contato sobre novidades e o lançamento.",
-      ].join("\\n"),
+      ].join("\n"),
       html: `<p>Novo interesse no AgendFined.</p><p><strong>E-mail:</strong> ${safeEmail}</p><p>A pessoa autorizou o contato sobre novidades e o lançamento.</p>`,
     },
     {
@@ -40,7 +40,7 @@ export async function sendInterestSubmissionEmails(email: string): Promise<SendR
         "",
         "Entraremos em contato quando houver novidades relevantes sobre o lançamento.",
         "Não enviaremos campanhas recorrentes sem uma nova autorização.",
-      ].join("\\n"),
+      ].join("\n"),
       html: "<p>Recebemos seu interesse no AgendFined.</p><p>Entraremos em contato quando houver novidades relevantes sobre o lançamento.</p><p>Não enviaremos campanhas recorrentes sem uma nova autorização.</p>",
     },
   ];

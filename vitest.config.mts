@@ -24,6 +24,8 @@ export default defineConfig({
             "lib/**/*.test.{ts,tsx}",
             "app/**/*.test.{ts,tsx}",
             "components/**/*.test.{ts,tsx}",
+            "tests/support/**/*.test.ts",
+            "scripts/**/*.test.ts",
           ],
         },
       },

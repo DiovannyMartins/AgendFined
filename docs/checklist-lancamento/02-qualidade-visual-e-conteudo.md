@@ -4,7 +4,7 @@
 
 Garantir que o site esteja visualmente consistente, claro, responsivo e livre de erros de conteúdo antes da publicação.
 
-**Status da fase:** parcial — os fluxos locais e a revisão visual básica passaram; a reserva pública completa ainda depende do Supabase remoto.
+**Status da fase:** parcial — os fluxos locais e a revisão visual básica passaram; a reserva pública E2E ainda não foi executada com a nova proteção de escrita remota, e feedback humano (29) e teste de usabilidade (42) ainda não foram realizados.
 
 ## Itens relacionados
 
@@ -15,13 +15,15 @@ Garantir que o site esteja visualmente consistente, claro, responsivo e livre de
 - [x] 20. Revisar experiência mobile
 - [x] 24. Atualizar copyright
 - [x] 25. Revisar conteúdo escrito
-- [~] 26. Testar formulários
+- [x] 26. Testar formulários — validação, erros e sucesso cobertos por testes unitários (inclusive o formulário de interesse); reserva pública, login, consulta e cancelamento passaram no E2E em 6 de outubro de 2026 (2 de 2, com limpeza dos dados criados).
 - [x] 27. Fazer o logo apontar para a página inicial
 - [x] 28. Revisar design
+- [ ] 29. Obter feedback de outra pessoa — não realizado; roteiro em [roteiro-feedback-e-usabilidade.md](./roteiro-feedback-e-usabilidade.md). Testes automatizados não substituem este item.
 - [x] 30. Verificar links quebrados
-- [x] 31. Testar UX
+- [x] 31. Testar UX — tarefas principais exercitadas por E2E e revisão do responsável; não substitui o teste de usabilidade (42).
 - [x] 33. Atualizar informações de contato
 - [x] 35. Personalizar página 404 — página com contexto de agenda, navegação de retorno e CTA para recursos.
+- [ ] 42. Realizar teste de usabilidade — não realizado; roteiro em [roteiro-feedback-e-usabilidade.md](./roteiro-feedback-e-usabilidade.md). Nenhum participante ou resultado foi registrado.
 
 ## Instruções
 
@@ -58,10 +60,9 @@ Nenhuma página deve conter texto provisório, erro visual conhecido, CTA sem de
 - CTA principal, links de navegação, seção Sobre, preços e links legais foram exercitados nos testes E2E.
 - Foi adicionado skip link para teclado no marketing, autenticação e painel.
 - `agendfined@outlook.com` ficou separado do remetente automático `reservas@agendfined.com.br`.
-- O fluxo público completo de reserva depende do seed remoto do Supabase; o teste não conseguiu criar o negócio de teste neste ambiente.
+- O E2E de reserva (`tests/e2e/booking.spec.ts`) passou a recusar escrita sem `ALLOW_REMOTE_E2E_WRITES=true` e host em `E2E_ALLOWED_SUPABASE_HOSTS`, valida cada etapa do seed e remove em `afterAll` tudo o que criou (ver [README](./README.md)). Ainda não foi executado com essa proteção.
 - A imagem principal `public/images/hero.webp` passou a ser usada na home e no compartilhamento; o PNG original foi preservado como fonte.
 - O fallback global `app/global-error.tsx` oferece mensagem em pt-BR e recuperação sem expor a mensagem interna do erro.
 - O teste E2E da home confirma foco e ativação do skip link por teclado.
-- A execução focada de E2E confirmou 16 cenários `ok` em Chromium desktop e viewport mobile; o processo do runner não encerrou sozinho após o resumo.
-- A investigação repetida com `CI=1`, servidor Next direto e wrapper de encerramento reproduziu o mesmo comportamento; a mudança especulativa foi removida e o bloqueio ficou registrado.
+- Execuções anteriores no Windows confirmaram 16 cenários `ok`, mas o runner não encerrou sozinho e deixou processos Node. O `playwright.config.ts` passou a iniciar o servidor com `node … next start` numa porta dedicada (3100), sem `npm run`, sem reutilizar servidor existente por padrão e com encerramento por `SIGTERM`. A validação de duas execuções consecutivas no Windows sem processos órfãos ainda precisa ser registrada (ver [README](./README.md)).
 

@@ -4,16 +4,15 @@
 
 Permitir que mecanismos de busca encontrem o site e garantir que pessoas com diferentes necessidades consigam navegar e usar suas funções principais.
 
-**Status da fase:** parcial — SEO técnico e verificações E2E passaram; Search Console e auditoria completa de acessibilidade ainda estão pendentes.
+**Status da fase:** parcial — SEO técnico e verificações E2E passaram; o sitemap foi reenviado e aguarda processamento; a auditoria completa de acessibilidade e o teste com leitor de tela ainda não foram feitos.
 
 ## Itens relacionados
 
 - [x] 21. Otimizar SEO on-page
-- [x] 22. Criar links para redes sociais — Instagram: `https://www.instagram.com/agendfined/`.
-- [~] 32. Auditar acessibilidade — skip link e foco da home cobertos por E2E; falta auditoria automatizada completa e leitor de tela.
+- [~] 32. Auditar acessibilidade — skip link e foco da home cobertos por E2E; PageSpeed registrou acessibilidade 96 na home mobile. Faltam auditoria automatizada (axe) nas rotas públicas e autenticadas, verificação manual e leitor de tela; roteiro em [auditoria-acessibilidade.md](./auditoria-acessibilidade.md).
 - [x] 36. Publicar política de privacidade
 - [x] 37. Planejar SEO off-page — plano local registrado em `docs/checklist-lancamento/seo-off-page.md`.
-- [!] 44. Enviar site para indexação — depende de acesso e aprovação no Google Search Console.
+- [~] 44. Enviar site para indexação — sitemap **enviado** em 6 de outubro de 2026; **processado:** não — o Search Console mostra “Não foi possível buscar o sitemap” (0 páginas) e o relatório de indexação diz “Dados em processamento: volte em mais ou menos um dia”; **páginas indexadas:** ainda sem dados. O endpoint responde HTTP 200 com XML válido e o `robots.txt` aponta para ele. Reverificar em 24–48 h e, persistindo, reenviar. Os negócios `barbearia-teste`, `e2e-barbearia-42536698` e `e2e-barbearia-42543475` foram desativados (`is_active = false`) em 6 de outubro de 2026 pelo responsável e saem do sitemap na próxima revalidação (até 1 h).
 
 ## Instruções de SEO
 
@@ -59,7 +58,8 @@ As páginas públicas devem possuir metadados coerentes, sitemap enviado e nenhu
 - Login, cadastro, recuperação, MFA, dashboard, consulta e confirmação usam `noindex, nofollow`.
 - Skip links foram adicionados ao marketing, autenticação e dashboard.
 - Os testes E2E de SEO passaram em desktop e mobile.
-- Pendente: enviar o sitemap ao Google Search Console e concluir auditoria manual/automatizada completa de acessibilidade.
+- Search Console: sitemap reenviado em 6 de outubro de 2026, aguardando processamento; acompanhar “Sitemaps” e “Páginas” até o status “Processado” e páginas indexadas.
+- Pendente: auditoria automatizada e manual completa de acessibilidade, conforme [auditoria-acessibilidade.md](./auditoria-acessibilidade.md).
 - O plano de SEO off-page foi registrado sem criar perfis, publicar links ou executar campanhas externas.
 - A execução focada de E2E confirmou os endpoints públicos, canonical, metadata e `noindex` em desktop e mobile.
 

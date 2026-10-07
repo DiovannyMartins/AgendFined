@@ -41,7 +41,7 @@ export function SignupForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Criar conta</CardTitle>
+        <CardTitle role="heading" aria-level={1} className="text-2xl">Criar conta</CardTitle>
         <CardDescription>Comece a receber reservas grátis.</CardDescription>
       </CardHeader>
       <CardContent>

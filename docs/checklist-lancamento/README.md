@@ -2,30 +2,33 @@
 
 Este diretório descreve como revisar e preparar o AgendFined para o lançamento usando os 50 itens da checklist da [Wix](https://pt.wix.com/blog/checklist-novo-site).
 
-O item 49 (internacionalização/site multilíngue) está **fora do escopo** por decisão do responsável e não é pendência.
+**Fora do escopo por decisão do responsável:** 19 (formulário de e-mail), 29 (feedback de terceiros), 38 (lista de contatos), 42 (teste de usabilidade) e 49 (site multilíngue). Não são pendências.
 
 ## Situação consolidada — 6 de outubro de 2026
 
-**Veredito: parcialmente concluído.** 36 dos 49 itens em escopo estão `[x]` (≈ 73%); 8 `[~]`, 3 `[!]` e 2 `[ ]`.
+**Veredito: parcialmente concluído.** 36 dos 45 itens em escopo estão `[x]` (80%); 7 `[~]` e 2 `[!]`.
 
 | Fase | Situação |
 | --- | --- |
 | 1 — Auditoria e planejamento | concluída |
-| 2 — Qualidade visual e conteúdo | parcial: 13 (vídeo), 29 e 42 (feedback e usabilidade humanos, não iniciados) |
-| 3 — SEO e acessibilidade | parcial: 32 (auditoria completa) e 44 (sitemap enviado, aguardando processamento) |
-| 4 — Conversão e comunicação | parcial: 19 (formulário de interesse sem envio real registrado), 34 (só e-mail, sem chat/SLA); bloqueada: 38, 39, 47 |
-| 5 — Métricas, segurança e desempenho | parcial: 2 e 46 (após o deploy das fontes: desempenho 78, LCP 4,8 s; meta 2,5 s), 50 (sem responsável/SLA). Item 45 confirmado em tempo real. |
+| 2 — Qualidade visual e conteúdo | parcial: 13 (vídeo da hero) |
+| 3 — SEO e acessibilidade | parcial: 32 (axe sem violações; falta leitor de tela) e 44 (sitemap enviado, aguardando leitura do Google) |
+| 4 — Conversão e comunicação | parcial: 34 (suporte só por e-mail, sem chat/SLA); bloqueada: 39 e 47 (divulgação depende de autorização) |
+| 5 — Métricas, segurança e desempenho | parcial: 2 e 46 (desempenho 78, LCP 4,8 s; meta 2,5 s; novos ajustes aguardando deploy), 50 (sem responsável/SLA) |
 
 Distinção usada nos documentos: **implementado** (código pronto), **validado localmente** (testes/lint/build), **validado em produção** (evidência no domínio ou nos provedores) e **aprovado** (decisão humana registrada).
 
-## Correções da revisão final
+## O que foi feito
 
-- **E2E de reserva** (`tests/e2e/booking.spec.ts`, `tests/support/remote-write-guard.ts`): só escreve com `ALLOW_REMOTE_E2E_WRITES=true` **e** host de `NEXT_PUBLIC_SUPABASE_URL` listado em `E2E_ALLOWED_SUPABASE_HOSTS` (e fora de `E2E_FORBIDDEN_SUPABASE_HOSTS`); caso contrário é pulado. IDs únicos por execução, dados sintéticos (`example.com`), erros do seed verificados, “amanhã” calculado em `America/Sao_Paulo`, e `afterAll` remove reservas, lista de espera, clientes, bloqueios, disponibilidade, serviços, assinaturas, o negócio e o usuário Auth criados — apenas pelos IDs desta execução, mesmo após falha. **Ainda não executado** com a proteção.
-- **Runner Playwright** (`playwright.config.ts`): servidor `node … next start` na porta 3100 (sem `npm run`, sem reutilizar servidor por padrão, `SIGTERM` no encerramento). Use `npm run test:e2e:safe` (build + specs sem escrita). `E2E_SERVER=dev` volta ao `next dev`.
-- **Drill de restauração:** asserção `auth.users > 0`, contagens não vazias, `bash -euo pipefail`, `find -print -quit` e artefato restrito ao branch padrão. O arquivo `.github/workflows/` é protegido para edição remota; a versão corrigida está em [backup-restore-drill.proposto.yml](./backup-restore-drill.proposto.yml) e precisa ser copiada para `.github/workflows/backup-restore-drill.yml`. `tests/support/workflow-guards.test.ts` falha até isso ser feito.
-- **Formulário de interesse:** e-mails em texto tinham `\n` literal; honeypot era rejeitado em vez de aceito silenciosamente; texto “Inscrição recebida” virou “Interesse registrado”. Testes da action e do envio adicionados.
-- **Analytics:** CSP ampliada para `*.googletagmanager.com` e `*.analytics.google.com` (possível causa do “nenhum hit”); testes de `gtag`/`dataLayer` e da CSP.
-- **Documentação:** itens 29 e 42 reintroduzidos; 22 aparece só na Fase 4; 19, 34 e 38 com status honestos; 44 distingue enviado/processado/indexado. `npm run check:checklist` valida numeração, duplicatas, item 49, status e links.
+- **E2E de reserva** (`tests/e2e/booking.spec.ts`, `tests/support/remote-write-guard.ts`): só escreve com `ALLOW_REMOTE_E2E_WRITES=true` e host autorizado em `E2E_ALLOWED_SUPABASE_HOSTS`; IDs aleatórios por execução (`node:crypto`), dados sintéticos e limpeza garantida em `afterAll`. Passou em 6 de outubro de 2026.
+- **Runner Playwright** (`playwright.config.ts`): `next start` na porta 3100, sem `npm run` e sem reutilizar servidor; `E2E_SERVER=dev` usa `next dev` (necessário para o E2E de reserva, porque o Turnstile é fail-closed em build de produção).
+- **Drill de restauração** (`.github/workflows/backup-restore-drill.yml`): `auth.users > 0`, contagens não vazias, `bash -euo pipefail` e artefato restrito ao branch padrão; run `37557120032` verde.
+- **Analytics:** CSP com os coletores do GA4; hit confirmado em tempo real.
+- **Desempenho:** fontes via `next/font` (LCP 9,8 s → 4,8 s); depois, hero sem `backdrop-blur`/`mix-blend`, vídeo só em telas ≥ 768 px e após o `load`, e Turnstile fora da home.
+- **Acessibilidade:** axe nas rotas públicas com 0 violações após as correções.
+- **Segurança:** dependências de produção com 0 vulnerabilidades (`next` 16.3.8, CLI do shadcn removido) e alertas do CodeQL corrigidos.
+- **Formulário de interesse:** removido por decisão do responsável.
+- **Documentação:** `npm run check:checklist` valida numeração, duplicatas, itens fora do escopo, status e links.
 
 ## Validação técnica — 6 de outubro de 2026
 
@@ -60,10 +63,9 @@ O travamento do Playwright no Windows não se reproduziu com a nova configuraç�
 | --- | --- | --- | --- |
 | Acompanhar sitemap (item 44) | Search Console | responsável pelo lançamento | status “Processado” e páginas indexadas |
 | Reduzir LCP mobile ou aprovar novo limite (2, 46) | PageSpeed/produção | engenharia + responsável | LCP ≤ 2,5 s ou limite aprovado por escrito |
-| Auditoria de acessibilidade (32) | navegador + leitor de tela | QA | [auditoria-acessibilidade.md](./auditoria-acessibilidade.md) preenchido |
-| Feedback e usabilidade (29, 42) | sessões com pessoas | produto | [roteiro-feedback-e-usabilidade.md](./roteiro-feedback-e-usabilidade.md) preenchido |
+| Teste com leitor de tela (32) | NVDA ou VoiceOver | QA | [auditoria-acessibilidade.md](./auditoria-acessibilidade.md) preenchido |
 | Definir responsável, substituto e SLA (34, 50) | — | responsável pelo lançamento | campos preenchidos em [operacao-pos-lancamento.md](./operacao-pos-lancamento.md) |
-| Decidir lista de contatos (38) e autorizar divulgação (39, 47) | Instagram/campanhas | responsável pelo lançamento | decisão e calendário aprovados |
+| Autorizar divulgação (39, 47) | Instagram/campanhas | responsável pelo lançamento | decisão e calendário aprovados |
 
 ## Ordem recomendada
 

@@ -36,12 +36,22 @@ export function HeroVideo() {
       }
     };
 
-    const startTimer = window.setTimeout(() => {
-      void startVideo();
-    }, 1500);
+    // The video is decorative. Skip it on small screens and data-saver
+    // connections (the poster image stays), and only start after the page
+    // has finished loading so it never competes with fonts and LCP.
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+    if (!window.matchMedia("(min-width: 768px)").matches || connection?.saveData) return;
+
+    let startTimer: number | undefined;
+    const schedule = () => {
+      startTimer = window.setTimeout(() => void startVideo(), 1000);
+    };
+    if (document.readyState === "complete") schedule();
+    else window.addEventListener("load", schedule, { once: true });
 
     return () => {
       cancelled = true;
+      window.removeEventListener("load", schedule);
       window.clearTimeout(startTimer);
       hls?.destroy();
       video.removeEventListener("loadedmetadata", playVideo);

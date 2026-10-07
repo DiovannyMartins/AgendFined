@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 // Consistency check for docs/checklist-lancamento.
-// - items 1..50 (except 49, excluded by decision) appear exactly once;
-// - item 49 does not appear;
+// - items 1..50 (except EXCLUDED_ITEMS, removed by the owner) appear exactly once;
+// - excluded items do not appear;
 // - only [x], [~], [!] and [ ] are used;
 // - relative Markdown links point to existing files.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const EXCLUDED_ITEMS = [49];
+// Out of scope by decision of the launch owner (6 Oct 2026):
+// 19 e-mail signup form, 29 third-party feedback, 38 contact list,
+// 42 usability test, 49 multilingual site.
+export const EXCLUDED_ITEMS = [19, 29, 38, 42, 49];
 const ITEM_LINE = /^\s*-\s*\[(.)\]\s*(\d+)\.\s/;
 const ANY_CHECKBOX = /^\s*-\s*\[([^\]]*)\]\s*(\d+)\./;
 const LINK = /\[[^\]]*\]\(([^)\s]+)\)/g;
@@ -71,5 +74,5 @@ if (isMain) {
     for (const error of errors) console.error(`✗ ${error}`);
     process.exit(1);
   }
-  console.log("✓ checklist consistente: 49 itens em escopo, item 49 excluído, status e links válidos.");
+  console.log(`✓ checklist consistente: ${50 - EXCLUDED_ITEMS.length} itens em escopo, excluídos ${EXCLUDED_ITEMS.join(", ")}, status e links válidos.`);
 }

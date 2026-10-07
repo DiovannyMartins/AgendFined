@@ -52,7 +52,7 @@ export function UpdatePasswordForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Redefinir senha</CardTitle>
+        <CardTitle role="heading" aria-level={1} className="text-2xl">Redefinir senha</CardTitle>
         <CardDescription>Escolha uma nova senha para sua conta.</CardDescription>
       </CardHeader>
       <CardContent>

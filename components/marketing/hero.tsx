@@ -7,14 +7,16 @@ export function Hero({ children }: { children?: React.ReactNode }) {
     <section id="top" className="relative isolate min-h-[calc(100svh-1px)] scroll-mt-20 overflow-hidden bg-black text-white">
       <HeroVideo />
 
-      <div className="pointer-events-none absolute left-[20%] top-[-20%] -z-10 size-[600px] rounded-full bg-white/10 blur-[120px] mix-blend-screen" />
-      <div className="pointer-events-none absolute bottom-[-10%] right-[20%] -z-10 size-[500px] rounded-full bg-zinc-500/10 blur-[120px] mix-blend-screen" />
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-black/65 backdrop-blur-[2px]" />
+      {/* Soft glows as radial gradients: same look as blurred blobs without
+          the per-frame blur/blend cost over the video on mobile GPUs. */}
+      <div className="pointer-events-none absolute left-[20%] top-[-20%] -z-10 size-[840px] -translate-x-[120px] -translate-y-[120px] rounded-full bg-[radial-gradient(closest-side,rgba(255,255,255,0.10),transparent)]" />
+      <div className="pointer-events-none absolute bottom-[-10%] right-[20%] -z-10 size-[740px] translate-x-[120px] translate-y-[120px] rounded-full bg-[radial-gradient(closest-side,rgba(113,113,122,0.10),transparent)]" />
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-black/70" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-48 bg-gradient-to-b from-transparent to-background" />
 
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center px-4 pb-16 pt-32 text-center sm:pt-40 lg:px-6">
         <div
-          className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm text-white/80 backdrop-blur-md"
+          className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm text-white/80"
         >
           <Sparkles className="size-3.5 text-white" />
           Reservas online para profissionais

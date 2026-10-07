@@ -40,7 +40,7 @@ export function ForgotPasswordForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Recuperar senha</CardTitle>
+        <CardTitle role="heading" aria-level={1} className="text-2xl">Recuperar senha</CardTitle>
         <CardDescription>Enviaremos um link seguro para redefinir sua senha.</CardDescription>
       </CardHeader>
       <CardContent>

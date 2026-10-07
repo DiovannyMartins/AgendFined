@@ -89,7 +89,7 @@ export const TurnstileWidget = memo(function TurnstileWidget({
 }: {
   onToken: (token: string) => void;
   onState?: (ready: boolean) => void;
-  action: "booking_write" | "booking_consult" | "interest_signup";
+  action: "booking_write" | "booking_consult";
 }) {
   const sitekey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const containerRef = useRef<HTMLDivElement>(null);

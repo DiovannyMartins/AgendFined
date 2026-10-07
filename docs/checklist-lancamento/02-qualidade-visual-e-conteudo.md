@@ -4,7 +4,7 @@
 
 Garantir que o site esteja visualmente consistente, claro, responsivo e livre de erros de conteúdo antes da publicação.
 
-**Status da fase:** parcial — os fluxos locais e a revisão visual básica passaram; a reserva pública E2E ainda não foi executada com a nova proteção de escrita remota, e feedback humano (29) e teste de usabilidade (42) ainda não foram realizados.
+**Status da fase:** parcial — os fluxos locais e a revisão visual básica passaram; reserva pública E2E passou em 6 de outubro de 2026. Feedback de terceiros (29) e teste de usabilidade (42) foram retirados do escopo pelo responsável.
 
 ## Itens relacionados
 
@@ -15,15 +15,13 @@ Garantir que o site esteja visualmente consistente, claro, responsivo e livre de
 - [x] 20. Revisar experiência mobile
 - [x] 24. Atualizar copyright
 - [x] 25. Revisar conteúdo escrito
-- [x] 26. Testar formulários — validação, erros e sucesso cobertos por testes unitários (inclusive o formulário de interesse); reserva pública, login, consulta e cancelamento passaram no E2E em 6 de outubro de 2026 (2 de 2, com limpeza dos dados criados).
+- [x] 26. Testar formulários — validação, erros e sucesso cobertos por testes unitários; reserva pública, login, consulta e cancelamento passaram no E2E em 6 de outubro de 2026 (2 de 2, com limpeza dos dados criados).
 - [x] 27. Fazer o logo apontar para a página inicial
 - [x] 28. Revisar design
-- [ ] 29. Obter feedback de outra pessoa — não realizado; roteiro em [roteiro-feedback-e-usabilidade.md](./roteiro-feedback-e-usabilidade.md). Testes automatizados não substituem este item.
 - [x] 30. Verificar links quebrados
 - [x] 31. Testar UX — tarefas principais exercitadas por E2E e revisão do responsável; não substitui o teste de usabilidade (42).
 - [x] 33. Atualizar informações de contato
 - [x] 35. Personalizar página 404 — página com contexto de agenda, navegação de retorno e CTA para recursos.
-- [ ] 42. Realizar teste de usabilidade — não realizado; roteiro em [roteiro-feedback-e-usabilidade.md](./roteiro-feedback-e-usabilidade.md). Nenhum participante ou resultado foi registrado.
 
 ## Instruções
 

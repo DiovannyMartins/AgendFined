@@ -19,7 +19,6 @@ import { Reveal } from "@/components/reveal";
 import { Faq } from "./faq";
 import { Plans } from "./plans";
 import { Hero } from "@/components/marketing/hero";
-import { InterestForm } from "@/components/marketing/interest-form";
 import { createClient } from "@/lib/supabase/server";
 
 const benefits = [
@@ -341,20 +340,6 @@ export default async function MarketingHome() {
         </Reveal>
       </section>
 
-      <section id="lista-de-interesse" className="border-y border-border bg-muted/20 px-4 py-20 lg:px-6 md:py-24">
-        <div className="mx-auto max-w-3xl text-center">
-          <Badge variant="secondary" className="mb-5 rounded-full px-3.5 text-sm">
-            Fique por dentro
-          </Badge>
-          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Quer saber quando o AgendFined estiver pronto?</h2>
-          <p className="mx-auto mt-4 max-w-xl leading-relaxed text-muted-foreground">
-            Deixe seu e-mail para receber uma confirmação e novidades relevantes sobre o lançamento. Sem campanhas recorrentes sem nova autorização.
-          </p>
-          <div className="mt-8">
-            <InterestForm />
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
@@ -373,7 +358,7 @@ function BookingPreview() {
             </span>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-white">Barbearia Demo</p>
-              <p className="text-xs text-white/45">Página pública de reservas</p>
+              <p className="text-xs text-white/60">Página pública de reservas</p>
             </div>
           </div>
           <Badge className="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/10 text-xs text-emerald-300">
@@ -388,7 +373,7 @@ function BookingPreview() {
           <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">Resumo</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/60">Resumo</p>
                 <p className="mt-2 text-base font-semibold text-white">Corte + Barba</p>
                 <p className="mt-1 text-xs text-white/55">R$ 60 · 45 min</p>
               </div>
@@ -414,7 +399,7 @@ function BookingPreview() {
           <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">Horários disponíveis</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/60">Horários disponíveis</p>
                 <p className="mt-2 text-sm font-medium text-white">Escolha um horário</p>
               </div>
               <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-medium text-white/60">Hoje</span>
@@ -434,7 +419,7 @@ function BookingPreview() {
                 </div>
               ))}
             </div>
-            <p className="mt-4 text-center text-[10px] text-white/40">Horários atualizados agora</p>
+            <p className="mt-4 text-center text-[10px] text-white/60">Horários atualizados agora</p>
           </div>
         </div>
       </div>

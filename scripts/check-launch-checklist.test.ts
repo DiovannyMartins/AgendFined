@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { checkChecklist } from "./check-launch-checklist.mjs";
+import { checkChecklist, EXCLUDED_ITEMS } from "./check-launch-checklist.mjs";
 
 const dirs: string[] = [];
 function fixture(files: Record<string, string>) {
@@ -13,14 +13,14 @@ function fixture(files: Record<string, string>) {
 }
 const allItems = (skip: number[] = []) =>
   Array.from({ length: 50 }, (_, i) => i + 1)
-    .filter((n) => n !== 49 && !skip.includes(n))
+    .filter((n) => !EXCLUDED_ITEMS.includes(n) && !skip.includes(n))
     .map((n) => `- [x] ${n}. Item`)
     .join("\n");
 
 afterEach(() => dirs.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true })));
 
 describe("checkChecklist", () => {
-  it("accepts the 49 in-scope items", () => {
+  it("accepts every in-scope item", () => {
     expect(checkChecklist(fixture({ "01-a.md": allItems() }))).toEqual([]);
   });
 

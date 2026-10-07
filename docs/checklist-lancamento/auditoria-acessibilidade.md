@@ -1,6 +1,6 @@
 # Auditoria de acessibilidade (item 32)
 
-**Estado:** parcial. Há evidência automatizada limitada (skip link e foco por E2E; PageSpeed acessibilidade 96 na home mobile) e verificações por inspeção de código. Auditoria com axe em todas as rotas, verificação manual completa e leitor de tela ainda não foram executados.
+**Estado:** parcial. A auditoria automatizada das rotas públicas foi feita e está sem violações; faltam leitor de tela e as rotas que dependem de dados (painel e páginas de negócio).
 
 ## Verificado por inspeção de código nesta revisão
 
@@ -21,6 +21,9 @@
 
 | Data | Rota | Ferramenta/método | Problema | Impacto | Correção/decisão |
 | --- | --- | --- | --- | --- | --- |
-| | | | | | |
+| 06/10/2026 | `/` | axe 4 (`@axe-core/playwright`), desktop e 360 px | `color-contrast`: textos `text-white/40–45` da prévia de agenda (4,46:1) | sério | trocado para `text-white/60` |
+| 06/10/2026 | `/login`, `/cadastro`, `/recuperar-senha`, `/redefinir-senha` | axe | `page-has-heading-one` | moderado | título do card exposto como `role="heading" aria-level={1}` |
+| 06/10/2026 | `/privacidade`, `/termos` | axe | `landmark-one-main` e `region` | moderado | layout com `<header>`, `<main id="main-content">` e `<footer>` |
+| 06/10/2026 | 8 rotas públicas (inclui 404) | axe, desktop e 360 px | nova execução após as correções | — | **0 violações**; sem rolagem horizontal em 360 px |
 
 O item 32 só vira `[x]` com axe e verificação manual registrados; sem leitor de tela, permanece `[~]`.

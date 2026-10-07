@@ -1,4 +1,4 @@
-export type TurnstileAction = "booking_write" | "booking_consult" | "interest_signup";
+export type TurnstileAction = "booking_write" | "booking_consult";
 
 type VerifyTurnstileOptions = {
   expectedAction: TurnstileAction;

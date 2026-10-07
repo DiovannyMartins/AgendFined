@@ -2,19 +2,21 @@
 
 Este diretório descreve como revisar e preparar o AgendFined para o lançamento usando os 50 itens da checklist da [Wix](https://pt.wix.com/blog/checklist-novo-site).
 
-**Fora do escopo por decisão do responsável:** 19 (formulário de e-mail), 29 (feedback de terceiros), 38 (lista de contatos), 42 (teste de usabilidade) e 49 (site multilíngue). Não são pendências.
+**Fora do escopo por decisão do responsável:** 19 (formulário de e-mail), 29 (feedback de terceiros), 38 (lista de contatos), 39 e 47 (divulgação e campanhas), 42 (teste de usabilidade) e 49 (site multilíngue). Não são pendências.
+
+**Aceitos no estado atual pelo responsável (6 de outubro de 2026):** 2 e 46 (desempenho 81, LCP simulado 4,7 s acima da meta interna de 2,5 s), 13 (vídeo decorativo da hero, desligado no celular), 32 (axe sem violações e fluxo de reserva revisado; sem teste com leitor de tela), 34 (suporte só por e-mail, sem chat ao vivo) e 50 (runbook sem responsável/SLA definidos).
 
 ## Situação consolidada — 6 de outubro de 2026
 
-**Veredito: parcialmente concluído.** 36 dos 45 itens em escopo estão `[x]` (80%); 7 `[~]` e 2 `[!]`.
+**Veredito: tecnicamente pronto, com ação externa pendente.** 42 dos 43 itens em escopo estão `[x]`; falta só o 44 (leitura do sitemap pelo Google).
 
 | Fase | Situação |
 | --- | --- |
 | 1 — Auditoria e planejamento | concluída |
-| 2 — Qualidade visual e conteúdo | parcial: 13 (vídeo da hero) |
-| 3 — SEO e acessibilidade | parcial: 32 (axe sem violações; falta leitor de tela) e 44 (sitemap enviado, aguardando leitura do Google) |
-| 4 — Conversão e comunicação | parcial: 34 (suporte só por e-mail, sem chat/SLA); bloqueada: 39 e 47 (divulgação depende de autorização) |
-| 5 — Métricas, segurança e desempenho | parcial: 2 e 46 (home estática: desempenho 81, FCP 1,7 s, LCP simulado 4,7 s; meta 2,5 s), 50 (sem responsável/SLA) |
+| 2 — Qualidade visual e conteúdo | concluída |
+| 3 — SEO e acessibilidade | parcial: 44 (sitemap enviado, aguardando leitura do Google) |
+| 4 — Conversão e comunicação | concluída |
+| 5 — Métricas, segurança e desempenho | concluída |
 
 Distinção usada nos documentos: **implementado** (código pronto), **validado localmente** (testes/lint/build), **validado em produção** (evidência no domínio ou nos provedores) e **aprovado** (decisão humana registrada).
 
@@ -59,13 +61,9 @@ O travamento do Playwright no Windows não se reproduziu com a nova configuraç�
 
 ## Pendências externas
 
-| Ação | Plataforma | Responsável esperado | Concluída quando |
-| --- | --- | --- | --- |
-| Acompanhar sitemap (item 44) | Search Console | responsável pelo lançamento | status “Processado” e páginas indexadas |
-| Reduzir LCP mobile ou aprovar novo limite (2, 46) | PageSpeed/produção | engenharia + responsável | LCP ≤ 2,5 s ou limite aprovado por escrito |
-| Teste com leitor de tela (32) | NVDA ou VoiceOver | QA | [auditoria-acessibilidade.md](./auditoria-acessibilidade.md) preenchido |
-| Definir responsável, substituto e SLA (34, 50) | — | responsável pelo lançamento | campos preenchidos em [operacao-pos-lancamento.md](./operacao-pos-lancamento.md) |
-| Autorizar divulgação (39, 47) | Instagram/campanhas | responsável pelo lançamento | decisão e calendário aprovados |
+| Ação | Plataforma | Concluída quando |
+| --- | --- | --- |
+| Acompanhar a leitura do sitemap (item 44) | Google Search Console | status “Processado” e páginas indexadas |
 
 ## Ordem recomendada
 

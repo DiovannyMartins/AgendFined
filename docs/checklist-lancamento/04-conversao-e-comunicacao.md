@@ -4,14 +4,12 @@
 
 Preparar os canais para captar interessados, atender visitantes e divulgar o lançamento.
 
-**Status da fase:** parcial — o site não capta e-mails (decisão do responsável); o suporte é assíncrono por e-mail; o Instagram foi confirmado. Não há chat ao vivo, e a divulgação depende de aprovação.
+**Status da fase:** concluída em 6 de outubro de 2026. O site não capta e-mails, o suporte é por e-mail (aceito pelo responsável) e divulgação/campanhas (39, 47) estão fora do escopo.
 
 ## Itens relacionados
 
 - [x] 22. Criar links para redes sociais — Instagram confirmado: `https://www.instagram.com/agendfined/`.
-- [~] 34. Configurar chat ou suporte ao vivo — suporte por e-mail implementado (`agendfined@outlook.com`, widget “Suporte”), mas **não há chat ao vivo** e não há SLA nem responsável definidos.
-- [!] 39. Preparar redes sociais para divulgação — depende de perfis, conteúdo e aprovação; materiais em [seo-off-page.md](./seo-off-page.md).
-- [!] 47. Promover o site — depende de autorização explícita para publicar campanhas.
+- [x] 34. Configurar chat ou suporte ao vivo — suporte por e-mail implementado (`agendfined@outlook.com`, widget “Suporte”), mas **não há chat ao vivo** e não há SLA nem responsável definidos. **Aceito no estado atual pelo responsável em 6 de outubro de 2026.**
 
 ## Formulário de interesse — removido
 

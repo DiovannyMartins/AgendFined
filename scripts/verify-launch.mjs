@@ -105,13 +105,31 @@ async function checkPublicEndpoint(path, expectedStatus = 200) {
   }
 }
 
+// Exact host matching (not substring) for CSP sources and sitemap URLs.
+function cspDirectiveSources(csp, name) {
+  const directive = csp.split(";").map((part) => part.trim().split(/\s+/)).find(([key]) => key === name);
+  return directive ? directive.slice(1) : [];
+}
+function sourceAllowsHost(source, host) {
+  const match = /^https:\/\/(\*\.)?([^/:]+)$/.exec(source);
+  if (!match) return false;
+  return match[1] ? host.endsWith(`.${match[2]}`) : host === match[2];
+}
+function sitemapLocs(xml) {
+  return [...xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)].map((m) => {
+    try { return new URL(m[1]); } catch { return null; }
+  }).filter(Boolean);
+}
+
 const home = await checkPublicEndpoint("/");
 const robots = await checkPublicEndpoint("/robots.txt");
 const sitemap = await checkPublicEndpoint("/sitemap.xml");
 
 if (home) {
   const csp = home.headers.get("content-security-policy") || "";
-  if (csp.includes("googletagmanager.com")) pass("CSP allows Google Tag Manager");
+  if (cspDirectiveSources(csp, "script-src").some((source) => sourceAllowsHost(source, "www.googletagmanager.com"))) {
+    pass("CSP allows Google Tag Manager");
+  }
   else warn("CSP response does not expose googletagmanager.com; verify the deployed build");
 }
 
@@ -123,7 +141,8 @@ if (robots) {
 
 if (sitemap) {
   const text = await sitemap.text();
-  if (text.includes("https://agendfined.com.br/") || text.includes(`${baseUrl}/`)) {
+  const homeOrigins = new Set(["https://agendfined.com.br", new URL(baseUrl).origin]);
+  if (sitemapLocs(text).some((url) => homeOrigins.has(url.origin) && (url.pathname === "/" || url.pathname === ""))) {
     pass("sitemap.xml contains the canonical home URL");
   }
   else fail("sitemap.xml does not contain the canonical home URL");

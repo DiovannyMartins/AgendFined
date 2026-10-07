@@ -5,6 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { useState, useTransition } from "react";
 import { retryUpgrade, startUpgrade } from "@/lib/billing/actions";
 import { navigateToCheckout } from "@/lib/billing/checkout-navigation";
+import { useIsAuthenticated } from "@/components/use-is-authenticated";
 
 const ctaClassName =
   "relative mt-7 inline-flex h-11 items-center justify-center gap-2 rounded-full bg-background px-5 text-sm font-medium text-foreground transition-all hover:scale-[1.02] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60";
@@ -15,9 +16,10 @@ type MarketingPlanCtaProps = {
 };
 
 export function MarketingPlanCta({
-  isAuthenticated = false,
+  isAuthenticated: isAuthenticatedOverride,
   label,
 }: MarketingPlanCtaProps) {
+  const isAuthenticated = useIsAuthenticated(isAuthenticatedOverride);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 

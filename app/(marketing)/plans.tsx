@@ -50,7 +50,7 @@ const PLAN_COPY: Record<Plan, {
   },
 };
 
-export function Plans({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
+export function Plans({ isAuthenticated }: { isAuthenticated?: boolean }) {
   return (
     <section id="planos" className="relative scroll-mt-24 overflow-hidden border-y border-border bg-muted/20">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.07),transparent_38%)]" />

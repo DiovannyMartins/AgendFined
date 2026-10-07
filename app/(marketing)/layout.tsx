@@ -1,14 +1,10 @@
 import type { ReactNode } from "react";
-import { createClient as createServerClient } from "@/lib/supabase/server";
 import { Navbar } from "./navbar";
 import { Footer } from "./footer";
 
-export default async function MarketingLayout({ children }: { children: ReactNode }) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+// Static on purpose: no per-request auth lookup here, so the marketing pages
+// are served from the CDN. The navbar resolves the session on the client.
+export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-full flex-col">
       <a
@@ -17,7 +13,7 @@ export default async function MarketingLayout({ children }: { children: ReactNod
       >
         Pular para o conteúdo
       </a>
-      <Navbar isAuthenticated={Boolean(user)} />
+      <Navbar />
       <main id="main-content" className="flex-1">
         {children}
       </main>

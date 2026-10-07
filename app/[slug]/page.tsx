@@ -53,7 +53,7 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
   if (servicesError) throw new Error("PUBLIC_SERVICES_LOOKUP_FAILED");
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-muted/30">
+    <main className="min-h-[calc(100vh-4rem)] bg-muted/30">
       <div className="mx-auto max-w-5xl px-4 py-12 lg:px-6">
         <header className="mb-10 text-center">
           <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -84,6 +84,6 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
           </Link>
         </p>
       </div>
-    </div>
+    </main>
   );
 }

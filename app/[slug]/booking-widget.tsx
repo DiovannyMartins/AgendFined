@@ -197,6 +197,22 @@ export function BookingWidget({
 
   const slot = selectedSlot;
 
+  // Announced politely to screen readers whenever the slot list changes.
+  const slotStatus = !date
+    ? ""
+    : isPending
+      ? "Carregando horários."
+      : availabilityError
+        ? availabilityError
+        : slots.length === 0
+          ? "Nenhum horário disponível nesta data."
+          : `${slots.length} ${slots.length === 1 ? "horário disponível" : "horários disponíveis"}.`;
+  const submitHint = !slot
+    ? "Escolha um horário para confirmar."
+    : !consent
+      ? "Marque a autorização de tratamento dos dados para confirmar."
+      : null;
+
   return (
     <div className="mx-auto max-w-2xl rounded-2xl border border-border bg-background p-6 shadow-sm">
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -228,8 +244,9 @@ export function BookingWidget({
           />
         </div>
 
-        <div className="space-y-2">
-          <Label>Horários disponíveis</Label>
+        <fieldset className="space-y-2">
+          <legend className="mb-2 text-sm leading-none font-medium">Horários disponíveis</legend>
+          <p className="sr-only" aria-live="polite" aria-atomic="true">{slotStatus}</p>
           {!date ? (
             <p className="text-sm text-muted-foreground">Selecione uma data para ver os horários.</p>
           ) : isPending ? (
@@ -246,6 +263,7 @@ export function BookingWidget({
                 <button
                   key={time}
                   type="button"
+                  aria-pressed={slot === time}
                   onClick={() => {
                     setSelectedSlot(time);
                     resetWaitlist();
@@ -262,12 +280,10 @@ export function BookingWidget({
               ))}
             </div>
           )}
-          {slot && service && (
-            <p className="text-xs text-muted-foreground">
-              Horário selecionado: {date} às {slot} ({service.name})
-            </p>
-          )}
-        </div>
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            {slot && service ? `Horário selecionado: ${date} às ${slot} (${service.name})` : null}
+          </p>
+        </fieldset>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
@@ -295,9 +311,10 @@ export function BookingWidget({
               type="email"
               value={customerEmail}
               onChange={(e) => setCustomerEmail(e.target.value)}
+              aria-describedby="customerEmail-help"
               required
             />
-            <p className="text-xs text-muted-foreground">
+            <p id="customerEmail-help" className="text-xs text-muted-foreground">
               Enviaremos os dados da reserva para este endereço.
             </p>
           </div>
@@ -313,7 +330,7 @@ export function BookingWidget({
           />
         </div>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
         {waitlistOffered && (
           <div className="rounded-xl border border-border bg-muted/40 p-4">
@@ -334,7 +351,7 @@ export function BookingWidget({
         )}
 
         {waitlistSubmitted && (
-          <div className="rounded-xl border border-green-600/30 bg-green-50 p-4 text-sm text-green-800">
+          <div role="status" className="rounded-xl border border-green-600/30 bg-green-50 p-4 text-sm text-green-800">
             {waitlistSubmitted}
           </div>
         )}
@@ -369,9 +386,19 @@ export function BookingWidget({
           onState={setTurnstileReady}
         />
 
-        <Button type="submit" className="w-full" disabled={submitting || !slot || !consent || !turnstileReady}>
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={submitting || !slot || !consent || !turnstileReady}
+          aria-describedby={submitHint ? "submit-hint" : undefined}
+        >
           {submitting ? "Confirmando..." : "Confirmar reserva"}
         </Button>
+        {submitHint && (
+          <p id="submit-hint" className="text-center text-xs text-muted-foreground">
+            {submitHint}
+          </p>
+        )}
       </form>
     </div>
   );

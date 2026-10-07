@@ -17,8 +17,8 @@ export default async function ConsultarPage({
   if (!business) notFound();
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-lg items-center justify-center px-4 py-12">
+    <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-lg items-center justify-center px-4 py-12">
       <ConsultarForm slug={slug} />
-    </div>
+    </main>
   );
 }

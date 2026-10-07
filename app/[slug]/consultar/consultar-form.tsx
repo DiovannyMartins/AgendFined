@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,12 @@ function ConsultarFormInner({ slug, onReset }: { slug: string; onReset: () => vo
   const [code, setCode] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileReady, setTurnstileReady] = useState(true);
+  const resultHeading = useRef<HTMLHeadingElement>(null);
+
+  // Move focus to the result so screen readers announce it.
+  useEffect(() => {
+    if (state.status === "success") resultHeading.current?.focus();
+  }, [state.status]);
 
   if (state.status === "success") {
     const booking = state.booking;
@@ -38,7 +44,7 @@ function ConsultarFormInner({ slug, onReset }: { slug: string; onReset: () => vo
 
     return (
       <div className="w-full rounded-2xl border border-border bg-background p-8 text-center shadow-sm">
-        <h2 className="text-xl font-semibold">Reserva encontrada</h2>
+        <h1 ref={resultHeading} tabIndex={-1} className="text-xl font-semibold outline-none">Reserva encontrada</h1>
         <div className="mt-6 space-y-3 rounded-xl bg-muted/40 p-5 text-left">
           <div className="flex items-center gap-2 font-medium">
             <CalendarClock className="size-5 text-primary" />
@@ -71,7 +77,7 @@ function ConsultarFormInner({ slug, onReset }: { slug: string; onReset: () => vo
 
   return (
     <div className="w-full rounded-2xl border border-border bg-background p-8 text-center shadow-sm">
-      <h2 className="text-xl font-semibold">Consultar reserva</h2>
+      <h1 className="text-xl font-semibold">Consultar reserva</h1>
       <p className="mt-2 text-sm text-muted-foreground">
         Informe o código da sua reserva para ver os detalhes.
       </p>
@@ -90,7 +96,7 @@ function ConsultarFormInner({ slug, onReset }: { slug: string; onReset: () => vo
         </div>
         <TurnstileWidget action="booking_consult" onToken={setTurnstileToken} onState={setTurnstileReady} />
         <input type="hidden" name="cfTurnstileToken" value={turnstileToken} />
-        {state.status === "error" && <p className="text-sm text-destructive">{state.message}</p>}
+        {state.status === "error" && <p role="alert" className="text-sm text-destructive">{state.message}</p>}
         <Button type="submit" className="w-full" disabled={pending || !turnstileReady}>
           {pending ? "Consultando..." : "Consultar"}
         </Button>

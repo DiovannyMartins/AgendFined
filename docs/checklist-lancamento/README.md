@@ -14,7 +14,7 @@ Este diretório descreve como revisar e preparar o AgendFined para o lançamento
 | 2 — Qualidade visual e conteúdo | parcial: 13 (vídeo da hero) |
 | 3 — SEO e acessibilidade | parcial: 32 (axe sem violações; falta leitor de tela) e 44 (sitemap enviado, aguardando leitura do Google) |
 | 4 — Conversão e comunicação | parcial: 34 (suporte só por e-mail, sem chat/SLA); bloqueada: 39 e 47 (divulgação depende de autorização) |
-| 5 — Métricas, segurança e desempenho | parcial: 2 e 46 (desempenho 78, LCP 4,8 s; meta 2,5 s; novos ajustes aguardando deploy), 50 (sem responsável/SLA) |
+| 5 — Métricas, segurança e desempenho | parcial: 2 e 46 (home estática: desempenho 81, FCP 1,7 s, LCP simulado 4,7 s; meta 2,5 s), 50 (sem responsável/SLA) |
 
 Distinção usada nos documentos: **implementado** (código pronto), **validado localmente** (testes/lint/build), **validado em produção** (evidência no domínio ou nos provedores) e **aprovado** (decisão humana registrada).
 
@@ -24,8 +24,8 @@ Distinção usada nos documentos: **implementado** (código pronto), **validado 
 - **Runner Playwright** (`playwright.config.ts`): `next start` na porta 3100, sem `npm run` e sem reutilizar servidor; `E2E_SERVER=dev` usa `next dev` (necessário para o E2E de reserva, porque o Turnstile é fail-closed em build de produção).
 - **Drill de restauração** (`.github/workflows/backup-restore-drill.yml`): `auth.users > 0`, contagens não vazias, `bash -euo pipefail` e artefato restrito ao branch padrão; run `37557120032` verde.
 - **Analytics:** CSP com os coletores do GA4; hit confirmado em tempo real.
-- **Desempenho:** fontes via `next/font` (LCP 9,8 s → 4,8 s); depois, hero sem `backdrop-blur`/`mix-blend`, vídeo só em telas ≥ 768 px e após o `load`, e Turnstile fora da home.
-- **Acessibilidade:** axe nas rotas públicas com 0 violações após as correções.
+- **Desempenho:** fontes via `next/font` (LCP 9,8 s → 4,8 s); hero sem `backdrop-blur`/`mix-blend`, vídeo só em telas ≥ 768 px e após o `load`, Turnstile fora da home; home estática servida do cache (TTFB ~1,7 s → 85–300 ms; desempenho 81).
+- **Acessibilidade:** axe nas rotas públicas com 0 violações após as correções; PageSpeed acessibilidade 100; fluxo de reserva com anúncios para leitor de tela.
 - **Segurança:** dependências de produção com 0 vulnerabilidades (`next` 16.3.8, CLI do shadcn removido) e alertas do CodeQL corrigidos.
 - **Formulário de interesse:** removido por decisão do responsável.
 - **Documentação:** `npm run check:checklist` valida numeração, duplicatas, itens fora do escopo, status e links.

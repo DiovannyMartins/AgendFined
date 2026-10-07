@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CalendarClock } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useIsAuthenticated } from "@/components/use-is-authenticated";
 
 const links = [
   { href: "/#recursos", label: "Recursos" },
@@ -12,7 +13,8 @@ const links = [
   { href: "/#planos", label: "Preços" },
 ];
 
-export function Navbar({ isAuthenticated }: { isAuthenticated: boolean }) {
+export function Navbar() {
+  const isAuthenticated = useIsAuthenticated();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {

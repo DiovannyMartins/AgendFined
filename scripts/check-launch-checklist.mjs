@@ -10,8 +10,8 @@ import { fileURLToPath } from "node:url";
 
 // Out of scope by decision of the launch owner (6 Oct 2026):
 // 19 e-mail signup form, 29 third-party feedback, 38 contact list,
-// 42 usability test, 49 multilingual site.
-export const EXCLUDED_ITEMS = [19, 29, 38, 42, 49];
+// 39/47 promotion and campaigns, 42 usability test, 49 multilingual site.
+export const EXCLUDED_ITEMS = [19, 29, 38, 39, 42, 47, 49];
 const ITEM_LINE = /^\s*-\s*\[(.)\]\s*(\d+)\.\s/;
 const ANY_CHECKBOX = /^\s*-\s*\[([^\]]*)\]\s*(\d+)\./;
 const LINK = /\[[^\]]*\]\(([^)\s]+)\)/g;

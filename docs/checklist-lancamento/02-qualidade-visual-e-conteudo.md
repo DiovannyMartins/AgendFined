@@ -4,11 +4,11 @@
 
 Garantir que o site esteja visualmente consistente, claro, responsivo e livre de erros de conteúdo antes da publicação.
 
-**Status da fase:** parcial — os fluxos locais e a revisão visual básica passaram; reserva pública E2E passou em 6 de outubro de 2026. Feedback de terceiros (29) e teste de usabilidade (42) foram retirados do escopo pelo responsável.
+**Status da fase:** concluída em 6 de outubro de 2026 (item 13 aceito no estado atual pelo responsável).
 
 ## Itens relacionados
 
-- [~] 13. Otimizar fotos e vídeos — imagem principal convertida para WebP; o vídeo remoto HLS depende do provedor e ainda requer medição em produção.
+- [x] 13. Otimizar fotos e vídeos — imagem principal convertida para WebP; o vídeo remoto HLS depende do provedor e ainda requer medição em produção. **Aceito no estado atual pelo responsável em 6 de outubro de 2026.**
 - [x] 14. Adicionar logo e favicon — marca tipográfica com ícone e `app/favicon.ico` presentes e verificados.
 - [x] 17. Criar página “Em construção” ou “Em breve” — avaliado como não aplicável porque o site já está publicado.
 - [x] 18. Posicionar CTAs

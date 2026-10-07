@@ -4,7 +4,7 @@
 
 Permitir que mecanismos de busca encontrem o site e garantir que pessoas com diferentes necessidades consigam navegar e usar suas funções principais.
 
-**Status da fase:** parcial — só falta o item 44: o sitemap foi enviado e aguarda leitura do Google. Item 32 aceito no estado atual pelo responsável.
+**Status da fase:** concluída em 7 de outubro de 2026 (item 32 aceito no estado atual pelo responsável).
 
 ## Itens relacionados
 
@@ -12,7 +12,7 @@ Permitir que mecanismos de busca encontrem o site e garantir que pessoas com dif
 - [x] 32. Auditar acessibilidade — **axe (WCAG 2.1 A/AA + boas práticas) em 6 de outubro de 2026:** 8 rotas públicas × desktop e 360 px; os achados (contraste 4,46:1 na prévia da home, falta de `h1` nas 4 telas de autenticação, falta de `<main>`/landmarks em privacidade e termos) foram corrigidos e a nova execução deu **0 violações**, sem rolagem horizontal em 360 px. Falta o teste com leitor de tela e as rotas autenticadas/da página do negócio; detalhes em [auditoria-acessibilidade.md](./auditoria-acessibilidade.md). **Aceito no estado atual pelo responsável em 6 de outubro de 2026.**
 - [x] 36. Publicar política de privacidade
 - [x] 37. Planejar SEO off-page — plano local registrado em `docs/checklist-lancamento/seo-off-page.md`.
-- [~] 44. Enviar site para indexação — sitemap **enviado** em 6 de outubro de 2026; **processado:** não — o Search Console mostra “Não foi possível buscar o sitemap” (0 páginas) e o relatório de indexação diz “Dados em processamento: volte em mais ou menos um dia”; **páginas indexadas:** ainda sem dados. O endpoint responde HTTP 200 com XML válido e o `robots.txt` aponta para ele. Reverificar em 24–48 h e, persistindo, reenviar. Os negócios `barbearia-teste`, `e2e-barbearia-42536698` e `e2e-barbearia-42543475` foram desativados (`is_active = false`) em 6 de outubro de 2026 pelo responsável e o sitemap publicado após o deploy já lista só `/`, `/privacidade` e `/termos`.
+- [x] 44. Enviar site para indexação — sitemap enviado em 6 de outubro de 2026 e **processado em 7 de outubro de 2026** (3 páginas encontradas); relatório de indexação em 7 de outubro: **2 páginas indexadas, 0 não indexadas**, nenhum problema nos últimos 90 dias.
 
 ## Instruções de SEO
 

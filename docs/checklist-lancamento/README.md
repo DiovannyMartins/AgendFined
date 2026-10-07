@@ -6,15 +6,15 @@ Este diretório descreve como revisar e preparar o AgendFined para o lançamento
 
 **Aceitos no estado atual pelo responsável (6 de outubro de 2026):** 2 e 46 (desempenho 81, LCP simulado 4,7 s acima da meta interna de 2,5 s), 13 (vídeo decorativo da hero, desligado no celular), 32 (axe sem violações e fluxo de reserva revisado; sem teste com leitor de tela), 34 (suporte só por e-mail, sem chat ao vivo) e 50 (runbook sem responsável/SLA definidos).
 
-## Situação consolidada — 6 de outubro de 2026
+## Situação consolidada — 7 de outubro de 2026
 
-**Veredito: tecnicamente pronto, com ação externa pendente.** 42 dos 43 itens em escopo estão `[x]`; falta só o 44 (leitura do sitemap pelo Google).
+**Veredito: concluído, com itens aceitos pelo responsável.** Os 43 itens em escopo estão `[x]`; seis deles (2, 13, 32, 34, 46 e 50) foram aceitos no estado atual sem atingir a meta original, conforme registrado abaixo.
 
 | Fase | Situação |
 | --- | --- |
 | 1 — Auditoria e planejamento | concluída |
 | 2 — Qualidade visual e conteúdo | concluída |
-| 3 — SEO e acessibilidade | parcial: 44 (sitemap enviado, aguardando leitura do Google) |
+| 3 — SEO e acessibilidade | concluída (sitemap processado e 2 páginas indexadas em 7/10) |
 | 4 — Conversão e comunicação | concluída |
 | 5 — Métricas, segurança e desempenho | concluída |
 
@@ -61,9 +61,7 @@ O travamento do Playwright no Windows não se reproduziu com a nova configuraç�
 
 ## Pendências externas
 
-| Ação | Plataforma | Concluída quando |
-| --- | --- | --- |
-| Acompanhar a leitura do sitemap (item 44) | Google Search Console | status “Processado” e páginas indexadas |
+Nenhuma. O acompanhamento contínuo está em [operacao-pos-lancamento.md](./operacao-pos-lancamento.md).
 
 ## Ordem recomendada
 

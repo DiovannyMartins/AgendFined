@@ -1,3 +1,4 @@
+import { randomBytes, randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { APP_TIMEZONE } from "../../lib/app-timezone";
@@ -13,8 +14,9 @@ import { dateInTimeZone, decideRemoteWrites } from "../support/remote-write-guar
 // Run it with E2E_SERVER=dev: a production build enforces Turnstile
 // (fail-closed) and local environments do not carry its keys.
 const guard = decideRemoteWrites(process.env);
-const runId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-const PASSWORD = process.env.INTEGRATION_TEST_PASSWORD ?? `Test-${runId}-aA1!`;
+// Cryptographically random: the run ID also seeds the test password.
+const runId = randomUUID().slice(0, 13);
+const PASSWORD = process.env.INTEGRATION_TEST_PASSWORD ?? `Test-${randomBytes(18).toString("base64url")}-aA1!`;
 // Synthetic, non-deliverable data only (example.com / reserved test numbers).
 const EMAIL = `e2e.owner.${runId}@example.com`;
 const CUSTOMER_EMAIL = `e2e.customer.${runId}@example.com`;

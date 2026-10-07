@@ -29,6 +29,13 @@ function shiftDays(key: string, delta: number): string {
   return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
 }
 
+function prioritizeConfirmed(bookings: AgendaBooking[]): AgendaBooking[] {
+  return [...bookings].sort((a, b) => {
+    const statusOrder = Number(b.status === "confirmed") - Number(a.status === "confirmed");
+    return statusOrder || new Date(a.start_at).getTime() - new Date(b.start_at).getTime();
+  });
+}
+
 export function AgendaView({
   bookings,
 }: {
@@ -45,14 +52,17 @@ export function AgendaView({
   const anchorDate = dateFilter ?? todayKey;
 
   // Status applies in every view; the date is an optional filter that narrows
-  // the list when set.
+  // the list when set. Confirmed reservations stay at the top because they
+  // still require an operational action from the business.
   const filtered = useMemo(
     () =>
-      filterAgenda(bookings, {
-        filters: {
-          status: status || null,
-        },
-      }),
+      prioritizeConfirmed(
+        filterAgenda(bookings, {
+          filters: {
+            status: status || null,
+          },
+        }),
+      ),
     [bookings, status],
   );
 

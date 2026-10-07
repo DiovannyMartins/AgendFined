@@ -14,7 +14,7 @@ O item 49 (internacionalização/site multilíngue) está **fora do escopo** por
 | 2 — Qualidade visual e conteúdo | parcial: 13 (vídeo), 29 e 42 (feedback e usabilidade humanos, não iniciados) |
 | 3 — SEO e acessibilidade | parcial: 32 (auditoria completa) e 44 (sitemap enviado, aguardando processamento) |
 | 4 — Conversão e comunicação | parcial: 19 (formulário de interesse sem envio real registrado), 34 (só e-mail, sem chat/SLA); bloqueada: 38, 39, 47 |
-| 5 — Métricas, segurança e desempenho | parcial: 2 e 46 (medição de 6/10: LCP 9,8 s; correção de fontes aguardando deploy), 50 (sem responsável/SLA). Item 45 confirmado em tempo real. |
+| 5 — Métricas, segurança e desempenho | parcial: 2 e 46 (após o deploy das fontes: desempenho 78, LCP 4,8 s; meta 2,5 s), 50 (sem responsável/SLA). Item 45 confirmado em tempo real. |
 
 Distinção usada nos documentos: **implementado** (código pronto), **validado localmente** (testes/lint/build), **validado em produção** (evidência no domínio ou nos provedores) e **aprovado** (decisão humana registrada).
 
@@ -58,8 +58,7 @@ O travamento do Playwright no Windows não se reproduziu com a nova configuraç�
 
 | Ação | Plataforma | Responsável esperado | Concluída quando |
 | --- | --- | --- | --- |
-| Copiar o drill proposto e reexecutá-lo | GitHub Actions | responsável pelo repositório | execução verde com `auth.users > 0` |
-| Deploy (CSP + fontes `next/font`) e nova medição PageSpeed | Vercel | engenharia | LCP mobile medido após o deploy |
+| Executar o drill de restauração (workflow já atualizado no PR #47) | GitHub Actions | responsável pelo repositório | execução verde com `auth.users > 0` |
 | Acompanhar sitemap (item 44) | Search Console | responsável pelo lançamento | status “Processado” e páginas indexadas |
 | Reduzir LCP mobile ou aprovar novo limite (2, 46) | PageSpeed/produção | engenharia + responsável | LCP ≤ 2,5 s ou limite aprovado por escrito |
 | Auditoria de acessibilidade (32) | navegador + leitor de tela | QA | [auditoria-acessibilidade.md](./auditoria-acessibilidade.md) preenchido |

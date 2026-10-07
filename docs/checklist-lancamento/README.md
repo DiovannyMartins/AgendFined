@@ -58,7 +58,6 @@ O travamento do Playwright no Windows não se reproduziu com a nova configuraç�
 
 | Ação | Plataforma | Responsável esperado | Concluída quando |
 | --- | --- | --- | --- |
-| Executar o drill de restauração (workflow já atualizado no PR #47) | GitHub Actions | responsável pelo repositório | execução verde com `auth.users > 0` |
 | Acompanhar sitemap (item 44) | Search Console | responsável pelo lançamento | status “Processado” e páginas indexadas |
 | Reduzir LCP mobile ou aprovar novo limite (2, 46) | PageSpeed/produção | engenharia + responsável | LCP ≤ 2,5 s ou limite aprovado por escrito |
 | Auditoria de acessibilidade (32) | navegador + leitor de tela | QA | [auditoria-acessibilidade.md](./auditoria-acessibilidade.md) preenchido |

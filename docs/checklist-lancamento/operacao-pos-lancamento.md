@@ -55,7 +55,7 @@ Enquanto esses campos não forem preenchidos pelo responsável, o item 50 perman
 
 - Confirmar um hit do Google Analytics no DebugView/tempo real; a tag foi encontrada, mas a sessão do Tag Assistant não mostrou hit enviado.
 - Aguardar o processamento do sitemap reenviado no Search Console; o endpoint público responde HTTP 200 e XML válido.
-- Reexecutar o drill isolado após as novas asserções (`auth.users > 0`, contagens não vazias, `pipefail`). A execução `37418154732` validou 3 businesses, 19 bookings, 5 customers, 13 usuários Auth, 0 tabelas públicas sem RLS e 15 FKs.
+- Drill isolado reexecutado com as novas asserções (`auth.users > 0`, contagens não vazias, `pipefail`) no run `37557120032`: sucesso. A execução anterior `37418154732` validou 3 businesses, 19 bookings, 5 customers, 13 usuários Auth, 0 tabelas públicas sem RLS e 15 FKs.
 
 ## Monitoramento configurado
 

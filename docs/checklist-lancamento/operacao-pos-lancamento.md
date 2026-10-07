@@ -42,11 +42,20 @@ com dados reais neste repositório.
 4. Revalidar os fluxos principais e comunicar o responsável pelo lançamento.
 5. Após a recuperação, abrir uma tarefa com causa, impacto e prevenção.
 
+## Responsabilidades e SLA
+
+- **Responsável principal:** não informado.
+- **Substituto:** não informado.
+- **SLA de suporte / expectativa de resposta:** não informado. O suporte é assíncrono por `agendfined@outlook.com`.
+- **Canal de alerta:** e-mail da conta Better Stack (uptime, 5xx e heartbeat de backup).
+
+Enquanto esses campos não forem preenchidos pelo responsável, o item 50 permanece parcial.
+
 ## Aprovações externas pendentes
 
 - Confirmar um hit do Google Analytics no DebugView/tempo real; a tag foi encontrada, mas a sessão do Tag Assistant não mostrou hit enviado.
 - Aguardar o processamento do sitemap reenviado no Search Console; o endpoint público responde HTTP 200 e XML válido.
-- O drill isolado do GitHub Actions `37418154732` concluiu com sucesso: restaurou os dumps público e Auth em banco descartável e validou 3 businesses, 19 bookings, 5 customers, 13 usuários Auth, 0 tabelas públicas sem RLS e 15 FKs.
+- Reexecutar o drill isolado após as novas asserções (`auth.users > 0`, contagens não vazias, `pipefail`). A execução `37418154732` validou 3 businesses, 19 bookings, 5 customers, 13 usuários Auth, 0 tabelas públicas sem RLS e 15 FKs.
 
 ## Monitoramento configurado
 

@@ -15,7 +15,9 @@ export type InterestActionResult =
 const interestSchema = z.object({
   email: emailSchema,
   consent: z.boolean().refine(Boolean, "Autorize o contato para continuar."),
-  website: z.string().max(0).optional(),
+  // Honeypot: any value is accepted by the schema and handled below, so bots
+  // get the same success response and no e-mail is sent.
+  website: z.string().max(500).optional(),
   cfTurnstileToken: z.string().optional(),
 });
 
@@ -61,7 +63,7 @@ export async function submitInterest(
     return {
       ok: false,
       code: result.reason === "not_configured" ? "EMAIL_NOT_CONFIGURED" : "EMAIL_PROVIDER_ERROR",
-      message: "Não foi possível enviar sua inscrição agora. Tente novamente mais tarde.",
+      message: "Não foi possível registrar seu interesse agora. Tente novamente mais tarde.",
     };
   }
 

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Instrument_Sans, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { SupportWidget } from "@/components/support-widget";
 import { GoogleAnalytics } from "@/components/google-analytics";
@@ -29,11 +30,29 @@ export const metadata: Metadata = {
   },
 };
 
+// Self-hosted by next/font: no render-blocking request to Google Fonts and
+// no layout shift. The CSS variables keep the names used in globals.css.
+const instrumentSans = Instrument_Sans({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  display: "swap",
+  variable: "--font-instrument-sans",
+  fallback: ["Arial", "sans-serif"],
+});
+const instrumentSerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  display: "swap",
+  variable: "--font-instrument-serif",
+  fallback: ["Georgia", "serif"],
+});
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="pt-BR"
-      className="h-full antialiased"
+      className={`${instrumentSans.variable} ${instrumentSerif.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         {children}

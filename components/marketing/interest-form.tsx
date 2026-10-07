@@ -34,7 +34,7 @@ export function InterestForm() {
   if (state.ok && !pending && state !== INITIAL) {
     return (
       <div className="mx-auto max-w-xl rounded-3xl border border-border bg-background/70 p-8 text-center">
-        <p className="text-lg font-medium">Inscrição recebida.</p>
+        <p className="text-lg font-medium">Interesse registrado.</p>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Enviamos uma confirmação para seu e-mail. Entraremos em contato apenas quando houver novidades relevantes.
         </p>

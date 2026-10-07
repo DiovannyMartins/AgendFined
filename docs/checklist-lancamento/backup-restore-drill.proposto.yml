@@ -1,0 +1,98 @@
+name: Isolated encrypted backup restore drill
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+defaults:
+  run:
+    # -e: stop on any failing command; -u: fail on unset variables;
+    # -o pipefail: a failing command inside a pipeline fails the step.
+    shell: bash -euo pipefail {0}
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Download latest successful encrypted backup
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Only artifacts produced by the expected backup workflow, on the
+          # default branch of this same repository, are trusted.
+          run_id=$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow database-backup.yml \
+            --branch "${{ github.event.repository.default_branch }}" \
+            --status success \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId // empty')
+          test -n "$run_id"
+          mkdir -p backup
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --dir backup
+          public_backup=$(find backup -type f -name 'agendfined-[0-9]*.sql.gz.aes256gcm' ! -name '*-auth-*' -print -quit)
+          auth_backup=$(find backup -type f -name 'agendfined-auth-[0-9]*.sql.gz.aes256gcm' -print -quit)
+          test -n "$public_backup"
+          test -n "$auth_backup"
+          printf 'PUBLIC_BACKUP=%s\nAUTH_BACKUP=%s\n' "$public_backup" "$auth_backup" >> "$GITHUB_ENV"
+
+      - name: Prepare disposable Supabase project
+        run: |
+          mkdir -p restore-project
+          cp -R supabase restore-project/
+          sed -i 's/project_id = "projeto"/project_id = "af-restore-ci"/' restore-project/supabase/config.toml
+
+      - name: Start isolated database and apply migrations
+        run: |
+          npx supabase start \
+            --workdir restore-project \
+            --exclude gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor \
+            --yes
+          npx supabase db reset --local --workdir restore-project --no-seed --yes
+
+      - name: Restore public and Auth dumps into isolated database
+        run: |
+          node scripts/backup/restore-to-local-docker.mjs "$PUBLIC_BACKUP" supabase_db_af-restore-ci public
+          node scripts/backup/restore-to-local-docker.mjs "$AUTH_BACKUP" supabase_db_af-restore-ci auth
+
+      - name: Verify restored data, constraints and RLS
+        run: |
+          counts=$(docker exec supabase_db_af-restore-ci psql -U supabase_admin -d postgres -Atc \
+            "select (select count(*) from public.businesses), (select count(*) from public.bookings), (select count(*) from public.customers), (select count(*) from auth.users);")
+          IFS='|' read -r businesses bookings customers users <<< "$counts"
+          for value in "$businesses" "$bookings" "$customers" "$users"; do
+            [[ "$value" =~ ^[0-9]+$ ]] || { echo "::error::Contagem restaurada vazia ou inválida"; exit 1; }
+          done
+          test "${businesses:-0}" -gt 0
+          test "${bookings:-0}" -gt 0
+          test "${customers:-0}" -gt 0
+          # The Auth dump must restore at least one user.
+          test "${users:-0}" -gt 0
+          rls_missing=$(docker exec supabase_db_af-restore-ci psql -U supabase_admin -d postgres -Atc \
+            "select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity;")
+          [[ "$rls_missing" =~ ^[0-9]+$ ]] || { echo "::error::Consulta de RLS sem resultado"; exit 1; }
+          test "$rls_missing" = "0"
+          fk_count=$(docker exec supabase_db_af-restore-ci psql -U supabase_admin -d postgres -Atc \
+            "select count(*) from pg_constraint where contype = 'f' and connamespace = 'public'::regnamespace;")
+          [[ "$fk_count" =~ ^[0-9]+$ ]] || { echo "::error::Consulta de FKs sem resultado"; exit 1; }
+          test "$fk_count" -gt 0
+          echo "Restored counts businesses|bookings|customers|auth.users: $counts"
+          echo "RLS-disabled public tables: $rls_missing"
+          echo "Public foreign keys checked: $fk_count"
+
+      - name: Stop isolated database
+        if: always()
+        run: npx supabase stop --workdir restore-project --no-backup

@@ -1,4 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Instrument+Serif:ital@0;1&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -51,8 +50,6 @@
 }
 
 :root {
-  --font-instrument-sans: "Instrument Sans", Arial, sans-serif;
-  --font-instrument-serif: "Instrument Serif", Georgia, serif;
   --font-geist-mono: "SFMono-Regular", Consolas, monospace;
   --background: #141414;
   --foreground: #eeeeee;

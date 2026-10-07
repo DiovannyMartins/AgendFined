@@ -14,10 +14,12 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "check:launch": "node scripts/verify-launch.mjs",
+    "check:checklist": "node scripts/check-launch-checklist.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run --project integration",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:safe": "next build --webpack && playwright test tests/e2e/landing.spec.ts tests/e2e/seo.spec.ts tests/e2e/public.spec.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

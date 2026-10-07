@@ -40,7 +40,7 @@ async function ConfirmationContent({ code, slug, cancelToken }: { code: string; 
   }).format(new Date(booking.start_at));
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-lg items-center justify-center px-4 py-12">
+    <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-lg items-center justify-center px-4 py-12">
       <div className="w-full rounded-2xl border border-border bg-background p-8 text-center shadow-sm">
         <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-green-100 text-green-700">
           <CheckCircle2 className="size-8" />
@@ -84,7 +84,7 @@ async function ConfirmationContent({ code, slug, cancelToken }: { code: string; 
           </Link>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 

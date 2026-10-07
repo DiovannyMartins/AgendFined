@@ -1,6 +1,6 @@
 # Auditoria de acessibilidade (item 32)
 
-**Estado:** parcial. A auditoria automatizada das rotas públicas foi feita e está sem violações; faltam leitor de tela e as rotas que dependem de dados (painel e páginas de negócio).
+**Estado:** parcial. Rotas públicas auditadas com axe (0 violações) e fluxo de reserva/consulta/cancelamento revisado na árvore de acessibilidade, com correções. Falta conferir ao vivo a página de um negócio após o deploy e o teste com leitor de tela.
 
 ## Verificado por inspeção de código nesta revisão
 
@@ -25,5 +25,8 @@
 | 06/10/2026 | `/login`, `/cadastro`, `/recuperar-senha`, `/redefinir-senha` | axe | `page-has-heading-one` | moderado | título do card exposto como `role="heading" aria-level={1}` |
 | 06/10/2026 | `/privacidade`, `/termos` | axe | `landmark-one-main` e `region` | moderado | layout com `<header>`, `<main id="main-content">` e `<footer>` |
 | 06/10/2026 | 8 rotas públicas (inclui 404) | axe, desktop e 360 px | nova execução após as correções | — | **0 violações**; sem rolagem horizontal em 360 px |
+| 06/10/2026 | `/{slug}` (reserva) | revisão da árvore de acessibilidade no código | troca de data/serviço atualizava os horários sem aviso; rótulo “Horários disponíveis” solto; horário escolhido sem estado; erro da reserva não anunciado; botão desabilitado sem explicação; sem `<main>` | sério | região `aria-live` com a quantidade de horários/carregando/erro, `fieldset`/`legend`, `aria-pressed` nos horários, `role="alert"` no erro, dica ligada ao botão, `aria-describedby` no e-mail, `<main>` |
+| 06/10/2026 | `/{slug}/consultar` | revisão da árvore de acessibilidade no código | sem `h1`; resultado e erro não anunciados; sem `<main>` | moderado | `h1` em “Consultar reserva” e “Reserva encontrada”, foco movido para o resultado, `role="alert"` no erro, `<main>` |
+| 06/10/2026 | `/{slug}/confirmacao` | revisão da árvore de acessibilidade no código | cancelamento concluído e erro não anunciados; sem `<main>` | moderado | `role="status"` no sucesso, `role="alert"` no erro, `<main>` |
 
 O item 32 só vira `[x]` com axe e verificação manual registrados; sem leitor de tela, permanece `[~]`.

@@ -22,7 +22,7 @@ export function CancelBooking({ code, token }: { code: string; token: string }) 
 
   if (state.status === "done") {
     return (
-      <div className="mt-6 rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-center">
+      <div role="status" className="mt-6 rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-center">
         <p className="text-sm font-medium">Reserva cancelada!</p>
         <p className="mt-1 text-sm text-muted-foreground">
           O horário foi liberado e poderá ser reservado novamente.
@@ -53,7 +53,7 @@ export function CancelBooking({ code, token }: { code: string; token: string }) 
               </label>
               <Input id="cancelReason" name="cancelReason" maxLength={250} />
             </div>
-            {state.status === "error" && <p className="text-sm text-destructive">{state.message}</p>}
+            {state.status === "error" && <p role="alert" className="text-sm text-destructive">{state.message}</p>}
             <Button type="submit" variant="destructive" disabled={pending} className="w-full">
               {pending ? "Cancelando..." : "Confirmar cancelamento"}
             </Button>

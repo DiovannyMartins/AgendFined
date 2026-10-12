@@ -26,6 +26,7 @@ CHECK_URL=http://localhost:3000 APP_URL=http://localhost:3000 npm run check:laun
 4. Depois de adicionar ou alterar uma variável, faça um novo deploy. A variável de Analytics usada no projeto é `NEXT_PUBLIC_GA_MEASUREMENT_ID`.
 5. Em **Domains**, confirme o domínio principal, HTTPS e redirecionamento canônico.
 6. Depois do deploy, rode `npm run check:launch -- --production` e faça uma visita manual à landing, cadastro, login e uma rota pública.
+7. Configure `CRON_SECRET` e `RECONCILIATION_CRON_SECRET` como Secrets em Production. O scheduler de reconciliação está configurado no Supabase `pg_cron` com o job `billing-reconciliation` a cada 30 minutos; o mesmo segredo é mantido no Supabase Vault e enviado no header `Authorization: Bearer ...`. O Vercel Cron não é usado para essa rotina.
 
 ## Supabase
 
@@ -40,7 +41,8 @@ npx supabase db push --linked
 ```
 
 4. Confirme que o cron/pg_net chama a Edge Function `booking-reminders` com `REMINDER_CRON_SECRET` e que a função possui `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY` e `RESEND_FROM_EMAIL`.
-5. Não altere RLS, RPCs, cron ou secrets diretamente como parte de um deploy de frontend. Faça mudanças de banco em migration, revise-as e valide com os testes de integração usando Node 22+.
+5. Para a reconciliação, confirme no Vault os nomes `agendfined_reconciliation_cron_url` e `agendfined_reconciliation_cron_secret`, e no `cron.job` o schedule `*/30 * * * *` com `active = true`.
+6. Não altere RLS, RPCs, cron ou secrets diretamente como parte de um deploy de frontend. Faça mudanças de banco em migration, revise-as e valide com os testes de integração usando Node 22+.
 
 ## Mercado Pago
 

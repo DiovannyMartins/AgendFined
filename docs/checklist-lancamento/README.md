@@ -52,7 +52,7 @@ Distinção usada nos documentos: **implementado** (código pronto), **validado 
 | `npm run build` | exit 0, 29 s, 26 páginas (inclui fontes via `next/font`) |
 | Playwright landing/seo/public — execução 1 | exit 0, 18 s, 10 passed; depois: 0 servidores de teste, porta 3100 livre, 0 processos Node |
 | Playwright landing/seo/public — execução 2 | exit 0, 12 s, 10 passed; depois: 0 servidores de teste, porta 3100 livre, 0 processos Node |
-| `npm run check:launch -- --production` | exit 0; `/`, `/robots.txt`, `/sitemap.xml`, CSP e canonical PASS; 1 aviso (segredo do scheduler de reconciliação) |
+  | `npm run check:launch -- --production` | exit 0; `/`, `/robots.txt`, `/sitemap.xml`, CSP e canonical PASS; secrets do scheduler verificados no Vercel Production/Supabase Vault e cron ativo a cada 30 minutos em 12 de outubro |
 | Integração (`--project integration`, Supabase de produção, autorizado pelo responsável) | exit 0, 55 s, 13 arquivos, 88 testes |
 | E2E de reserva — tentativa 1 (`next start`) | exit 1, 67 s: reserva recusada pelo Turnstile fail-closed do build de produção (ambiente local sem chaves). Limpeza sem erro. |
 | E2E de reserva — tentativa 2 (`E2E_SERVER=dev`, 21h07) | exit 0, 138 s, 2 passed; limpeza sem erro. O e-mail de confirmação falhou (`provider_error`) porque o cliente de teste usa `@example.com`, que o Resend não entrega; a reserva não depende do e-mail. |
@@ -61,7 +61,7 @@ O travamento do Playwright no Windows não se reproduziu com a nova configuraç�
 
 ## Pendências externas
 
-Nenhuma. O acompanhamento contínuo está em [operacao-pos-lancamento.md](./operacao-pos-lancamento.md).
+Nenhuma pendência externa bloqueante. O acompanhamento contínuo e as melhorias operacionais aceitas estão em [operacao-pos-lancamento.md](./operacao-pos-lancamento.md).
 
 ## Ordem recomendada
 

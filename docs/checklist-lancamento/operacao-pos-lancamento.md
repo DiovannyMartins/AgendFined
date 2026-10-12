@@ -51,10 +51,12 @@ com dados reais neste repositório.
 
 Enquanto esses campos não forem preenchidos pelo responsável, o item 50 permanece parcial.
 
-## Aprovações externas pendentes
+## Acompanhamento operacional
 
-- Confirmar um hit do Google Analytics no DebugView/tempo real; a tag foi encontrada, mas a sessão do Tag Assistant não mostrou hit enviado.
+- Analytics: hit confirmado em produção em 6 de outubro de 2026; continuar verificando os eventos na rotina semanal.
 - Search Console: sitemap processado em 7 de outubro de 2026, com 2 páginas indexadas.
+  - Reconciliação de cobrança: job `billing-reconciliation` no Supabase `pg_cron`, a cada 30 minutos, com endpoint privado protegido por segredo no Vault; revisar falhas em `net._http_response` e nos logs da Vercel.
+- Responsável, substituto e SLA ainda não foram informados; esse ponto foi aceito pelo responsável como melhoria operacional do item 50 e não bloqueia o MVP publicado.
 - Drill isolado reexecutado com as novas asserções (`auth.users > 0`, contagens não vazias, `pipefail`) no run `37557120032`: sucesso. A execução anterior `37418154732` validou 3 businesses, 19 bookings, 5 customers, 13 usuários Auth, 0 tabelas públicas sem RLS e 15 FKs.
 
 ## Monitoramento configurado

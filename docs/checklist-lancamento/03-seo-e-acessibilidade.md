@@ -58,8 +58,8 @@ As páginas públicas devem possuir metadados coerentes, sitemap enviado e nenhu
 - Login, cadastro, recuperação, MFA, dashboard, consulta e confirmação usam `noindex, nofollow`.
 - Skip links foram adicionados ao marketing, autenticação e dashboard.
 - Os testes E2E de SEO passaram em desktop e mobile.
-- Search Console: sitemap reenviado em 6 de outubro de 2026, aguardando processamento; acompanhar “Sitemaps” e “Páginas” até o status “Processado” e páginas indexadas.
-- Pendente: auditoria automatizada e manual completa de acessibilidade, conforme [auditoria-acessibilidade.md](./auditoria-acessibilidade.md).
+- Search Console: sitemap reenviado em 6 de outubro de 2026 e processado em 7 de outubro; o relatório registrou 3 páginas encontradas, 2 indexadas e 0 não indexadas.
+- A auditoria automatizada foi concluída sem violações nas rotas públicas cobertas; o teste com leitor de tela e a cobertura das rotas autenticadas permanecem como melhoria futura aceita pelo responsável, conforme [auditoria-acessibilidade.md](./auditoria-acessibilidade.md).
 - O plano de SEO off-page foi registrado sem criar perfis, publicar links ou executar campanhas externas.
 - A execução focada de E2E confirmou os endpoints públicos, canonical, metadata e `noindex` em desktop e mobile.
 

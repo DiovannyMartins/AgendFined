@@ -46,7 +46,7 @@ Medir o comportamento do site, proteger os dados e confirmar que a aplicação s
 - Nenhum evento envia e-mail, telefone, nome, código de reserva ou identificador de usuário.
 - A variável `NEXT_PUBLIC_GA_MEASUREMENT_ID` foi cadastrada na Vercel para Production.
 - O código está publicado em produção e o carregamento do Google Analytics foi validado no HTML/CSP do domínio oficial.
-- O Tag Assistant encontrou a tag `G-92YJVL0YB0`, mas exibiu “Esta tag não enviou nenhum hit”; a confirmação de evento permanece bloqueada até o Google Analytics receber um hit.
+- O Tag Assistant encontrou a tag `G-92YJVL0YB0`, e uma visita em produção gerou `g/collect`; o Google Analytics mostrou 1 usuário ativo nos últimos 30 minutos em 6 de outubro de 2026.
 - Hipótese corrigida no código: a CSP permitia só `analytics.google.com` (sem subdomínios) e não incluía `*.googletagmanager.com` em `connect-src`/`img-src`. Agora segue a lista do Google para GA4 e há teste em `lib/security/next-config.test.ts`. Sem `page_view` manual: o único `page_view` vem do `config` (`send_page_view: true`).
 - Se um bloqueador impedir o `gtag.js`, os eventos ficam na fila `dataLayer` sem erro (coberto por teste).
 
@@ -106,14 +106,14 @@ Registrar para cada nova medição: URL, data, dispositivo, ferramenta, métrica
 - ID do Analytics cadastrado na Vercel como configuração de Production.
 - Validação técnica mais recente: ver a seção “Validação técnica” no [README](./README.md).
 - Runbook de operação, backup, rollback e manutenção registrado em `docs/checklist-lancamento/operacao-pos-lancamento.md`.
-- `npm run check:launch -- --production` passou nas variáveis, `/`, `/robots.txt`, `/sitemap.xml`, CSP e referência canônica; houve apenas o aviso de que o segredo do scheduler de reconciliação não está configurado.
+- `npm run check:launch -- --production` passou nas variáveis, `/`, `/robots.txt`, `/sitemap.xml`, CSP e referência canônica; os secrets do scheduler foram verificados no Vercel Production e no Supabase Vault em 12 de outubro de 2026, e o job `billing-reconciliation` foi confirmado ativo a cada 30 minutos.
 - PageSpeed foi repetido em produção após a última otimização: desempenho mobile 76, LCP 4,4 s, FCP 2,7 s, TBT 240 ms, CLS 0,037, acessibilidade 96, boas práticas 92 e SEO 100. O relatório ainda apontou 298 KiB de JavaScript não usado e 5 tarefas longas.
-- O sitemap `https://agendfined.com.br/sitemap.xml` respondeu HTTP 200 com XML válido e foi reenviado no Search Console em 6 de outubro de 2026; o Google ainda está processando a leitura.
+- O sitemap `https://agendfined.com.br/sitemap.xml` respondeu HTTP 200 com XML válido, foi reenviado em 6 de outubro de 2026 e teve processamento confirmado no Search Console em 7 de outubro, com 2 páginas indexadas.
 - O workflow manual de backup #42 concluiu com sucesso no GitHub Actions em 38 s, publicou um artefato e renovou o heartbeat. O Better Stack mostra `AgendFined backup freshness` como `Up`, esperado a cada 18 horas, com último heartbeat recente.
 - O workflow de drill isolado `37418154732` concluiu com sucesso em 1m36s: restaurou 3 businesses, 19 bookings, 5 customers e 13 usuários Auth; encontrou 0 tabelas públicas sem RLS e 15 FKs. Essa execução é anterior à asserção explícita de `auth.users > 0`.
 - O alerta de erros 5xx foi salvo no Better Stack para a fonte `AgendFined Vercel`, usando consulta Log SQL, limiar acima de zero, janela de 5 minutos, confirmação de 5 minutos e recuperação de 5 minutos.
 - Better Stack Telemetry mantém a fonte `AgendFined Vercel` ativa. O monitor de disponibilidade `AgendFined produção` (ID `5024662`) foi criado para `https://agendfined.com.br`, com checagem a cada 3 minutos, confirmação após 5 minutos de falha e e-mail para `diovannydev@gmail.com`.
-- A CSP publicada permite os endpoints regionais do Google Analytics; ainda é necessário confirmar um hit real no DebugView/tempo real.
+- A CSP publicada permite os endpoints regionais do Google Analytics; o hit real em produção foi confirmado em 6 de outubro de 2026.
 
 ## Critério de conclusão
 

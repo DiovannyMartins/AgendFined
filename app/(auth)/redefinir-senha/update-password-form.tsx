@@ -71,9 +71,12 @@ export function UpdatePasswordForm() {
                 id="password"
                 type="password"
                 autoComplete="new-password"
-                minLength={15}
+                minLength={8}
                 {...register("password")}
               />
+              <p className="text-xs text-muted-foreground">
+                Use pelo menos 8 caracteres, com letra maiúscula, minúscula, número e símbolo.
+              </p>
               {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
             </div>
             {serverError && <p className="text-sm text-destructive">{serverError}</p>}

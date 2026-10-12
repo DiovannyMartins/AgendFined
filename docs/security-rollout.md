@@ -11,7 +11,8 @@ no servidor.
   `aal2` nas tabelas da aplicação quando a conta tem fator verificado. A
   verificação de código tem limite por usuário. A página de configurações
   contém o acesso ao cadastro do autenticador.
-- Senhas: cadastro e redefinição exigem ao menos 15 caracteres, com letras e números; o login aceita
+- Senhas: cadastro e redefinição exigem ao menos 8 caracteres, com letras minúsculas e maiúsculas,
+  números e símbolos; o login aceita
   as senhas existentes. O Supabase Auth armazena senhas com bcrypt, sem que a
   aplicação receba o hash.
 - Limites: login, cadastro, recuperação, reserva, consulta, busca e

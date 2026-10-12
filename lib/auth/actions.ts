@@ -148,7 +148,8 @@ export async function updatePassword(_prev: ActionResult, formData: FormData): P
     return {
       ok: false,
       code: "VALIDATION",
-      message: "Escolha uma senha com pelo menos 15 caracteres, uma letra e um número.",
+      message:
+        "Escolha uma senha com pelo menos 8 caracteres, uma letra maiúscula, uma letra minúscula, um número e um símbolo.",
       fieldErrors: { password: parsedPassword.error.issues.map((issue) => issue.message) },
     };
   }

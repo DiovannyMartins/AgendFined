@@ -8,10 +8,12 @@ export const loginSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 
 export const passwordSchema = z.string()
-  .min(15, "A senha deve ter pelo menos 15 caracteres.")
+  .min(8, "A senha deve ter pelo menos 8 caracteres.")
   .max(128, "Senha muito longa.")
-  .regex(/[A-Za-z]/, "Inclua pelo menos uma letra.")
-  .regex(/[0-9]/, "Inclua pelo menos um número.");
+  .regex(/[a-z]/, "Inclua pelo menos uma letra minúscula.")
+  .regex(/[A-Z]/, "Inclua pelo menos uma letra maiúscula.")
+  .regex(/[0-9]/, "Inclua pelo menos um número.")
+  .regex(/[^A-Za-z0-9\s]/, "Inclua pelo menos um símbolo.");
 
 export const signupSchema = z.object({
   displayName: z.string().trim().min(2, "Informe seu nome.").max(100, "Nome muito longo."),

@@ -86,16 +86,20 @@ describe("signupSchema", () => {
 
   it("accepts valid signup", () => {
     expect(
-      signupSchema.safeParse({ displayName: "João", email: "a@b.com", password: "uma senha longa e única 2026" }).success,
+      signupSchema.safeParse({ displayName: "João", email: "a@b.com", password: "Abcdef1!" }).success,
     ).toBe(true);
   });
 });
 
 describe("passwordSchema", () => {
-  it("requires 15 characters with letters and digits", () => {
+  it("requires 8 characters with upper/lowercase letters, a digit, and a symbol", () => {
     expect(passwordSchema.safeParse("12345678").success).toBe(false);
-    expect(passwordSchema.safeParse("uma senha longa e única").success).toBe(false);
-    expect(passwordSchema.safeParse("uma senha longa e única 2026").success).toBe(true);
+    expect(passwordSchema.safeParse("abcdefg1!").success).toBe(false);
+    expect(passwordSchema.safeParse("ABCDEFG1!").success).toBe(false);
+    expect(passwordSchema.safeParse("Abcdefgh!").success).toBe(false);
+    expect(passwordSchema.safeParse("Abcdefg1").success).toBe(false);
+    expect(passwordSchema.safeParse("Abc1!").success).toBe(false);
+    expect(passwordSchema.safeParse("Abcdef1!").success).toBe(true);
   });
 });
 

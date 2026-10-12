@@ -29,6 +29,7 @@ import {
   classifyCustomerNote,
   classifyOperationalError,
 } from "@/lib/typesafe/judgments";
+import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
 
 export type ActionResult = {
   ok: boolean;
@@ -193,6 +194,16 @@ export async function createBooking(input: {
     }
   }
 
+  // Calendar sync is best effort: a temporary Google outage must never make a
+  // valid public reservation fail. The periodic scheduler remains the safety net.
+  if (data?.id) {
+    try {
+      await syncGoogleCalendarBooking(business.id, data.id);
+    } catch (error) {
+      console.error("google_calendar_booking_sync_failed", { bookingId: data.id, reason: error instanceof Error ? error.message : "unknown" });
+    }
+  }
+
   return data?.public_code
     ? { ok: true, publicCode: data.public_code, cancelToken }
     : { ok: false, code: "db_error", message: "Não foi possível concluir a reserva. Tente novamente." };
@@ -308,6 +319,19 @@ export async function cancelPublicBooking(
   });
 
   if (error) return cancellationRejected();
+
+  const { data: cancelledBooking } = await supabase
+    .from("bookings")
+    .select("id,business_id")
+    .eq("public_code", parsed.data)
+    .maybeSingle();
+  if (cancelledBooking) {
+    try {
+      await syncGoogleCalendarBooking(cancelledBooking.business_id, cancelledBooking.id);
+    } catch (syncError) {
+      console.error("google_calendar_booking_sync_failed", { bookingId: cancelledBooking.id, reason: syncError instanceof Error ? syncError.message : "unknown" });
+    }
+  }
 
   if (reason) {
     const judgment = await classifyCancellationReason(reason);

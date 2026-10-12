@@ -5,12 +5,16 @@ import { PlanSection } from "./plan-section";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { isProPlan } from "@/lib/plan/plan";
+import { getGoogleCalendarConnectionStatus } from "@/lib/google-calendar/queries";
+import { GoogleCalendarSection } from "./google-calendar-section";
 
 export default async function ConfiguracoesPage() {
   const business = await getCurrentBusiness();
   if (!business) redirect("/dashboard/setup");
 
   const supabase = await createClient();
+  const googleCalendar = await getGoogleCalendarConnectionStatus(business.id);
   const { data: availability } = await supabase
     .from("availability")
     .select("*")
@@ -34,6 +38,8 @@ export default async function ConfiguracoesPage() {
       />
 
       <PlanSection business={{ id: business.id, plan: business.plan }} />
+
+      <GoogleCalendarSection connection={googleCalendar} isPro={isProPlan(business.plan)} />
 
       <section className="space-y-2">
         <h2 className="text-xl font-semibold">Segurança da conta</h2>

@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { runBoundedReconciliation } from "@/lib/billing/reconciliation-runner";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enforceApiRateLimit, getClientIpFromHeaders } from "@/lib/booking/rate-limit";
+import { runGoogleCalendarSyncBatch } from "@/lib/google-calendar/sync";
 
 export const runtime = "nodejs";
 
@@ -27,7 +28,13 @@ async function run(request: NextRequest) {
   console.info(JSON.stringify({ event: "reconciliation_http_started" }));
   try {
     const reports = await runBoundedReconciliation();
-    const body = { ok: true, reportCount: reports.length, durationMs: Date.now() - startedAt };
+    let calendarSync: { connections: number; synced: number; deleted: number; failed: number } | null = null;
+    try {
+      calendarSync = await runGoogleCalendarSyncBatch();
+    } catch {
+      console.error(JSON.stringify({ event: "google_calendar_sync_batch_failed" }));
+    }
+    const body = { ok: true, reportCount: reports.length, calendarSync, durationMs: Date.now() - startedAt };
     console.info(JSON.stringify({ event: "reconciliation_http_finished", ...body }));
     return NextResponse.json(body);
   } catch {

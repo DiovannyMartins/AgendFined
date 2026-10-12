@@ -507,6 +507,59 @@ export type Database = {
           },
         ]
       }
+      google_calendar_connections: {
+        Row: {
+          access_token_ciphertext: string
+          business_id: string
+          calendar_id: string
+          created_at: string
+          google_email: string
+          id: string
+          last_error: string | null
+          last_sync_at: string | null
+          refresh_token_ciphertext: string
+          scope: string
+          token_expires_at: string
+          updated_at: string
+        }
+        Insert: {
+          access_token_ciphertext: string
+          business_id: string
+          calendar_id?: string
+          created_at?: string
+          google_email: string
+          id?: string
+          last_error?: string | null
+          last_sync_at?: string | null
+          refresh_token_ciphertext: string
+          scope: string
+          token_expires_at: string
+          updated_at?: string
+        }
+        Update: {
+          access_token_ciphertext?: string
+          business_id?: string
+          calendar_id?: string
+          created_at?: string
+          google_email?: string
+          id?: string
+          last_error?: string | null
+          last_sync_at?: string | null
+          refresh_token_ciphertext?: string
+          scope?: string
+          token_expires_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_calendar_connections_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: true
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       waitlist_entries: {
         Row: {
           business_id: string

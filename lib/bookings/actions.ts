@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { canTransition, type BookingStatus } from "@/lib/bookings/transitions";
 import { bookingStatusSchema } from "@/lib/validation/schemas";
 import { classifyCancellationReason } from "@/lib/typesafe/judgments";
+import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
 
 export async function updateBookingStatus(
   _prev: { ok: boolean; message?: string },
@@ -67,6 +68,14 @@ export async function updateBookingStatus(
         .update({ cancel_reason_category: judgment.category })
         .eq("id", id)
         .eq("business_id", business.id);
+    }
+  }
+
+  if (nextStatus === "cancelled") {
+    try {
+      await syncGoogleCalendarBooking(business.id, id);
+    } catch (syncError) {
+      console.error("google_calendar_booking_sync_failed", { bookingId: id, reason: syncError instanceof Error ? syncError.message : "unknown" });
     }
   }
 

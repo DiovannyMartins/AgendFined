@@ -35,7 +35,7 @@ const REMINDER_BATCH_LIMIT = 50;
 type Candidate = {
   id: string;
   business_name: string;
-  business_timezone?: string;
+  business_timezone: string;
   customer_name_snapshot: string;
   customer_email_snapshot: string | null;
   service_name_snapshot: string;

@@ -6,6 +6,19 @@ O AgendFined sincroniza reservas confirmadas em uma única direção: AgendFined
 
 O AgendFined não lê eventos existentes do Google Calendar. Ao desconectar, o acesso é revogado e a conexão local é removida; eventos que já foram criados no Google Calendar permanecem lá.
 
+### Fusos horários
+
+Cada negócio tem um fuso IANA próprio, com `America/Sao_Paulo` como padrão. A reserva é
+convertida do horário local do negócio para um instante UTC; o mesmo fuso é usado no
+site público, painel, lembretes, exportação e evento do Google Calendar.
+
+Ao conectar, o sistema consulta automaticamente o fuso do calendário principal e o
+guarda apenas como metadado. Se ele for diferente do fuso do negócio, Configurações
+mostra um aviso. O proprietário pode alinhar os fusos pelo botão de configuração,
+mas a alteração é bloqueada enquanto existirem reservas futuras confirmadas para
+evitar deslocar horários já publicados. Não se deve corrigir a diferença somando ou
+subtraindo uma hora manualmente.
+
 ## Google Cloud
 
 1. Crie ou selecione um projeto no [Google Cloud Console](https://console.cloud.google.com/).

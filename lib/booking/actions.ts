@@ -58,7 +58,7 @@ export async function createBooking(input: {
   if (!preamble.ok) return preamble.result;
   const { supabase, business } = preamble;
 
-  const startAtIso = zonedTimeToUtc(input.date, input.startTime);
+  const startAtIso = zonedTimeToUtc(input.date, input.startTime, business.timezone);
 
   const parsed = publicBookingSchema.safeParse({
     serviceId: input.serviceId,
@@ -92,7 +92,7 @@ export async function createBooking(input: {
   // business.
   let slotRange: SlotRange | null;
   try {
-    slotRange = await getSlotRange(supabase, business.id, input.date);
+    slotRange = await getSlotRange(supabase, business.id, input.date, business.timezone);
   } catch {
     return {
       ok: false,
@@ -108,6 +108,7 @@ export async function createBooking(input: {
     slotIntervalMinutes: business.slot_interval_minutes,
     minNoticeMinutes: business.min_notice_minutes,
     bookingWindowDays: getEffectiveBookingWindowDays(business.plan, business.booking_window_days),
+    timezone: business.timezone,
   };
   if (!isWithinWindow(input.date, rules, new Date())) {
     return {
@@ -169,6 +170,7 @@ export async function createBooking(input: {
       businessName: business.name,
       serviceName: service.name,
       startAt: startAtIso,
+      timezone: business.timezone,
       publicCode: data.public_code,
       confirmationUrl: buildPrivateConfirmationUrl(input.slug, data.public_code, cancelToken),
     });
@@ -398,7 +400,7 @@ export async function joinWaitlist(input: {
   if (!preamble.ok) return preamble.result;
   const { business } = preamble;
 
-  const startAt = zonedTimeToUtc(input.date, input.startTime);
+  const startAt = zonedTimeToUtc(input.date, input.startTime, business.timezone);
 
   const parsed = parseWaitlistInput({
     serviceId: input.serviceId,
@@ -447,6 +449,7 @@ type ResolvedBusiness = {
   slot_interval_minutes: number;
   min_notice_minutes: number;
   booking_window_days: number;
+  timezone: string;
 };
 
 async function resolvePublicBusinessAndRateLimit(
@@ -498,8 +501,9 @@ async function getSlotRange(
   supabase: ServerClient,
   businessId: string,
   date: string,
+  timezone: string,
 ): Promise<SlotRange | null> {
-  const weekday = weekdayOf(date);
+  const weekday = weekdayOf(date, timezone);
 
   // Availability, blocks and occupied slots belong to the business, so the
   // revalidation is scoped to the business.
@@ -513,7 +517,7 @@ async function getSlotRange(
   if (intervalsError) throw new Error(intervalsError.message);
   if (!intervals || intervals.length === 0) return null;
 
-  const day = localDayRangeUtc(date);
+  const day = localDayRangeUtc(date, timezone);
 
   const [{ data: blocks, error: blocksError }, { data: bookings, error: bookingsError }] = await Promise.all([
     supabase

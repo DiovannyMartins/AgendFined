@@ -14,14 +14,14 @@ import { APP_TIMEZONE } from "@/lib/app-timezone";
 
 const INITIAL: ConsultState = { status: "idle" };
 
-export function ConsultarForm({ slug }: { slug: string }) {
+export function ConsultarForm({ slug, timezone }: { slug: string; timezone: string }) {
   // Bumping the key remounts the inner form, resetting both its useActionState
   // (back to idle) and its local code field.
   const [round, setRound] = useState(0);
-  return <ConsultarFormInner key={round} slug={slug} onReset={() => setRound((r) => r + 1)} />;
+  return <ConsultarFormInner key={round} slug={slug} timezone={timezone} onReset={() => setRound((r) => r + 1)} />;
 }
 
-function ConsultarFormInner({ slug, onReset }: { slug: string; onReset: () => void }) {
+function ConsultarFormInner({ slug, timezone, onReset }: { slug: string; timezone: string; onReset: () => void }) {
   const [state, formAction, pending] = useActionState(consultBooking, INITIAL);
   const [code, setCode] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -35,10 +35,11 @@ function ConsultarFormInner({ slug, onReset }: { slug: string; onReset: () => vo
 
   if (state.status === "success") {
     const booking = state.booking;
-    const dateStr = new Intl.DateTimeFormat("pt-BR", { dateStyle: "full", timeZone: APP_TIMEZONE }).format(
+    const bookingTimezone = booking.timezone ?? timezone ?? APP_TIMEZONE;
+    const dateStr = new Intl.DateTimeFormat("pt-BR", { dateStyle: "full", timeZone: bookingTimezone }).format(
       new Date(booking.startAt),
     );
-    const timeStr = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: APP_TIMEZONE }).format(
+    const timeStr = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: bookingTimezone }).format(
       new Date(booking.startAt),
     );
 

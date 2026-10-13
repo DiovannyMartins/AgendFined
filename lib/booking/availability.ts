@@ -44,9 +44,7 @@ export function minutesToTime(totalMinutes: number): string {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-function tzOffsetMinutes(_timezone: string, utcMs: number): number {
-  void _timezone;
-  const timezone = APP_TIMEZONE;
+function tzOffsetMinutes(timezone: string, utcMs: number): number {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
     year: "numeric",
@@ -89,10 +87,9 @@ export function generateSlotStartTimes(
   return candidates;
 }
 
-export function toLocalDate(date: Date, _timezone?: string): string {
-  void _timezone;
+export function toLocalDate(date: Date, timezone: string = APP_TIMEZONE): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: APP_TIMEZONE,
+    timeZone: timezone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -104,60 +101,52 @@ export function toLocalDate(date: Date, _timezone?: string): string {
 export function isWithinWindow(date: string, rules: BusinessRules, now: Date): boolean {
   const [y, m, d] = date.split("-").map(Number);
   const target = new Date(Date.UTC(y, m - 1, d));
-  const today = new Date(toLocalDate(now) + "T00:00:00Z");
+  const today = new Date(toLocalDate(now, rules.timezone) + "T00:00:00Z");
   const windowEnd = new Date(today);
   windowEnd.setUTCDate(windowEnd.getUTCDate() + rules.bookingWindowDays);
   return target >= today && target <= windowEnd;
 }
 
-export function zonedTimeToUtcMs(date: string, time: string, _timezone?: string): number {
-  void _timezone;
+export function zonedTimeToUtcMs(date: string, time: string, timezone: string = APP_TIMEZONE): number {
   const [y, m, d] = date.split("-").map(Number);
   const [hh, mm] = time.split(":").map(Number);
-  // UTC instant whose local (em America/Sao_Paulo) wall-clock reading equals date+time.
+  // UTC instant whose local wall-clock reading in `timezone` equals date+time.
   // Iterate to converge on DST-aware offsets.
   const naive = Date.UTC(y, m - 1, d, hh, mm);
-  let guess = naive - tzOffsetMinutes(APP_TIMEZONE, naive) * 60_000;
-  guess = naive - tzOffsetMinutes(APP_TIMEZONE, guess) * 60_000;
-  guess = naive - tzOffsetMinutes(APP_TIMEZONE, guess) * 60_000;
+  let guess = naive - tzOffsetMinutes(timezone, naive) * 60_000;
+  guess = naive - tzOffsetMinutes(timezone, guess) * 60_000;
+  guess = naive - tzOffsetMinutes(timezone, guess) * 60_000;
   return guess;
 }
 
-export function zonedTimeToUtc(date: string, time: string, _timezone?: string): string {
-  void _timezone;
-  return new Date(zonedTimeToUtcMs(date, time)).toISOString();
+export function zonedTimeToUtc(date: string, time: string, timezone: string = APP_TIMEZONE): string {
+  return new Date(zonedTimeToUtcMs(date, time, timezone)).toISOString();
 }
 
 // Inclusive start / exclusive end of the local calendar day `date`,
 // expressed as UTC instants.
-export function localDayRangeUtc(date: string, _timezone?: string): { start: string; end: string } {
-  void _timezone;
-  const startMs = zonedTimeToUtcMs(date, "00:00");
+export function localDayRangeUtc(date: string, timezone: string = APP_TIMEZONE): { start: string; end: string } {
+  const startMs = zonedTimeToUtcMs(date, "00:00", timezone);
   const [y, m, d] = date.split("-").map(Number);
   const next = new Date(Date.UTC(y, m - 1, d + 1));
   const nextDate = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
-  const endMs = zonedTimeToUtcMs(nextDate, "00:00");
+  const endMs = zonedTimeToUtcMs(nextDate, "00:00", timezone);
   return { start: new Date(startMs).toISOString(), end: new Date(endMs).toISOString() };
 }
 
 // Weekday of a local date (ISO yyyy-mm-dd), as 1=Sun..7=Sat.
 // Mirrors JS Date.getDay()+1, which is the convention the availability form
 // exposes (1 - Domingo, 2 - Segunda, ... 7 - Sábado).
-export function weekdayOf(date: string, _timezone?: string): number {
-  void _timezone;
-  const short = new Intl.DateTimeFormat("en-US", { timeZone: APP_TIMEZONE, weekday: "short" }).format(
-    new Date(`${date}T12:00:00Z`),
-  );
-  const map: Record<string, number> = {
-    Sun: 1, Mon: 2, Tue: 3, Wed: 4, Thu: 5, Fri: 6, Sat: 7,
-  };
-  return map[short] ?? 1;
+export function weekdayOf(date: string, timezone: string = APP_TIMEZONE): number {
+  void timezone;
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 1;
 }
 
 export function isValidSlot(date: string, start: string, now: Date, rules: BusinessRules): boolean {
   // Convert the local date+time to its real UTC instant, then measure
   // the notice against "now" on the same UTC timeline.
-  const slotInstant = zonedTimeToUtcMs(date, start);
+  const slotInstant = zonedTimeToUtcMs(date, start, rules.timezone);
   const noticeMs = rules.minNoticeMinutes * 60 * 1000;
   return slotInstant - now.getTime() >= noticeMs;
 }
@@ -180,7 +169,7 @@ export function computeAvailableSlots(params: {
     const starts = generateSlotStartTimes(interval, rules.slotIntervalMinutes, durationMinutes);
     for (const start of starts) {
       // Build the candidate in UTC (local slot -> UTC), per §9.5/§10.3.
-      const startMs = zonedTimeToUtcMs(date, start);
+      const startMs = zonedTimeToUtcMs(date, start, rules.timezone);
       const candidateUtc: UtcRange = {
         startMs,
         endMs: startMs + durationMinutes * 60_000,

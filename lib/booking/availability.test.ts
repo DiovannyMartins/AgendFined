@@ -140,8 +140,12 @@ describe("zonedTimeToUtc (§9.5 UTC conversion)", () => {
     expect(zonedTimeToUtc("2026-09-10", "12:00")).toBe("2026-09-10T15:00:00.000Z");
   });
 
-  it("ignora o segundo param de timezone (fuso fixo da aplicação)", () => {
-    expect(zonedTimeToUtc("2026-09-10", "12:00", "Europe/Lisbon")).toBe("2026-09-10T15:00:00.000Z");
+  it("converte o horário usando o fuso do negócio", () => {
+    expect(zonedTimeToUtc("2026-09-10", "12:00", "Europe/Lisbon")).toBe("2026-09-10T11:00:00.000Z");
+  });
+
+  it("respeita o fuso de Cuiabá", () => {
+    expect(zonedTimeToUtc("2026-09-10", "12:00", "America/Cuiaba")).toBe("2026-09-10T16:00:00.000Z");
   });
 
   it("zonedTimeToUtcMs agrees with zonedTimeToUtc", () => {

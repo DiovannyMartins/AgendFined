@@ -15,13 +15,13 @@ import {
 import { statusLabel } from "@/lib/bookings/status";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 
-function dayHeading(dateKey: string): string {
+function dayHeading(dateKey: string, timezone = APP_TIMEZONE): string {
   const [y, m, d] = dateKey.split("-").map(Number);
   return new Intl.DateTimeFormat("pt-BR", {
     weekday: "short",
     day: "2-digit",
     month: "2-digit",
-    timeZone: APP_TIMEZONE,
+    timeZone: timezone,
   }).format(new Date(Date.UTC(y, m - 1, d, 12)));
 }
 

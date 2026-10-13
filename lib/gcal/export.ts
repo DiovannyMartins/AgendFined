@@ -58,6 +58,6 @@ export async function buildGcalExportResult(
   const gated = await runProGated(business, (businessId) => fetchBookings(businessId));
   if (gated.status !== "ok") return gated;
 
-  const events = toGcalBookings(gated.data, now);
+  const events = toGcalBookings(gated.data, now, business?.timezone);
   return { status: "ok", icsFeed: buildIcsFeed(events), count: events.length };
 }

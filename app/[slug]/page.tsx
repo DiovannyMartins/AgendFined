@@ -68,6 +68,7 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
         <BookingWidget
           businessId={business.id}
           slug={slug}
+          timezone={business.timezone}
           services={(services ?? []).map((s) => ({
             id: s.id,
             name: s.name,

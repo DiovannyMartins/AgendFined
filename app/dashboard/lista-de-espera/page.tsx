@@ -34,13 +34,13 @@ export default async function ListaEsperaPage() {
       )}
       {result.status === "error" && <ErrorState />}
       {result.status === "ok" && (
-        <EntriesList entries={result.entries} />
+        <EntriesList entries={result.entries} timezone={business.timezone} />
       )}
     </div>
   );
 }
 
-function EntriesList({ entries }: { entries: ManageWaitlistEntry[] }) {
+function EntriesList({ entries, timezone }: { entries: ManageWaitlistEntry[]; timezone: string }) {
   if (entries.length === 0) {
     return (
       <Card className="mt-6">
@@ -66,7 +66,7 @@ function EntriesList({ entries }: { entries: ManageWaitlistEntry[] }) {
                 <Badge variant={status.variant}>{status.label}</Badge>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                {formatWhen(entry.start_at)}
+                {formatWhen(entry.start_at, timezone)}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {entry.customer_name} · {entry.customer_phone}

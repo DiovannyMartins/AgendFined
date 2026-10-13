@@ -25,10 +25,12 @@ type ServiceOption = {
 export function BookingWidget({
   businessId,
   slug,
+  timezone,
   services,
 }: {
   businessId: string;
   slug: string;
+  timezone: string;
   services: ServiceOption[];
 }) {
   const router = useRouter();
@@ -60,8 +62,8 @@ export function BookingWidget({
   const minDate = useMemo(() => {
     // Allow today; the server enforces min_notice and the future window, so a
     // same-day calendar date is valid when the business permits it.
-    return toLocalDate(new Date());
-  }, []);
+    return toLocalDate(new Date(), timezone);
+  }, [timezone]);
 
   function handleServiceChange(value: string) {
     setServiceId(value);

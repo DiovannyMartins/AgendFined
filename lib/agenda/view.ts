@@ -56,29 +56,27 @@ function minutesToTime(totalMinutes: number): string {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-const dateKeyFormatter = () =>
+const dateKeyFormatter = (timezone: string = APP_TIMEZONE) =>
   new Intl.DateTimeFormat("en-CA", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-    timeZone: APP_TIMEZONE,
+    timeZone: timezone,
   });
 
 // The local calendar date ("YYYY-MM-DD") on which a UTC instant falls.
-export function bookingLocalDate(iso: string, _tz?: string): string {
-  void _tz;
-  return dateKeyFormatter().format(new Date(iso));
+export function bookingLocalDate(iso: string, timezone: string = APP_TIMEZONE): string {
+  return dateKeyFormatter(timezone).format(new Date(iso));
 }
 
 // The local wall-clock "HH:MM" of a UTC instant (used to place a booking
 // on the day grid's time rows).
-export function bookingLocalTime(iso: string, _tz?: string): string {
-  void _tz;
+export function bookingLocalTime(iso: string, timezone: string = APP_TIMEZONE): string {
   return new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-    timeZone: APP_TIMEZONE,
+    timeZone: timezone,
   }).format(new Date(iso));
 }
 
@@ -118,11 +116,11 @@ export function filterAgenda(
   bookings: AgendaBooking[],
   opts: { tz?: string; filters: AgendaFilters },
 ): AgendaBooking[] {
-  const { filters } = opts;
+  const { filters, tz = APP_TIMEZONE } = opts;
   return bookings.filter((booking) => {
     if (
       filters.dateKey &&
-      bookingLocalDate(booking.start_at) !== filters.dateKey
+      bookingLocalDate(booking.start_at, tz) !== filters.dateKey
     ) {
       return false;
     }

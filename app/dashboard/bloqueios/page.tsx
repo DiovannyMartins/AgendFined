@@ -19,7 +19,7 @@ export default async function BloqueiosPage() {
       </p>
 
       <div className="rounded-xl border border-border bg-card/40 p-4">
-        <BlockForm />
+        <BlockForm timezone={business?.timezone} />
       </div>
 
       {blocks && blocks.length > 0 && (
@@ -31,6 +31,7 @@ export default async function BloqueiosPage() {
               startAt={block.start_at}
               endAt={block.end_at}
               reason={block.reason}
+              timezone={business?.timezone}
             />
           ))}
         </div>

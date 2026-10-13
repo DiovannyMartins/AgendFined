@@ -7,9 +7,9 @@ import {
   encryptGoogleToken,
   refreshGoogleAccessToken,
 } from "./oauth";
+import { APP_TIMEZONE } from "@/lib/app-timezone";
 
 const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
-const APP_TIMEZONE = "America/Sao_Paulo";
 const REFRESH_MARGIN_MS = 60_000;
 
 type BookingForCalendar = {
@@ -30,20 +30,22 @@ type Connection = {
   access_token_ciphertext: string;
   refresh_token_ciphertext: string;
   token_expires_at: string;
+  calendar_timezone: string | null;
+  business_timezone: string;
 };
 
 function googleEventId(bookingId: string): string {
   return `agendfined${createHash("sha256").update(bookingId).digest("hex").slice(0, 40)}`;
 }
 
-function calendarEvent(booking: BookingForCalendar) {
+function calendarEvent(booking: BookingForCalendar, timezone: string) {
   const note = booking.customer_note?.trim();
   return {
     id: googleEventId(booking.id),
     summary: `${booking.service_name_snapshot} — ${booking.customer_name_snapshot}`,
     description: ["Criado pelo AgendFined", note ? `Observação: ${note}` : ""].filter(Boolean).join("\n"),
-    start: { dateTime: booking.start_at, timeZone: APP_TIMEZONE },
-    end: { dateTime: booking.end_at, timeZone: APP_TIMEZONE },
+    start: { dateTime: booking.start_at, timeZone: timezone },
+    end: { dateTime: booking.end_at, timeZone: timezone },
     extendedProperties: {
       private: { agendfined: "true", agendfinedBookingId: booking.id },
     },
@@ -73,11 +75,28 @@ async function loadConnection(businessId: string): Promise<Connection | null> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("google_calendar_connections")
-    .select("id,business_id,google_email,calendar_id,access_token_ciphertext,refresh_token_ciphertext,token_expires_at")
+    .select("id,business_id,google_email,calendar_id,access_token_ciphertext,refresh_token_ciphertext,token_expires_at,calendar_timezone")
     .eq("business_id", businessId)
     .maybeSingle();
   if (error) throw new Error("GOOGLE_CALENDAR_CONNECTION_LOAD_FAILED");
-  return data;
+  if (!data) return null;
+  const { data: business, error: businessError } = await admin
+    .from("businesses")
+    .select("timezone")
+    .eq("id", businessId)
+    .single();
+  if (businessError) throw new Error("GOOGLE_CALENDAR_BUSINESS_LOAD_FAILED");
+  return { ...data, business_timezone: business?.timezone ?? APP_TIMEZONE };
+}
+
+async function readCalendarTimezone(accessToken: string, calendarId: string): Promise<string | null> {
+  const response = await googleRequest<{ timeZone?: string }>(
+    accessToken,
+    `/calendars/${encodeURIComponent(calendarId)}`,
+  );
+  return response.status >= 200 && response.status < 300 && typeof response.data?.timeZone === "string"
+    ? response.data.timeZone
+    : null;
 }
 
 async function accessTokenFor(connection: Connection): Promise<string> {
@@ -123,7 +142,7 @@ export async function syncGoogleCalendarBooking(businessId: string, bookingId: s
     return;
   }
 
-  const event = calendarEvent(booking);
+  const event = calendarEvent(booking, connection.business_timezone);
   const updated = await googleRequest(accessToken, eventPath, { method: "PUT", body: JSON.stringify(event) });
   if (updated.status === 404) {
     const inserted = await googleRequest(accessToken, `/calendars/${encodeURIComponent(connection.calendar_id)}/events`, { method: "POST", body: JSON.stringify(event) });
@@ -139,6 +158,15 @@ export async function syncGoogleCalendarForBusiness(businessId: string): Promise
   const admin = createAdminClient();
   try {
     const accessToken = await accessTokenFor(connection);
+    const calendarTimezone = await readCalendarTimezone(accessToken, connection.calendar_id);
+    if (calendarTimezone && calendarTimezone !== connection.calendar_timezone) {
+      const { error: timezoneError } = await admin
+        .from("google_calendar_connections")
+        .update({ calendar_timezone: calendarTimezone })
+        .eq("id", connection.id);
+      if (timezoneError) throw new Error("GOOGLE_CALENDAR_TIMEZONE_SAVE_FAILED");
+      connection.calendar_timezone = calendarTimezone;
+    }
     const [{ data: upcoming, error: upcomingError }, { data: cancelled, error: cancelledError }] = await Promise.all([
       admin.from("bookings").select("id,start_at,end_at,status,service_name_snapshot,customer_name_snapshot,customer_note")
         .eq("business_id", businessId).eq("status", "confirmed").gte("end_at", new Date(Date.now() - 60 * 60 * 1000).toISOString()).order("start_at").limit(250),
@@ -148,7 +176,7 @@ export async function syncGoogleCalendarForBusiness(businessId: string): Promise
 
     let synced = 0;
     for (const booking of (upcoming ?? []) as BookingForCalendar[]) {
-      const event = calendarEvent(booking);
+      const event = calendarEvent(booking, connection.business_timezone);
       const path = `/calendars/${encodeURIComponent(connection.calendar_id)}/events/${encodeURIComponent(event.id)}`;
       const updated = await googleRequest(accessToken, path, { method: "PUT", body: JSON.stringify(event) });
       if (updated.status === 404) {

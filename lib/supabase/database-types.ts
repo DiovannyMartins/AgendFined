@@ -241,6 +241,7 @@ export type Database = {
       businesses: {
         Row: {
           booking_window_days: number
+          timezone: string
           created_at: string
           current_subscription_id: string | null
           description: string | null
@@ -257,6 +258,7 @@ export type Database = {
         }
         Insert: {
           booking_window_days?: number
+          timezone?: string
           created_at?: string
           current_subscription_id?: string | null
           description?: string | null
@@ -273,6 +275,7 @@ export type Database = {
         }
         Update: {
           booking_window_days?: number
+          timezone?: string
           created_at?: string
           current_subscription_id?: string | null
           description?: string | null
@@ -512,6 +515,7 @@ export type Database = {
           access_token_ciphertext: string
           business_id: string
           calendar_id: string
+          calendar_timezone: string | null
           created_at: string
           google_email: string
           id: string
@@ -526,6 +530,7 @@ export type Database = {
           access_token_ciphertext: string
           business_id: string
           calendar_id?: string
+          calendar_timezone?: string | null
           created_at?: string
           google_email: string
           id?: string
@@ -540,6 +545,7 @@ export type Database = {
           access_token_ciphertext?: string
           business_id?: string
           calendar_id?: string
+          calendar_timezone?: string | null
           created_at?: string
           google_email?: string
           id?: string
@@ -825,6 +831,7 @@ export type Database = {
           business_name: string
           business_phone: string
           business_slug: string
+          business_timezone: string
           end_at: string
           service_name: string
           start_at: string
@@ -837,6 +844,7 @@ export type Database = {
           id: string
           name: string
           slug: string
+          timezone: string
         }[]
       }
       get_public_services: {
@@ -856,6 +864,7 @@ export type Database = {
           business_id: string
           business_name: string
           business_slug: string
+          business_timezone: string
           customer_email_snapshot: string
           customer_name_snapshot: string
           id: string

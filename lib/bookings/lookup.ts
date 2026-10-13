@@ -10,6 +10,7 @@ export type PublicBookingLookup = {
   businessName: string;
   businessSlug: string;
   businessPhone: string;
+  timezone?: string;
 };
 
 // Row shape returned by the security-definer RPC get_booking_by_public_code.
@@ -20,6 +21,7 @@ export type PublicBookingRow = {
   business_name: string;
   business_slug: string;
   business_phone: string;
+  business_timezone?: string;
 };
 
 // Fetcher injected at the db boundary so the lookup stays unit-testable.
@@ -71,6 +73,7 @@ export async function lookupBookingByPublicCode(
       businessName: data.business_name,
       businessSlug: data.business_slug,
       businessPhone: data.business_phone,
+      timezone: data.business_timezone,
     },
   };
 }

@@ -14,7 +14,7 @@ export default async function ConfiguracoesPage() {
   if (!business) redirect("/dashboard/setup");
 
   const supabase = await createClient();
-  const googleCalendar = await getGoogleCalendarConnectionStatus(business.id);
+  const googleCalendar = await getGoogleCalendarConnectionStatus(business.id, business.timezone);
   const { data: availability } = await supabase
     .from("availability")
     .select("*")
@@ -32,6 +32,7 @@ export default async function ConfiguracoesPage() {
           slotIntervalMinutes: business.slot_interval_minutes,
           minNoticeMinutes: business.min_notice_minutes,
           bookingWindowDays: business.booking_window_days,
+          timezone: business.timezone,
           description: business.description,
           plan: business.plan,
         }}

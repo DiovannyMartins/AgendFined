@@ -16,6 +16,7 @@ import type { BookingStatus } from "@/lib/bookings/transitions";
 import { STATUS_LABEL } from "@/lib/bookings/status";
 import { toLocalDate } from "@/lib/booking/availability";
 import { AgendaList } from "./agenda-list";
+import { APP_TIMEZONE } from "@/lib/app-timezone";
 type StatusFilter = BookingStatus | "";
 
 const STATUS_ITEMS: Record<string, string> = {
@@ -38,15 +39,18 @@ function prioritizeConfirmed(bookings: AgendaBooking[]): AgendaBooking[] {
 
 export function AgendaView({
   bookings,
+  timezone,
 }: {
   bookings: AgendaBooking[];
+  timezone?: string;
 }) {
   // The date is an optional filter. `null` means "all dates", so the list
   // ("Todas as reservas") shows every reservation until a date is picked.
   const [dateFilter, setDateFilter] = useState<string | null>(null);
   const [status, setStatus] = useState<StatusFilter>("");
 
-  const todayKey = toLocalDate(new Date());
+  const businessTimezone = timezone ?? APP_TIMEZONE;
+  const todayKey = toLocalDate(new Date(), businessTimezone);
   // The day/week grids always need a concrete anchor; fall back to today when
   // the date filter is off.
   const anchorDate = dateFilter ?? todayKey;
@@ -58,20 +62,21 @@ export function AgendaView({
     () =>
       prioritizeConfirmed(
         filterAgenda(bookings, {
+          tz: businessTimezone,
           filters: {
             status: status || null,
           },
         }),
       ),
-    [bookings, status],
+    [bookings, status, businessTimezone],
   );
 
   const listBookings = useMemo(
     () =>
       dateFilter
-        ? filterAgenda(filtered, { filters: { dateKey: dateFilter } })
+        ? filterAgenda(filtered, { tz: businessTimezone, filters: { dateKey: dateFilter } })
         : filtered,
-    [filtered, dateFilter],
+    [filtered, dateFilter, businessTimezone],
   );
 
   const dateStep = 1;
@@ -143,7 +148,7 @@ export function AgendaView({
       </div>
 
       <div className="mt-4">
-        <AgendaList bookings={listBookings} />
+        <AgendaList bookings={listBookings} timezone={businessTimezone} />
       </div>
     </div>
   );

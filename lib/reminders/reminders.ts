@@ -24,6 +24,7 @@ export type ReminderCandidateRow = {
   service_name_snapshot: string;
   start_at: string;
   public_code: string;
+  business_timezone?: string;
 };
 
 export type ReminderEmail = {
@@ -55,7 +56,7 @@ export function prepareReminderEmails(
 
 export function buildReminderEmail(row: ReminderCandidateRow): ReminderEmail {
   const to = row.customer_email_snapshot!;
-  const when = formatWhen(row.start_at);
+  const when = formatWhen(row.start_at, row.business_timezone);
   return {
     bookingId: row.id,
     to,

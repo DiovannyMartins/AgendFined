@@ -8,6 +8,7 @@ type BookingConfirmation = {
   startAt: string;
   publicCode: string;
   confirmationUrl: string;
+  timezone?: string;
 };
 
 type SendResult = { sent: true } | { sent: false; reason: "not_configured" | "provider_error" };
@@ -115,7 +116,7 @@ export async function sendBookingConfirmationEmail(input: BookingConfirmation): 
   const from = process.env.RESEND_FROM_EMAIL;
   if (!apiKey || !from) return { sent: false, reason: "not_configured" };
 
-  const formattedWhen = formatWhen(input.startAt);
+  const formattedWhen = formatWhen(input.startAt, input.timezone);
   const text = [
     `Olá, ${input.customerName}!`,
     "",

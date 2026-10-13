@@ -5,6 +5,7 @@ type ReminderCandidate = {
   service_name_snapshot: string;
   start_at: string;
   public_code: string;
+  business_timezone?: string;
 };
 
 export type ReminderEmail = {
@@ -14,7 +15,6 @@ export type ReminderEmail = {
   html: string;
 };
 
-const APP_TIMEZONE = "America/Sao_Paulo";
 const HTML_ENTITIES: Record<string, string> = {
   "&": "&amp;",
   "<": "&lt;",
@@ -27,7 +27,7 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => HTML_ENTITIES[character]);
 }
 
-function formatWhen(iso: string): string {
+function formatWhen(iso: string, timezone = "America/Sao_Paulo"): string {
   const parts = new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
     month: "2-digit",
@@ -35,14 +35,14 @@ function formatWhen(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-    timeZone: APP_TIMEZONE,
+    timeZone: timezone,
   }).formatToParts(new Date(iso));
   const value = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
   return `${value("day")}/${value("month")}/${value("year")} às ${value("hour")}:${value("minute")}`;
 }
 
 export function buildReminderEmail(candidate: ReminderCandidate): ReminderEmail {
-  const when = formatWhen(candidate.start_at);
+  const when = formatWhen(candidate.start_at, candidate.business_timezone);
   const customerName = escapeHtml(candidate.customer_name_snapshot);
   const businessName = escapeHtml(candidate.business_name);
   const serviceName = escapeHtml(candidate.service_name_snapshot);

@@ -5,10 +5,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { CheckCircle2, CalendarClock } from "lucide-react";
 import { CopyCode } from "@/components/copy-code";
 import { isValidCancelToken } from "@/lib/bookings/cancel";
-import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { CancelBooking } from "./cancel-booking";
 import { publicCodeSchema } from "@/lib/validation/schemas";
 import { enforceConsultRateLimit, getClientIp } from "@/lib/booking/rate-limit";
+import { APP_TIMEZONE } from "@/lib/app-timezone";
 
 async function ConfirmationContent({ code, slug, cancelToken }: { code: string; slug: string; cancelToken?: string }) {
   const parsedCode = publicCodeSchema.safeParse(code);
@@ -31,12 +31,12 @@ async function ConfirmationContent({ code, slug, cancelToken }: { code: string; 
 
   const dateStr = new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "full",
-    timeZone: APP_TIMEZONE,
+    timeZone: booking.business_timezone ?? APP_TIMEZONE,
   }).format(new Date(booking.start_at));
   const timeStr = new Intl.DateTimeFormat("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
-    timeZone: APP_TIMEZONE,
+    timeZone: booking.business_timezone ?? APP_TIMEZONE,
   }).format(new Date(booking.start_at));
 
   return (

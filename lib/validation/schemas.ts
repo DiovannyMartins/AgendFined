@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isValidPublicCode, normalizePublicCode } from "@/lib/bookings/public-code";
+import { isValidTimeZone } from "@/lib/app-timezone";
 
 export const loginSchema = z.object({
   email: z.string().trim().max(254).email("Informe um e-mail válido."),
@@ -36,6 +37,7 @@ export const businessSchema = z.object({
   slotIntervalMinutes: z.number().int().min(1, "O intervalo deve ser de pelo menos 1 minuto.").max(1440, "O intervalo não pode passar de 1440 minutos."),
   minNoticeMinutes: z.number().int().min(0).max(10080),
   bookingWindowDays: z.number().int().min(1).max(365),
+  timezone: z.string().trim().min(1).refine(isValidTimeZone, "Informe um fuso horário IANA válido."),
   // nullish: accepts "", null (empty in the form maps to null server-side) and
   // undefined, so the optional description can genuinely be left blank.
   description: z.string().trim().max(500).nullish(),
@@ -59,6 +61,7 @@ export const businessFormSchema = z.object({
     .refine((value) => Number(value) >= 1 && Number(value) <= 1440, "Use um intervalo entre 1 e 1440 minutos."),
   minNoticeMinutes: z.number().int().min(0).max(10080),
   bookingWindowDays: z.number().int().min(1).max(365),
+  timezone: z.string().trim().min(1, "Escolha um fuso horário."),
   description: z.string().trim().max(500).nullish(),
 });
 export type BusinessFormValues = z.infer<typeof businessFormSchema>;

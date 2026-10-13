@@ -19,8 +19,10 @@ import { semanticSearchCustomers } from "@/lib/customers/search";
 
 export function ClientsList({
   history,
+  timezone,
 }: {
   history: CustomerHistory[];
+  timezone: string;
 }) {
   const [query, setQuery] = useState("");
   const [semanticIds, setSemanticIds] = useState<Set<string> | null>(null);
@@ -121,7 +123,7 @@ export function ClientsList({
                       )}
                     </DialogDescription>
                   </DialogHeader>
-                  <HistoryList bookings={bookings} />
+          <HistoryList bookings={bookings} timezone={timezone} />
                 </DialogContent>
               </DialogTrigger>
             </Dialog>
@@ -134,8 +136,10 @@ export function ClientsList({
 
 function HistoryList({
   bookings,
+  timezone,
 }: {
   bookings: CustomerHistory["bookings"];
+  timezone: string;
 }) {
   if (bookings.length === 0) {
     return (
@@ -153,7 +157,7 @@ function HistoryList({
             <div className="flex items-center justify-between gap-2">
               <p className="font-medium">
                 <CalendarDays className="mr-1 inline size-4 text-muted-foreground" />
-                {formatWhen(booking.start_at)}
+                {formatWhen(booking.start_at, timezone)}
               </p>
               <Badge variant={status.variant}>{status.label}</Badge>
             </div>

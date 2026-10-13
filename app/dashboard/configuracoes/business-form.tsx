@@ -19,6 +19,7 @@ import { upsertBusiness, type ActionResultState } from "@/lib/business/actions";
 import { businessFormSchema, type BusinessFormValues } from "@/lib/validation/schemas";
 import { getBookingWindowLimitDays, type Plan } from "@/lib/plan/plan";
 import { trackAnalyticsEvent } from "@/lib/analytics";
+import { APP_TIMEZONE, TIMEZONE_OPTIONS } from "@/lib/app-timezone";
 
 const INITIAL: ActionResultState = { ok: true, data: undefined };
 
@@ -29,6 +30,7 @@ type BusinessFormInitial = {
   slotIntervalMinutes: number;
   minNoticeMinutes: number;
   bookingWindowDays: number;
+  timezone: string;
   description: string | null;
   plan: Plan;
 };
@@ -46,6 +48,9 @@ export function BusinessForm({
   const creating = !slug;
   const plan: Plan = initial?.plan === "pro" ? "pro" : "free";
   const bookingWindowLimitDays = getBookingWindowLimitDays(plan);
+  const timezoneOptions = initial?.timezone && !TIMEZONE_OPTIONS.some((option) => option.value === initial.timezone)
+    ? [{ value: initial.timezone, label: initial.timezone }, ...TIMEZONE_OPTIONS]
+    : TIMEZONE_OPTIONS;
 
   const {
     register,
@@ -60,6 +65,7 @@ export function BusinessForm({
       slotIntervalMinutes: String(initial?.slotIntervalMinutes ?? 30),
       minNoticeMinutes: Number(initial?.minNoticeMinutes ?? 120),
       bookingWindowDays: Math.min(Number(initial?.bookingWindowDays ?? 60), bookingWindowLimitDays),
+      timezone: String(initial?.timezone ?? APP_TIMEZONE),
       description: String(initial?.description ?? ""),
     },
   });
@@ -74,6 +80,7 @@ export function BusinessForm({
       fd.set("minNoticeMinutes", String(values.minNoticeMinutes));
       fd.set("bookingWindowDays", String(values.bookingWindowDays));
       fd.set("description", values.description ?? "");
+      fd.set("timezone", values.timezone);
       const result = await upsertBusiness(INITIAL, fd);
       setState(result);
       setSubmitted(true);
@@ -188,6 +195,27 @@ export function BusinessForm({
                 </p>
               )}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="timezone">Fuso horário do negócio</Label>
+            <select
+              id="timezone"
+              className="flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3"
+              {...register("timezone")}
+            >
+              {timezoneOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Os clientes, o painel, os lembretes e o Google Calendar usarão este fuso. A alteração é bloqueada enquanto houver reservas futuras.
+            </p>
+            {(errors.timezone || fieldErrors.timezone) && (
+              <p className="text-sm text-destructive">
+                {errors.timezone?.message ?? fieldErrors.timezone?.[0]}
+              </p>
+            )}
           </div>
 
           {state.ok && submitted && !creating && (

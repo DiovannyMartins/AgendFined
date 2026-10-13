@@ -18,7 +18,7 @@ export default async function ConsultarPage({
 
   return (
     <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-lg items-center justify-center px-4 py-12">
-      <ConsultarForm slug={slug} />
+      <ConsultarForm slug={slug} timezone={business.timezone} />
     </main>
   );
 }

@@ -42,6 +42,7 @@ type BusinessPayload = {
   slotIntervalMinutes: number;
   minNoticeMinutes: number;
   bookingWindowDays: number;
+  timezone: string;
   description?: string | null;
 };
 
@@ -58,6 +59,7 @@ export async function upsertBusiness(
     slotIntervalMinutes: Number(formData.get("slotIntervalMinutes") ?? 30),
     minNoticeMinutes: Number(formData.get("minNoticeMinutes") ?? 120),
     bookingWindowDays: Number(formData.get("bookingWindowDays") ?? 60),
+    timezone: String(formData.get("timezone") ?? "America/Sao_Paulo").trim(),
     description: String(formData.get("description") ?? "") || null,
   };
 
@@ -105,6 +107,21 @@ export async function upsertBusiness(
   }
 
   if (existing.data?.id) {
+    const { count: futureBookings } = await supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", existing.data.id)
+      .eq("status", "confirmed")
+      .gt("start_at", new Date().toISOString());
+    const current = await supabase.from("businesses").select("timezone").eq("id", existing.data.id).single();
+    if (current.data?.timezone !== parsed.data.timezone && (futureBookings ?? 0) > 0) {
+      return {
+        ok: false,
+        code: "TIMEZONE_HAS_BOOKINGS",
+        message: "Cancele ou conclua as reservas futuras antes de alterar o fuso horário do negócio.",
+        fieldErrors: { timezone: ["Há reservas futuras neste negócio."] },
+      };
+    }
     const { error } = await supabase
       .from("businesses")
       .update({
@@ -115,6 +132,7 @@ export async function upsertBusiness(
         min_notice_minutes: parsed.data.minNoticeMinutes,
         booking_window_days: parsed.data.bookingWindowDays,
         description: parsed.data.description ?? null,
+        timezone: parsed.data.timezone,
       })
       .eq("id", existing.data.id)
       .eq("owner_id", user.id);
@@ -141,6 +159,7 @@ export async function upsertBusiness(
       slot_interval_minutes: parsed.data.slotIntervalMinutes,
       min_notice_minutes: parsed.data.minNoticeMinutes,
       booking_window_days: parsed.data.bookingWindowDays,
+      timezone: parsed.data.timezone,
       description: parsed.data.description ?? null,
     });
 

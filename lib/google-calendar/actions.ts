@@ -58,3 +58,38 @@ export async function disconnectGoogleCalendar(
   revalidatePath("/dashboard/configuracoes");
   return { ok: true, message: "Google Calendar desconectado." };
 }
+
+export async function adoptGoogleCalendarTimezone(
+  _prev: GoogleCalendarActionState,
+): Promise<GoogleCalendarActionState> {
+  void _prev;
+  const business = await getCurrentBusiness();
+  if (!business) return { ok: false, message: "Configure seu negócio primeiro." };
+  const admin = createAdminClient();
+  const { data: connection } = await admin
+    .from("google_calendar_connections")
+    .select("calendar_timezone")
+    .eq("business_id", business.id)
+    .maybeSingle();
+  if (!connection?.calendar_timezone) {
+    return { ok: false, message: "Ainda não foi possível descobrir o fuso do Google Calendar. Sincronize novamente." };
+  }
+  const { count } = await admin
+    .from("bookings")
+    .select("id", { count: "exact", head: true })
+    .eq("business_id", business.id)
+    .eq("status", "confirmed")
+    .gt("start_at", new Date().toISOString());
+  if ((count ?? 0) > 0) {
+    return { ok: false, message: "Não alterei o fuso porque há reservas futuras. Cancele ou conclua essas reservas antes." };
+  }
+  const { error } = await admin
+    .from("businesses")
+    .update({ timezone: connection.calendar_timezone })
+    .eq("id", business.id);
+  if (error) return { ok: false, message: "Não foi possível atualizar o fuso do negócio." };
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/configuracoes");
+  revalidatePath("/dashboard/agenda");
+  return { ok: true, message: "Fuso do negócio alinhado ao Google Calendar." };
+}

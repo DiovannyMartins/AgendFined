@@ -9,7 +9,7 @@ import { APP_TIMEZONE } from "@/lib/app-timezone";
 
 const INITIAL = { ok: true } as ActionResult;
 
-export function BlockForm() {
+export function BlockForm({ timezone = APP_TIMEZONE }: { timezone?: string }) {
   const [state, formAction, pending] = useActionState(createBlock, INITIAL);
 
   return (
@@ -27,6 +27,7 @@ export function BlockForm() {
       <div className="space-y-2">
         <Label htmlFor="reason">Motivo (opcional)</Label>
         <Input id="reason" name="reason" maxLength={120} placeholder="Férias, pausa, compromisso..." />
+        <p className="text-xs text-muted-foreground">Os horários são interpretados em {timezone}.</p>
       </div>
       {!state.ok && <p className="text-sm text-destructive">{state.message}</p>}
       <Button type="submit" disabled={pending} size="sm">
@@ -41,17 +42,19 @@ export function BlockRow({
   startAt,
   endAt,
   reason,
+  timezone = APP_TIMEZONE,
 }: {
   id: string;
   startAt: string;
   endAt: string;
   reason: string | null;
+  timezone?: string;
 }) {
   const fmt = (iso: string) =>
     new Intl.DateTimeFormat("pt-BR", {
       dateStyle: "short",
       timeStyle: "short",
-      timeZone: APP_TIMEZONE,
+      timeZone: timezone,
     }).format(new Date(iso));
 
   return (

@@ -25,8 +25,9 @@ export default async function AgendaPage() {
   const list = bookings ?? [];
   const now = new Date();
 
-  const todayKey = toLocalDate(now);
+  const todayKey = toLocalDate(now, business.timezone);
   const todayBookings = filterAgenda(list, {
+    tz: business.timezone,
     filters: { dateKey: todayKey },
   }).filter((b) => b.status !== "cancelled");
 
@@ -97,6 +98,7 @@ export default async function AgendaPage() {
 
       <AgendaView
         bookings={list}
+        timezone={business.timezone}
       />
     </div>
   );

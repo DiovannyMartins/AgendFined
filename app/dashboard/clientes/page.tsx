@@ -46,7 +46,7 @@ export default async function ClientesPage() {
           </CardContent>
         </Card>
       ) : (
-        <ClientsList history={history} />
+        <ClientsList history={history} timezone={business.timezone} />
       )}
     </div>
   );

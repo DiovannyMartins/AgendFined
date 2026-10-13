@@ -19,6 +19,7 @@ describe("businessSchema", () => {
     slotIntervalMinutes: 30,
     minNoticeMinutes: 120,
     bookingWindowDays: 60,
+    timezone: "America/Sao_Paulo",
   };
 
   it("accepts a valid business", () => {

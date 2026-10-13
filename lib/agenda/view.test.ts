@@ -20,8 +20,8 @@ describe("bookingLocalDate", () => {
     expect(bookingLocalDate(LATE_UTC, SP)).toBe("2026-09-01");
   });
 
-  it("usa fuso fixo da aplicação: mesmo com UTC passado, cai no dia de SP", () => {
-    expect(bookingLocalDate(LATE_UTC, "UTC")).toBe("2026-09-01");
+  it("uses the timezone supplied by the business", () => {
+    expect(bookingLocalDate(LATE_UTC, "UTC")).toBe("2026-09-02");
   });
 
   it("keeps a daytime booking on the same date", () => {

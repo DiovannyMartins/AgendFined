@@ -237,7 +237,7 @@ export async function getSlotsForDate(
 
   const { data: business, error: businessError } = await supabase
     .from("businesses")
-    .select("id, is_active, slot_interval_minutes, min_notice_minutes, booking_window_days, plan")
+    .select("id, is_active, slot_interval_minutes, min_notice_minutes, booking_window_days, plan, timezone")
     .eq("id", businessId)
     .single();
 
@@ -259,11 +259,12 @@ export async function getSlotsForDate(
     slotIntervalMinutes: business.slot_interval_minutes,
     minNoticeMinutes: business.min_notice_minutes,
     bookingWindowDays: getEffectiveBookingWindowDays(business.plan, business.booking_window_days),
+    timezone: business.timezone,
   };
   if (!isWithinWindow(date, rules, new Date())) return { available: [], error: "booking_window" };
 
-  // §10.2: interpret "now" and the requested date no fuso da aplicação.
-  const weekday = weekdayOf(date);
+  // §10.2: interpret "now" and the requested date in the business timezone.
+  const weekday = weekdayOf(date, business.timezone);
 
   // Availability, blocks and occupied slots are resolved for the business only.
   const { data: intervals, error: intervalsError } = await supabase
@@ -275,7 +276,7 @@ export async function getSlotsForDate(
 
   if (intervalsError) return { available: [], error: "db_error" };
 
-  const day = localDayRangeUtc(date);
+  const day = localDayRangeUtc(date, business.timezone);
 
   const [{ data: blocks, error: blocksError }, { data: bookings, error: bookingsError }] = await Promise.all([
     supabase

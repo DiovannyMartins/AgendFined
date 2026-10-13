@@ -1,9 +1,8 @@
-// Shared appointment rendering: "dd/mm/yyyy às HH:mm" no fuso da aplicação.
-// `start_at` é UTC; renderiza o horário local em America/Sao_Paulo.
+// Shared appointment rendering: `start_at` is UTC and the business timezone is
+// supplied by the caller. The default preserves legacy callers.
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 
-export function formatWhen(iso: string, _timezone?: string): string {
-  void _timezone;
+export function formatWhen(iso: string, timezone: string = APP_TIMEZONE): string {
   const parts = new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
     month: "2-digit",
@@ -11,7 +10,7 @@ export function formatWhen(iso: string, _timezone?: string): string {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-    timeZone: APP_TIMEZONE,
+    timeZone: timezone,
   }).formatToParts(new Date(iso));
 
   const value = (type: string) => parts.find((p) => p.type === type)?.value ?? "";

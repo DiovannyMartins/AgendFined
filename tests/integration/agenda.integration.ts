@@ -1,5 +1,6 @@
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
 import { adminClient, retryOnFk } from "./index";
+import { futureSlot } from "./future-slot";
 
 // Integration tests against the real Supabase project (§19.2). They verify the
 // business-level scheduling seam: the business-level no-overlap exclusion
@@ -12,16 +13,17 @@ const EMAIL = `agenda.${stamp}@agendfined.dev`;
 const PASSWORD = process.env.INTEGRATION_TEST_PASSWORD ?? `Test-${stamp}-aA1!`;
 const DISPLAY_NAME = "Dona Ana";
 
-// Far-future instants; a fresh business means no cross-run collisions.
-const SLOT_A = "2099-03-01T14:00:00.000Z";
-const SLOT_A_END = "2099-03-01T14:30:00.000Z";
-const SLOT_A_OVERLAP = "2099-03-01T14:15:00.000Z";
-const SLOT_B = "2099-03-01T16:00:00.000Z";
-const SLOT_B_OVERLAP = "2099-03-01T16:15:00.000Z";
-const SLOT_C = "2099-03-01T18:00:00.000Z";
-const SLOT_C_END = "2099-03-01T18:30:00.000Z";
-const SLOT_D = "2099-03-02T10:00:00.000Z";
-const SLOT_D_END = "2099-03-02T10:30:00.000Z";
+// Future instants inside the configured booking window; a fresh business means
+// no cross-run collisions.
+const SLOT_A = futureSlot(0, 14);
+const SLOT_A_END = futureSlot(0, 14, 30);
+const SLOT_A_OVERLAP = futureSlot(0, 14, 15);
+const SLOT_B = futureSlot(0, 16);
+const SLOT_B_OVERLAP = futureSlot(0, 16, 15);
+const SLOT_C = futureSlot(0, 18);
+const SLOT_C_END = futureSlot(0, 18, 30);
+const SLOT_D = futureSlot(1, 10);
+const SLOT_D_END = futureSlot(1, 10, 30);
 
 let admin: ReturnType<typeof adminClient>;
 let ownerId = "";
@@ -173,8 +175,8 @@ describe("T02: agenda por negócio (business-level scheduling)", () => {
       .from("availability_blocks")
       .insert({
         business_id: businessId,
-        start_at: "2099-03-01T17:30:00.000Z",
-        end_at: "2099-03-01T19:00:00.000Z",
+        start_at: futureSlot(0, 17, 30),
+        end_at: futureSlot(0, 19),
         reason: "pausa",
       });
     expect(error).not.toBeNull();
@@ -237,7 +239,7 @@ describe("T03: create_booking binds to the business", () => {
       p_business_id: businessId,
       p_cancel_token_hash: "a".repeat(64),
       p_service_id: serviceId,
-      p_start_at: "2099-03-03T10:00:00.000Z",
+      p_start_at: futureSlot(2, 10),
       p_customer_name: "Com Snapshots",
       p_customer_phone: "+55119566660003",
     });

@@ -1,5 +1,6 @@
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
 import { adminClient, anonClient, anonClientForUser } from "./index";
+import { futureSlot } from "./future-slot";
 
 // Security regression suite (§57). Runs against the real project. Requires
 // .env.local with valid keys and the 0013 migration applied.
@@ -27,8 +28,8 @@ let serviceB = "";
 let businessC = "";
 let serviceC = "";
 
-const SLOT_1 = "2099-02-01T10:00:00.000Z";
-const SLOT_2 = "2099-02-01T11:00:00.000Z";
+const SLOT_1 = futureSlot(0, 10);
+const SLOT_2 = futureSlot(0, 11);
 
 function bookingArgs(businessId: string, serviceId: string, startAt = SLOT_1, phone?: string) {
   return {
@@ -279,7 +280,7 @@ describe("anon data exposure (§36)", () => {
     const { data: active, error: activeError } = await anon.rpc("get_public_business", { p_slug: `biz-a-${stamp}` });
     expect(activeError).toBeNull();
     expect(active?.[0]?.id).toBe(businessA);
-    expect(Object.keys(active?.[0] ?? {}).sort()).toEqual(["description", "id", "name", "slug"]);
+    expect(Object.keys(active?.[0] ?? {}).sort()).toEqual(["description", "id", "name", "slug", "timezone"]);
     const { data: inactive, error: inactiveError } = await anon.rpc("get_public_business", { p_slug: `biz-c-${stamp}` });
     expect(inactiveError).toBeNull();
     expect(inactive?.length ?? 0).toBe(0);
@@ -327,7 +328,7 @@ describe("public lookup goes through the server layer (§16) and returns no PII"
   it("anon CANNOT call the SECURITY DEFINER lookup directly (hardened)", async () => {
     const { data: created } = await admin.rpc(
       "create_booking",
-      bookingArgs(businessA, activeServiceA, "2099-02-11T09:00:00.000Z", `+551191${stamp}`),
+      bookingArgs(businessA, activeServiceA, futureSlot(1, 9), `+551191${stamp}`),
     );
     publicCode = created!.public_code;
     const anon = anonClient();

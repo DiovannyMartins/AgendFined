@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { updatePassword, type ActionResult } from "@/lib/auth/actions";
+import { mfaChallengePath } from "@/lib/auth/assurance";
 
 const INITIAL: ActionResult = { ok: true, data: undefined };
 
@@ -42,6 +43,10 @@ export function UpdatePasswordForm() {
       const fd = new FormData();
       fd.set("password", values.password);
       const result = await updatePassword(INITIAL, fd);
+      if (!result.ok && result.code === "MFA_REQUIRED") {
+        router.push(mfaChallengePath("/redefinir-senha"));
+        return;
+      }
       setState(result);
       setSubmitted(true);
     });

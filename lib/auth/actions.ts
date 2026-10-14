@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { emailSchema, loginSchema, passwordSchema, signupSchema } from "@/lib/validation/schemas";
 import { enforceAuthRateLimit, enforceMfaRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 import { auditSecurityEvent } from "@/lib/security/audit";
+import { mfaChallengePath, requiresMfaChallenge, safeInternalPath } from "@/lib/auth/assurance";
 
 export type ActionResult<T = undefined> =
   | { ok: true; data: T }
@@ -92,14 +93,17 @@ export async function login(_prev: ActionResult, formData: FormData): Promise<Ac
     };
   }
 
-  // Only allow same-origin, non-protocol-relative paths to avoid open redirect.
-  const safeNext = next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/dashboard";
+  const safeNext = safeInternalPath(next);
   const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if (assuranceError) return genericError("Não foi possível verificar a segurança da sessão.");
   auditSecurityEvent("auth.login");
-  const redirectPath = assurance.nextLevel === "aal2" && assurance.currentLevel !== "aal2" ? "/mfa" : safeNext;
-  const separator = redirectPath.includes("?") ? "&" : "?";
-  redirect(`${redirectPath}${separator}login=1`);
+  const separator = safeNext.includes("?") ? "&" : "?";
+  const successfulLoginPath = `${safeNext}${separator}login=1`;
+  redirect(
+    requiresMfaChallenge(assurance)
+      ? mfaChallengePath(successfulLoginPath)
+      : successfulLoginPath,
+  );
 }
 
 export async function logout() {
@@ -143,6 +147,24 @@ export async function updatePassword(_prev: ActionResult, formData: FormData): P
   const supabase = await createClient();
   const password = String(formData.get("password") ?? "");
 
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return { ok: false, code: "UNAUTHORIZED", message: "Faça login novamente." };
+  }
+
+  const { data: assurance, error: assuranceError } =
+    await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (assuranceError) {
+    return genericError("Não foi possível verificar a segurança da sessão.");
+  }
+  if (requiresMfaChallenge(assurance)) {
+    return {
+      ok: false,
+      code: "MFA_REQUIRED",
+      message: "Confirme seu autenticador antes de alterar a senha.",
+    };
+  }
+
   const parsedPassword = passwordSchema.safeParse(password);
   if (!parsedPassword.success) {
     return {
@@ -168,7 +190,7 @@ export async function beginTotpEnrollment(): Promise<ActionResult<{ factorId: st
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, code: "UNAUTHORIZED", message: "Faça login novamente." };
   const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (assuranceError || (assurance.nextLevel === "aal2" && assurance.currentLevel !== "aal2")) {
+  if (assuranceError || requiresMfaChallenge(assurance)) {
     return { ok: false, code: "MFA_REQUIRED", message: "Confirme seu autenticador atual antes de adicionar outro." };
   }
 

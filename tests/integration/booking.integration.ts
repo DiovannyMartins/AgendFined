@@ -1,5 +1,6 @@
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
 import { adminClient, anonClientForUser, retryOnFk } from "./index";
+import { futureSlot } from "./future-slot";
 
 // These are integration tests against the real Supabase project (§19.2).
 // RUN: npm run test:integration. Requires .env.local with valid keys.
@@ -77,7 +78,7 @@ afterAll(async () => {
 });
 
 describe("createBooking RPC (§11.4)", () => {
-  const slot = "2099-01-05T14:00:00.000Z"; // future UTC instant
+  const slot = futureSlot(0, 14);
 
   it("creates a valid booking with snapshots", async () => {
     const { data, error } = await admin.rpc("create_booking", {
@@ -99,7 +100,7 @@ describe("createBooking RPC (§11.4)", () => {
   });
 
   it("rejects an overlapping booking (exclusion constraint)", async () => {
-    const overlapSlot = "2099-01-05T14:15:00.000Z"; // overlaps the 14:00-14:30 booking
+    const overlapSlot = futureSlot(0, 14, 15);
     const { error } = await admin.rpc("create_booking", {
       p_business_id: businessId,
       p_cancel_token_hash: "b".repeat(64),
@@ -131,7 +132,7 @@ describe("createBooking RPC (§11.4)", () => {
       p_business_id: businessId,
       p_cancel_token_hash: "b".repeat(64),
       p_service_id: serviceId,
-      p_start_at: "2099-01-05T14:30:00.000Z",
+      p_start_at: futureSlot(0, 14, 30),
       p_customer_name: "Cliente Sigiloso",
       p_customer_phone: "+5511955555555",
     });
@@ -144,7 +145,15 @@ describe("createBooking RPC (§11.4)", () => {
     expect(lo?.business_slug).toContain("biz-integracao");
     // The public code must never authorize customer personal data.
     expect(Object.keys(lo ?? {}).sort()).toEqual(
-      ["business_name", "business_phone", "business_slug", "end_at", "service_name", "start_at"].sort(),
+      [
+        "business_name",
+        "business_phone",
+        "business_slug",
+        "business_timezone",
+        "end_at",
+        "service_name",
+        "start_at",
+      ].sort(),
     );
   });
 
@@ -185,7 +194,7 @@ describe("RLS (§13.2)", () => {
     expect(businessError).toBeNull();
     const biz = businesses?.[0];
     expect(biz?.id).toBe(businessId);
-    expect(Object.keys(biz ?? {}).sort()).toEqual(["description", "id", "name", "slug"]);
+    expect(Object.keys(biz ?? {}).sort()).toEqual(["description", "id", "name", "slug", "timezone"]);
     // But the outsider cannot read the owner's bookings (private data).
     const { data: rows } = await outsider.from("bookings").select("*").eq("business_id", businessId);
     expect(rows?.length ?? 0).toBe(0);
@@ -195,12 +204,12 @@ describe("RLS (§13.2)", () => {
 describe("block vs future booking conflict (§9.4)", () => {
   it("owner cannot create a block overlapping an active future booking", async () => {
     const owner = await anonClientForUser(EMAIL, PASSWORD);
-    // 2099-01-05T14:00–14:30 is the confirmed booking created above; this block
+    // The 14:00–14:30 slot is the confirmed booking created above; this block
     // covers 13:30–15:00, so it must be rejected by the database layer.
     const { error } = await owner.from("availability_blocks").insert({
       business_id: businessId,
-      start_at: "2099-01-05T13:30:00.000Z",
-      end_at: "2099-01-05T15:00:00.000Z",
+      start_at: futureSlot(0, 13, 30),
+      end_at: futureSlot(0, 15),
       reason: "teste sobreposicao",
     });
     expect(error).not.toBeNull();
@@ -212,8 +221,8 @@ describe("block vs future booking conflict (§9.4)", () => {
     // A block on a day with no existing booking; this insert must succeed.
     const { error: blockErr } = await owner.from("availability_blocks").insert({
       business_id: businessId,
-      start_at: "2099-01-07T10:00:00.000Z",
-      end_at: "2099-01-07T12:00:00.000Z",
+      start_at: futureSlot(2, 10),
+      end_at: futureSlot(2, 12),
       reason: "bloqueio teste",
     });
     expect(blockErr).toBeNull();
@@ -223,7 +232,7 @@ describe("block vs future booking conflict (§9.4)", () => {
       p_business_id: businessId,
       p_cancel_token_hash: "b".repeat(64),
       p_service_id: serviceId,
-      p_start_at: "2099-01-07T10:30:00.000Z",
+      p_start_at: futureSlot(2, 10, 30),
       p_customer_name: "Outro Cliente",
       p_customer_phone: "+5511966666666",
     });

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { assertProPlan } from "@/lib/plan/plan";
 import { classifyOperationalError } from "@/lib/bookings/classification";
 import { generateCancelToken, hashCancelToken } from "@/lib/bookings/cancel";
+import { buildPrivateConfirmationPath } from "@/lib/bookings/private-confirmation";
 
 // Server actions for the waitlist management dashboard (issue #22, ADR 0008).
 // Managing the waitlist is a PROFISSIONAL feature, so both actions gate on the
@@ -117,10 +118,9 @@ export async function convertWaitlistEntry(
 
   revalidatePath("/dashboard/lista-de-espera");
   revalidatePath("/dashboard/agenda");
-  const query = new URLSearchParams({ code: data!.public_code, cancel: cancelToken });
   return {
     ok: true,
     publicCode: data!.public_code,
-    cancellationUrl: `/${encodeURIComponent(gate.slug)}/confirmacao?${query.toString()}`,
+    cancellationUrl: buildPrivateConfirmationPath(gate.slug, data!.public_code, cancelToken),
   };
 }

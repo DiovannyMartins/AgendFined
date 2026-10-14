@@ -11,6 +11,7 @@ import { verifyMercadoPagoWebhookSignature } from "@/lib/billing/webhook-signatu
 import { runMercadoPagoWebhook } from "@/lib/billing/webhook-server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enforceApiRateLimit, getClientIpFromHeaders } from "@/lib/booking/rate-limit";
+import { resolveSignedWebhookDataId } from "@/lib/billing/webhook-envelope";
 
 const MAX_WEBHOOK_BODY_BYTES = 32 * 1024;
 
@@ -68,23 +69,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "invalid_payload" }, { status: 400 });
   }
 
+  const type = body.type;
+  const id = resolveSignedWebhookDataId(dataId, body.data?.id);
+  if (!type || !id) {
+    return NextResponse.json({ error: "invalid_payload" }, { status: 400 });
+  }
+
   if (
     !verifyMercadoPagoWebhookSignature({
       xSignature,
       xRequestId,
-      dataId,
+      dataId: id,
       secret,
     })
   ) {
     return NextResponse.json({ error: "invalid_signature" }, { status: 401 });
-  }
-
-  const type = body.type;
-  // The signature is verified over the query `data.id`, so process that same id
-  // (falling back to the body) rather than a different one.
-  const id = dataId ?? body.data?.id;
-  if (!type || !id) {
-    return NextResponse.json({ error: "invalid_payload" }, { status: 400 });
   }
 
   const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;

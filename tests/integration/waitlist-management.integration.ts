@@ -1,5 +1,6 @@
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 import { adminClient, anonClientForUser, retryOnFk } from "./index";
+import { futureSlot } from "./future-slot";
 import {
   buildWaitlistManagementResult,
   type FetchWaitlistEntries,
@@ -18,8 +19,8 @@ const PRO_EMAIL = `wl-pro.${stamp}@agendfined.dev`;
 const OUTSIDER_EMAIL = `wl-out.${stamp}@agendfined.dev`;
 const PASSWORD = process.env.INTEGRATION_TEST_PASSWORD ?? `Test-${stamp}-aA1!`;
 
-const SLOT = "2099-01-07T14:00:00.000Z";
-const SLOT_CONVERT = "2099-01-07T15:00:00.000Z";
+const SLOT = futureSlot(0, 14);
+const SLOT_CONVERT = futureSlot(0, 15);
 
 let admin: ReturnType<typeof adminClient>;
 let freeOwnerId = "";

@@ -13,6 +13,7 @@ import { getSlotsForDate } from "@/lib/availability/actions";
 import { toLocalDate } from "@/lib/booking/availability";
 import { cn } from "@/lib/utils";
 import { trackAnalyticsEvent } from "@/lib/analytics";
+import { buildPrivateConfirmationPath } from "@/lib/bookings/private-confirmation";
 
 type ServiceOption = {
   id: string;
@@ -143,8 +144,7 @@ export function BookingWidget({
     setSubmitting(false);
     if (result.ok && result.publicCode && result.cancelToken) {
       trackAnalyticsEvent("booking_complete", { method: "public_form" });
-      const query = new URLSearchParams({ code: result.publicCode, cancel: result.cancelToken });
-      router.push(`/${slug}/confirmacao?${query.toString()}`);
+      router.push(buildPrivateConfirmationPath(slug, result.publicCode, result.cancelToken));
     } else if (result.code === "slot_taken") {
       // INC-3: the slot was lost to another reservation — offer the waitlist.
       setError(result.message ?? "Esse horário não está mais disponível.");

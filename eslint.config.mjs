@@ -1,13 +1,33 @@
 import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+import eslint from "@eslint/js";
+import react from "eslint-plugin-react";
+import reactHooks from "eslint-plugin-react-hooks";
+import globals from "globals";
+import typescriptEslint from "typescript-eslint";
 
 const eslintConfig = defineConfig([
-  ...nextVitals,
-  ...nextTs,
-  // Override default ignores of eslint-config-next.
+  eslint.configs.recommended,
+  ...typescriptEslint.configs.recommended,
+  {
+    files: ["**/*.{js,mjs,cjs,ts,tsx}"],
+    ...react.configs.flat.recommended,
+    settings: { react: { version: "detect" } },
+    languageOptions: {
+      ...react.configs.flat.recommended.languageOptions,
+      globals: { ...globals.browser, ...globals.node },
+    },
+    rules: {
+      ...react.configs.flat.recommended.rules,
+      ...react.configs.flat["jsx-runtime"].rules,
+      "react/prop-types": "off",
+    },
+  },
+  {
+    files: ["**/*.{js,mjs,cjs,ts,tsx}"],
+    plugins: { "react-hooks": reactHooks },
+    rules: reactHooks.configs.flat.recommended.rules,
+  },
   globalIgnores([
-    // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
     "build/**",

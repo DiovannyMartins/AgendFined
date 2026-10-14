@@ -30,6 +30,7 @@ import {
   classifyOperationalError,
 } from "@/lib/bookings/classification";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
+import { buildPrivateConfirmationUrl } from "@/lib/bookings/private-confirmation";
 
 export type ActionResult = {
   ok: boolean;
@@ -172,7 +173,12 @@ export async function createBooking(input: {
       startAt: startAtIso,
       timezone: business.timezone,
       publicCode: data.public_code,
-      confirmationUrl: buildPrivateConfirmationUrl(input.slug, data.public_code, cancelToken),
+      confirmationUrl: buildPrivateConfirmationUrl(
+        process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        input.slug,
+        data.public_code,
+        cancelToken,
+      ),
     });
     if (!emailResult.sent) {
       console.error("booking_confirmation_email_failed", {
@@ -361,20 +367,6 @@ function cancellationRejected(): CancelState {
     code: "INVALID_TOKEN",
     message: "Não foi possível cancelar esta reserva.",
   };
-}
-
-function buildPrivateConfirmationUrl(slug: string, publicCode: string, cancelToken: string): string {
-  const configured = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  let baseUrl: URL;
-  try {
-    baseUrl = new URL(configured);
-  } catch {
-    baseUrl = new URL("http://localhost:3000");
-  }
-  const url = new URL(`/${encodeURIComponent(slug)}/confirmacao`, baseUrl);
-  url.searchParams.set("code", publicCode);
-  url.searchParams.set("cancel", cancelToken);
-  return url.toString();
 }
 
 // Waitlist join (INC-3). When a customer's preferred slot is already occupied

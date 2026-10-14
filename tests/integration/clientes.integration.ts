@@ -1,5 +1,6 @@
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
 import { adminClient, anonClientForUser, retryOnFk } from "./index";
+import { futureSlot } from "./future-slot";
 import { buildCustomerHistory, filterCustomers } from "@/lib/customers/history";
 
 // Integration tests against the real Supabase project (§19.2). They verify the
@@ -79,9 +80,9 @@ function createBooking(name: string, phone: string, email: string | null, startA
 
 describe("INC-1: histórico de clientes (dedup por business_id + phone)", () => {
   // Two bookings by the same phone (same person), one by a different phone.
-  const ELI_1 = "2099-06-01T10:00:00.000Z";
-  const ELI_2 = "2099-06-01T11:00:00.000Z";
-  const JOANA_1 = "2099-06-01T12:00:00.000Z";
+  const ELI_1 = futureSlot(0, 10);
+  const ELI_2 = futureSlot(0, 11);
+  const JOANA_1 = futureSlot(0, 12);
 
   it("a customer is deduplicated: one row per phone, even across repeated bookings", async () => {
     const { error: e1 } = await createBooking("Eli", PHONE_ELI, "eli@ex.com", ELI_1);

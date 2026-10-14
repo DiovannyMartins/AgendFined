@@ -1,7 +1,9 @@
 import { createHash, randomBytes } from "node:crypto";
+import { isValidCancelToken } from "./cancel-token";
 
 const CANCEL_TOKEN_BYTES = 32;
-const CANCEL_TOKEN_REGEX = /^[A-Za-z0-9_-]{43}$/;
+
+export { isValidCancelToken } from "./cancel-token";
 
 // The public booking code identifies a reservation but never authorizes a
 // mutation. Cancellation uses an independent 256-bit capability. Only its
@@ -10,10 +12,7 @@ export function generateCancelToken(): string {
   return randomBytes(CANCEL_TOKEN_BYTES).toString("base64url");
 }
 
-export function isValidCancelToken(token: string): boolean {
-  return CANCEL_TOKEN_REGEX.test(token);
-}
-
 export function hashCancelToken(token: string): string {
+  if (!isValidCancelToken(token)) throw new Error("INVALID_CANCEL_TOKEN");
   return createHash("sha256").update(token, "utf8").digest("hex");
 }

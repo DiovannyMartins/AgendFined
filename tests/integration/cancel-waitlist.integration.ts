@@ -1,5 +1,6 @@
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
 import { adminClient, anonClient, anonClientForUser, retryOnFk } from "./index";
+import { futureSlot } from "./future-slot";
 
 // Integration tests against the real Supabase project (§19.2) for INC-3:
 // self-service cancellation + waitlist. The derived cancellation *token* is
@@ -19,11 +20,11 @@ let ownerId = "";
 let businessId = "";
 let serviceId = "";
 
-const SLOT = "2099-01-06T14:00:00.000Z";
-const SLOT_2 = "2099-01-06T15:00:00.000Z";
+const SLOT = futureSlot(0, 14);
+const SLOT_2 = futureSlot(0, 15);
 // A slot that remains occupied for the waitlist tests (a waitlist is only for an
 // occupied slot — a free slot should just be booked).
-const SLOT_WAIT = "2099-01-06T16:00:00.000Z";
+const SLOT_WAIT = futureSlot(0, 16);
 const CANCEL_TOKEN_HASH = "f".repeat(64);
 
 async function createBookingAt(startAt: string, phone: string) {
@@ -128,7 +129,7 @@ describe("cancel_booking_by_public_code (INC-3)", () => {
   });
 
   it("rejects a valid public code with the wrong private capability", async () => {
-    const booking = await createBookingAt("2099-01-06T15:30:00.000Z", "+5511980000004");
+    const booking = await createBookingAt(futureSlot(0, 15, 30), "+5511980000004");
     const { error } = await admin.rpc("cancel_booking_by_public_code", {
       p_code: booking.public_code,
       p_cancel_token_hash: "0".repeat(64),

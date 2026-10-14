@@ -4,13 +4,12 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CheckCircle2, CalendarClock } from "lucide-react";
 import { CopyCode } from "@/components/copy-code";
-import { isValidCancelToken } from "@/lib/bookings/cancel";
-import { CancelBooking } from "./cancel-booking";
+import { PrivateCancellation } from "./private-cancellation";
 import { publicCodeSchema } from "@/lib/validation/schemas";
 import { enforceConsultRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 
-async function ConfirmationContent({ code, slug, cancelToken }: { code: string; slug: string; cancelToken?: string }) {
+async function ConfirmationContent({ code, slug }: { code: string; slug: string }) {
   const parsedCode = publicCodeSchema.safeParse(code);
   if (!parsedCode.success) notFound();
 
@@ -71,9 +70,7 @@ async function ConfirmationContent({ code, slug, cancelToken }: { code: string; 
           <CopyCode code={parsedCode.data} />
         </div>
         <div className="mt-6 flex flex-col items-center gap-3 text-sm font-medium">
-          {cancelToken && isValidCancelToken(cancelToken) && (
-            <CancelBooking code={parsedCode.data} token={cancelToken} />
-          )}
+          <PrivateCancellation code={parsedCode.data} />
         </div>
         <div className="mt-6 flex flex-col gap-2 text-sm font-medium">
           <Link href={`/${slug}`} className="hover:underline">
@@ -93,15 +90,15 @@ export default async function ConfirmationPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ code?: string; cancel?: string }>;
+  searchParams: Promise<{ code?: string }>;
 }) {
   const { slug } = await params;
-  const { code, cancel } = await searchParams;
+  const { code } = await searchParams;
   if (!code) notFound();
 
   return (
     <Suspense fallback={<div className="py-24 text-center text-muted-foreground">Carregando...</div>}>
-      <ConfirmationContent code={code} slug={slug} cancelToken={cancel} />
+      <ConfirmationContent code={code} slug={slug} />
     </Suspense>
   );
 }

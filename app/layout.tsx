@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Instrument_Sans, Instrument_Serif } from "next/font/google";
+import { headers } from "next/headers";
 import "./globals.css";
 import { SupportWidget } from "@/components/support-widget";
 import { GoogleAnalytics } from "@/components/google-analytics";
@@ -48,7 +49,9 @@ const instrumentSerif = Instrument_Serif({
   fallback: ["Georgia", "serif"],
 });
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html
       lang="pt-BR"
@@ -57,7 +60,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         {children}
         <SupportWidget />
-        <GoogleAnalytics />
+        <GoogleAnalytics nonce={nonce} />
         <LoginAnalyticsTracker />
       </body>
     </html>

@@ -8,7 +8,7 @@ const input = {
   serviceName: "Corte <premium>",
   startAt: "2026-05-10T18:00:00Z",
   publicCode: "65925DBB",
-  confirmationUrl: "https://agenda.example/barbearia/confirmacao?code=65925DBB&cancel=private_token",
+  confirmationUrl: "https://agenda.example/barbearia/confirmacao?code=65925DBB#cancel=private_token",
 };
 
 afterEach(() => {
@@ -47,7 +47,7 @@ describe("sendBookingConfirmationEmail", () => {
     expect(request.html).toContain("Barbearia &quot;Demo&quot;");
     expect(request.html).toContain("Corte &lt;premium&gt;");
     expect(request.html).toContain("cancel=private_token");
-    expect(request.html).toContain("&amp;cancel=");
+    expect(request.html).not.toContain("&amp;cancel=");
     expect(request.html).not.toContain("<cliente>");
   });
 

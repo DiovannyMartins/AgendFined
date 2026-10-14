@@ -1,6 +1,7 @@
 import { type NextFetchEvent, type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
 import { sendSecurityLog } from "@/lib/security/betterstack";
+import { buildContentSecurityPolicy } from "@/lib/security/content-security-policy";
 
 const PROTECTED_PREFIXES = ["/dashboard"];
 // /redefinir-senha is deliberately NOT in AUTH_ROUTES: it must remain reachable
@@ -10,6 +11,15 @@ const AUTH_ROUTES = ["/login", "/cadastro", "/recuperar-senha"];
 
 export async function proxy(request: NextRequest, event: NextFetchEvent) {
   const pathname = request.nextUrl.pathname;
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const contentSecurityPolicy = buildContentSecurityPolicy(
+    nonce,
+    process.env.NODE_ENV === "development",
+  );
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+  // Next.js reads the incoming CSP to apply this nonce to its framework scripts.
+  requestHeaders.set("Content-Security-Policy", contentSecurityPolicy);
   let response: NextResponse;
   if (
     /^\/(?:\.git|\.env|\.next|node_modules)(?:\/|$)/i.test(pathname) ||
@@ -17,7 +27,7 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
   ) {
     response = new NextResponse(null, { status: 404 });
   } else {
-    const { supabaseResponse, user } = await updateSession(request);
+    const { supabaseResponse, user } = await updateSession(request, requestHeaders);
 
     const isProtected = PROTECTED_PREFIXES.some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
@@ -43,6 +53,8 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
       }
     }
   }
+
+  response.headers.set("Content-Security-Policy", contentSecurityPolicy);
 
   // Log path and status only: query strings may contain booking codes or OAuth
   // tokens. The numeric status enables a Better Stack alert for HTTP 5xx.

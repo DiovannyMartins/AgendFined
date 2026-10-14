@@ -80,6 +80,40 @@ afterAll(async () => {
 describe("createBooking RPC (§11.4)", () => {
   const slot = futureSlot(0, 14);
 
+  it("preserves an existing customer when a public booking reuses their phone", async () => {
+    const original = {
+      business_id: businessId,
+      name: "Cliente original",
+      phone: "+5511912345678",
+      email: "original@example.org",
+    };
+    const { data: customer, error: customerError } = await admin.from("customers")
+      .insert(original).select("id").single();
+    expect(customerError).toBeNull();
+
+    const { data: booking, error } = await admin.rpc("create_booking", {
+      p_business_id: businessId,
+      p_service_id: serviceId,
+      p_start_at: futureSlot(25, 14),
+      p_cancel_token_hash: "c".repeat(64),
+      p_customer_phone: original.phone,
+      p_customer_name: "Nome não verificado",
+      p_customer_email: "unverified@example.org",
+    });
+    expect(error).toBeNull();
+    expect(booking).toMatchObject({
+      customer_id: customer!.id,
+      customer_name_snapshot: "Nome não verificado",
+      customer_email_snapshot: "unverified@example.org",
+    });
+
+    const owner = await anonClientForUser(EMAIL, PASSWORD);
+    const { data: visibleCustomer, error: readError } = await owner.from("customers")
+      .select("name,phone,email").eq("id", customer!.id).single();
+    expect(readError).toBeNull();
+    expect(visibleCustomer).toEqual({ name: original.name, phone: original.phone, email: original.email });
+  });
+
   it("creates a valid booking with snapshots", async () => {
     const { data, error } = await admin.rpc("create_booking", {
       p_business_id: businessId,

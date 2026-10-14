@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 import { mfaChallengePath, requiresMfaChallenge, safeInternalPath } from "./assurance";
 
 describe("authentication assurance policy", () => {
+  it.each(["/\t/example.org", "/\n/example.org", "/\r/example.org", "/dashboard\u0000"])("rejects control characters in return path %j", (path) => {
+    expect(safeInternalPath(path)).toBe("/dashboard");
+  });
+
+  it("preserves a local destination with query and fragment", () => {
+    expect(safeInternalPath("/dashboard?tab=agenda#today")).toBe("/dashboard?tab=agenda#today");
+  });
   it("requires a challenge when the account supports AAL2 but the session is AAL1", () => {
     expect(requiresMfaChallenge({ currentLevel: "aal1", nextLevel: "aal2" })).toBe(true);
   });

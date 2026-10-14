@@ -8,6 +8,7 @@ import {
   refreshGoogleAccessToken,
 } from "./oauth";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
+import { isProPlan } from "@/lib/plan/plan";
 
 const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 const REFRESH_MARGIN_MS = 60_000;
@@ -82,10 +83,11 @@ async function loadConnection(businessId: string): Promise<Connection | null> {
   if (!data) return null;
   const { data: business, error: businessError } = await admin
     .from("businesses")
-    .select("timezone")
+    .select("timezone,plan")
     .eq("id", businessId)
     .single();
   if (businessError) throw new Error("GOOGLE_CALENDAR_BUSINESS_LOAD_FAILED");
+  if (!business || !isProPlan(business.plan)) return null;
   return { ...data, business_timezone: business?.timezone ?? APP_TIMEZONE };
 }
 
@@ -208,7 +210,10 @@ export async function syncGoogleCalendarForBusiness(businessId: string): Promise
 
 export async function runGoogleCalendarSyncBatch(): Promise<{ connections: number; synced: number; deleted: number; failed: number }> {
   const admin = createAdminClient();
-  const { data: connections, error } = await admin.from("google_calendar_connections").select("business_id").order("updated_at", { ascending: true }).limit(25);
+  const { data: connections, error } = await admin.from("google_calendar_connections")
+    .select("business_id,businesses!inner(plan)")
+    .eq("businesses.plan", "pro")
+    .order("updated_at", { ascending: true }).limit(25);
   if (error) throw new Error("GOOGLE_CALENDAR_CONNECTIONS_LOAD_FAILED");
   let synced = 0;
   let deleted = 0;

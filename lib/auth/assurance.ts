@@ -10,9 +10,18 @@ export function requiresMfaChallenge(assurance: {
 }
 
 export function safeInternalPath(value: string | null | undefined, fallback = "/dashboard"): string {
-  return value?.startsWith("/") && !value.startsWith("//") && !value.includes("\\")
-    ? value
-    : fallback;
+  if (!value?.startsWith("/") || value.startsWith("//") || value.includes("\\") ||
+      Array.from(value).some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) {
+    return fallback;
+  }
+  // URL parsers remove control characters and normalize separators. Check the
+  // interpreted origin as well as the input before handing it to a redirect.
+  const origin = "https://internal.invalid";
+  try {
+    return new URL(value, origin).origin === origin ? value : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 export function mfaChallengePath(next: string): string {

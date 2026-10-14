@@ -134,7 +134,7 @@ bash scripts/security-release-wizard.sh
 ```
 
 O wizard grava apenas em `.env` (ignorado pelo Git), orienta a configuração de
-Supabase, Mercado Pago, Resend, TypeSafe e Vercel, e não envia secrets para o repositório.
+Supabase, Mercado Pago, Resend e Vercel, e não envia secrets para o repositório.
 
 | Variável | Exposição | Uso |
 | --- | --- | --- |
@@ -147,9 +147,7 @@ Supabase, Mercado Pago, Resend, TypeSafe e Vercel, e não envia secrets para o r
 | `APP_URL` | Somente Server | URL base para redirects de e-mail (preferido) |
 | `NEXT_PUBLIC_APP_URL` | Client/Server | Fallback; use `APP_URL` no servidor |
 | `CRON_SECRET` | Somente Server | Segredo privado do scheduler para `/api/internal/reconciliation` |
-| `TYPESAFE_API_KEY` | Somente Server | Chave opcional para classificações de cancelamento, observações e triagem da lista de espera |
-
-> A service role e a chave TypeSafe **nunca** devem aparecer no bundle do navegador, em variável `NEXT_PUBLIC_`, no repositório Git ou em logs públicos. Sem `TYPESAFE_API_KEY`, os rótulos assistidos ficam ausentes e os fluxos determinísticos continuam funcionando.
+> A service role **nunca** deve aparecer no bundle do navegador, em variável `NEXT_PUBLIC_`, no repositório Git ou em logs públicos.
 > O Turnstile é *fail-closed*: sem ambas as chaves o widget não renderiza e o gate de anti-bot fica desativado.
 
 ## Principais decisões técnicas

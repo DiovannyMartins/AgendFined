@@ -30,7 +30,7 @@
 - [x] T013 [US3] Make `getSlotsForDate` fail explicitly for business/service/interval/block/booking read errors and handle the error state in `app/[slug]/booking-widget.tsx`.
 - [x] T014 [US3] Validate Edge Function env vars and candidate payloads, use bounded claimed candidates, fence mark-sent updates, and return non-2xx on DB mark failures in `supabase/functions/booking-reminders/index.ts`.
 - [x] T015 [US3] Restrict auth callback redirects to configured trusted origins and align reconciliation cron secret naming/constant-time comparison in `app/auth/callback/route.ts` and `app/api/internal/reconciliation/route.ts`.
-- [x] T016 [P] [US3] Add fail-closed env validation, bounded auth/AI inputs, and complete relevant `revalidatePath` calls in `lib/supabase/admin.ts`, `lib/auth/actions.ts`, `lib/services/search.ts`, `lib/customers/search.ts`, and `lib/business/actions.ts`. (`server-only` package was not installed and was not added as an unnecessary dependency.)
+- [x] T016 [P] [US3] Add fail-closed env validation, bounded auth inputs, and complete relevant `revalidatePath` calls in `lib/supabase/admin.ts`, `lib/auth/actions.ts`, `lib/services/search.ts`, `lib/customers/search.ts`, and `lib/business/actions.ts`. (`server-only` package was not installed and was not added as an unnecessary dependency.)
 - [x] T017 [P] [US3] Add unit tests for availability DB failure, redirect origin, cron secret, and reminder response/error mapping. (Existing route/action suites plus integration reminder coverage pass.)
 
 ## Phase 5: Verification and convergence

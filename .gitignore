@@ -55,19 +55,8 @@ dev-server.log
 tunnel.log
 tunnel.log.err
 
-# AI agents and skills (untracked by default)
-.agents/
-.claude/
-.cursor/
-.copilot/
-.opencode/
-skills-lock.json
-AGENTS.md
-CLAUDE.md
+# Local development metadata (untracked by default)
 CONTEXT.md
-docs/agents/
-*.skills/
-*_skills/
 
 # product spec (kept local, not committed)
 documento-projeto.md

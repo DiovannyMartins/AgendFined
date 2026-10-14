@@ -28,7 +28,7 @@ import {
   classifyCancellationReason,
   classifyCustomerNote,
   classifyOperationalError,
-} from "@/lib/typesafe/judgments";
+} from "@/lib/bookings/classification";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
 
 export type ActionResult = {

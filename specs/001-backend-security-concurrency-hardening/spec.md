@@ -6,7 +6,7 @@
 
 **Status**: Implemented and deployed; reminder secrets pending configuration
 
-**Input**: User request to correct all critical and important findings from the TypeSafe/Jev backend review, plus the directly related suggestions that prevent recurrence.
+**Input**: User request to correct all critical and important findings from the backend review, plus the directly related suggestions that prevent recurrence.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -80,7 +80,7 @@ As a user or operator, I receive an explicit failure when Supabase, an RPC, cach
 - **FR-006**: Supabase errors MUST be preserved as explicit domain errors across RPC, Server Action, Route Handler, and client UI boundaries; infrastructure failure MUST NOT be represented as an empty successful result.
 - **FR-007**: Next.js mutations MUST revalidate all affected paths and keep service-role credentials and server-only modules out of client bundles.
 - **FR-008**: Auth redirects MUST use a configured trusted origin, and internal cron authentication MUST use one documented secret with constant-time comparison.
-- **FR-009**: Login, signup, reset, AI search suggestions, and customer search MUST enforce bounded inputs and appropriate abuse/privacy minimization.
+- **FR-009**: Login, signup, reset, search suggestions, and customer search MUST enforce bounded inputs and appropriate abuse/privacy minimization.
 - **FR-010**: The implementation MUST include regression coverage for public isolation, concurrent booking/status behavior, availability failure, reminder claims, and stable error mapping.
 
 ### Key Entities

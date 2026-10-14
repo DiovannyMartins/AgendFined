@@ -15,8 +15,6 @@ import {
   type WaitlistManagementResult,
 } from "@/lib/waitlist/manage";
 import type { WaitlistStatus } from "@/lib/waitlist/waitlist";
-import { scoreWaitlistPriority } from "@/lib/typesafe/judgments";
-import { prepareAiBudget, recordAiUsage } from "@/lib/security/usage";
 
 type GetBusiness = () => Promise<WaitlistManagementBusiness | null>;
 
@@ -52,43 +50,5 @@ export async function getWaitlistManagement(
   const getBusiness = deps?.getBusiness ?? getCurrentBusiness;
   const fetchEntries = deps?.fetchEntries ?? fetchOwnerEntries;
   const business = await getBusiness();
-  const result = await buildWaitlistManagementResult(business, fetchEntries);
-  if (result.status !== "ok") return result;
-
-  let aiAllowed = false;
-  let userId: string | null = null;
-  if (!deps) {
-    const supabase = await createClient();
-    const { data } = await supabase.auth.getUser();
-    userId = data.user?.id ?? null;
-    aiAllowed = Boolean(userId && business && await prepareAiBudget(userId, business.id, "waitlistPriority"));
-  }
-
-  const priority = aiAllowed && userId
-    ? await scoreWaitlistPriority(
-    result.entries.map((entry) => ({
-      id: entry.id,
-      serviceName: entry.service_name,
-      startAt: entry.start_at,
-      createdAt: entry.created_at,
-      status: entry.status,
-    })),
-    { onUsage: (usage) => recordAiUsage(userId!, "waitlistPriority", usage) },
-  )
-    : new Map();
-  if (priority.size === 0) return result;
-
-  const entries = result.entries
-    .map((entry) => {
-      const judgment = priority.get(entry.id);
-      return judgment && judgment.confidence >= 0.7
-        ? { ...entry, priority_score: judgment.score, priority_confidence: judgment.confidence }
-        : entry;
-    })
-    .sort((a, b) => {
-      const scoreDifference = (b.priority_score ?? -1) - (a.priority_score ?? -1);
-      return scoreDifference || a.created_at.localeCompare(b.created_at);
-    });
-
-  return { status: "ok", entries };
+  return buildWaitlistManagementResult(business, fetchEntries);
 }

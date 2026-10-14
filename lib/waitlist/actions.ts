@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { createClient } from "@/lib/supabase/server";
 import { assertProPlan } from "@/lib/plan/plan";
-import { classifyOperationalError } from "@/lib/typesafe/judgments";
+import { classifyOperationalError } from "@/lib/bookings/classification";
 import { generateCancelToken, hashCancelToken } from "@/lib/bookings/cancel";
 
 // Server actions for the waitlist management dashboard (issue #22, ADR 0008).

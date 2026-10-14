@@ -2,7 +2,7 @@
 
 ## Evidence reviewed
 
-- TypeSafe/Jev triage and manual review of migrations, Server Actions, Route Handlers, auth, and the reminder Edge Function.
+- Manual review of migrations, Server Actions, Route Handlers, auth, and the reminder Edge Function.
 - Installed Next.js 16.3 documentation: Server Actions are directly reachable POST endpoints and must authenticate/authorize inside every action; mutations should revalidate affected paths; Route Handlers are the backend-for-frontend boundary.
 - Supabase/Postgres guidance: least privilege, indexed RLS predicates, fully qualified security-definer functions with an empty `search_path`, atomic `FOR UPDATE SKIP LOCKED` claims, short transactions, and database constraints as the final correctness boundary.
 

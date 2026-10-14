@@ -11,8 +11,7 @@ type ServiceSearchOption = {
 };
 
 // Service search is intentionally local. The request is supplied by an
-// anonymous visitor and may contain personal information; it must not be sent
-// to an external AI provider just to select a public service.
+// anonymous visitor and may contain personal information.
 export async function suggestService(
   description: string,
   businessId: string,

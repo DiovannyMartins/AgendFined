@@ -12,7 +12,6 @@ import {
   formatCurrencyBRL,
   formatRate,
   type BillingReport,
-  type ReportInsight,
 } from "@/lib/reports/reports";
 import { cn } from "@/lib/utils";
 
@@ -66,12 +65,12 @@ export default async function RelatoriosPage({
         />
       )}
       {result.status === "error" && <ErrorState />}
-      {result.status === "ok" && <ReportBody key={result.key} report={result.report} insight={result.insight} />}
+      {result.status === "ok" && <ReportBody key={result.key} report={result.report} />}
     </div>
   );
 }
 
-function ReportBody({ report, insight }: { report: BillingReport; insight?: ReportInsight }) {
+function ReportBody({ report }: { report: BillingReport }) {
   const stats = [
     {
       label: "Faturamento no período",
@@ -101,19 +100,6 @@ function ReportBody({ report, insight }: { report: BillingReport; insight?: Repo
 
   return (
     <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {insight && (
-        <Card className="sm:col-span-2 lg:col-span-4">
-          <CardHeader>
-            <CardTitle className="text-base">Leitura assistida</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {insight.kind === "insufficient_data" && "Há poucas reservas no período para tirar uma conclusão confiável."}
-            {insight.kind === "healthy" && "Não há um sinal dominante de cancelamentos ou no-shows exigindo atenção."}
-            {insight.kind === "watch_cancellation_rate" && "A taxa de cancelamento é o principal indicador para acompanhar neste período."}
-            {insight.kind === "watch_no_show_rate" && "A taxa de no-show é o principal indicador para acompanhar neste período."}
-          </CardContent>
-        </Card>
-      )}
       {stats.map((stat) => (
         <Card key={stat.label}>
           <CardHeader>

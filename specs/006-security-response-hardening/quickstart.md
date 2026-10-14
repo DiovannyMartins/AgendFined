@@ -20,7 +20,7 @@ npm run typecheck
 npm run build
 ```
 
-Integration tests require the Node 22 command in `AGENTS.md` and mutate their configured project.
+Integration tests require Node.js 22+ and mutate their configured project.
 
 ## Validation recorded on 2026-09-22
 

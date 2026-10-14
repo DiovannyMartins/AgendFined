@@ -9,8 +9,7 @@ import { StatusAction } from "./status-action";
 import type { AgendaBooking } from "@/lib/agenda/view";
 import { statusLabel } from "@/lib/bookings/status";
 import { formatPublicCode } from "@/lib/bookings/public-code";
-import { CANCELLATION_REASON_CATEGORY_LABELS } from "@/lib/typesafe/labels";
-import type { CancellationReasonCategory } from "@/lib/typesafe/labels";
+import { CANCELLATION_REASON_CATEGORY_LABELS, type CancellationReasonCategory } from "@/lib/bookings/classification";
 
 type BookingRow = AgendaBooking;
 

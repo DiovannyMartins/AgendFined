@@ -5,7 +5,7 @@ import { getCurrentBusiness } from "@/lib/business/queries";
 import { createClient } from "@/lib/supabase/server";
 import { canTransition, type BookingStatus } from "@/lib/bookings/transitions";
 import { bookingStatusSchema } from "@/lib/validation/schemas";
-import { classifyCancellationReason } from "@/lib/typesafe/judgments";
+import { classifyCancellationReason } from "@/lib/bookings/classification";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
 
 export async function updateBookingStatus(

@@ -1,6 +1,5 @@
--- Optional TypeSafe-derived labels. Raw user text remains the source of truth;
--- these fields are only operational annotations and may be null when the
--- TypeSafe key is not configured or a judgment is unavailable.
+-- Optional booking labels. Raw user text remains the source of truth; these
+-- fields are only operational annotations and may be null when unavailable.
 alter table public.bookings
   add column if not exists cancel_reason_category text
     check (cancel_reason_category is null or cancel_reason_category in (
@@ -23,8 +22,8 @@ alter table public.bookings
     not null default false;
 
 comment on column public.bookings.cancel_reason_category is
-  'Optional semantic category derived from cancel_reason; never replaces the raw reason.';
+  'Optional category derived from cancel_reason; never replaces the raw reason.';
 comment on column public.bookings.customer_note_category is
-  'Optional semantic category derived from customer_note.';
+  'Optional category derived from customer_note.';
 comment on column public.bookings.customer_note_requires_follow_up is
   'Optional operational flag derived from customer_note; false is the safe default.';

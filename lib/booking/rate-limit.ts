@@ -25,9 +25,8 @@ export const CONSULT_RATE_LIMIT = {
 } as const;
 
 // Public read/search actions are cheaper than a booking, but still execute
-// privileged database work (and may call an external classifier). Keep their
-// counters separate from booking writes so one kind of traffic cannot starve
-// another.
+// privileged database work. Keep their counters separate from booking writes so
+// one kind of traffic cannot starve another.
 export const PUBLIC_READ_RATE_LIMIT = {
   availabilityPerIp: { limit: 120, windowSeconds: 60 * 15 },
   availabilityPerIpBusiness: { limit: 60, windowSeconds: 60 * 15 },
@@ -41,11 +40,6 @@ export const AUTH_RATE_LIMIT = {
   signup: { perIp: 5, perEmail: 3, windowSeconds: 60 * 60 },
   passwordReset: { perIp: 5, perEmail: 3, windowSeconds: 60 * 60 },
   mfaVerify: { perUser: 10, windowSeconds: 15 * 60 },
-} as const;
-
-export const AI_RATE_LIMIT = {
-  waitlistPriority: { limit: 20, windowSeconds: 60 * 60 },
-  reportInsight: { limit: 20, windowSeconds: 60 * 60 },
 } as const;
 
 export const API_RATE_LIMIT = {
@@ -129,19 +123,6 @@ export async function enforceApiRateLimit(
   const config = API_RATE_LIMIT[route];
   return enforceWindows(supabase, [
     { key: `api:${route}|ip:${ip}`, limit: config.limit, windowSeconds: config.windowSeconds },
-  ]);
-}
-
-export async function enforceAiRateLimit(
-  supabase: ServerClient,
-  userId: string,
-  businessId: string,
-  action: keyof typeof AI_RATE_LIMIT,
-): Promise<boolean> {
-  const config = AI_RATE_LIMIT[action];
-  return enforceWindows(supabase, [
-    { key: `ai:${action}|user:${userId}`, limit: config.limit, windowSeconds: config.windowSeconds },
-    { key: `ai:${action}|business:${businessId}`, limit: config.limit * 2, windowSeconds: config.windowSeconds },
   ]);
 }
 

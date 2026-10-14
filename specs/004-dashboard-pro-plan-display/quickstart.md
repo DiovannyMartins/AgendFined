@@ -2,7 +2,7 @@
 
 ## Pré-requisitos
 
-- Node.js 22 ou superior conforme `AGENTS.md`.
+- Node.js 22 ou superior.
 - Dependências instaladas com `npm install`.
 - Variáveis do projeto configuradas para acessar o dashboard.
 

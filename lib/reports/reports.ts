@@ -17,9 +17,6 @@
 //     no_show).
 import type { BookingStatus } from "@/lib/bookings/transitions";
 import { runProGated, type GatedBusiness } from "@/lib/plan/gate";
-import { classifyReportInsight, type ReportInsight } from "@/lib/typesafe/judgments";
-
-export type { ReportInsight } from "@/lib/typesafe/judgments";
 
 export type ReportBooking = {
   id: string;
@@ -172,7 +169,7 @@ export type BillingReportResult =
   | { status: "no_business" }
   | { status: "error" }
   | { status: "upgrade_required" }
-  | { status: "ok"; key: RangeKey; range: DateRange; report: BillingReport; insight?: ReportInsight };
+  | { status: "ok"; key: RangeKey; range: DateRange; report: BillingReport };
 
 export type ReportBusiness = GatedBusiness;
 
@@ -185,15 +182,11 @@ export async function buildBillingReportResult(
   business: ReportBusiness | null,
   fetchBookings: FetchReportBookings,
   rangeKey?: string,
-  options?: { classifyInsight?: (report: BillingReport) => Promise<ReportInsight | null> },
 ): Promise<BillingReportResult> {
   const { key, range } = resolveRange(rangeKey);
   const gated = await runProGated(business, (businessId) => fetchBookings(businessId, range));
   if (gated.status !== "ok") return gated;
 
   const report = buildBillingReport(gated.data, range);
-  const insight = await (options?.classifyInsight ?? ((value: BillingReport) => classifyReportInsight(value)))(report);
-  return insight && insight.confidence >= 0.7
-    ? { status: "ok", key, range, report, insight }
-    : { status: "ok", key, range, report };
+  return { status: "ok", key, range, report };
 }

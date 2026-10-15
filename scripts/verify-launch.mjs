@@ -57,7 +57,7 @@ for (const key of requiredEnvironment) {
 if (process.env.CRON_SECRET?.trim() || process.env.RECONCILIATION_CRON_SECRET?.trim()) {
   pass("environment reconciliation scheduler secret is configured");
 } else {
-  warn("environment reconciliation scheduler secret is not configured; enable it before scheduling /api/internal/reconciliation");
+  warn("reconciliation scheduler secret is absent from the local environment; this check does not inspect Vercel Production or Supabase Vault");
 }
 
 if (productionCheck && process.env.APP_URL && !/^https:\/\//i.test(process.env.APP_URL)) {

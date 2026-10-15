@@ -12,6 +12,8 @@ npm run check:launch -- --production
 
 O script verifica a presença das variáveis, o formato dos endpoints, HTTPS, `robots.txt`, `sitemap.xml` e a CSP pública. Ele nunca imprime valores de secrets.
 
+As verificações de variáveis leem o ambiente local, inclusive `.env.local`; não consultam as variáveis da Vercel nem o Supabase Vault. Um aviso local de segredo ausente não comprova falha em produção.
+
 Para uma instância local:
 
 ```bash
@@ -43,6 +45,12 @@ npx supabase db push --linked
 4. Confirme que o cron/pg_net chama a Edge Function `booking-reminders` com `REMINDER_CRON_SECRET` e que a função possui `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY` e `RESEND_FROM_EMAIL`.
 5. Para a reconciliação, confirme no Vault os nomes `agendfined_reconciliation_cron_url` e `agendfined_reconciliation_cron_secret`, e no `cron.job` o schedule `*/30 * * * *` com `active = true`.
 6. Não altere RLS, RPCs, cron ou secrets diretamente como parte de um deploy de frontend. Faça mudanças de banco em migration, revise-as e valide com os testes de integração usando Node 22+.
+
+### Diagnóstico do scheduler
+
+`process_billing_reconciliation()` usa timeout HTTP de 60 segundos. O status `succeeded` em `cron.job_run_details` confirma o disparo, não a conclusão HTTP. Consulte `net._http_response` pelo ID retornado pela função e verifique `status_code`, `timed_out` e `error_msg`. Uma resposta 200 deve conter `ok: true`; verifique também `calendarSync.failed`, pois erros de calendário não tornam a resposta HTTP um erro.
+
+O teste `tests/sql/reconciliation-scheduler.sql` verifica a requisição real enfileirada e reverte a transação antes do envio. Execute com `npx supabase db query --linked --file tests/sql/reconciliation-scheduler.sql`. Ele exige a URL e o segredo já configurados no Vault e não revela seus valores.
 
 ## Mercado Pago
 

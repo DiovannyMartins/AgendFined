@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MfaPanel } from "./mfa-panel";
@@ -25,12 +27,17 @@ export default async function MfaPage({
   if (next && assurance.currentLevel === "aal2") redirect(returnTo);
 
   return (
-    <main className="container mx-auto flex min-h-[calc(100vh-4rem)] max-w-lg items-center px-4 py-12">
-      <MfaPanel
-        factorId={data.totp.find((factor) => factor.status === "verified")?.id ?? null}
-        verified={assurance.currentLevel === "aal2"}
-        returnTo={returnTo}
-      />
+    <main className="container mx-auto flex min-h-[calc(100vh-4rem)] max-w-lg flex-col items-center justify-center px-4 py-12">
+      <Link href="/" className="mb-8 inline-flex">
+        <BrandLogo />
+      </Link>
+      <div className="w-full">
+        <MfaPanel
+          factorId={data.totp.find((factor) => factor.status === "verified")?.id ?? null}
+          verified={assurance.currentLevel === "aal2"}
+          returnTo={returnTo}
+        />
+      </div>
     </main>
   );
 }

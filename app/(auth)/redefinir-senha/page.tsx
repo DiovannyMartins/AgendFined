@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarClock } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { mfaChallengePath, requiresMfaChallenge } from "@/lib/auth/assurance";
@@ -18,8 +18,7 @@ export default async function RedefinirSenhaPage() {
   return (
     <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4 py-12">
       <Link href="/" className="mb-8 flex items-center gap-2 font-semibold">
-        <CalendarClock className="size-6" />
-        <span className="text-lg">AgendFined</span>
+        <BrandLogo />
       </Link>
       <UpdatePasswordForm />
     </div>

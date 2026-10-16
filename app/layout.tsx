@@ -1,10 +1,14 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Instrument_Sans, Instrument_Serif } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 import { SupportWidget } from "@/components/support-widget";
 import { GoogleAnalytics } from "@/components/google-analytics";
 import { LoginAnalyticsTracker } from "@/components/login-analytics-tracker";
+
+export const viewport: Viewport = {
+  themeColor: "#141414",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://agendfined.com.br"),
@@ -20,14 +24,14 @@ export const metadata: Metadata = {
     description:
       "Receba agendamentos online, organize seus horários e ofereça uma experiência mais profissional aos seus clientes.",
     url: "https://agendfined.com.br",
-    images: [{ url: "/images/hero.webp", width: 1600, height: 900, alt: "AgendFined" }],
+    images: [{ url: "/brand/social.png", width: 1200, height: 630, alt: "AgendFined — Agendamentos online para profissionais" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "AgendFined — Agendamentos online para profissionais",
     description:
       "Receba agendamentos online, organize seus horários e ofereça uma experiência mais profissional aos seus clientes.",
-    images: ["/images/hero.webp"],
+    images: ["/brand/social.png"],
   },
 };
 

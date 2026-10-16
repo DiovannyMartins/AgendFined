@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarClock } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useIsAuthenticated } from "@/components/use-is-authenticated";
@@ -34,11 +34,9 @@ export function Navbar() {
       )}
     >
       <nav className="mx-auto flex h-20 max-w-6xl items-center justify-between px-4 lg:px-6">
-        <Link href="/#top" className="group flex items-center gap-2 font-semibold">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-transform duration-300 group-hover:scale-105">
-            <CalendarClock className="size-4" />
-          </span>
-          <span>AgendFined</span>
+        <Link href="/#top" className="inline-flex shrink-0 items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4">
+          <BrandLogo symbol className="sm:hidden" />
+          <BrandLogo className="hidden sm:block" />
         </Link>
 
         <div className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 import {
   ArrowLeft,
   ArrowRight,
@@ -21,10 +22,7 @@ export default function NotFound() {
       <div className="mx-auto flex w-full max-w-7xl flex-col px-5 pb-10 pt-6 sm:px-8 sm:pt-8 lg:px-12">
         <header className="flex items-center justify-between">
           <Link href="/" className="group inline-flex items-center gap-2.5 font-semibold tracking-tight">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-black/20 transition-transform duration-300 group-hover:scale-105">
-              <CalendarClock className="size-4" />
-            </span>
-            <span>AgendFined</span>
+            <BrandLogo className="w-[150px] sm:w-[180px]" />
           </Link>
 
           <Link

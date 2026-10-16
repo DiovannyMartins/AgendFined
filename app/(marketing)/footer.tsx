@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowUpRight, CalendarClock } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 
 const columns = [
   {
@@ -34,10 +35,7 @@ export function Footer() {
         <div className="grid gap-12 lg:grid-cols-[1.4fr_1fr]">
           <div>
             <Link href="/" className="group inline-flex items-center gap-2 font-semibold">
-              <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-transform duration-300 group-hover:scale-105">
-                <CalendarClock className="size-4" />
-              </span>
-              <span>AgendFined</span>
+              <BrandLogo />
             </Link>
             <p className="mt-5 max-w-sm text-lg leading-relaxed text-muted-foreground">
               Sua agenda trabalhando por você, 24 horas por dia.

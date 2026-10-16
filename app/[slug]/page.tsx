@@ -30,6 +30,7 @@ export async function generateMetadata({
         title: `${business.name} — AgendFined`,
         description,
         url: `https://agendfined.com.br/${encodeURIComponent(slug)}`,
+        images: [{ url: "/brand/social.png", width: 1200, height: 630, alt: "AgendFined" }],
       },
     };
   } catch {

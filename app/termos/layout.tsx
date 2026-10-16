@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarClock } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -8,8 +8,7 @@ export default function TermosLayout({ children }: { children: React.ReactNode }
     <div className="mx-auto max-w-3xl px-4 py-12 lg:px-6">
       <header>
         <Link href="/" className="mb-8 inline-flex items-center gap-2 font-semibold">
-          <CalendarClock className="size-5" />
-          <span>AgendFined</span>
+          <BrandLogo />
         </Link>
       </header>
       <main id="main-content">{children}</main>

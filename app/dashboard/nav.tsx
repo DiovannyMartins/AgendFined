@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { CalendarClock, CalendarDays, UserRound, Blocks, CalendarPlus, Settings, Sparkles, BarChart3, Hourglass, LogOut, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CopyPublicLink } from "@/components/copy-public-link";
+import { BrandLogo } from "@/components/brand-logo";
 import { logout } from "@/lib/auth/actions";
 
 const links = [
@@ -27,7 +28,7 @@ export function DashboardNav({ slug }: { slug: string | null }) {
     <nav className="w-full border-b border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-6 lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col lg:border-b-0 lg:border-r lg:bg-background lg:px-5 lg:py-8 lg:backdrop-blur-none">
       <div className="mb-3 flex items-center justify-between lg:mb-10 lg:w-[216px]">
         <Link href="/dashboard" className="text-lg font-semibold tracking-tight">
-          AgendFined
+          <BrandLogo />
         </Link>
         <button
           type="button"

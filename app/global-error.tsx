@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { BrandLogo } from "@/components/brand-logo";
 
 export default function GlobalError({
   error,
@@ -32,9 +33,7 @@ export default function GlobalError({
         }}
       >
         <main style={{ maxWidth: "32rem", textAlign: "center" }}>
-          <p style={{ color: "#b0b0b0", fontSize: "0.8rem", letterSpacing: "0.18em", textTransform: "uppercase" }}>
-            AgendFined
-          </p>
+          <BrandLogo style={{ display: "block", width: 180, height: "auto", margin: "0 auto 24px" }} />
           <h1 style={{ fontSize: "clamp(2rem, 8vw, 4rem)", lineHeight: 1, margin: "1rem 0" }}>
             Tivemos um imprevisto.
           </h1>

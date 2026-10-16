@@ -144,7 +144,7 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
           {subscription?.status === "authorized" && (
             <div className="border-t border-border pt-4">
               <p className="text-sm text-muted-foreground">
-                Quer parar de ser cobrado? Cancelar encerra a assinatura e, após a carência, devolve o negócio ao plano Grátis.
+                A assinatura é recorrente mensal. Ao cancelar, novas cobranças são interrompidas conforme o processamento do Mercado Pago; os recursos PROFISSIONAL permanecem disponíveis por até 7 dias e depois o negócio volta ao Grátis.
               </p>
               <CancelSubscriptionButton />
             </div>

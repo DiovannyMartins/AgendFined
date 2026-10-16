@@ -32,6 +32,30 @@ Distinção usada nos documentos: **implementado** (código pronto), **validado 
 - **Formulário de interesse:** removido por decisão do responsável.
 - **Documentação:** `npm run check:checklist` valida numeração, duplicatas, itens fora do escopo, status e links.
 
+## Próxima execução — checkout e prontidão para 1º de dezembro
+
+O checkout PROFISSIONAL já está implementado em código (spec 005), incluindo início e retomada de tentativa, retorno, webhook assinado e reconciliação agendada. Isso não comprova por si só que o ciclo comercial completo foi validado em produção. A sequência abaixo fecha essa lacuna sem registrar dados de clientes nem secrets.
+
+1. **Teste isolado do ciclo de assinatura (engenharia/QA, antes de 10 de novembro):** usar credenciais e compradores de teste do Mercado Pago; validar cadastro/início, cancelamento ou autorização, retorno ao app, webhook e reconciliação. Confirmar que só o webhook/reconciliação autoriza o plano, duplicidade é segura e falhas preservam mensagem genérica. Evidência: data, ambiente, resultado por cenário, IDs técnicos mascarados e links de logs sem payload pessoal.
+2. **Revisão da oferta e termos (produto, até 3 de novembro):** conferir R$ 19/mês, periodicidade, cancelamento, carência de 7 dias, momento de liberação dos recursos e contato; garantir coerência entre landing, configurações e Termos. Evidência: checklist de telas e aprovação comercial registrada.
+3. **Ensaio de suporte (responsável, até 17 de novembro):** simular “paguei e continuo Grátis”, checkout abandonado, cancelamento e cobrança recusada; confirmar o caminho de reconciliação e a resposta de suporte. Evidência: roteiro e resultado sem dados reais.
+4. **Preparação de comunicação (produto, até 24 de novembro):** preparar bio, 3–6 peças, UTM e calendário T-7 a T+14. Publicar apenas após aprovação humana; campanhas continuam fora do escopo autorizado até essa aprovação.
+5. **Go/no-go (responsável, até 29 de novembro):** verificar reservas, cobrança, suporte, monitoramento, rollback e conteúdo legal/comercial; registrar decisão e contatos de plantão.
+
+### Andamento desta trilha
+
+- [x] Fluxo de checkout e seus componentes identificados na spec 005 e em `lib/billing/`.
+- [x] Webhook do Mercado Pago e endpoint privado de reconciliação identificados; o cron de 30 minutos está registrado como ativo em 12 de outubro.
+- [ ] Executar cenários de assinatura no ambiente de teste do Mercado Pago e registrar evidências.
+- [~] Revisar a oferta e os Termos contra o comportamento implementado. O catálogo compartilhado usa valor de `MERCADO_PAGO_PRO_AMOUNT_CENTS` (padrão R$ 19/mês); cancelamento e pausa mantêm acesso durante 7 dias; apenas status `authorized` libera PROFISSIONAL. Os Termos e a tela de plano agora explicam recorrência, ativação, cancelamento, carência e direito legal de arrependimento; confirmação do preço de produção e revisão jurídica/fluxo de estorno seguem pendentes. Registro em `revisao-oferta-e-termos.md`.
+- [~] Preparar ensaio de suporte; roteiro e escalonamento estão documentados em `ensaio-suporte-checkout.md`; falta execução do teste com o comprador convidado e definir responsável/substituto e prazo interno.
+- [~] Materiais e calendário T-7 a T+14 estão rascunhados em `materiais-lancamento.md`; aprovação e autorização de publicação permanecem pendentes.
+- [ ] Registrar decisão go/no-go até 29 de novembro.
+
+O teste com provedor permanece pendente. A inspeção local confirmou que há token em dotenv, mas ele não usa o prefixo `TEST-`; não foi lido nem exposto o valor. Como a integração escolhe o checkout de sandbox somente para token `TEST-`, não iniciei a ação para evitar criar uma pré-aprovação real. A documentação oficial do Mercado Pago orienta usar credenciais e contas de teste para validar a integração. Ver `ensaio-suporte-checkout.md`.
+
+No aspecto jurídico, os Termos agora distinguem a carência operacional do direito de arrependimento. A legislação oficial prevê direito de arrependimento em sete dias nas hipóteses aplicáveis e exige atendimento eletrônico para dúvidas, reclamações, suspensão e cancelamento; isso não substitui análise jurídica da relação concreta entre o AgendFined (SaaS B2B) e o negócio contratante. Revisão especializada do enquadramento e do procedimento de estorno segue pendente.
+
 ## Validação técnica — 6 de outubro de 2026
 
 | Comando | Ambiente | Resultado |

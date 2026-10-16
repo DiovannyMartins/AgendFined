@@ -25,24 +25,26 @@ Em 6 de outubro de 2026 o responsável decidiu não captar e-mails no site. A se
 6. Criar uma sequência de lançamento para posts, stories e divulgação direta.
 7. Medir cliques, cadastros e reservas originadas por cada canal.
 
-## Checklist de divulgação (preparação, sem publicar)
+## Materiais de divulgação (rascunho local; não publicado)
 
-- [ ] Bio do Instagram com o link `https://agendfined.com.br`.
-- [ ] 3 a 6 posts de lançamento com imagem real do produto e CTA para `/cadastro`.
-- [ ] Links com parâmetros UTM sem e-mail, telefone, nome ou código de reserva.
-- [ ] Calendário de publicação de T-7 a T+14 em relação a 1º de dezembro de 2026.
-- [ ] Aprovação do responsável registrada antes de qualquer publicação.
+- [x] Rascunho de bio do Instagram com `https://agendfined.com.br` em `materiais-lancamento.md`.
+- [x] Seis rascunhos de publicação com CTA para `/cadastro`, sem alegações de clientes ou recursos não confirmados.
+- [x] Links com parâmetros UTM sem e-mail, telefone, nome ou código de reserva.
+- [x] Calendário T-7 a T+14 registrado em `materiais-lancamento.md`.
+- [x] Aprovação do responsável para os textos/riscos genéricos registrada em conversa de 15 de outubro de 2026; confirmação final no momento de publicar continua necessária.
 
 ## Dependências externas
 
-- Textos comerciais aprovados.
-- Autorização para publicar campanhas.
+- Criativos visuais com telas reais/sintéticas e aprovação da prévia final.
+- Autorização para publicar campanhas; nenhum post foi publicado.
 - Decisão sobre chat ao vivo/SLA (item 34).
 
 ## Evidências obrigatórias
 
-- Links sociais conferidos.
-- Calendário de divulgação aprovado.
+- Links sociais conferidos na data da publicação.
+- Calendário em `materiais-lancamento.md` aprovado antes de agendar/publicar.
+
+Rascunhos locais não contam como campanha publicada. O responsável autorizou preparar e publicar os materiais em conversa de 15/10/2026. Não foi encontrada sessão de Instagram ou outra rede social conectada neste ambiente, então nenhuma publicação foi feita. A prévia final e a ação de publicar precisam ser realizadas na conta social do responsável.
 
 ## Critério de conclusão
 

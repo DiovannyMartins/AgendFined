@@ -216,7 +216,8 @@ describe("RLS isolation User A vs User B (§35)", () => {
     const outsider = await anonClientForUser(`outsider.${stamp}@agendfined.dev`, PASSWORD);
     const { data, error } = await outsider
       .from("bookings")
-      .update({ customer_name_snapshot: "hacked" })
+      // A column the dashboard may update, so RLS (not the column grant) decides.
+      .update({ cancel_reason: "hacked" })
       .eq("business_id", businessA)
       .select("*");
     expect(error).toBeNull();

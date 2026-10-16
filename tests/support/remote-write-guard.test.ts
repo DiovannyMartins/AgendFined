@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateInTimeZone, decideRemoteWrites } from "./remote-write-guard";
+import { dateInTimeZone, decideIntegrationWrites, decideRemoteWrites } from "./remote-write-guard";
 
 const base = {
   ALLOW_REMOTE_E2E_WRITES: "true",
@@ -24,6 +24,24 @@ describe("decideRemoteWrites", () => {
   ];
   it.each(cases)("refuses %o (%s)", (override) => {
     expect(decideRemoteWrites({ ...base, ...override }).allowed).toBe(false);
+  });
+});
+
+describe("decideIntegrationWrites", () => {
+  it("allows the local Supabase stack without any opt-in", () => {
+    expect(
+      decideIntegrationWrites({ NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321", SUPABASE_SERVICE_ROLE_KEY: "local" }),
+    ).toEqual({ allowed: true, host: "127.0.0.1:54321" });
+  });
+
+  it("refuses a remote project by default", () => {
+    expect(
+      decideIntegrationWrites({ NEXT_PUBLIC_SUPABASE_URL: "https://prod.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "remote" }).allowed,
+    ).toBe(false);
+  });
+
+  it("allows a remote project only through the explicit remote opt-in", () => {
+    expect(decideIntegrationWrites(base)).toEqual({ allowed: true, host: "test-project.supabase.co" });
   });
 });
 

@@ -1,8 +1,14 @@
 import { loadEnvFile } from "node:process";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database-types";
+import { decideIntegrationWrites } from "../support/remote-write-guard";
 
 loadEnvFile(".env.local");
+
+// Every integration file imports this module, so refusing here stops the suite
+// before it writes to a remote project (use `npm run test:integration:local`).
+const target = decideIntegrationWrites(process.env);
+if (!target.allowed) throw new Error(`Integração recusada: ${target.reason}`);
 
 export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 export const SUPABASE_PUBLISHABLE = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;

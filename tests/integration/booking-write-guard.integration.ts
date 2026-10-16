@@ -160,3 +160,36 @@ describe("owner writes to reservas outside the Server Actions", () => {
     expect(data?.status).toBe("cancelled");
   });
 });
+
+describe("owner changes to the negócio outside the Server Actions", () => {
+  it("cannot change the negócio timezone while reservas are scheduled", async () => {
+    const owner = await anonClientForUser(EMAIL, PASSWORD);
+
+    const { error } = await owner
+      .from("businesses")
+      .update({ timezone: "America/Manaus" })
+      .eq("id", businessId);
+    expect(error).not.toBeNull();
+
+    const { data } = await owner.from("businesses").select("timezone").eq("id", businessId).single();
+    expect(data?.timezone).toBe("America/Sao_Paulo");
+  });
+
+  it("can change the negócio timezone once nothing is scheduled", async () => {
+    const owner = await anonClientForUser(EMAIL, PASSWORD);
+    const cancelled = await owner
+      .from("bookings")
+      .update({ status: "cancelled" })
+      .eq("business_id", businessId)
+      .eq("status", "confirmed");
+    expect(cancelled.error).toBeNull();
+
+    const { data, error } = await owner
+      .from("businesses")
+      .update({ timezone: "America/Manaus" })
+      .eq("id", businessId)
+      .select("timezone");
+    expect(error).toBeNull();
+    expect(data).toEqual([{ timezone: "America/Manaus" }]);
+  });
+});

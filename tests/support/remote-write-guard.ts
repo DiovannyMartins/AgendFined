@@ -45,6 +45,24 @@ export function decideRemoteWrites(env: Env): RemoteWriteDecision {
   return { allowed: true, host };
 }
 
+const LOCAL_HOSTNAMES = new Set(["127.0.0.1", "localhost", "[::1]"]);
+
+// Integration tests create and delete users and businesses. The local Supabase
+// stack is always allowed; a remote project needs the same explicit opt-in as
+// the remote e2e suite.
+export function decideIntegrationWrites(env: Env): RemoteWriteDecision {
+  let url: URL;
+  try {
+    url = new URL(env.NEXT_PUBLIC_SUPABASE_URL ?? "");
+  } catch {
+    return { allowed: false, reason: "NEXT_PUBLIC_SUPABASE_URL inválida." };
+  }
+  if (LOCAL_HOSTNAMES.has(url.hostname.toLowerCase())) {
+    return { allowed: true, host: url.host.toLowerCase() };
+  }
+  return decideRemoteWrites(env);
+}
+
 // Calendar date (YYYY-MM-DD) `days` after now, in the given IANA time zone.
 // Independent of the machine's local time zone.
 export function dateInTimeZone(timeZone: string, days: number, now: Date = new Date()): string {

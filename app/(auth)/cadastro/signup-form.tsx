@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { signup, type ActionResult } from "@/lib/auth/actions";
+import { useAuthTurnstile } from "@/components/auth-turnstile";
 import { signupSchema, type SignupInput } from "@/lib/validation/schemas";
 import { trackAnalyticsEvent } from "@/lib/analytics";
 
@@ -16,6 +17,7 @@ export function SignupForm() {
   const [state, setState] = useState<ActionResult>(INITIAL);
   const [submitted, setSubmitted] = useState(false);
   const [pending, startTransition] = useTransition();
+  const captcha = useAuthTurnstile();
   const {
     register,
     handleSubmit,
@@ -28,8 +30,10 @@ export function SignupForm() {
       fd.set("displayName", values.displayName);
       fd.set("email", values.email);
       fd.set("password", values.password);
+      fd.set("cfTurnstileToken", captcha.token);
       const result = await signup(INITIAL, fd);
       setState(result);
+      captcha.renew();
       setSubmitted(true);
       if (result.ok) trackAnalyticsEvent("sign_up", { method: "email" });
     });
@@ -91,8 +95,9 @@ export function SignupForm() {
             <p className="text-xs text-muted-foreground">
               Ao criar a conta você concorda com nossos Termos e Política de Privacidade.
             </p>
+            {captcha.widget}
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full" disabled={pending}>
+            <Button type="submit" className="w-full" disabled={pending || !captcha.canSubmit}>
               {pending ? "Criando..." : "Começar grátis"}
             </Button>
           </form>

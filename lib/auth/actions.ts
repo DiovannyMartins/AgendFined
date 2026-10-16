@@ -18,6 +18,13 @@ const genericError = (message: string): { ok: false; code: string; message: stri
   message,
 });
 
+// Supabase Auth verifies the Turnstile token itself when CAPTCHA protection is
+// enabled for the project; tokens are single-use, so the app never pre-verifies.
+function captchaToken(formData: FormData): string | undefined {
+  const token = String(formData.get("cfTurnstileToken") ?? "").trim();
+  return token ? token.slice(0, 2048) : undefined;
+}
+
 async function authRateLimit(action: "login" | "signup" | "passwordReset", email: string) {
   try {
     const admin = createAdminClient();
@@ -51,7 +58,7 @@ export async function signup(_prev: ActionResult, formData: FormData): Promise<A
   const { error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
-    options: { data: { displayName: parsed.data.displayName } },
+    options: { data: { displayName: parsed.data.displayName }, captchaToken: captchaToken(formData) },
   });
 
   if (error) {
@@ -83,9 +90,15 @@ export async function login(_prev: ActionResult, formData: FormData): Promise<Ac
     return { ok: false, code: allowed === false ? "RATE_LIMITED" : "RATE_LIMIT_UNAVAILABLE", message: "Muitas tentativas. Tente novamente mais tarde." };
   }
 
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  const { error } = await supabase.auth.signInWithPassword({
+    ...parsed.data,
+    options: { captchaToken: captchaToken(formData) },
+  });
   if (error) {
     auditSecurityEvent("auth.login_failed");
+    if (error.code === "captcha_failed") {
+      return { ok: false, code: "CAPTCHA_FAILED", message: "Verificação humana falhou. Tente novamente." };
+    }
     return {
       ok: false,
       code: "INVALID_CREDENTIALS",
@@ -133,6 +146,7 @@ export async function requestPasswordReset(_prev: ActionResult, formData: FormDa
   // session is established before the new-password form renders (§24).
   const { error } = await supabase.auth.resetPasswordForEmail(parsedEmail.data, {
     redirectTo: `${origin}/auth/callback?next=/redefinir-senha`,
+    captchaToken: captchaToken(formData),
   });
 
   if (error) {

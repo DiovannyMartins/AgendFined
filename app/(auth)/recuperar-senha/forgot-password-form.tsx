@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { requestPasswordReset, type ActionResult } from "@/lib/auth/actions";
+import { useAuthTurnstile } from "@/components/auth-turnstile";
 
 const INITIAL: ActionResult = { ok: true, data: undefined };
 
@@ -18,6 +19,7 @@ export function ForgotPasswordForm() {
   const [state, setState] = useState<ActionResult>(INITIAL);
   const [submitted, setSubmitted] = useState(false);
   const [pending, startTransition] = useTransition();
+  const captcha = useAuthTurnstile();
   const {
     register,
     handleSubmit,
@@ -31,8 +33,10 @@ export function ForgotPasswordForm() {
     startTransition(async () => {
       const fd = new FormData();
       fd.set("email", values.email);
+      fd.set("cfTurnstileToken", captcha.token);
       const result = await requestPasswordReset(INITIAL, fd);
       setState(result);
+      captcha.renew();
       setSubmitted(true);
     });
   }
@@ -60,8 +64,9 @@ export function ForgotPasswordForm() {
               <Input id="email" type="email" autoComplete="email" {...register("email")} />
               {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
             </div>
+            {captcha.widget}
             {serverError && <p className="text-sm text-destructive">{serverError}</p>}
-            <Button type="submit" className="w-full" disabled={pending}>
+            <Button type="submit" className="w-full" disabled={pending || !captcha.canSubmit}>
               {pending ? "Enviando..." : "Enviar link"}
             </Button>
           </form>

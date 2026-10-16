@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { login, type ActionResult } from "@/lib/auth/actions";
+import { useAuthTurnstile } from "@/components/auth-turnstile";
 import { loginSchema, type LoginInput } from "@/lib/validation/schemas";
 
 const INITIAL: ActionResult = { ok: true, data: undefined };
@@ -15,6 +16,7 @@ const INITIAL: ActionResult = { ok: true, data: undefined };
 export function LoginForm() {
   const [state, setState] = useState<ActionResult>(INITIAL);
   const [pending, startTransition] = useTransition();
+  const captcha = useAuthTurnstile();
   const {
     register,
     handleSubmit,
@@ -26,8 +28,10 @@ export function LoginForm() {
       const fd = new FormData();
       fd.set("email", values.email);
       fd.set("password", values.password);
+      fd.set("cfTurnstileToken", captcha.token);
       const result = await login(INITIAL, fd);
       setState(result);
+      captcha.renew();
     });
   }
 
@@ -60,8 +64,9 @@ export function LoginForm() {
             />
             {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
           </div>
+          {captcha.widget}
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" className="w-full" disabled={pending}>
+          <Button type="submit" className="w-full" disabled={pending || !captcha.canSubmit}>
             {pending ? "Entrando..." : "Entrar"}
           </Button>
         </form>

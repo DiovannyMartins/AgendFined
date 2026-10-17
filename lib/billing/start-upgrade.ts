@@ -40,6 +40,8 @@ export interface StartUpgradeDeps {
     status: "failed" | "unknown";
     providerPreapprovalId?: string | null;
   }) => Promise<BillingAttempt>;
+  // Rejects with `CURRENT_SUBSCRIPTION_CONFLICT` when the current subscription
+  // is no longer the one read when the attempt was claimed.
   linkAttempt: (input: {
     attemptId: string;
     mpPreapprovalId: string;
@@ -160,7 +162,22 @@ export async function startUpgrade(deps: StartUpgradeDeps): Promise<StartUpgrade
 
   try {
     await linkAttempt({ attemptId: attempt.id, mpPreapprovalId: created.preapprovalId });
-  } catch {
+  } catch (err) {
+    // The current subscription moved while the provider created the checkout
+    // (e.g. the webhook made a paid superseded checkout current). Nothing was
+    // linked, so the new checkout's link is never handed out.
+    if (err instanceof Error && err.message === "CURRENT_SUBSCRIPTION_CONFLICT") {
+      await finishAttempt({
+        attemptId: attempt.id,
+        status: "failed",
+        providerPreapprovalId: created.preapprovalId,
+      }).catch(() => undefined);
+      return {
+        ok: false,
+        code: "UPGRADE_SUBSCRIPTION_CONFLICT",
+        message: "Sua assinatura mudou enquanto o pagamento era preparado. Atualize a página e confira seu plano.",
+      };
+    }
     await finishAttempt({
       attemptId: attempt.id,
       status: "unknown",

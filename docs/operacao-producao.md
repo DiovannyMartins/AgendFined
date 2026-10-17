@@ -60,6 +60,7 @@ O teste `tests/sql/reconciliation-scheduler.sql` verifica a requisição real en
 3. Mantenha `MERCADO_PAGO_WEBHOOK_SECRET` configurado e valide a assinatura recebida pelo handler.
 4. Confira o valor server-side em `MERCADO_PAGO_PRO_AMOUNT_CENTS`.
 5. O fluxo de assinatura deve ser validado com uma conta de teste adequada antes de qualquer cobrança real. Os scripts existentes são `scripts/setup-mercadopago.sh` e `scripts/setup-mercadopago-prod.sh`.
+6. Quando uma assinatura é autorizada, o webhook cancela os outros checkouts pendentes do negócio. Se o cliente pagou dois checkouts, o extra é cancelado e o log da Vercel registra o evento `billing_double_charge` com `businessId` e `mpPreapprovalId`. A cobrança já feita nesse checkout precisa ser estornada manualmente no painel do Mercado Pago.
 
 ## Resend
 

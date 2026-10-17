@@ -38,6 +38,8 @@ async function run(event: { type: string; dataId: string }, status: PreapprovalR
     event,
     getPreapproval: async () => stubPreapproval(status),
     ...createWebhookPersistence(),
+    cancelPreapproval: async () => undefined,
+    reportDoubleCharge: () => undefined,
     now: () => NOW,
   });
 }

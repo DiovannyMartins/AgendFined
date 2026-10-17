@@ -33,11 +33,22 @@ function makeDeps(overrides: Partial<HandleWebhookDeps> = {}) {
       effectivePlan: input.status === "authorized" ? "pro" as const : "free" as const,
       effectiveGracePeriodEnd: input.gracePeriodEnd,
     })),
+    findCurrentSubscription: vi.fn(async () => pendingSubscription("sub_1", "mp_1")),
+    listOtherPendingSubscriptions: vi.fn(async () => []),
+    cancelPreapproval: vi.fn(async () => undefined),
+    reportDoubleCharge: vi.fn(),
     now: () => NOW,
     ...overrides,
   };
   return deps;
 }
+
+function pendingSubscription(id: string, mpPreapprovalId: string) {
+  return { id, businessId: "biz_1", mpPreapprovalId, status: "pending" as const, gracePeriodEnd: null };
+}
+
+// A grace follows an assinatura that was paid, so these rows start authorized.
+const authorizedSubscription = { ...pendingSubscription("sub_1", "mp_1"), status: "authorized" as const };
 
 describe("handleWebhook (issue #24) lifecycle", () => {
   it("authorized marks the business pro and authorizes the subscription", async () => {
@@ -72,7 +83,10 @@ describe("handleWebhook (issue #24) lifecycle", () => {
   });
 
   it("paused starts a 7-day grace and keeps the plan untouched", async () => {
-    const deps = makeDeps({ getPreapproval: vi.fn(async () => makePreapproval("paused")) });
+    const deps = makeDeps({
+      findSubscription: vi.fn(async () => authorizedSubscription),
+      getPreapproval: vi.fn(async () => makePreapproval("paused")),
+    });
     const result = await handleWebhook(deps);
 
     expect(result).toEqual({ ok: true, applied: "grace" });
@@ -83,7 +97,10 @@ describe("handleWebhook (issue #24) lifecycle", () => {
   });
 
   it("cancelled starts a 7-day grace and keeps the plan untouched", async () => {
-    const deps = makeDeps({ getPreapproval: vi.fn(async () => makePreapproval("cancelled")) });
+    const deps = makeDeps({
+      findSubscription: vi.fn(async () => authorizedSubscription),
+      getPreapproval: vi.fn(async () => makePreapproval("cancelled")),
+    });
     const result = await handleWebhook(deps);
 
     expect(result).toEqual({ ok: true, applied: "grace" });
@@ -148,6 +165,7 @@ describe("handleWebhook (issue #24) lifecycle", () => {
 
   it("honours a configurable grace period", async () => {
     const deps = makeDeps({
+      findSubscription: vi.fn(async () => authorizedSubscription),
       getPreapproval: vi.fn(async () => makePreapproval("paused")),
       graceDays: 3,
     });
@@ -252,5 +270,118 @@ describe("handleWebhook (issue #24) lifecycle", () => {
     expect(applySnapshot).toHaveBeenCalledTimes(2);
     expect(applySnapshot).toHaveBeenNthCalledWith(1, expect.objectContaining({ status: "authorized" }));
     expect(applySnapshot).toHaveBeenNthCalledWith(2, expect.objectContaining({ status: "authorized" }));
+  });
+});
+
+describe("handleWebhook superseded checkouts", () => {
+  it("cancels the negócio's other pending checkouts once the current assinatura is authorized", async () => {
+    const deps = makeDeps({
+      listOtherPendingSubscriptions: vi.fn(async () => [pendingSubscription("sub_old", "mp_old")]),
+    });
+
+    const result = await handleWebhook(deps);
+
+    expect(result).toEqual({ ok: true, applied: "authorized" });
+    expect(deps.listOtherPendingSubscriptions).toHaveBeenCalledWith("biz_1", "sub_1");
+    expect(deps.cancelPreapproval).toHaveBeenCalledTimes(1);
+    expect(deps.cancelPreapproval).toHaveBeenCalledWith("mp_old");
+  });
+
+  it("answers a retryable provider error when a superseded checkout cannot be cancelled", async () => {
+    const deps = makeDeps({
+      listOtherPendingSubscriptions: vi.fn(async () => [pendingSubscription("sub_old", "mp_old")]),
+      cancelPreapproval: vi.fn(async () => {
+        throw new Error("Mercado Pago preapproval cancel failed (500)");
+      }),
+    });
+
+    await expect(handleWebhook(deps)).resolves.toEqual({
+      ok: false,
+      code: "PROVIDER_ERROR",
+      message: "Mercado Pago preapproval cancel failed (500)",
+    });
+  });
+
+  it("makes a paid old checkout the current assinatura while the current one is still pending", async () => {
+    const deps = makeDeps({
+      event: { type: "subscription_preapproval", dataId: "mp_old" },
+      findSubscription: vi.fn(async () => pendingSubscription("sub_old", "mp_old")),
+      findCurrentSubscription: vi.fn(async () => pendingSubscription("sub_new", "mp_new")),
+      listOtherPendingSubscriptions: vi.fn(async () => [pendingSubscription("sub_new", "mp_new")]),
+    });
+
+    const result = await handleWebhook(deps);
+
+    expect(result).toEqual({ ok: true, applied: "authorized" });
+    expect(deps.applySnapshot).toHaveBeenCalledTimes(1);
+    expect(deps.applySnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      subscriptionId: "sub_old",
+      status: "authorized",
+      makeCurrent: { expectedCurrentSubscriptionId: "sub_new" },
+    }));
+    expect(deps.listOtherPendingSubscriptions).toHaveBeenCalledWith("biz_1", "sub_old");
+    expect(deps.cancelPreapproval).toHaveBeenCalledWith("mp_new");
+  });
+
+  it("cancels a second paid checkout and reports the double charge when the current one is already authorized", async () => {
+    const deps = makeDeps({
+      event: { type: "subscription_preapproval", dataId: "mp_old" },
+      findSubscription: vi.fn(async () => pendingSubscription("sub_old", "mp_old")),
+      findCurrentSubscription: vi.fn(async () => ({
+        ...pendingSubscription("sub_new", "mp_new"),
+        status: "authorized" as const,
+      })),
+      applySnapshot: vi.fn(async (input) => ({
+        subscriptionId: input.subscriptionId,
+        businessId: input.businessId,
+        subscriptionStatus: input.status,
+        isCurrent: false,
+        effectivePlan: "pro" as const,
+        effectiveGracePeriodEnd: null,
+      })),
+    });
+
+    const result = await handleWebhook(deps);
+
+    expect(result).toEqual({ ok: true, applied: "duplicate" });
+    expect(deps.applySnapshot).toHaveBeenCalledWith(expect.not.objectContaining({ makeCurrent: expect.anything() }));
+    expect(deps.cancelPreapproval).toHaveBeenCalledTimes(1);
+    expect(deps.cancelPreapproval).toHaveBeenCalledWith("mp_old");
+    expect(deps.reportDoubleCharge).toHaveBeenCalledWith({ businessId: "biz_1", mpPreapprovalId: "mp_old" });
+  });
+
+  it("reports a double charge when a superseded checkout was already paid at the provider", async () => {
+    const deps = makeDeps({
+      listOtherPendingSubscriptions: vi.fn(async () => [
+        pendingSubscription("sub_paid", "mp_paid"),
+        pendingSubscription("sub_unpaid", "mp_unpaid"),
+      ]),
+      getPreapproval: vi.fn(async (id: string) => makePreapproval(id === "mp_unpaid" ? "pending" : "authorized")),
+    });
+
+    const result = await handleWebhook(deps);
+
+    expect(result).toEqual({ ok: true, applied: "authorized" });
+    expect(deps.cancelPreapproval).toHaveBeenCalledWith("mp_paid");
+    expect(deps.cancelPreapproval).toHaveBeenCalledWith("mp_unpaid");
+    expect(deps.reportDoubleCharge).toHaveBeenCalledTimes(1);
+    expect(deps.reportDoubleCharge).toHaveBeenCalledWith({ businessId: "biz_1", mpPreapprovalId: "mp_paid" });
+  });
+
+  it("starts no grace when a checkout that was never paid is cancelled", async () => {
+    const deps = makeDeps({
+      event: { type: "subscription_preapproval", dataId: "mp_old" },
+      findSubscription: vi.fn(async () => pendingSubscription("sub_old", "mp_old")),
+      getPreapproval: vi.fn(async () => makePreapproval("cancelled")),
+    });
+
+    const result = await handleWebhook(deps);
+
+    expect(result).toEqual({ ok: true, applied: "closed" });
+    expect(deps.applySnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      subscriptionId: "sub_old",
+      status: "cancelled",
+      gracePeriodEnd: null,
+    }));
   });
 });

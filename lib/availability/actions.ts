@@ -3,11 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { availabilitySchema, publicAvailabilitySchema } from "@/lib/validation/schemas";
+import { availabilitySchema, blockSchema, publicAvailabilitySchema } from "@/lib/validation/schemas";
+import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { getEffectiveBookingWindowDays } from "@/lib/plan/plan";
 import type { ActionResult } from "@/lib/business/actions";
-import { computeAvailableSlots, isWithinWindow, localDayRangeUtc, overlaps, toUtcRange, weekdayOf } from "@/lib/booking/availability";
+import { computeAvailableSlots, isWithinWindow, localDateTimeToUtc, localDayRangeUtc, overlaps, toUtcRange, weekdayOf } from "@/lib/booking/availability";
 import type { UtcRange } from "@/lib/booking/availability";
 import { enforceAvailabilityRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 
@@ -150,19 +151,33 @@ export async function createBlock(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const startAt = String(formData.get("startAt") ?? "");
-  const endAt = String(formData.get("endAt") ?? "");
-  const reason = String(formData.get("reason") ?? "").trim() || null;
-
-  if (!startAt || !endAt) {
-    return { ok: false, code: "VALIDATION", message: "Informe o início e o fim do bloqueio." };
-  }
-  if (new Date(endAt) <= new Date(startAt)) {
-    return { ok: false, code: "VALIDATION", message: "O fim deve ser depois do início." };
+  const parsed = blockSchema.safeParse({
+    startAt: String(formData.get("startAt") ?? ""),
+    endAt: String(formData.get("endAt") ?? ""),
+    reason: String(formData.get("reason") ?? "").trim() || null,
+  });
+  if (!parsed.success) {
+    return {
+      ok: false,
+      code: "VALIDATION",
+      message: "Informe o início e o fim do bloqueio.",
+      fieldErrors: parsed.error.flatten().fieldErrors,
+    };
   }
 
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
+
+  // datetime-local has no offset: resolve it in the business timezone here so
+  // the conflict check and the insert use the same UTC instants (§10.2).
+  const timezone = business.timezone || APP_TIMEZONE;
+  const startAt = localDateTimeToUtc(parsed.data.startAt, timezone);
+  const endAt = localDateTimeToUtc(parsed.data.endAt, timezone);
+  const reason = parsed.data.reason ?? null;
+
+  if (Date.parse(endAt) <= Date.parse(startAt)) {
+    return { ok: false, code: "VALIDATION", message: "O fim deve ser depois do início." };
+  }
 
   const supabase = await createClient();
 

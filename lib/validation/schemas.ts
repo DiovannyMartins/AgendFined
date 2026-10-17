@@ -103,9 +103,21 @@ export const availabilitySchema = z
   });
 export type AvailabilityInput = z.infer<typeof availabilitySchema>;
 
+// Bloqueios come from <input type="datetime-local">: wall-clock time without an
+// offset, interpreted in the business timezone by the action (never by the DB).
+const localDateTimeSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/, "Informe data e hora válidas.")
+  .refine((value) => {
+    const [y, m, d, hh, mm] = value.split(/[-T:]/).map(Number);
+    const probe = new Date(Date.UTC(y, m - 1, d, hh, mm));
+    return probe.getUTCFullYear() === y && probe.getUTCMonth() === m - 1 && probe.getUTCDate() === d
+      && probe.getUTCHours() === hh && probe.getUTCMinutes() === mm;
+  }, "Informe data e hora válidas.");
+
 export const blockSchema = z.object({
-  startAt: z.string().datetime(),
-  endAt: z.string().datetime(),
+  startAt: localDateTimeSchema,
+  endAt: localDateTimeSchema,
   reason: z.string().trim().max(120).nullish(),
 });
 export type BlockInput = z.infer<typeof blockSchema>;

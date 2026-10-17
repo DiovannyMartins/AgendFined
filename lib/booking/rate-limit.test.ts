@@ -8,6 +8,7 @@ import {
   buildServiceSearchRateKeys,
   enforceConsultRateLimit,
   enforceApiRateLimit,
+  enforceBillingCheckoutRateLimit,
   getClientIpFromHeaders,
   enforceRateLimit,
 } from "@/lib/booking/rate-limit";
@@ -113,6 +114,33 @@ describe("enforceRateLimit", () => {
   it("propagates an RPC error", async () => {
     const client = { rpc: vi.fn(async () => ({ data: null, error: new Error("boom") })) } as unknown as SupabaseClient<Database>;
     await expect(enforceRateLimit(client, "1.2.3.4", "biz-1")).rejects.toThrow("boom");
+  });
+});
+
+describe("enforceBillingCheckoutRateLimit", () => {
+  it("counts the negócio's checkouts in a 15-minute and a daily window", async () => {
+    const rpc = vi.fn(async () => ({ data: true, error: null }));
+    const client = { rpc } as unknown as SupabaseClient<Database>;
+
+    await expect(enforceBillingCheckoutRateLimit(client, "biz-1")).resolves.toBe(true);
+
+    expect(rpc).toHaveBeenCalledWith("check_booking_rate_limit", {
+      p_key: "billing:checkout|business:biz-1|15m",
+      p_limit: 5,
+      p_window_seconds: 900,
+    });
+    expect(rpc).toHaveBeenCalledWith("check_booking_rate_limit", {
+      p_key: "billing:checkout|business:biz-1|24h",
+      p_limit: 20,
+      p_window_seconds: 86_400,
+    });
+  });
+
+  it("blocks once the daily window is exhausted", async () => {
+    const rpc = vi.fn(async (_name: string, { p_key }: { p_key: string }) => ({ data: !p_key.endsWith("|24h"), error: null }));
+    const client = { rpc } as unknown as SupabaseClient<Database>;
+
+    await expect(enforceBillingCheckoutRateLimit(client, "biz-1")).resolves.toBe(false);
   });
 });
 

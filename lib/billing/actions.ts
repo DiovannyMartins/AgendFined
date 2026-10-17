@@ -21,6 +21,18 @@ import {
   retryPendingUpgrade as buildRetryPendingUpgrade,
   type RetryUpgradeResult,
 } from "./retry-upgrade";
+import { countPendingCheckouts, type CheckoutLimits } from "./checkout-limits";
+import { enforceBillingCheckoutRateLimit } from "@/lib/booking/rate-limit";
+
+// The checkout limits of the owner's negócio (one owner per negócio), shared by
+// the upgrade and the retry.
+function checkoutLimitsFor(businessId: string): CheckoutLimits {
+  const admin = createAdminClient();
+  return {
+    countPendingCheckouts: () => countPendingCheckouts(admin, businessId),
+    consumeCheckout: () => enforceBillingCheckoutRateLimit(admin, businessId),
+  };
+}
 
 // Surfaces in the Vercel logs next to the other billing reports; the checkout
 // has to be cancelled by hand in Mercado Pago.
@@ -58,6 +70,7 @@ export async function startUpgrade(): Promise<StartUpgradeResult> {
 
   return buildStartUpgrade({
     business: { id: business.id, plan: business.plan },
+    checkoutLimits: checkoutLimitsFor(business.id),
     provider,
     claimAttempt: async (input) => {
       const admin = createAdminClient();
@@ -162,6 +175,7 @@ export async function retryUpgrade(): Promise<RetryUpgradeResult> {
 
   return buildRetryPendingUpgrade({
     business: { id: business.id },
+    checkoutLimits: checkoutLimitsFor(business.id),
     provider,
     fetchSubscription: fetchCurrentSubscription,
     claimAttempt: async (input) => {

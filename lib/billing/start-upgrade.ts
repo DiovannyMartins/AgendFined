@@ -11,6 +11,7 @@ import { isSubscriptionInGrace, type BillingPlan, type BillingSubscription } fro
 import type { BillingProvider } from "./provider";
 import type { FetchSubscription } from "./get-subscription";
 import { MercadoPagoAmbiguousError } from "./mercado-pago";
+import { refuseCheckoutOverLimits, type CheckoutLimits } from "./checkout-limits";
 import { randomUUID } from "node:crypto";
 
 export type BillingAttempt = {
@@ -55,6 +56,8 @@ export interface StartUpgradeDeps {
   // When provided, guards against starting a second preapproval while one is
   // still pending (avoids orphaned preapprovals from double-clicking "upgrade").
   fetchSubscription?: FetchSubscription;
+  // The negócio's checkout limits, checked before an attempt is reserved.
+  checkoutLimits: CheckoutLimits;
   // A checkout created but never linked could not be cancelled; it needs a
   // manual cancel in Mercado Pago.
   reportOrphanCheckout: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
@@ -108,6 +111,9 @@ export async function startUpgrade(deps: StartUpgradeDeps): Promise<StartUpgrade
       message: "Você já iniciou uma assinatura. Conclua o pagamento para ativá-la.",
     };
   }
+
+  const overLimits = await refuseCheckoutOverLimits(deps.checkoutLimits);
+  if (overLimits) return overLimits;
 
   const idempotencyKey = deps.idempotencyKey ?? randomUUID();
   let attempt: BillingAttempt;

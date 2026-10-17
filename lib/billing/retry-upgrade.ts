@@ -11,6 +11,7 @@ import type { BillingProvider } from "./provider";
 import { MercadoPagoAmbiguousError } from "./mercado-pago";
 import { cancelUnlinkedCheckout, type BillingAttempt } from "./start-upgrade";
 import type { FetchSubscription } from "./get-subscription";
+import { refuseCheckoutOverLimits, type CheckoutLimits } from "./checkout-limits";
 
 export type RetryUpgradeResult = { ok: true; initPoint: string } | { ok: false; code: string; message: string };
 
@@ -42,6 +43,8 @@ export interface RetryUpgradeDeps {
   payerEmail?: string;
   notificationUrl?: string;
   idempotencyKey?: string;
+  // The negócio's checkout limits, checked before an attempt is reserved.
+  checkoutLimits: CheckoutLimits;
   // A checkout created but never linked could not be cancelled; it needs a
   // manual cancel in Mercado Pago.
   reportOrphanCheckout: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
@@ -61,6 +64,9 @@ export async function retryPendingUpgrade(deps: RetryUpgradeDeps): Promise<Retry
   if (!existing.subscriptionId) {
     return { ok: false, code: "SUBSCRIPTION_ID_UNAVAILABLE", message: "Não foi possível identificar a assinatura pendente." };
   }
+
+  const overLimits = await refuseCheckoutOverLimits(deps.checkoutLimits);
+  if (overLimits) return overLimits;
 
   const idempotencyKey = deps.idempotencyKey ?? randomUUID();
   let attempt: BillingAttempt;

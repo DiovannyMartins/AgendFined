@@ -64,6 +64,7 @@ function mapAttempt(row: Database["public"]["Tables"]["billing_attempts"]["Row"]
 function retryPersistence(): Omit<RetryUpgradeDeps, "business" | "provider" | "backUrl" | "idempotencyKey"> {
   return {
     reportOrphanCheckout: vi.fn(),
+    checkoutLimits: { countPendingCheckouts: async () => 0, consumeCheckout: async () => true },
     fetchSubscription: async (id) => {
       const { data: business, error: businessError } = await admin
         .from("businesses")

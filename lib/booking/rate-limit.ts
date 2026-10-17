@@ -48,6 +48,14 @@ export const API_RATE_LIMIT = {
   reconciliation: { limit: 30, windowSeconds: 15 * 60 },
 } as const;
 
+// Each checkout an owner starts (upgrade or retry) creates a Mercado Pago
+// preapproval with the AgendFined credential. Counted per negócio (one owner
+// per negócio), shared by both actions.
+export const BILLING_CHECKOUT_RATE_LIMIT = {
+  perBusinessShort: { limit: 5, windowSeconds: 15 * 60 },
+  perBusinessDaily: { limit: 20, windowSeconds: 24 * 60 * 60 },
+} as const;
+
 function isValidIp(value: string): boolean {
   return value.length <= 64 && isIP(value) !== 0;
 }
@@ -123,6 +131,16 @@ export async function enforceApiRateLimit(
   const config = API_RATE_LIMIT[route];
   return enforceWindows(supabase, [
     { key: `api:${route}|ip:${ip}`, limit: config.limit, windowSeconds: config.windowSeconds },
+  ]);
+}
+
+export async function enforceBillingCheckoutRateLimit(
+  supabase: ServerClient,
+  businessId: string,
+): Promise<boolean> {
+  return enforceWindows(supabase, [
+    { key: `billing:checkout|business:${businessId}|15m`, ...BILLING_CHECKOUT_RATE_LIMIT.perBusinessShort },
+    { key: `billing:checkout|business:${businessId}|24h`, ...BILLING_CHECKOUT_RATE_LIMIT.perBusinessDaily },
   ]);
 }
 

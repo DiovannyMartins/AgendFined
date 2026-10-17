@@ -12,7 +12,9 @@ function deps(overrides: Partial<RetryUpgradeDeps> = {}): RetryUpgradeDeps {
     startRetry: vi.fn(async () => ({ id: "attempt_retry", businessId: "biz_1", kind: "retry" as const, status: "creating" as const, idempotencyKey: "key", providerPreapprovalId: null })),
     finishAttempt: vi.fn(async () => ({ id: "attempt_retry", businessId: "biz_1", kind: "retry" as const, status: "unknown" as const, idempotencyKey: "key", providerPreapprovalId: "mp_new" })),
     linkAttempt: vi.fn(async () => undefined), backUrl: "https://app.example", idempotencyKey: "key",
-    reportOrphanCheckout: vi.fn(), ...overrides,
+    reportOrphanCheckout: vi.fn(),
+    checkoutLimits: { countPendingCheckouts: vi.fn(async () => 1), consumeCheckout: vi.fn(async () => true) },
+    ...overrides,
   };
 }
 
@@ -79,5 +81,33 @@ describe("retryPendingUpgrade when the current assinatura changes while the chec
     expect(result).toEqual({ ok: false, code: "RETRY_SUBSCRIPTION_CONFLICT", message: expect.any(String) });
     expect(d.finishAttempt).toHaveBeenCalledWith({ attemptId: "attempt_retry", status: "failed", providerPreapprovalId: "mp_new" });
     expect(d.reportOrphanCheckout).toHaveBeenCalledWith({ businessId: "biz_1", mpPreapprovalId: "mp_new" });
+  });
+});
+
+describe("retryPendingUpgrade checkout limits", () => {
+  it("refuses without reserving an attempt or calling Mercado Pago when the negócio's rate limit is exhausted", async () => {
+    const d = deps({ checkoutLimits: { countPendingCheckouts: vi.fn(async () => 1), consumeCheckout: vi.fn(async () => false) } });
+    const result = await retryPendingUpgrade(d);
+    expect(result).toEqual({ ok: false, code: "CHECKOUT_RATE_LIMITED", message: "Muitas tentativas de pagamento em pouco tempo. Aguarde alguns minutos e tente novamente." });
+    expect(d.claimAttempt).not.toHaveBeenCalled();
+    expect(d.provider.createPreapproval).not.toHaveBeenCalled();
+  });
+
+  it("refuses a sixth pending checkout without spending the rate limit", async () => {
+    const consumeCheckout = vi.fn(async () => true);
+    const d = deps({ checkoutLimits: { countPendingCheckouts: vi.fn(async () => 5), consumeCheckout } });
+    const result = await retryPendingUpgrade(d);
+    expect(result).toEqual({ ok: false, code: "TOO_MANY_PENDING_CHECKOUTS", message: expect.stringContaining("fale com o suporte") });
+    expect(consumeCheckout).not.toHaveBeenCalled();
+    expect(d.claimAttempt).not.toHaveBeenCalled();
+    expect(d.provider.createPreapproval).not.toHaveBeenCalled();
+  });
+
+  it("refuses when the limits cannot be checked", async () => {
+    const d = deps({ checkoutLimits: { countPendingCheckouts: vi.fn(async () => { throw new Error("database unavailable"); }), consumeCheckout: vi.fn(async () => true) } });
+    const result = await retryPendingUpgrade(d);
+    expect(result).toEqual({ ok: false, code: "CHECKOUT_LIMIT_UNAVAILABLE", message: expect.any(String) });
+    expect(d.claimAttempt).not.toHaveBeenCalled();
+    expect(d.provider.createPreapproval).not.toHaveBeenCalled();
   });
 });

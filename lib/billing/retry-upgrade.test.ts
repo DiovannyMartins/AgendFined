@@ -11,7 +11,9 @@ function deps(overrides: Partial<RetryUpgradeDeps> = {}): RetryUpgradeDeps {
     claimAttempt: vi.fn(async () => ({ id: "attempt_retry", businessId: "biz_1", kind: "retry" as const, status: "reserved" as const, idempotencyKey: "key", providerPreapprovalId: null })),
     startRetry: vi.fn(async () => ({ id: "attempt_retry", businessId: "biz_1", kind: "retry" as const, status: "creating" as const, idempotencyKey: "key", providerPreapprovalId: null })),
     finishAttempt: vi.fn(async () => ({ id: "attempt_retry", businessId: "biz_1", kind: "retry" as const, status: "unknown" as const, idempotencyKey: "key", providerPreapprovalId: "mp_new" })),
-    linkAttempt: vi.fn(async () => undefined), backUrl: "https://app.example", idempotencyKey: "key", ...overrides,
+    linkAttempt: vi.fn(async () => undefined), backUrl: "https://app.example", idempotencyKey: "key",
+    checkoutLimits: { countPendingCheckouts: vi.fn(async () => 1), consumeCheckout: vi.fn(async () => true) },
+    ...overrides,
   };
 }
 
@@ -53,5 +55,33 @@ describe("retryPendingUpgrade with billing_attempts", () => {
     expect(result).toEqual({ ok: false, code: "PROVIDER_UNKNOWN", message: "Não foi possível gerar um novo link de pagamento. Tente novamente." });
     expect(JSON.stringify(result)).not.toContain("timeout");
     expect(d.finishAttempt).toHaveBeenCalledWith({ attemptId: "attempt_retry", status: "unknown" });
+  });
+});
+
+describe("retryPendingUpgrade checkout limits", () => {
+  it("refuses without reserving an attempt or calling Mercado Pago when the negócio's rate limit is exhausted", async () => {
+    const d = deps({ checkoutLimits: { countPendingCheckouts: vi.fn(async () => 1), consumeCheckout: vi.fn(async () => false) } });
+    const result = await retryPendingUpgrade(d);
+    expect(result).toEqual({ ok: false, code: "CHECKOUT_RATE_LIMITED", message: "Muitas tentativas de pagamento em pouco tempo. Aguarde alguns minutos e tente novamente." });
+    expect(d.claimAttempt).not.toHaveBeenCalled();
+    expect(d.provider.createPreapproval).not.toHaveBeenCalled();
+  });
+
+  it("refuses a sixth pending checkout without spending the rate limit", async () => {
+    const consumeCheckout = vi.fn(async () => true);
+    const d = deps({ checkoutLimits: { countPendingCheckouts: vi.fn(async () => 5), consumeCheckout } });
+    const result = await retryPendingUpgrade(d);
+    expect(result).toEqual({ ok: false, code: "TOO_MANY_PENDING_CHECKOUTS", message: expect.stringContaining("fale com o suporte") });
+    expect(consumeCheckout).not.toHaveBeenCalled();
+    expect(d.claimAttempt).not.toHaveBeenCalled();
+    expect(d.provider.createPreapproval).not.toHaveBeenCalled();
+  });
+
+  it("refuses when the limits cannot be checked", async () => {
+    const d = deps({ checkoutLimits: { countPendingCheckouts: vi.fn(async () => { throw new Error("database unavailable"); }), consumeCheckout: vi.fn(async () => true) } });
+    const result = await retryPendingUpgrade(d);
+    expect(result).toEqual({ ok: false, code: "CHECKOUT_LIMIT_UNAVAILABLE", message: expect.any(String) });
+    expect(d.claimAttempt).not.toHaveBeenCalled();
+    expect(d.provider.createPreapproval).not.toHaveBeenCalled();
   });
 });

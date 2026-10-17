@@ -4,6 +4,8 @@ import { getSubscription } from "@/lib/billing/get-subscription";
 import { startUpgrade, type StartUpgradeDeps } from "@/lib/billing/start-upgrade";
 import type { BillingProvider } from "@/lib/billing/provider";
 import type { BillingSubscription } from "@/lib/billing/types";
+import { countPendingCheckouts } from "@/lib/billing/checkout-limits";
+import { enforceBillingCheckoutRateLimit } from "@/lib/booking/rate-limit";
 
 // Integration tests against the real Supabase project. Issue #23 (dashboard
 // "Plano" + upgrade Mercado Pago): the billing seam (`getSubscription`) reads the
@@ -200,6 +202,10 @@ describe("issue #23 billing: assinatura + RLS", () => {
       linkAttempt,
       backUrl: "https://app.example/dashboard/configuracoes",
       idempotencyKey,
+      checkoutLimits: {
+        countPendingCheckouts: () => countPendingCheckouts(admin, businessId),
+        consumeCheckout: () => enforceBillingCheckoutRateLimit(admin, businessId),
+      },
     });
 
     expect(result).toEqual({ ok: true, initPoint: "https://sandbox.mercadopago.com/checkout" });

@@ -33,6 +33,7 @@ function makeDeps(overrides: Partial<StartUpgradeDeps> = {}): StartUpgradeDeps {
     backUrl: "https://app.example/dashboard/configuracoes",
     payerEmail: "owner@example.com",
     idempotencyKey: "key_1",
+    checkoutLimits: { countPendingCheckouts: vi.fn(async () => 0), consumeCheckout: vi.fn(async () => true) },
     ...overrides,
   };
 }
@@ -101,8 +102,65 @@ describe("startUpgrade with billing_attempts", () => {
       claimAttempt: vi.fn(), startAttempt: vi.fn(), finishAttempt: vi.fn(), linkAttempt: vi.fn(),
       fetchSubscription: vi.fn(async () => ({ mpPreapprovalId: "mp_pending", status: "pending" as const, plan: "pro" as const, currentPeriodStart: null, currentPeriodEnd: null })),
       backUrl: "https://app.example",
+      checkoutLimits: { countPendingCheckouts: vi.fn(async () => 0), consumeCheckout: vi.fn(async () => true) },
     });
     expect(result).toEqual({ ok: false, code: "ALREADY_PRO", message: expect.any(String) });
     expect(provider.createPreapproval).not.toHaveBeenCalled();
+  });
+});
+
+describe("startUpgrade checkout limits", () => {
+  it("refuses without reserving an attempt or calling Mercado Pago when the negócio's rate limit is exhausted", async () => {
+    const deps = makeDeps({
+      checkoutLimits: { countPendingCheckouts: vi.fn(async () => 0), consumeCheckout: vi.fn(async () => false) },
+    });
+
+    const result = await startUpgrade(deps);
+
+    expect(result).toEqual({
+      ok: false,
+      code: "CHECKOUT_RATE_LIMITED",
+      message: "Muitas tentativas de pagamento em pouco tempo. Aguarde alguns minutos e tente novamente.",
+    });
+    expect(deps.claimAttempt).not.toHaveBeenCalled();
+    expect(deps.provider.createPreapproval).not.toHaveBeenCalled();
+  });
+
+  it("refuses a sixth pending checkout, pointing to the open links or support, without spending the rate limit", async () => {
+    const consumeCheckout = vi.fn(async () => true);
+    const deps = makeDeps({ checkoutLimits: { countPendingCheckouts: vi.fn(async () => 5), consumeCheckout } });
+
+    const result = await startUpgrade(deps);
+
+    expect(result).toEqual({
+      ok: false,
+      code: "TOO_MANY_PENDING_CHECKOUTS",
+      message: "Você já gerou muitos links de pagamento sem concluir. Conclua um deles ou fale com o suporte para gerar um novo.",
+    });
+    expect(consumeCheckout).not.toHaveBeenCalled();
+    expect(deps.claimAttempt).not.toHaveBeenCalled();
+    expect(deps.provider.createPreapproval).not.toHaveBeenCalled();
+  });
+
+  it("refuses when the limits cannot be checked", async () => {
+    const deps = makeDeps({
+      checkoutLimits: { countPendingCheckouts: vi.fn(async () => 0), consumeCheckout: vi.fn(async () => { throw new Error("rate limit unavailable"); }) },
+    });
+
+    const result = await startUpgrade(deps);
+
+    expect(result).toEqual({
+      ok: false,
+      code: "CHECKOUT_LIMIT_UNAVAILABLE",
+      message: "Não foi possível iniciar a operação de pagamento. Tente novamente.",
+    });
+    expect(deps.claimAttempt).not.toHaveBeenCalled();
+    expect(deps.provider.createPreapproval).not.toHaveBeenCalled();
+  });
+
+  it("still creates the fifth pending checkout", async () => {
+    const deps = makeDeps({ checkoutLimits: { countPendingCheckouts: vi.fn(async () => 4), consumeCheckout: vi.fn(async () => true) } });
+
+    await expect(startUpgrade(deps)).resolves.toEqual({ ok: true, initPoint: "https://mp.example/checkout" });
   });
 });

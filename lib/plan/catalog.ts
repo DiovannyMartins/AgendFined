@@ -15,7 +15,7 @@ export interface PlanInfo {
 }
 
 export function getProPriceCents(): number {
-  const raw = process.env.MERCADO_PAGO_PRO_AMOUNT_CENTS?.trim() || "1900";
+  const raw = process.env.MERCADO_PAGO_PRO_AMOUNT_CENTS?.trim() || "1990";
   const cents = Number(raw);
   if (!Number.isInteger(cents) || cents < 100 || cents > 1_000_000) {
     throw new Error("MERCADO_PAGO_PRO_AMOUNT_CENTS must be an integer between 100 and 1000000.");

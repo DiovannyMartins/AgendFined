@@ -21,7 +21,7 @@ describe("createMercadoPagoProvider", () => {
     vi.unstubAllGlobals();
   });
 
-  it("creates a preapproval for the configured R$19/mês plan and returns init_point", async () => {
+  it("creates a preapproval for the R$ 19,90/mês plan and returns init_point", async () => {
     const fetchMock = stubFetch(async () => jsonResponse({ id: "mp_123", init_point: "https://mp.example/checkout" }));
 
     const provider = createMercadoPagoProvider({ accessToken: "APP_USR-123" });
@@ -40,10 +40,11 @@ describe("createMercadoPagoProvider", () => {
     expect(init.method).toBe("POST");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer APP_USR-123");
     const body = JSON.parse(String(init.body));
+    expect(body.reason).toBe("Assinatura PROFISSIONAL - AgendFined (R$ 19,90/mês)");
     expect(body.auto_recurring).toEqual({
       frequency: 1,
       frequency_type: "months",
-      transaction_amount: 19,
+      transaction_amount: 19.9,
       currency_id: "BRL",
     });
     expect(body.status).toBe("pending");

@@ -83,7 +83,7 @@ O plano sem custo mensal. Contém o núcleo do agendamento: página pública, da
 _Avoid_: Free, gratuito, plano básico
 
 **PROFISSIONAL**:
-O plano pago (R$ 19/mês) que destrava os recursos profissionais: relatórios, lembretes automáticos, gestão da lista de espera, exportação para Google Calendar/.ics e uma janela futura de até 365 dias.
+O plano pago (R$ 19,90/mês) que destrava os recursos profissionais: relatórios, lembretes automáticos, gestão da lista de espera, exportação para Google Calendar/.ics e uma janela futura de até 365 dias.
 _Avoid_: Pro, premium, avançado, plano pago
 
 **Assinatura**:

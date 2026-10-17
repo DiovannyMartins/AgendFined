@@ -5,7 +5,7 @@
 ## Comportamento confirmado no repositório
 
 - A landing page e o dashboard usam o catálogo compartilhado `lib/plan/catalog.ts`.
-- O preço exibido deriva de `MERCADO_PAGO_PRO_AMOUNT_CENTS`, com padrão de `1900` centavos (R$ 19,00), e frequência `/mês`.
+- O preço exibido deriva de `MERCADO_PAGO_PRO_AMOUNT_CENTS`, com padrão de `1990` centavos (R$ 19,90), e frequência `/mês`.
 - O checkout é criado como pré-aprovação recorrente no Mercado Pago.
 - A assinatura só libera o plano PROFISSIONAL quando o estado consultado do provedor é `authorized`; voltar do checkout, por si só, não ativa o plano.
 - Cancelamento solicitado pelo painel interrompe a assinatura no provedor. O acesso PROFISSIONAL permanece durante carência de 7 dias e depois o negócio volta ao Grátis.
@@ -16,11 +16,11 @@
 
 Em `app/termos/page.tsx`, a seção 5 anteriormente dizia que valores e condições seriam informados antes da contratação, sem descrever recorrência, ativação, cancelamento ou carência. O texto foi atualizado com as regras confirmadas no código, distinguindo a carência operacional do direito legal de arrependimento. A tela de configurações agora explicita recorrência mensal e o prazo de até sete dias.
 
-O preço pode ser sobrescrito por variável de ambiente. Portanto, a aprovação do preço de R$ 19,00/mês deve também confirmar o valor efetivamente configurado no Mercado Pago e na Vercel Production, sem copiar ou registrar credenciais.
+O preço pode ser sobrescrito por variável de ambiente. Portanto, a aprovação do preço de R$ 19,90/mês deve também confirmar o valor efetivamente configurado no Mercado Pago e na Vercel Production, sem copiar ou registrar credenciais.
 
 ## Texto informativo aplicado
 
-O preço continua exibido dinamicamente pela oferta compartilhada; os Termos esclarecem que o preço vigente e as condições aparecem antes da confirmação, sem cristalizar R$ 19,00 caso o valor de produção esteja diferente. Explicam ainda cobrança mensal recorrente, ativação após autorização, cancelamento, carência técnica de até sete dias e preservação do direito de arrependimento.
+O preço continua exibido dinamicamente pela oferta compartilhada; os Termos esclarecem que o preço vigente e as condições aparecem antes da confirmação, sem cristalizar R$ 19,90 caso o valor de produção esteja diferente. Explicam ainda cobrança mensal recorrente, ativação após autorização, cancelamento, carência técnica de até sete dias e preservação do direito de arrependimento.
 
 Permanece necessária validação jurídica/comercial sobre momento exato da cobrança inicial e renovações, regras do Mercado Pago para estorno, tratamento de inadimplência, identidade do fornecedor e informações obrigatórias de contato. A atualização evita definir política de reembolso própria e encaminha pedidos pelo canal oficial.
 
@@ -28,7 +28,7 @@ O art. 49 do CDC trata de relações de consumo celebradas fora do estabelecimen
 
 ## Aprovação a registrar
 
-- [ ] Confirmar que o preço efetivo de produção é R$ 19,00/mês.
+- [ ] Confirmar que o preço efetivo de produção é R$ 19,90/mês.
 - [ ] Confirmar frequência, renovação e forma de cancelamento mostradas no checkout do Mercado Pago.
 - [ ] Aprovar a explicação de ativação após autorização e carência de 7 dias.
 - [ ] Revisar direitos de arrependimento, reembolso, inadimplência e identificação do fornecedor com assessor jurídico.

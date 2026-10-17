@@ -42,7 +42,7 @@ describe("PlanSection", () => {
     expect(screen.getByText("Grátis", { exact: true })).toBeInTheDocument();
     expect(screen.getByText("Atual", { exact: true })).toBeInTheDocument();
     expect(screen.getByText("PROFISSIONAL", { exact: true })).toBeInTheDocument();
-    expect(screen.getByText(/R\$ 19,00/)).toBeInTheDocument();
+    expect(screen.getByText(/R\$ 19,90/)).toBeInTheDocument();
     expect(screen.getByText("Relatórios", { exact: true })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Assinar PROFISSIONAL" })).toBeInTheDocument();
     expect(screen.queryByText("Recomendado", { exact: true })).not.toBeInTheDocument();
@@ -94,7 +94,7 @@ describe("PlanSection", () => {
     expect(screen.getByText("Atual", { exact: true })).toBeInTheDocument();
     expect(screen.queryByText("Pendente", { exact: true })).not.toBeInTheDocument();
     expect(screen.getByText("PROFISSIONAL", { exact: true })).toBeInTheDocument();
-    expect(screen.getByText(/R\$ 19,00/)).toBeInTheDocument();
+    expect(screen.getByText(/R\$ 19,90/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Fazer upgrade" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Assinar PROFISSIONAL" })).not.toBeInTheDocument();
   });

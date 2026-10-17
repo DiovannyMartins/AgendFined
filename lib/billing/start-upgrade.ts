@@ -40,6 +40,8 @@ export interface StartUpgradeDeps {
     status: "failed" | "unknown";
     providerPreapprovalId?: string | null;
   }) => Promise<BillingAttempt>;
+  // Rejects with `CURRENT_SUBSCRIPTION_CONFLICT` when the current subscription
+  // is no longer the one read when the attempt was claimed.
   linkAttempt: (input: {
     attemptId: string;
     mpPreapprovalId: string;
@@ -53,6 +55,23 @@ export interface StartUpgradeDeps {
   // When provided, guards against starting a second preapproval while one is
   // still pending (avoids orphaned preapprovals from double-clicking "upgrade").
   fetchSubscription?: FetchSubscription;
+  // A checkout created but never linked could not be cancelled; it needs a
+  // manual cancel in Mercado Pago.
+  reportOrphanCheckout: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
+}
+
+// Cancels a checkout whose link is never handed out because the link step
+// refused it. The attempt already records it as failed with its preapproval,
+// so a failed cancel loses nothing; it is reported for a manual cancel.
+export async function cancelUnlinkedCheckout(
+  input: { businessId: string; mpPreapprovalId: string },
+  deps: Pick<StartUpgradeDeps, "provider" | "reportOrphanCheckout">,
+): Promise<void> {
+  try {
+    await deps.provider.cancelPreapproval(input.mpPreapprovalId);
+  } catch {
+    await deps.reportOrphanCheckout(input);
+  }
 }
 
 export async function startUpgrade(deps: StartUpgradeDeps): Promise<StartUpgradeResult> {
@@ -160,7 +179,26 @@ export async function startUpgrade(deps: StartUpgradeDeps): Promise<StartUpgrade
 
   try {
     await linkAttempt({ attemptId: attempt.id, mpPreapprovalId: created.preapprovalId });
-  } catch {
+  } catch (err) {
+    // The current subscription moved while the provider created the checkout
+    // (e.g. the webhook made a paid superseded checkout current). Nothing was
+    // linked, so the new checkout's link is never handed out.
+    if (err instanceof Error && err.message === "CURRENT_SUBSCRIPTION_CONFLICT") {
+      await finishAttempt({
+        attemptId: attempt.id,
+        status: "failed",
+        providerPreapprovalId: created.preapprovalId,
+      }).catch(() => undefined);
+      await cancelUnlinkedCheckout(
+        { businessId: business.id, mpPreapprovalId: created.preapprovalId },
+        { provider, reportOrphanCheckout: deps.reportOrphanCheckout },
+      );
+      return {
+        ok: false,
+        code: "UPGRADE_SUBSCRIPTION_CONFLICT",
+        message: "Sua assinatura mudou enquanto o pagamento era preparado. Atualize a página e confira seu plano.",
+      };
+    }
     await finishAttempt({
       attemptId: attempt.id,
       status: "unknown",

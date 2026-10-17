@@ -11,7 +11,8 @@ function deps(overrides: Partial<RetryUpgradeDeps> = {}): RetryUpgradeDeps {
     claimAttempt: vi.fn(async () => ({ id: "attempt_retry", businessId: "biz_1", kind: "retry" as const, status: "reserved" as const, idempotencyKey: "key", providerPreapprovalId: null })),
     startRetry: vi.fn(async () => ({ id: "attempt_retry", businessId: "biz_1", kind: "retry" as const, status: "creating" as const, idempotencyKey: "key", providerPreapprovalId: null })),
     finishAttempt: vi.fn(async () => ({ id: "attempt_retry", businessId: "biz_1", kind: "retry" as const, status: "unknown" as const, idempotencyKey: "key", providerPreapprovalId: "mp_new" })),
-    linkAttempt: vi.fn(async () => undefined), backUrl: "https://app.example", idempotencyKey: "key", ...overrides,
+    linkAttempt: vi.fn(async () => undefined), backUrl: "https://app.example", idempotencyKey: "key",
+    reportOrphanCheckout: vi.fn(), ...overrides,
   };
 }
 
@@ -53,5 +54,30 @@ describe("retryPendingUpgrade with billing_attempts", () => {
     expect(result).toEqual({ ok: false, code: "PROVIDER_UNKNOWN", message: "Não foi possível gerar um novo link de pagamento. Tente novamente." });
     expect(JSON.stringify(result)).not.toContain("timeout");
     expect(d.finishAttempt).toHaveBeenCalledWith({ attemptId: "attempt_retry", status: "unknown" });
+  });
+});
+
+describe("retryPendingUpgrade when the current assinatura changes while the checkout is created", () => {
+  const conflict = () => vi.fn(async () => { throw new Error("CURRENT_SUBSCRIPTION_CONFLICT"); });
+
+  it("records the attempt as failed with the new checkout, then cancels that checkout, whose link is never handed out", async () => {
+    const d = deps({ linkAttempt: conflict(), reportOrphanCheckout: vi.fn() });
+    const result = await retryPendingUpgrade(d);
+    expect(result).toEqual({ ok: false, code: "RETRY_SUBSCRIPTION_CONFLICT", message: expect.any(String) });
+    expect(d.finishAttempt).toHaveBeenCalledWith({ attemptId: "attempt_retry", status: "failed", providerPreapprovalId: "mp_new" });
+    expect(d.provider.cancelPreapproval).toHaveBeenCalledWith("mp_new");
+    expect(d.provider.cancelPreapproval).not.toHaveBeenCalledWith("mp_old");
+    expect(vi.mocked(d.finishAttempt).mock.invocationCallOrder[0])
+      .toBeLessThan(vi.mocked(d.provider.cancelPreapproval).mock.invocationCallOrder[0]);
+    expect(d.reportOrphanCheckout).not.toHaveBeenCalled();
+  });
+
+  it("still answers the conflict and reports the checkout for a manual cancel when the cancel fails", async () => {
+    const p = provider(); p.cancelPreapproval = vi.fn(async () => { throw new Error("Mercado Pago preapproval cancel failed (500)"); });
+    const d = deps({ provider: p, linkAttempt: conflict(), reportOrphanCheckout: vi.fn() });
+    const result = await retryPendingUpgrade(d);
+    expect(result).toEqual({ ok: false, code: "RETRY_SUBSCRIPTION_CONFLICT", message: expect.any(String) });
+    expect(d.finishAttempt).toHaveBeenCalledWith({ attemptId: "attempt_retry", status: "failed", providerPreapprovalId: "mp_new" });
+    expect(d.reportOrphanCheckout).toHaveBeenCalledWith({ businessId: "biz_1", mpPreapprovalId: "mp_new" });
   });
 });

@@ -33,6 +33,7 @@ function makeDeps(overrides: Partial<StartUpgradeDeps> = {}): StartUpgradeDeps {
     backUrl: "https://app.example/dashboard/configuracoes",
     payerEmail: "owner@example.com",
     idempotencyKey: "key_1",
+    reportOrphanCheckout: vi.fn(),
     ...overrides,
   };
 }
@@ -101,8 +102,38 @@ describe("startUpgrade with billing_attempts", () => {
       claimAttempt: vi.fn(), startAttempt: vi.fn(), finishAttempt: vi.fn(), linkAttempt: vi.fn(),
       fetchSubscription: vi.fn(async () => ({ mpPreapprovalId: "mp_pending", status: "pending" as const, plan: "pro" as const, currentPeriodStart: null, currentPeriodEnd: null })),
       backUrl: "https://app.example",
+      reportOrphanCheckout: vi.fn(),
     });
     expect(result).toEqual({ ok: false, code: "ALREADY_PRO", message: expect.any(String) });
     expect(provider.createPreapproval).not.toHaveBeenCalled();
+  });
+});
+
+describe("startUpgrade when the current assinatura changes while the checkout is created", () => {
+  const conflict = () => vi.fn(async () => { throw new Error("CURRENT_SUBSCRIPTION_CONFLICT"); });
+
+  it("records the attempt as failed with the new checkout, then cancels that checkout, whose link is never handed out", async () => {
+    const deps = makeDeps({ linkAttempt: conflict(), reportOrphanCheckout: vi.fn() });
+
+    const result = await startUpgrade(deps);
+
+    expect(result).toEqual({ ok: false, code: "UPGRADE_SUBSCRIPTION_CONFLICT", message: expect.any(String) });
+    expect(deps.finishAttempt).toHaveBeenCalledWith({ attemptId: "attempt_1", status: "failed", providerPreapprovalId: "mp_123" });
+    expect(deps.provider.cancelPreapproval).toHaveBeenCalledWith("mp_123");
+    expect(vi.mocked(deps.finishAttempt).mock.invocationCallOrder[0])
+      .toBeLessThan(vi.mocked(deps.provider.cancelPreapproval).mock.invocationCallOrder[0]);
+    expect(deps.reportOrphanCheckout).not.toHaveBeenCalled();
+  });
+
+  it("still answers the conflict and reports the checkout for a manual cancel when the cancel fails", async () => {
+    const provider = makeProvider({ preapprovalId: "mp_123", initPoint: "https://mp.example/checkout" });
+    provider.cancelPreapproval = vi.fn(async () => { throw new Error("Mercado Pago preapproval cancel failed (500)"); });
+    const deps = makeDeps({ provider, linkAttempt: conflict(), reportOrphanCheckout: vi.fn() });
+
+    const result = await startUpgrade(deps);
+
+    expect(result).toEqual({ ok: false, code: "UPGRADE_SUBSCRIPTION_CONFLICT", message: expect.any(String) });
+    expect(deps.finishAttempt).toHaveBeenCalledWith({ attemptId: "attempt_1", status: "failed", providerPreapprovalId: "mp_123" });
+    expect(deps.reportOrphanCheckout).toHaveBeenCalledWith({ businessId: "biz_1", mpPreapprovalId: "mp_123" });
   });
 });

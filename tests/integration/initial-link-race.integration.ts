@@ -32,12 +32,19 @@ function notify(mpPreapprovalId: string) {
       externalReference: null,
       currentPeriodStart: null,
       currentPeriodEnd: null,
+      transactionAmount: 19.9,
+      currencyId: "BRL",
+      frequency: 1,
+      frequencyType: "months",
     }),
     ...createWebhookPersistence(),
     cancelPreapproval: async (id) => {
       providerStatus.set(id, "cancelled");
     },
     reportDoubleCharge: vi.fn(),
+    currentPriceCents: 1990,
+    reportStalePriceCharge: vi.fn(),
+    reportUnexpectedTermsCharge: vi.fn(),
     now: () => NOW,
   });
 }
@@ -219,6 +226,7 @@ function ambiguousProvider(): BillingProvider {
     }),
     getPreapproval: vi.fn(),
     cancelPreapproval: vi.fn(),
+    updatePreapprovalAmount: vi.fn(),
   };
 }
 
@@ -282,6 +290,7 @@ describe("initial upgrade racing a paid superseded checkout", () => {
       }),
       getPreapproval: vi.fn(),
       cancelPreapproval: vi.fn(),
+      updatePreapprovalAmount: vi.fn(),
     };
 
     const result = await startUpgrade({
@@ -329,6 +338,7 @@ describe("re-subscription in carência racing a recovered payment", () => {
       }),
       getPreapproval: vi.fn(),
       cancelPreapproval: vi.fn(),
+      updatePreapprovalAmount: vi.fn(),
     };
 
     const result = await startUpgrade({

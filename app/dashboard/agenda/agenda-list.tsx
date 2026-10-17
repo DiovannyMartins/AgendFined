@@ -115,7 +115,7 @@ export function AgendaList({
                     </p>
                   )}
                 </div>
-                <StatusAction id={booking.id} status={booking.status} />
+                <StatusAction id={booking.id} status={booking.status} startAt={booking.start_at} />
               </div>
             );
           })}

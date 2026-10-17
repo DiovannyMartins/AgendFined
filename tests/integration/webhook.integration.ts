@@ -30,6 +30,7 @@ function stubPreapproval(status: PreapprovalResource["status"]): PreapprovalReso
     externalReference: businessId,
     currentPeriodStart: null,
     currentPeriodEnd: null,
+    transactionAmount: 19.9,
   };
 }
 
@@ -40,6 +41,8 @@ async function run(event: { type: string; dataId: string }, status: PreapprovalR
     ...createWebhookPersistence(),
     cancelPreapproval: async () => undefined,
     reportDoubleCharge: () => undefined,
+    currentPriceCents: 1990,
+    reportStalePriceCharge: () => undefined,
     now: () => NOW,
   });
 }

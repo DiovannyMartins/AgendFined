@@ -143,7 +143,7 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
         id?: string;
         status?: string;
         external_reference?: string | null;
-        auto_recurring?: { start_date?: string | null; end_date?: string | null };
+        auto_recurring?: { start_date?: string | null; end_date?: string | null; transaction_amount?: number | null };
       };
       const status = body.status;
       if (status !== "pending" && status !== "authorized" && status !== "paused" && status !== "cancelled") {
@@ -155,7 +155,24 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
         externalReference: body.external_reference ?? null,
         currentPeriodStart: body.auto_recurring?.start_date ?? null,
         currentPeriodEnd: body.auto_recurring?.end_date ?? null,
+        transactionAmount:
+          typeof body.auto_recurring?.transaction_amount === "number" ? body.auto_recurring.transaction_amount : null,
       };
+    },
+
+    async updatePreapprovalAmount(id: string, amountCents: number): Promise<void> {
+      const res = await fetch(`${apiBaseUrl}/preapproval/${id}`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${config.accessToken}`,
+          "Content-Type": "application/json; charset=utf-8",
+        },
+        body: JSON.stringify({
+          auto_recurring: { transaction_amount: amountCents / 100, currency_id: "BRL" },
+        }),
+      });
+
+      await assertOk(res, "preapproval amount update");
     },
 
     async cancelPreapproval(id: string): Promise<void> {

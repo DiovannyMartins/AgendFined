@@ -36,10 +36,13 @@ function notify(mpPreapprovalId: string) {
       externalReference: null,
       currentPeriodStart: null,
       currentPeriodEnd: null,
+      transactionAmount: 19.9,
     }),
     ...createWebhookPersistence(),
     cancelPreapproval,
     reportDoubleCharge,
+    currentPriceCents: 1990,
+    reportStalePriceCharge: () => undefined,
     now: () => NOW,
   });
 }

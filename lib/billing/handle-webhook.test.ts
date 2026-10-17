@@ -9,6 +9,7 @@ function makePreapproval(status: PreapprovalResource["status"], overrides: Parti
     externalReference: "biz_1",
     currentPeriodStart: null,
     currentPeriodEnd: null,
+    transactionAmount: 19.9,
     ...overrides,
   };
 }
@@ -37,6 +38,8 @@ function makeDeps(overrides: Partial<HandleWebhookDeps> = {}) {
     listOtherPendingSubscriptions: vi.fn(async () => []),
     cancelPreapproval: vi.fn(async () => undefined),
     reportDoubleCharge: vi.fn(),
+    reportStalePriceCharge: vi.fn(),
+    currentPriceCents: 1990,
     now: () => NOW,
     ...overrides,
   };
@@ -383,5 +386,34 @@ describe("handleWebhook superseded checkouts", () => {
       status: "cancelled",
       gracePeriodEnd: null,
     }));
+  });
+});
+
+describe("handleWebhook stale-price checkouts", () => {
+  it("refuses a checkout paid below the current price: cancels it, reports a refund and grants nothing", async () => {
+    const deps = makeDeps({
+      getPreapproval: vi.fn(async () => makePreapproval("authorized", { transactionAmount: 19 })),
+    });
+
+    const result = await handleWebhook(deps);
+
+    expect(result).toEqual({ ok: true, applied: "stale_price" });
+    expect(deps.applySnapshot).not.toHaveBeenCalled();
+    expect(deps.cancelPreapproval).toHaveBeenCalledWith("mp_1");
+    expect(deps.reportStalePriceCharge).toHaveBeenCalledWith({ businessId: "biz_1", mpPreapprovalId: "mp_1" });
+  });
+
+  it("keeps renewing an assinatura that was authorized at an older price", async () => {
+    const deps = makeDeps({
+      findSubscription: vi.fn(async () => authorizedSubscription),
+      findCurrentSubscription: vi.fn(async () => authorizedSubscription),
+      getPreapproval: vi.fn(async () => makePreapproval("authorized", { transactionAmount: 19 })),
+    });
+
+    const result = await handleWebhook(deps);
+
+    expect(result).toEqual({ ok: true, applied: "authorized" });
+    expect(deps.cancelPreapproval).not.toHaveBeenCalled();
+    expect(deps.reportStalePriceCharge).not.toHaveBeenCalled();
   });
 });

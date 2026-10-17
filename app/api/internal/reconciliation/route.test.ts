@@ -1,8 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const { run } = vi.hoisted(() => ({ run: vi.fn(async () => []) }));
+const { run, reprice } = vi.hoisted(() => ({
+  run: vi.fn(async () => []),
+  reprice: vi.fn(async () => ({ checked: 2, repriced: 1, cancelled: 0, failed: 0 })),
+}));
 vi.mock("@/lib/billing/reconciliation-runner", () => ({ runBoundedReconciliation: run }));
+vi.mock("@/lib/billing/reprice-checkouts-runner", () => ({ runPendingCheckoutRepricing: reprice }));
+vi.mock("@/lib/google-calendar/sync", () => ({ runGoogleCalendarSyncBatch: vi.fn(async () => null) }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
 vi.mock("@/lib/booking/rate-limit", () => ({
   enforceApiRateLimit: async () => true,
@@ -52,5 +57,25 @@ describe("private reconciliation route", () => {
     response = await POST(request("POST", "Bearer internal-secret"));
     expect(response.status).toBe(500);
     expect(await response.text()).not.toContain("private details");
+  });
+
+  it("reprices pending checkouts after reconciliation", async () => {
+    process.env.RECONCILIATION_CRON_SECRET = "internal-secret";
+    const response = await POST(request("POST", "Bearer internal-secret"));
+    expect(response.status).toBe(200);
+    expect(reprice).toHaveBeenCalledTimes(1);
+    expect(await response.json()).toEqual(expect.objectContaining({
+      repricing: { checked: 2, repriced: 1, cancelled: 0, failed: 0 },
+    }));
+  });
+
+  it("still answers ok when the repricing fails", async () => {
+    process.env.RECONCILIATION_CRON_SECRET = "internal-secret";
+    reprice.mockRejectedValueOnce(new Error("private details"));
+    const response = await POST(request("POST", "Bearer internal-secret"));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toEqual(expect.objectContaining({ ok: true, repricing: null }));
+    expect(JSON.stringify(body)).not.toContain("private details");
   });
 });

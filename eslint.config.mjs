@@ -32,6 +32,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Material de marketing (render do anúncio, bundle vendorizado); não roda no app.
+    "design/**",
   ]),
 ]);
 

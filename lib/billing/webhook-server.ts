@@ -95,6 +95,20 @@ export function createWebhookPersistence() {
   };
 }
 
+// The refusal of a first authorization whose terms the plan does not sell, shared
+// by the webhook, the checkout return and the reconciliation. Surfaces in the
+// Vercel logs next to the reconciliation reports; the charge already taken has
+// to be refunded by hand in Mercado Pago.
+export function createCheckoutTermsReporting() {
+  return {
+    currentPriceCents: getProPriceCents(),
+    reportStalePriceCharge: (input: { businessId: string; mpPreapprovalId: string }) =>
+      console.error(JSON.stringify({ event: "billing_stale_price_charge", ...input })),
+    reportUnexpectedTermsCharge: (input: { businessId: string; mpPreapprovalId: string }) =>
+      console.error(JSON.stringify({ event: "billing_unexpected_terms_charge", ...input })),
+  };
+}
+
 export interface MercadoPagoWebhookServerConfig {
   accessToken: string;
   graceDays?: number;
@@ -114,9 +128,7 @@ export async function runMercadoPagoWebhook(
     // charge already taken has to be refunded by hand in Mercado Pago.
     reportDoubleCharge: (input) =>
       console.error(JSON.stringify({ event: "billing_double_charge", ...input })),
-    currentPriceCents: getProPriceCents(),
-    reportStalePriceCharge: (input) =>
-      console.error(JSON.stringify({ event: "billing_stale_price_charge", ...input })),
+    ...createCheckoutTermsReporting(),
     graceDays: config.graceDays,
   });
 }

@@ -1,5 +1,6 @@
 import type { BillingProvider, Preapproval } from "./provider";
 import { DEFAULT_GET_PREAPPROVAL_TIMEOUT_MS } from "./mercado-pago";
+import { refuseUnacceptedCheckout, type CheckoutTermsDeps } from "./checkout-terms";
 
 export type ReconciliationAttemptStatus = "reserved" | "creating" | "unknown" | "ambiguous" | "linked" | "failed";
 
@@ -40,7 +41,9 @@ export interface ReconciliationReport {
   detail: string;
 }
 
-export interface BillingReconciliationDependencies {
+// A first authorization with terms the plan does not sell is refused like the
+// webhook refuses it; the checkout is cancelled through `provider`.
+export interface BillingReconciliationDependencies extends Omit<CheckoutTermsDeps, "cancelPreapproval"> {
   provider: BillingProvider & {
     searchPreapprovals?: () => Promise<Preapproval[]>;
   };
@@ -171,6 +174,13 @@ export async function reconcileBilling(deps: BillingReconciliationDependencies):
         await emit({ kind: "ambiguous_provider_match", resourceId: providerId, detail: "external_reference is incompatible with the attempt" });
         continue;
       }
+      // A refused checkout is reconciled as the cancelled checkout it now is. A
+      // failed cancel throws and leaves the attempt for the next run.
+      const refusal = await refuseUnacceptedCheckout(
+        { businessId: attempt.businessId, mpPreapprovalId: providerId, snapshot, localStatus: local[0]?.status ?? null },
+        { ...deps, cancelPreapproval: id => deps.provider.cancelPreapproval(id) },
+      );
+      if (refusal) snapshot = { ...snapshot, status: "cancelled" };
       if (!(await deps.claim(key, token))) {
         skipped += 1;
         log("claim_lost", { attemptId: attempt.id });

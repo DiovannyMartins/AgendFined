@@ -4,6 +4,7 @@
 // the current price at Mercado Pago. Dependencies are injected so it is
 // unit-testable without the provider or a database.
 import type { Preapproval } from "./provider";
+import { MercadoPagoAmbiguousError } from "./mercado-pago";
 
 export interface RepriceCheckoutsDeps {
   // `mp_preapproval_id` of the local `pending` subscriptions.
@@ -47,7 +48,10 @@ async function repriceCheckout(id: string, deps: RepriceCheckoutsDeps): Promise<
   try {
     await deps.updatePreapprovalAmount(id, deps.currentPriceCents);
     return "repriced";
-  } catch {
+  } catch (error) {
+    // An answer that never arrived is not a refusal: Mercado Pago may have
+    // applied the new price. Left for the next run.
+    if (error instanceof MercadoPagoAmbiguousError) throw error;
     // Refused: cancel instead, so the link cannot be paid at the old price.
     // The payer gets Mercado Pago's cancellation e-mail and can subscribe again.
     await deps.cancelPreapproval(id);

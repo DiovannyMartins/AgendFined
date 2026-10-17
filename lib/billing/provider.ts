@@ -40,6 +40,10 @@ export interface Preapproval {
   // The recurring charge in reais (`auto_recurring.transaction_amount`), fixed
   // when the checkout was created; null when the provider omits it.
   transactionAmount: number | null;
+  // The rest of the recurring terms (`auto_recurring`); null when omitted.
+  currencyId: string | null;
+  frequency: number | null;
+  frequencyType: string | null;
 }
 
 export interface BillingProvider {

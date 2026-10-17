@@ -26,6 +26,9 @@ const getPreapproval = vi.fn(async (id: string): Promise<Preapproval> => ({
   currentPeriodStart: null,
   currentPeriodEnd: null,
   transactionAmount: 19,
+  currencyId: "BRL",
+  frequency: 1,
+  frequencyType: "months",
 }));
 const updatePreapprovalAmount = vi.fn(async () => undefined);
 const cancelPreapproval = vi.fn(async () => undefined);

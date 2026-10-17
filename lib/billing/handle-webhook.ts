@@ -6,7 +6,9 @@
 //     The negócio's other pending checkouts (left payable by a retry) are
 //     cancelled. A paid superseded checkout becomes the current subscription
 //     while the current one is unpaid; when the current one is already paid,
-//     the extra one is cancelled and reported as a double charge.
+//     the extra one is cancelled and reported as a double charge. A first
+//     authorization whose terms are not the plan's (below the current price,
+//     or not BRL monthly) is refused: cancelled and reported for a refund.
 //   * `paused`/`cancelled` (incl. a failed recurring payment, which Mercado Pago
 //     surfaces as `paused`) -> start a 7-day grace period. The business stays
 //     Pro during the grace; the downgrade happens after it expires (the
@@ -18,6 +20,7 @@
 // plan is never set from the provider's word alone — `authorized` is the only
 // path that makes a business Pro, and a missing/invalid status fails closed.
 import type { SubscriptionStatus } from "./types";
+import { refuseUnacceptedCheckout, type CheckoutTermsRefusal } from "./checkout-terms";
 
 // The current state of a preapproval, as read from the provider (`GET
 // /preapproval/{id}`). `externalReference` is the caller's `external_reference`,
@@ -28,8 +31,12 @@ export interface PreapprovalResource {
   externalReference: string | null;
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
-  // The recurring charge in reais, fixed when the checkout was created.
+  // The recurring terms, fixed when the checkout was created: the charge in
+  // reais, its currency and how often it repeats. Null when omitted.
   transactionAmount: number | null;
+  currencyId: string | null;
+  frequency: number | null;
+  frequencyType: string | null;
 }
 
 export interface WebhookEvent {
@@ -87,12 +94,15 @@ export interface HandleWebhookDeps {
   // the charge is reported for a manual refund.
   currentPriceCents: number;
   reportStalePriceCharge: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
+  // A checkout whose currency or frequency is not what the PROFISSIONAL plan
+  // sells (BRL, monthly) is refused the same way.
+  reportUnexpectedTermsCharge: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
   graceDays?: number;
   now?: () => Date;
 }
 
 export type HandleWebhookResult =
-  | { ok: true; applied: "authorized" | "duplicate" | "stale_price" | "grace" | "closed" | "pending" | "ignored" }
+  | { ok: true; applied: "authorized" | "duplicate" | "stale_price" | "unexpected_terms" | "grace" | "closed" | "pending" | "ignored" }
   | { ok: false; code: string; message: string };
 
 const DEFAULT_GRACE_DAYS = 7;
@@ -141,24 +151,20 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
 
   // Only the first authorization is checked: an assinatura already authorized
   // at an older price keeps renewing at that price.
-  if (
-    preapproval.status === "authorized" &&
-    sub.status === "pending" &&
-    preapproval.transactionAmount !== null &&
-    Math.round(preapproval.transactionAmount * 100) < deps.currentPriceCents
-  ) {
-    await deps.reportStalePriceCharge({ businessId, mpPreapprovalId: event.dataId });
-    try {
-      await deps.cancelPreapproval(event.dataId);
-    } catch (err) {
-      return {
-        ok: false,
-        code: "PROVIDER_ERROR",
-        message: err instanceof Error ? err.message : "Não foi possível cancelar o checkout com preço antigo.",
-      };
-    }
-    return { ok: true, applied: "stale_price" };
+  let refusal: CheckoutTermsRefusal | null;
+  try {
+    refusal = await refuseUnacceptedCheckout(
+      { businessId, mpPreapprovalId: event.dataId, snapshot: preapproval, localStatus: sub.status },
+      deps,
+    );
+  } catch (err) {
+    return {
+      ok: false,
+      code: "PROVIDER_ERROR",
+      message: err instanceof Error ? err.message : "Não foi possível cancelar o checkout recusado.",
+    };
   }
+  if (refusal) return { ok: true, applied: refusal };
 
   const now = deps.now?.() ?? new Date();
   // A checkout still `pending` locally never made the negócio PROFISSIONAL, so

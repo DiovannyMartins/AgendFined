@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Preapproval } from "./provider";
 import { repricePendingCheckouts, type RepriceCheckoutsDeps } from "./reprice-checkouts";
+import { MercadoPagoAmbiguousError } from "./mercado-pago";
 
 function snapshot(id: string, overrides: Partial<Preapproval> = {}): Preapproval {
   return {
@@ -10,6 +11,9 @@ function snapshot(id: string, overrides: Partial<Preapproval> = {}): Preapproval
     currentPeriodStart: null,
     currentPeriodEnd: null,
     transactionAmount: 19,
+    currencyId: "BRL",
+    frequency: 1,
+    frequencyType: "months",
     ...overrides,
   };
 }
@@ -66,6 +70,19 @@ describe("repricePendingCheckouts", () => {
 
     expect(deps.cancelPreapproval).toHaveBeenCalledWith("mp_old");
     expect(result).toEqual({ checked: 1, repriced: 0, cancelled: 1, failed: 0 });
+  });
+
+  it("leaves for the next run, without cancelling, an amount update whose answer never arrived", async () => {
+    const deps = makeDeps({
+      updatePreapprovalAmount: vi.fn(async () => {
+        throw new MercadoPagoAmbiguousError("Mercado Pago preapproval amount update timed out");
+      }),
+    });
+
+    const result = await repricePendingCheckouts(deps);
+
+    expect(deps.cancelPreapproval).not.toHaveBeenCalled();
+    expect(result).toEqual({ checked: 1, repriced: 0, cancelled: 0, failed: 1 });
   });
 
   it("counts a checkout it could not handle and keeps going with the next ones", async () => {

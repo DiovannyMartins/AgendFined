@@ -68,9 +68,9 @@ _Avoid_: Fila, agendamento pendente, banco de espera
 Reserva em que o cliente não compareceu. Estado terminal que permanece no histórico.
 _Avoid_: Falta, ausência, não comparecimento
 
-**Fuso da aplicação**:
-Fuso único America/Sao_Paulo (horário de Brasília). Datas são armazenadas em UTC e exibidas nesse fuso.
-_Avoid_: Fuso por negócio, região, hora local
+**Fuso do negócio**:
+Fuso IANA configurado por negócio (`businesses.timezone`, padrão America/Sao_Paulo). Datas são armazenadas em UTC; disponibilidade, bloqueios digitados no dashboard e slots são interpretados e exibidos no fuso do negócio. Não pode ser alterado enquanto houver reservas agendadas.
+_Avoid_: Fuso da aplicação, fuso único, região, hora local
 
 ## Planos
 

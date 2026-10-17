@@ -12,7 +12,7 @@
     "start": "next start",
     "seed:local": "node scripts/seed-demo-user.mjs",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "check:launch": "node scripts/verify-launch.mjs",
     "check:checklist": "node scripts/check-launch-checklist.mjs",
     "test": "vitest run --project unit",

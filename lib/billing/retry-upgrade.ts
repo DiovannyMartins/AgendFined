@@ -34,12 +34,20 @@ export interface RetryUpgradeDeps {
     status: "failed" | "unknown";
     providerPreapprovalId?: string | null;
   }) => Promise<BillingAttempt>;
+  // Rejects with `CURRENT_SUBSCRIPTION_CONFLICT` when the current subscription
+  // is no longer the one the retry reserved.
   linkAttempt: (input: { attemptId: string; mpPreapprovalId: string }) => Promise<void>;
   backUrl: string;
   payerEmail?: string;
   notificationUrl?: string;
   idempotencyKey?: string;
 }
+
+const SUBSCRIPTION_CONFLICT: RetryUpgradeResult = {
+  ok: false,
+  code: "RETRY_SUBSCRIPTION_CONFLICT",
+  message: "A assinatura pendente mudou. Atualize a página e tente novamente.",
+};
 
 export async function retryPendingUpgrade(deps: RetryUpgradeDeps): Promise<RetryUpgradeResult> {
   const existing = await deps.fetchSubscription(deps.business.id);
@@ -85,7 +93,7 @@ export async function retryPendingUpgrade(deps: RetryUpgradeDeps): Promise<Retry
     // still exists. If the CAS rejects it, release the reservation so a stale
     // retry cannot strand the business in "billing in progress" forever.
     await deps.finishAttempt({ attemptId: attempt.id, status: "failed" }).catch(() => undefined);
-    return { ok: false, code: "RETRY_SUBSCRIPTION_CONFLICT", message: "A assinatura pendente mudou. Atualize a página e tente novamente." };
+    return SUBSCRIPTION_CONFLICT;
   }
   if (attempt.status !== "creating") {
     return { ok: false, code: "UPGRADE_IN_PROGRESS", message: "O retry já está em andamento." };
@@ -112,7 +120,18 @@ export async function retryPendingUpgrade(deps: RetryUpgradeDeps): Promise<Retry
 
   try {
     await deps.linkAttempt({ attemptId: attempt.id, mpPreapprovalId: created.preapprovalId });
-  } catch {
+  } catch (err) {
+    // The current subscription moved while the provider created the checkout
+    // (e.g. the webhook made a paid superseded checkout current). Nothing was
+    // linked, so the new checkout's link is never handed out.
+    if (err instanceof Error && err.message === "CURRENT_SUBSCRIPTION_CONFLICT") {
+      await deps.finishAttempt({
+        attemptId: attempt.id,
+        status: "failed",
+        providerPreapprovalId: created.preapprovalId,
+      }).catch(() => undefined);
+      return SUBSCRIPTION_CONFLICT;
+    }
     await deps.finishAttempt({
       attemptId: attempt.id,
       status: "unknown",

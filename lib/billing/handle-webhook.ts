@@ -28,6 +28,8 @@ export interface PreapprovalResource {
   externalReference: string | null;
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
+  // The recurring charge in reais, fixed when the checkout was created.
+  transactionAmount: number | null;
 }
 
 export interface WebhookEvent {
@@ -80,12 +82,17 @@ export interface HandleWebhookDeps {
   // assinatura. Its recurrence is cancelled; the charge already taken needs a
   // manual refund, so it is reported.
   reportDoubleCharge: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
+  // The PROFISSIONAL price now (`getProPriceCents`). A checkout paid below it
+  // was created before a price change; it is cancelled instead of activated and
+  // the charge is reported for a manual refund.
+  currentPriceCents: number;
+  reportStalePriceCharge: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
   graceDays?: number;
   now?: () => Date;
 }
 
 export type HandleWebhookResult =
-  | { ok: true; applied: "authorized" | "duplicate" | "grace" | "closed" | "pending" | "ignored" }
+  | { ok: true; applied: "authorized" | "duplicate" | "stale_price" | "grace" | "closed" | "pending" | "ignored" }
   | { ok: false; code: string; message: string };
 
 const DEFAULT_GRACE_DAYS = 7;
@@ -131,6 +138,27 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
     };
   }
   const businessId = sub.businessId;
+
+  // Only the first authorization is checked: an assinatura already authorized
+  // at an older price keeps renewing at that price.
+  if (
+    preapproval.status === "authorized" &&
+    sub.status === "pending" &&
+    preapproval.transactionAmount !== null &&
+    Math.round(preapproval.transactionAmount * 100) < deps.currentPriceCents
+  ) {
+    await deps.reportStalePriceCharge({ businessId, mpPreapprovalId: event.dataId });
+    try {
+      await deps.cancelPreapproval(event.dataId);
+    } catch (err) {
+      return {
+        ok: false,
+        code: "PROVIDER_ERROR",
+        message: err instanceof Error ? err.message : "Não foi possível cancelar o checkout com preço antigo.",
+      };
+    }
+    return { ok: true, applied: "stale_price" };
+  }
 
   const now = deps.now?.() ?? new Date();
   // A checkout still `pending` locally never made the negócio PROFISSIONAL, so

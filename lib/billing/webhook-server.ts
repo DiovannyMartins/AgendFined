@@ -8,6 +8,7 @@
 // service context (no `auth.uid()`).
 import type { Database } from "@/lib/supabase/database-types";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getProPriceCents } from "@/lib/plan/catalog";
 import { createMercadoPagoProvider } from "./mercado-pago";
 import {
   handleWebhook,
@@ -113,6 +114,9 @@ export async function runMercadoPagoWebhook(
     // charge already taken has to be refunded by hand in Mercado Pago.
     reportDoubleCharge: (input) =>
       console.error(JSON.stringify({ event: "billing_double_charge", ...input })),
+    currentPriceCents: getProPriceCents(),
+    reportStalePriceCharge: (input) =>
+      console.error(JSON.stringify({ event: "billing_stale_price_charge", ...input })),
     graceDays: config.graceDays,
   });
 }

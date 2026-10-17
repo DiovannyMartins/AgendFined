@@ -11,6 +11,7 @@ function makeDeps(overrides: Partial<CancelSubscriptionDeps> = {}): CancelSubscr
       createPreapproval: vi.fn(),
       getPreapproval: vi.fn(),
       cancelPreapproval: vi.fn(async () => undefined),
+      updatePreapprovalAmount: vi.fn(),
     } as BillingProvider,
     fetchSubscription: vi.fn(async () => ({
       mpPreapprovalId: "mp_1",

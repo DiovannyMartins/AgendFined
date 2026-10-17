@@ -4,7 +4,7 @@ import { MercadoPagoAmbiguousError } from "./mercado-pago";
 import type { BillingProvider } from "./provider";
 
 const existing = { subscriptionId: "sub_old", mpPreapprovalId: "mp_old", status: "pending" as const, plan: "pro" as const, currentPeriodStart: null, currentPeriodEnd: null };
-function provider(): BillingProvider { return { createPreapproval: vi.fn(async () => ({ preapprovalId: "mp_new", initPoint: "https://mp.example/new" })), getPreapproval: vi.fn(), cancelPreapproval: vi.fn(async () => undefined) }; }
+function provider(): BillingProvider { return { createPreapproval: vi.fn(async () => ({ preapprovalId: "mp_new", initPoint: "https://mp.example/new" })), getPreapproval: vi.fn(), cancelPreapproval: vi.fn(async () => undefined), updatePreapprovalAmount: vi.fn() }; }
 function deps(overrides: Partial<RetryUpgradeDeps> = {}): RetryUpgradeDeps {
   return {
     business: { id: "biz_1" }, provider: provider(), fetchSubscription: vi.fn(async () => existing),

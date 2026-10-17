@@ -156,10 +156,51 @@ describe("createMercadoPagoProvider", () => {
       externalReference: "biz_1",
       currentPeriodStart: "2026-09-01T00:00:00.000Z",
       currentPeriodEnd: "2026-10-01T00:00:00.000Z",
+      transactionAmount: null,
     });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.mercadopago.com/preapproval/mp_1");
     expect(init.method).toBe("GET");
+  });
+
+  it("reads the checkout amount of a preapproval", async () => {
+    stubFetch(async () =>
+      jsonResponse({
+        id: "mp_1",
+        status: "pending",
+        external_reference: "att_1",
+        auto_recurring: { transaction_amount: 19, currency_id: "BRL" },
+      }),
+    );
+
+    const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });
+
+    await expect(provider.getPreapproval("mp_1")).resolves.toEqual(
+      expect.objectContaining({ id: "mp_1", status: "pending", transactionAmount: 19 }),
+    );
+  });
+
+  it("updates the checkout amount of a preapproval", async () => {
+    const fetchMock = stubFetch(async () => jsonResponse({ id: "mp_1" }));
+
+    const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });
+    await provider.updatePreapprovalAmount("mp_1", 1990);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.mercadopago.com/preapproval/mp_1");
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(String(init.body))).toEqual({
+      auto_recurring: { transaction_amount: 19.9, currency_id: "BRL" },
+    });
+  });
+
+  it("throws when Mercado Pago refuses the amount update", async () => {
+    stubFetch(async () => jsonResponse({ message: "cannot update amount" }, 400));
+
+    const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });
+    await expect(provider.updatePreapprovalAmount("mp_1", 1990)).rejects.toThrow(
+      "Mercado Pago preapproval amount update failed (400): cannot update amount",
+    );
   });
 
   it("aborts a slow preapproval GET at the configured timeout", async () => {

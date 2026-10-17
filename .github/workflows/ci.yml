@@ -39,15 +39,11 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # Same service versions as the linked production project (supabase/.temp,
-      # gitignored). The CLI defaults start a newer stack whose fresh database
-      # does not grant the public tables to service_role.
-      - name: Pin Supabase service versions
-        run: |
-          mkdir -p supabase/.temp
-          echo "17.6.1.166" > supabase/.temp/postgres-version
-          echo "v2.195.0" > supabase/.temp/gotrue-version
-          echo "v14.5" > supabase/.temp/rest-version
+      # The migrations rely on the cloud default that grants new public tables to
+      # the Data API roles; config.toml opts out, so a fresh stack would deny
+      # service_role on every table.
+      - name: Match the cloud table grants
+        run: sed -i 's/^auto_expose_new_tables = false$/auto_expose_new_tables = true/' supabase/config.toml && grep -q '^auto_expose_new_tables = true$' supabase/config.toml
       # Applies supabase/migrations and seed.sql; the suite needs only db, auth,
       # PostgREST and the gateway.
       - run: npx supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta,realtime,storage-api

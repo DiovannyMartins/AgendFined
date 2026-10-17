@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "agendfined-local-beta",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:/Users/Diovanny/AppData/Local/Temp/claude/C--Users-Diovanny--claude-spares-spare-koWU82/87168c35-578e-4487-9696-890caf2a6e58/scratchpad/dev-local.mjs"],
+      "port": 3100
+    }
+  ]
+}

@@ -20,6 +20,7 @@
 // plan is never set from the provider's word alone — `authorized` is the only
 // path that makes a business Pro, and a missing/invalid status fails closed.
 import type { SubscriptionStatus } from "./types";
+import { refuseUnacceptedCheckout, type CheckoutTermsRefusal } from "./checkout-terms";
 
 // The current state of a preapproval, as read from the provider (`GET
 // /preapproval/{id}`). `externalReference` is the caller's `external_reference`,
@@ -150,24 +151,20 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
 
   // Only the first authorization is checked: an assinatura already authorized
   // at an older price keeps renewing at that price.
-  const refusal =
-    preapproval.status === "authorized" && sub.status === "pending"
-      ? refuseCheckoutTerms(preapproval, deps.currentPriceCents)
-      : null;
-  if (refusal) {
-    const report = refusal === "stale_price" ? deps.reportStalePriceCharge : deps.reportUnexpectedTermsCharge;
-    await report({ businessId, mpPreapprovalId: event.dataId });
-    try {
-      await deps.cancelPreapproval(event.dataId);
-    } catch (err) {
-      return {
-        ok: false,
-        code: "PROVIDER_ERROR",
-        message: err instanceof Error ? err.message : "Não foi possível cancelar o checkout recusado.",
-      };
-    }
-    return { ok: true, applied: refusal };
+  let refusal: CheckoutTermsRefusal | null;
+  try {
+    refusal = await refuseUnacceptedCheckout(
+      { businessId, mpPreapprovalId: event.dataId, snapshot: preapproval, localStatus: sub.status },
+      deps,
+    );
+  } catch (err) {
+    return {
+      ok: false,
+      code: "PROVIDER_ERROR",
+      message: err instanceof Error ? err.message : "Não foi possível cancelar o checkout recusado.",
+    };
   }
+  if (refusal) return { ok: true, applied: refusal };
 
   const now = deps.now?.() ?? new Date();
   // A checkout still `pending` locally never made the negócio PROFISSIONAL, so
@@ -251,25 +248,4 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
     return { ok: true, applied: "grace" };
   }
   return { ok: true, applied: "pending" };
-}
-
-// Whether a checkout's recurring terms differ from what the PROFISSIONAL plan
-// sells: a charge below the current price (created before a price change), or
-// a currency or frequency other than BRL monthly. A term the provider omits is
-// not held against the checkout.
-function refuseCheckoutTerms(
-  preapproval: PreapprovalResource,
-  currentPriceCents: number,
-): "stale_price" | "unexpected_terms" | null {
-  if (preapproval.transactionAmount !== null && Math.round(preapproval.transactionAmount * 100) < currentPriceCents) {
-    return "stale_price";
-  }
-  if (
-    (preapproval.currencyId !== null && preapproval.currencyId !== "BRL") ||
-    (preapproval.frequency !== null && preapproval.frequency !== 1) ||
-    (preapproval.frequencyType !== null && preapproval.frequencyType !== "months")
-  ) {
-    return "unexpected_terms";
-  }
-  return null;
 }

@@ -4,11 +4,12 @@
 // provider preapproval is intentionally not cancelled here: the new checkout
 // is still pending, and cancelling it before payment makes Mercado Pago send a
 // misleading cancellation e-mail. Provider cleanup must happen only after a
-// replacement is authorized, with webhook/reconciliation state available.
+// replacement is authorized, with webhook/reconciliation state available. Only
+// the new checkout is cancelled when its link is refused, since nobody has it.
 import { randomUUID } from "node:crypto";
 import type { BillingProvider } from "./provider";
 import { MercadoPagoAmbiguousError } from "./mercado-pago";
-import type { BillingAttempt } from "./start-upgrade";
+import { cancelUnlinkedCheckout, type BillingAttempt } from "./start-upgrade";
 import type { FetchSubscription } from "./get-subscription";
 
 export type RetryUpgradeResult = { ok: true; initPoint: string } | { ok: false; code: string; message: string };
@@ -41,6 +42,9 @@ export interface RetryUpgradeDeps {
   payerEmail?: string;
   notificationUrl?: string;
   idempotencyKey?: string;
+  // A checkout created but never linked could not be cancelled; it needs a
+  // manual cancel in Mercado Pago.
+  reportOrphanCheckout: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
 }
 
 const SUBSCRIPTION_CONFLICT: RetryUpgradeResult = {
@@ -130,6 +134,10 @@ export async function retryPendingUpgrade(deps: RetryUpgradeDeps): Promise<Retry
         status: "failed",
         providerPreapprovalId: created.preapprovalId,
       }).catch(() => undefined);
+      await cancelUnlinkedCheckout(
+        { businessId: deps.business.id, mpPreapprovalId: created.preapprovalId },
+        deps,
+      );
       return SUBSCRIPTION_CONFLICT;
     }
     await deps.finishAttempt({

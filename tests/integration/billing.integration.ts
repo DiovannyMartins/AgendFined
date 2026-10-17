@@ -200,6 +200,7 @@ describe("issue #23 billing: assinatura + RLS", () => {
       linkAttempt,
       backUrl: "https://app.example/dashboard/configuracoes",
       idempotencyKey,
+      reportOrphanCheckout: vi.fn(),
     });
 
     expect(result).toEqual({ ok: true, initPoint: "https://sandbox.mercadopago.com/checkout" });

@@ -22,6 +22,12 @@ import {
   type RetryUpgradeResult,
 } from "./retry-upgrade";
 
+// Surfaces in the Vercel logs next to the other billing reports; the checkout
+// has to be cancelled by hand in Mercado Pago.
+function reportOrphanCheckout(input: { businessId: string; mpPreapprovalId: string }) {
+  console.error(JSON.stringify({ event: "billing_orphan_checkout_cancel_failed", ...input }));
+}
+
 // Server action called by the "Fazer upgrade" button. Returns the Mercado Pago
 // `init_point` so the client can redirect the payer to the checkout (sandbox in
 // dev). Reads `MERCADO_PAGO_ACCESS_TOKEN`; when unset it fails closed with a
@@ -119,6 +125,7 @@ export async function startUpgrade(): Promise<StartUpgradeResult> {
     backUrl,
     payerEmail: user?.email,
     notificationUrl,
+    reportOrphanCheckout,
   });
 }
 
@@ -200,6 +207,7 @@ export async function retryUpgrade(): Promise<RetryUpgradeResult> {
     backUrl,
     payerEmail: user?.email,
     notificationUrl,
+    reportOrphanCheckout,
   });
 }
 

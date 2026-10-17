@@ -37,6 +37,13 @@ export interface Preapproval {
   externalReference: string | null;
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
+  // The recurring charge in reais (`auto_recurring.transaction_amount`), fixed
+  // when the checkout was created; null when the provider omits it.
+  transactionAmount: number | null;
+  // The rest of the recurring terms (`auto_recurring`); null when omitted.
+  currencyId: string | null;
+  frequency: number | null;
+  frequencyType: string | null;
 }
 
 export interface BillingProvider {
@@ -46,6 +53,9 @@ export interface BillingProvider {
   // Fetches a preapproval by id so the webhook handler can read its current
   // status and map it onto the plan lifecycle.
   getPreapproval(id: string, options?: { timeoutMs?: number }): Promise<Preapproval>;
+  // Changes the recurring charge of a preapproval, e.g. to bring a checkout
+  // created before a price change up to the current price.
+  updatePreapprovalAmount(id: string, amountCents: number): Promise<void>;
   // Cancels a preapproval so the provider stops charging (user-initiated cancel).
   // Idempotent: cancelling an already-cancelled preapproval succeeds.
   cancelPreapproval(id: string): Promise<void>;

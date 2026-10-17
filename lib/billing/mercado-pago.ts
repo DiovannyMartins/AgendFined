@@ -18,6 +18,9 @@ const CANCELLED = "cancelled";
 
 const DEFAULT_API_BASE_URL = "https://api.mercadopago.com";
 export const DEFAULT_GET_PREAPPROVAL_TIMEOUT_MS = 30_000;
+// The webhook and the reconciliation cron (60 s HTTP timeout) wait on these
+// writes, so a stalled one gives up sooner than a read.
+export const DEFAULT_UPDATE_PREAPPROVAL_TIMEOUT_MS = 10_000;
 
 export class MercadoPagoAmbiguousError extends Error {
   constructor(message: string) {
@@ -50,6 +53,34 @@ async function assertOk(res: Response, operation: string): Promise<void> {
     // Non-JSON error body; the status is enough.
   }
   throw new Error(`Mercado Pago ${operation} failed (${res.status})${detail ? `: ${detail}` : ""}`);
+}
+
+// A `PUT /preapproval/{id}` that gives up after the update timeout. A response
+// that never arrives (timeout or network failure) is ambiguous: Mercado Pago
+// may have applied the change.
+async function putPreapproval(url: string, accessToken: string, body: unknown, operation: string): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(new Error(`Mercado Pago ${operation} timed out`)),
+    DEFAULT_UPDATE_PREAPPROVAL_TIMEOUT_MS,
+  );
+  try {
+    return await fetch(url, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    throw new MercadoPagoAmbiguousError(
+      error instanceof Error ? error.message : `Mercado Pago ${operation} response was not received`,
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingProvider {
@@ -143,30 +174,56 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
         id?: string;
         status?: string;
         external_reference?: string | null;
-        auto_recurring?: { start_date?: string | null; end_date?: string | null };
+        auto_recurring?: {
+          start_date?: string | null;
+          end_date?: string | null;
+          transaction_amount?: number | null;
+          currency_id?: string | null;
+          frequency?: number | null;
+          frequency_type?: string | null;
+        };
       };
+      // Every caller applies this snapshot to the preapproval it asked for, so a
+      // response about any other one (or none) must never be used.
+      if (body.id !== id) {
+        throw new Error("Mercado Pago preapproval response does not match the requested id");
+      }
       const status = body.status;
       if (status !== "pending" && status !== "authorized" && status !== "paused" && status !== "cancelled") {
         throw new Error("Mercado Pago preapproval response missing a valid status");
       }
       return {
-        id: body.id ?? id,
+        id,
         status,
         externalReference: body.external_reference ?? null,
         currentPeriodStart: body.auto_recurring?.start_date ?? null,
         currentPeriodEnd: body.auto_recurring?.end_date ?? null,
+        transactionAmount:
+          typeof body.auto_recurring?.transaction_amount === "number" ? body.auto_recurring.transaction_amount : null,
+        currencyId: body.auto_recurring?.currency_id ?? null,
+        frequency: typeof body.auto_recurring?.frequency === "number" ? body.auto_recurring.frequency : null,
+        frequencyType: body.auto_recurring?.frequency_type ?? null,
       };
     },
 
+    async updatePreapprovalAmount(id: string, amountCents: number): Promise<void> {
+      const res = await putPreapproval(
+        `${apiBaseUrl}/preapproval/${id}`,
+        config.accessToken,
+        { auto_recurring: { transaction_amount: amountCents / 100, currency_id: "BRL" } },
+        "preapproval amount update",
+      );
+
+      await assertOk(res, "preapproval amount update");
+    },
+
     async cancelPreapproval(id: string): Promise<void> {
-      const res = await fetch(`${apiBaseUrl}/preapproval/${id}`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${config.accessToken}`,
-          "Content-Type": "application/json; charset=utf-8",
-        },
-        body: JSON.stringify({ status: CANCELLED }),
-      });
+      const res = await putPreapproval(
+        `${apiBaseUrl}/preapproval/${id}`,
+        config.accessToken,
+        { status: CANCELLED },
+        "preapproval cancel",
+      );
 
       if (res.ok) return;
 

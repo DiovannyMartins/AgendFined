@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { reconcileBilling, type BillingReconciliationDependencies, type ReconciliationAttempt } from "./reconciliation";
 import type { Preapproval } from "./provider";
 
-const snapshot: Preapproval = { id: "mp_1", status: "authorized", externalReference: "attempt_1", currentPeriodStart: null, currentPeriodEnd: null };
+const snapshot: Preapproval = { id: "mp_1", status: "authorized", externalReference: "attempt_1", currentPeriodStart: null, currentPeriodEnd: null, transactionAmount: null, currencyId: null, frequency: null, frequencyType: null };
 const attempt = (overrides: Partial<ReconciliationAttempt> = {}): ReconciliationAttempt => ({
   id: "attempt_1", businessId: "biz_1", status: "unknown", providerPreapprovalId: "mp_1", expectedSubscriptionId: null,
   updatedAt: new Date().toISOString(), ...overrides,
@@ -10,11 +10,12 @@ const attempt = (overrides: Partial<ReconciliationAttempt> = {}): Reconciliation
 
 function deps(overrides: Partial<BillingReconciliationDependencies> = {}): BillingReconciliationDependencies {
   return {
-    provider: { createPreapproval: vi.fn(), getPreapproval: vi.fn(async () => snapshot), cancelPreapproval: vi.fn() },
+    provider: { createPreapproval: vi.fn(), getPreapproval: vi.fn(async () => snapshot), cancelPreapproval: vi.fn(), updatePreapprovalAmount: vi.fn() },
     attempts: [attempt()], subscriptions: [], businesses: [{ id: "biz_1", currentSubscriptionId: null, plan: "free" }],
     claim: vi.fn(async () => true), release: vi.fn(async () => undefined),
     markAttempt: vi.fn(async () => undefined), reconcileAttempt: vi.fn(async () => undefined),
     applySnapshot: vi.fn(async () => undefined), report: vi.fn(async () => undefined),
+    currentPriceCents: 1990, reportStalePriceCharge: vi.fn(), reportUnexpectedTermsCharge: vi.fn(),
     ...overrides,
   };
 }
@@ -48,7 +49,7 @@ describe("billing reconciliation fencing and correlation", () => {
     const d = deps({
       attempts: [attempt({ id: "one", providerPreapprovalId: "mp_one" }), attempt({ id: "two", providerPreapprovalId: "mp_two" })],
       provider: {
-        createPreapproval: vi.fn(), cancelPreapproval: vi.fn(),
+        createPreapproval: vi.fn(), cancelPreapproval: vi.fn(), updatePreapprovalAmount: vi.fn(),
         getPreapproval: vi.fn(async id => ({ ...snapshot, id, externalReference: id.replace("mp_", "") })),
       },
       reconcileAttempt: vi.fn().mockRejectedValueOnce(new Error("one failed")).mockResolvedValueOnce(undefined),
@@ -60,7 +61,7 @@ describe("billing reconciliation fencing and correlation", () => {
   it("does not treat a provider search error as zero matches", async () => {
     const report = vi.fn(async () => undefined);
     const d = deps({ attempts: [attempt({ providerPreapprovalId: null })], report,
-      provider: { createPreapproval: vi.fn(), getPreapproval: vi.fn(), cancelPreapproval: vi.fn(), searchPreapprovals: vi.fn(async () => { throw new Error("temporary MP error"); }) } });
+      provider: { createPreapproval: vi.fn(), getPreapproval: vi.fn(), cancelPreapproval: vi.fn(), updatePreapprovalAmount: vi.fn(), searchPreapprovals: vi.fn(async () => { throw new Error("temporary MP error"); }) } });
     await reconcileBilling(d);
     expect(report).toHaveBeenCalledWith(expect.objectContaining({ kind: "provider_error" }));
     expect(d.reconcileAttempt).not.toHaveBeenCalled();
@@ -72,14 +73,14 @@ describe("billing reconciliation fencing and correlation", () => {
   });
 
   it("rejects an incompatible external reference", async () => {
-    const d = deps({ provider: { createPreapproval: vi.fn(), getPreapproval: vi.fn(async () => ({ ...snapshot, externalReference: "other" })), cancelPreapproval: vi.fn() } });
+    const d = deps({ provider: { createPreapproval: vi.fn(), getPreapproval: vi.fn(async () => ({ ...snapshot, externalReference: "other" })), cancelPreapproval: vi.fn(), updatePreapprovalAmount: vi.fn() } });
     await reconcileBilling(d);
     expect(d.markAttempt).toHaveBeenCalledWith("attempt_1", "ambiguous", "mp_1", "unknown", expect.any(String));
     expect(d.reconcileAttempt).not.toHaveBeenCalled();
   });
 
   it("allows an absent external reference when the provider id is known", async () => {
-    const d = deps({ provider: { createPreapproval: vi.fn(), getPreapproval: vi.fn(async () => ({ ...snapshot, externalReference: null })), cancelPreapproval: vi.fn() } });
+    const d = deps({ provider: { createPreapproval: vi.fn(), getPreapproval: vi.fn(async () => ({ ...snapshot, externalReference: null })), cancelPreapproval: vi.fn(), updatePreapprovalAmount: vi.fn() } });
     await reconcileBilling(d); expect(d.reconcileAttempt).toHaveBeenCalledTimes(1);
   });
 
@@ -103,5 +104,29 @@ describe("billing reconciliation fencing and correlation", () => {
 
   it("is safe to rerun after the provider snapshot is already linked", async () => {
     const d = deps({ attempts: [attempt({ status: "linked" })] }); await reconcileBilling(d); expect(d.reconcileAttempt).not.toHaveBeenCalled();
+  });
+});
+
+describe("billing reconciliation of a checkout paid with terms the plan does not sell", () => {
+  const stalePaid: Preapproval = { ...snapshot, transactionAmount: 19, currencyId: "BRL", frequency: 1, frequencyType: "months" };
+
+  it("reports the charge, cancels the checkout and reconciles it as cancelled instead of activating it", async () => {
+    const d = deps({ provider: { createPreapproval: vi.fn(), getPreapproval: vi.fn(async () => stalePaid), cancelPreapproval: vi.fn(async () => undefined), updatePreapprovalAmount: vi.fn() } });
+
+    await reconcileBilling(d);
+
+    expect(d.reportStalePriceCharge).toHaveBeenCalledWith({ businessId: "biz_1", mpPreapprovalId: "mp_1" });
+    expect(d.provider.cancelPreapproval).toHaveBeenCalledWith("mp_1");
+    expect(d.reconcileAttempt).toHaveBeenCalledWith(expect.objectContaining({ id: "attempt_1" }), { ...stalePaid, status: "cancelled" }, expect.any(String));
+  });
+
+  it("leaves the attempt for the next run when the cancel fails", async () => {
+    const d = deps({ provider: { createPreapproval: vi.fn(), getPreapproval: vi.fn(async () => stalePaid), cancelPreapproval: vi.fn(async () => { throw new Error("Mercado Pago preapproval cancel failed (500)"); }), updatePreapprovalAmount: vi.fn() } });
+
+    await reconcileBilling(d);
+
+    expect(d.reportStalePriceCharge).toHaveBeenCalledWith({ businessId: "biz_1", mpPreapprovalId: "mp_1" });
+    expect(d.reconcileAttempt).not.toHaveBeenCalled();
+    expect(d.release).toHaveBeenCalled();
   });
 });

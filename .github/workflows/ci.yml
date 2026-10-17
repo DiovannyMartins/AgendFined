@@ -39,6 +39,15 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      # Same service versions as the linked production project (supabase/.temp,
+      # gitignored). The CLI defaults start a newer stack whose fresh database
+      # does not grant the public tables to service_role.
+      - name: Pin Supabase service versions
+        run: |
+          mkdir -p supabase/.temp
+          echo "17.6.1.166" > supabase/.temp/postgres-version
+          echo "v2.195.0" > supabase/.temp/gotrue-version
+          echo "v14.5" > supabase/.temp/rest-version
       # Applies supabase/migrations and seed.sql; the suite needs only db, auth,
       # PostgREST and the gateway.
       - run: npx supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta,realtime,storage-api

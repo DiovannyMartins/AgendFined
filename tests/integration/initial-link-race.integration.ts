@@ -64,6 +64,7 @@ function mapAttempt(row: Database["public"]["Tables"]["billing_attempts"]["Row"]
 // The same RPC wiring as the `startUpgrade` server action, with the service role.
 function upgradePersistence(): Omit<StartUpgradeDeps, "business" | "provider" | "backUrl" | "idempotencyKey"> {
   return {
+    reportOrphanCheckout: vi.fn(),
     fetchSubscription: async (id) => {
       const { data: business, error: businessError } = await admin
         .from("businesses")
@@ -303,6 +304,7 @@ describe("initial upgrade racing a paid superseded checkout", () => {
 
     expect(webhook).toEqual({ ok: true, applied: "authorized" });
     expect(result).toEqual({ ok: false, code: "UPGRADE_SUBSCRIPTION_CONFLICT", message: expect.any(String) });
+    expect(provider.cancelPreapproval).toHaveBeenCalledWith(MP_NEW);
     expect(await readBusiness(businessId)).toEqual({ plan: "pro", current_subscription_id: oldSubscriptionId });
     expect(await readAttempt(idempotencyKey)).toEqual({ status: "failed", provider_preapproval_id: MP_NEW });
   });
@@ -351,6 +353,7 @@ describe("re-subscription in carência racing a recovered payment", () => {
 
     expect(webhook).toEqual({ ok: true, applied: "authorized" });
     expect(result).toEqual({ ok: false, code: "UPGRADE_SUBSCRIPTION_CONFLICT", message: expect.any(String) });
+    expect(provider.cancelPreapproval).toHaveBeenCalledWith(MP_NEW);
     expect(await readBusiness(businessId)).toEqual({ plan: "pro", current_subscription_id: currentSubscriptionId });
     expect(await readAttempt(idempotencyKey)).toEqual({ status: "failed", provider_preapproval_id: MP_NEW });
   });

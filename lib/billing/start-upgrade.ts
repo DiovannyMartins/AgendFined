@@ -55,6 +55,23 @@ export interface StartUpgradeDeps {
   // When provided, guards against starting a second preapproval while one is
   // still pending (avoids orphaned preapprovals from double-clicking "upgrade").
   fetchSubscription?: FetchSubscription;
+  // A checkout created but never linked could not be cancelled; it needs a
+  // manual cancel in Mercado Pago.
+  reportOrphanCheckout: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
+}
+
+// Cancels a checkout whose link is never handed out because the link step
+// refused it. The attempt already records it as failed with its preapproval,
+// so a failed cancel loses nothing; it is reported for a manual cancel.
+export async function cancelUnlinkedCheckout(
+  input: { businessId: string; mpPreapprovalId: string },
+  deps: Pick<StartUpgradeDeps, "provider" | "reportOrphanCheckout">,
+): Promise<void> {
+  try {
+    await deps.provider.cancelPreapproval(input.mpPreapprovalId);
+  } catch {
+    await deps.reportOrphanCheckout(input);
+  }
 }
 
 export async function startUpgrade(deps: StartUpgradeDeps): Promise<StartUpgradeResult> {
@@ -172,6 +189,10 @@ export async function startUpgrade(deps: StartUpgradeDeps): Promise<StartUpgrade
         status: "failed",
         providerPreapprovalId: created.preapprovalId,
       }).catch(() => undefined);
+      await cancelUnlinkedCheckout(
+        { businessId: business.id, mpPreapprovalId: created.preapprovalId },
+        { provider, reportOrphanCheckout: deps.reportOrphanCheckout },
+      );
       return {
         ok: false,
         code: "UPGRADE_SUBSCRIPTION_CONFLICT",

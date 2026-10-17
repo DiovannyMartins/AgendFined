@@ -131,6 +131,7 @@ describe("issue #23 billing: assinatura + RLS", () => {
       })),
       getPreapproval: vi.fn(),
       cancelPreapproval: vi.fn(),
+      updatePreapprovalAmount: vi.fn(),
     };
     const idempotencyKey = `billing-upgrade-${stamp}`;
     const claimAttempt: StartUpgradeDeps["claimAttempt"] = async (input) => {
@@ -206,6 +207,7 @@ describe("issue #23 billing: assinatura + RLS", () => {
         countPendingCheckouts: () => countPendingCheckouts(admin, businessId),
         consumeCheckout: () => enforceBillingCheckoutRateLimit(admin, businessId),
       },
+      reportOrphanCheckout: vi.fn(),
     });
 
     expect(result).toEqual({ ok: true, initPoint: "https://sandbox.mercadopago.com/checkout" });

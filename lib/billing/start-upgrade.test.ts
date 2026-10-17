@@ -6,7 +6,7 @@ import type { BillingProvider, CreatePreapprovalResult } from "./provider";
 const BUSINESS = { id: "biz_1", plan: "free" as const };
 
 function makeProvider(result: CreatePreapprovalResult): BillingProvider {
-  return { createPreapproval: vi.fn(async () => result), getPreapproval: vi.fn(), cancelPreapproval: vi.fn() };
+  return { createPreapproval: vi.fn(async () => result), getPreapproval: vi.fn(), cancelPreapproval: vi.fn(), updatePreapprovalAmount: vi.fn() };
 }
 
 function makeAttempt(overrides: Record<string, unknown> = {}) {
@@ -34,6 +34,7 @@ function makeDeps(overrides: Partial<StartUpgradeDeps> = {}): StartUpgradeDeps {
     payerEmail: "owner@example.com",
     idempotencyKey: "key_1",
     checkoutLimits: { countPendingCheckouts: vi.fn(async () => 0), consumeCheckout: vi.fn(async () => true) },
+    reportOrphanCheckout: vi.fn(),
     ...overrides,
   };
 }
@@ -66,7 +67,7 @@ describe("startUpgrade with billing_attempts", () => {
   it("marks a clearly rejected provider request failed", async () => {
     const provider = {
       createPreapproval: vi.fn(async () => { throw new Error("Mercado Pago preapproval failed (400)"); }),
-      getPreapproval: vi.fn(), cancelPreapproval: vi.fn(),
+      getPreapproval: vi.fn(), cancelPreapproval: vi.fn(), updatePreapprovalAmount: vi.fn(),
     } satisfies BillingProvider;
     const deps = makeDeps({ provider });
     const result = await startUpgrade(deps);
@@ -77,7 +78,7 @@ describe("startUpgrade with billing_attempts", () => {
   it("marks an ambiguous provider response unknown", async () => {
     const provider = {
       createPreapproval: vi.fn(async () => { throw new MercadoPagoAmbiguousError("timeout"); }),
-      getPreapproval: vi.fn(), cancelPreapproval: vi.fn(),
+      getPreapproval: vi.fn(), cancelPreapproval: vi.fn(), updatePreapprovalAmount: vi.fn(),
     } satisfies BillingProvider;
     const deps = makeDeps({ provider });
     const result = await startUpgrade(deps);
@@ -103,9 +104,39 @@ describe("startUpgrade with billing_attempts", () => {
       fetchSubscription: vi.fn(async () => ({ mpPreapprovalId: "mp_pending", status: "pending" as const, plan: "pro" as const, currentPeriodStart: null, currentPeriodEnd: null })),
       backUrl: "https://app.example",
       checkoutLimits: { countPendingCheckouts: vi.fn(async () => 0), consumeCheckout: vi.fn(async () => true) },
+      reportOrphanCheckout: vi.fn(),
     });
     expect(result).toEqual({ ok: false, code: "ALREADY_PRO", message: expect.any(String) });
     expect(provider.createPreapproval).not.toHaveBeenCalled();
+  });
+});
+
+describe("startUpgrade when the current assinatura changes while the checkout is created", () => {
+  const conflict = () => vi.fn(async () => { throw new Error("CURRENT_SUBSCRIPTION_CONFLICT"); });
+
+  it("records the attempt as failed with the new checkout, then cancels that checkout, whose link is never handed out", async () => {
+    const deps = makeDeps({ linkAttempt: conflict(), reportOrphanCheckout: vi.fn() });
+
+    const result = await startUpgrade(deps);
+
+    expect(result).toEqual({ ok: false, code: "UPGRADE_SUBSCRIPTION_CONFLICT", message: expect.any(String) });
+    expect(deps.finishAttempt).toHaveBeenCalledWith({ attemptId: "attempt_1", status: "failed", providerPreapprovalId: "mp_123" });
+    expect(deps.provider.cancelPreapproval).toHaveBeenCalledWith("mp_123");
+    expect(vi.mocked(deps.finishAttempt).mock.invocationCallOrder[0])
+      .toBeLessThan(vi.mocked(deps.provider.cancelPreapproval).mock.invocationCallOrder[0]);
+    expect(deps.reportOrphanCheckout).not.toHaveBeenCalled();
+  });
+
+  it("still answers the conflict and reports the checkout for a manual cancel when the cancel fails", async () => {
+    const provider = makeProvider({ preapprovalId: "mp_123", initPoint: "https://mp.example/checkout" });
+    provider.cancelPreapproval = vi.fn(async () => { throw new Error("Mercado Pago preapproval cancel failed (500)"); });
+    const deps = makeDeps({ provider, linkAttempt: conflict(), reportOrphanCheckout: vi.fn() });
+
+    const result = await startUpgrade(deps);
+
+    expect(result).toEqual({ ok: false, code: "UPGRADE_SUBSCRIPTION_CONFLICT", message: expect.any(String) });
+    expect(deps.finishAttempt).toHaveBeenCalledWith({ attemptId: "attempt_1", status: "failed", providerPreapprovalId: "mp_123" });
+    expect(deps.reportOrphanCheckout).toHaveBeenCalledWith({ businessId: "biz_1", mpPreapprovalId: "mp_123" });
   });
 });
 

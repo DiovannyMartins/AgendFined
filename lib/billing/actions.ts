@@ -7,7 +7,7 @@ import { getCurrentBusiness } from "@/lib/business/queries";
 import { createMercadoPagoProvider } from "./mercado-pago";
 import { fetchCurrentSubscription } from "./get-subscription";
 import { syncReturnedSubscription } from "./return-sync";
-import { createWebhookPersistence } from "./webhook-server";
+import { createCheckoutTermsReporting, createWebhookPersistence } from "./webhook-server";
 import { revalidatePath } from "next/cache";
 import {
   startUpgrade as buildStartUpgrade,
@@ -32,6 +32,12 @@ function checkoutLimitsFor(businessId: string): CheckoutLimits {
     countPendingCheckouts: () => countPendingCheckouts(admin, businessId),
     consumeCheckout: () => enforceBillingCheckoutRateLimit(admin, businessId),
   };
+}
+
+// Surfaces in the Vercel logs next to the other billing reports; the checkout
+// has to be cancelled by hand in Mercado Pago.
+function reportOrphanCheckout(input: { businessId: string; mpPreapprovalId: string }) {
+  console.error(JSON.stringify({ event: "billing_orphan_checkout_cancel_failed", ...input }));
 }
 
 // Server action called by the "Fazer upgrade" button. Returns the Mercado Pago
@@ -132,6 +138,7 @@ export async function startUpgrade(): Promise<StartUpgradeResult> {
     backUrl,
     payerEmail: user?.email,
     notificationUrl,
+    reportOrphanCheckout,
   });
 }
 
@@ -214,6 +221,7 @@ export async function retryUpgrade(): Promise<RetryUpgradeResult> {
     backUrl,
     payerEmail: user?.email,
     notificationUrl,
+    reportOrphanCheckout,
   });
 }
 
@@ -231,6 +239,8 @@ export async function syncCurrentSubscriptionAfterReturn(): Promise<void> {
     fetchSubscription: fetchCurrentSubscription,
     getPreapproval: provider.getPreapproval,
     applySnapshot: persistence.applySnapshot,
+    cancelPreapproval: (mpPreapprovalId) => provider.cancelPreapproval(mpPreapprovalId),
+    ...createCheckoutTermsReporting(),
   });
   revalidatePath("/dashboard/configuracoes");
 }

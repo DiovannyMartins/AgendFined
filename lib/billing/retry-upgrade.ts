@@ -4,11 +4,12 @@
 // provider preapproval is intentionally not cancelled here: the new checkout
 // is still pending, and cancelling it before payment makes Mercado Pago send a
 // misleading cancellation e-mail. Provider cleanup must happen only after a
-// replacement is authorized, with webhook/reconciliation state available.
+// replacement is authorized, with webhook/reconciliation state available. Only
+// the new checkout is cancelled when its link is refused, since nobody has it.
 import { randomUUID } from "node:crypto";
 import type { BillingProvider } from "./provider";
 import { MercadoPagoAmbiguousError } from "./mercado-pago";
-import type { BillingAttempt } from "./start-upgrade";
+import { cancelUnlinkedCheckout, type BillingAttempt } from "./start-upgrade";
 import type { FetchSubscription } from "./get-subscription";
 import { refuseCheckoutOverLimits, type CheckoutLimits } from "./checkout-limits";
 
@@ -35,6 +36,8 @@ export interface RetryUpgradeDeps {
     status: "failed" | "unknown";
     providerPreapprovalId?: string | null;
   }) => Promise<BillingAttempt>;
+  // Rejects with `CURRENT_SUBSCRIPTION_CONFLICT` when the current subscription
+  // is no longer the one the retry reserved.
   linkAttempt: (input: { attemptId: string; mpPreapprovalId: string }) => Promise<void>;
   backUrl: string;
   payerEmail?: string;
@@ -42,7 +45,16 @@ export interface RetryUpgradeDeps {
   idempotencyKey?: string;
   // The negócio's checkout limits, checked before an attempt is reserved.
   checkoutLimits: CheckoutLimits;
+  // A checkout created but never linked could not be cancelled; it needs a
+  // manual cancel in Mercado Pago.
+  reportOrphanCheckout: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
 }
+
+const SUBSCRIPTION_CONFLICT: RetryUpgradeResult = {
+  ok: false,
+  code: "RETRY_SUBSCRIPTION_CONFLICT",
+  message: "A assinatura pendente mudou. Atualize a página e tente novamente.",
+};
 
 export async function retryPendingUpgrade(deps: RetryUpgradeDeps): Promise<RetryUpgradeResult> {
   const existing = await deps.fetchSubscription(deps.business.id);
@@ -91,7 +103,7 @@ export async function retryPendingUpgrade(deps: RetryUpgradeDeps): Promise<Retry
     // still exists. If the CAS rejects it, release the reservation so a stale
     // retry cannot strand the business in "billing in progress" forever.
     await deps.finishAttempt({ attemptId: attempt.id, status: "failed" }).catch(() => undefined);
-    return { ok: false, code: "RETRY_SUBSCRIPTION_CONFLICT", message: "A assinatura pendente mudou. Atualize a página e tente novamente." };
+    return SUBSCRIPTION_CONFLICT;
   }
   if (attempt.status !== "creating") {
     return { ok: false, code: "UPGRADE_IN_PROGRESS", message: "O retry já está em andamento." };
@@ -118,7 +130,22 @@ export async function retryPendingUpgrade(deps: RetryUpgradeDeps): Promise<Retry
 
   try {
     await deps.linkAttempt({ attemptId: attempt.id, mpPreapprovalId: created.preapprovalId });
-  } catch {
+  } catch (err) {
+    // The current subscription moved while the provider created the checkout
+    // (e.g. the webhook made a paid superseded checkout current). Nothing was
+    // linked, so the new checkout's link is never handed out.
+    if (err instanceof Error && err.message === "CURRENT_SUBSCRIPTION_CONFLICT") {
+      await deps.finishAttempt({
+        attemptId: attempt.id,
+        status: "failed",
+        providerPreapprovalId: created.preapprovalId,
+      }).catch(() => undefined);
+      await cancelUnlinkedCheckout(
+        { businessId: deps.business.id, mpPreapprovalId: created.preapprovalId },
+        deps,
+      );
+      return SUBSCRIPTION_CONFLICT;
+    }
     await deps.finishAttempt({
       attemptId: attempt.id,
       status: "unknown",

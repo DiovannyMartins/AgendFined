@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>AgendFined — cards de anúncio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=block" rel="stylesheet">
+<style>
+  /* Cards de feed 1080×1350 (4:5). Só a paleta do site/Reels: #141414, #FFFFFF, #EEEEEE, #242424, #333333, #B0B0B0.
+     Cada card é um conceito visual próprio. render.cjs captura cada .card como PNG. */
+  :root { --ink: #141414; --white: #ffffff; --paper: #eeeeee; --g2: #242424; --g3: #333333; --muted: #b0b0b0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #0a0a0a; }
+  body { font-family: "Instrument Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+    display: flex; flex-direction: column; align-items: center; gap: 60px; padding: 60px 0; }
+  .card { position: relative; width: 1080px; height: 1350px; flex: none; overflow: hidden; }
+  .card.dark { background: var(--ink); color: var(--paper); }
+  .card.light { background: var(--paper); color: var(--ink); }
+  /* Contraste dentro da mesma família: peso leve e tom mais suave */
+  .soft { font-weight: 400; }
+  .dark .soft { color: var(--muted); }
+  .light .soft { color: var(--g3); }
+  .mono { font-family: "Geist Mono", ui-monospace, monospace; }
+  .abs { position: absolute; }
+
+  /* Granulação: clareia no escuro, escurece no claro */
+  .card::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 90; opacity: .07;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  .dark::after { mix-blend-mode: screen; }
+  .light::after { mix-blend-mode: multiply; opacity: .09; }
+
+  /* Destaque invertido: bloco sólido atrás da palavra */
+  .mark { display: inline-block; padding: 0 .16em .02em; border-radius: .14em; line-height: 1.02; }
+  .dark .mark { background: var(--white); color: var(--ink); }
+  .light .mark { background: var(--ink); color: var(--white); }
+
+  h1 { font-size: 104px; line-height: .98; font-weight: 600; letter-spacing: -.04em; }
+  .kicker { font-family: "Geist Mono", monospace; font-size: 22px; letter-spacing: .16em; text-transform: uppercase; font-weight: 500; }
+  .dark .kicker { color: var(--muted); }
+  .light .kicker { color: var(--g3); }
+  .lede { font-size: 34px; line-height: 1.3; }
+  .dark .lede { color: var(--muted); }
+  .light .lede { color: var(--g3); }
+
+  /* Rodapé com assinatura e chamada */
+  .foot { position: absolute; left: 80px; right: 80px; bottom: 64px; display: flex; align-items: center; justify-content: space-between; z-index: 40; }
+  .foot img { height: 40px; }
+  /* Chamada em texto, sem cara de botão: imagem de post não é clicável.
+     ?v=organico → "link na bio"; ?v=anuncio → só o site (o botão real é do Instagram). */
+  .foot .cta { font-size: 28px; letter-spacing: -.01em; }
+  .foot .cta b { font-weight: 600; }
+  .foot .cta .sep { margin: 0 12px; }
+  .foot .cta .url { font-family: "Geist Mono", monospace; font-size: 26px; letter-spacing: .02em; }
+  .dark .foot .cta { color: var(--muted); } .dark .foot .cta b, .dark .foot .cta .url { color: var(--white); }
+  .light .foot .cta { color: var(--g3); } .light .foot .cta b, .light .foot .cta .url { color: var(--ink); }
+
+  /* 01 · Bilhete de reserva */
+  .ticket { position: absolute; width: 860px; height: 420px; border-radius: 36px; display: flex; }
+  .ticket.ghost-a { background: var(--muted); }
+  .ticket.ghost-b { background: var(--g3); }
+  .ticket.main { background: var(--ink); color: var(--white); box-shadow: 0 50px 90px rgba(20,20,20,.35), 0 10px 24px rgba(20,20,20,.25); }
+  .t-main { flex: 1; padding: 42px 48px; display: flex; flex-direction: column; }
+  .t-top { display: flex; justify-content: space-between; align-items: center; }
+  .t-top .kicker { font-size: 17px; color: var(--muted); }
+  .t-ok { width: 44px; height: 44px; border-radius: 50%; background: var(--white); display: grid; place-items: center; }
+  .t-ok svg { width: 24px; height: 24px; stroke: var(--ink); stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .t-biz { margin-top: 14px; font-size: 30px; font-weight: 600; }
+  .t-when { display: flex; align-items: flex-end; gap: 22px; margin-top: 6px; }
+  .t-time { font-size: 148px; font-weight: 600; letter-spacing: -.05em; line-height: .9; }
+  .t-day { font-family: "Geist Mono", monospace; font-size: 24px; color: var(--muted); line-height: 1.3; padding-bottom: 10px; }
+  .t-grid { margin-top: auto; display: grid; grid-template-columns: 1.3fr 1fr .8fr; gap: 20px; padding-top: 22px; border-top: 1px solid var(--g3); }
+  .t-grid span { display: block; font-family: "Geist Mono", monospace; font-size: 14px; letter-spacing: .14em; color: var(--muted); }
+  .t-grid b { display: block; margin-top: 6px; font-size: 24px; font-weight: 600; }
+  .t-stub { position: relative; width: 210px; border-left: 3px dashed var(--g3); display: flex; align-items: center; justify-content: center; gap: 22px; }
+  .t-stub::before, .t-stub::after { content: ""; position: absolute; left: -30px; width: 56px; height: 56px; border-radius: 50%; background: var(--paper); }
+  .t-stub::before { top: -28px; } .t-stub::after { bottom: -28px; }
+  .barcode { display: flex; flex-direction: column; gap: 4px; width: 74px; height: 300px; justify-content: center; }
+  .barcode i { display: block; background: var(--white); border-radius: 1px; }
+  .t-code { writing-mode: vertical-rl; font-family: "Geist Mono", monospace; font-size: 24px; letter-spacing: .2em; color: var(--white); }
+
+  /* 02 · Relógio de 24h */
+  .dial { position: absolute; left: 140px; top: 400px; width: 800px; height: 800px; }
+  .dial-center { position: absolute; left: 140px; top: 400px; width: 800px; height: 800px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .dial-center b { font-size: 230px; font-weight: 600; letter-spacing: -.06em; line-height: .85; color: var(--white); }
+  .dial-center b .soft { margin-left: 4px; }
+  .dial-center span { margin-top: 26px; }
+  .callout { position: absolute; display: flex; align-items: center; gap: 16px; padding: 16px 24px 16px 16px; border-radius: 22px; z-index: 5;
+    background: var(--white); color: var(--ink); box-shadow: 0 24px 60px rgba(0,0,0,.55); }
+  .callout .ic { width: 52px; height: 52px; border-radius: 15px; background: var(--ink); display: grid; place-items: center; flex: none; }
+  .callout .ic svg { width: 28px; height: 28px; stroke: var(--white); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .callout .ic img { width: 30px; }
+  .callout b { display: block; font-size: 24px; }
+  .callout span { font-family: "Geist Mono", monospace; font-size: 18px; color: var(--g3); }
+
+  /* 03 · Manifesto riscado */
+  .strikes { position: absolute; left: 80px; right: 60px; top: 190px; }
+  .strike { position: relative; display: block; width: max-content; font-size: 92px; font-weight: 600; letter-spacing: -.04em; line-height: 1.12; color: var(--g3); }
+  .strike::after { content: ""; position: absolute; left: -14px; right: -14px; top: 54%; height: 12px; border-radius: 6px; background: var(--ink); transform: rotate(var(--r, -2deg)); }
+  .strike.soft { font-weight: 400; }
+  .adopt { position: absolute; left: 60px; right: 60px; top: 930px; height: 236px; border-radius: 44px; background: var(--ink); color: var(--white);
+    display: flex; align-items: center; gap: 40px; padding: 0 54px; box-shadow: 0 40px 80px rgba(20,20,20,.25); }
+  .adopt img { width: 128px; flex: none; }
+  .adopt h2 { font-size: 74px; font-weight: 600; letter-spacing: -.04em; line-height: 1; }
+  .adopt .soft { color: var(--muted); }
+  .adopt p { margin-top: 12px; font-size: 28px; color: var(--muted); }
+
+  /* 04 · Grade da agenda */
+  .grid { position: absolute; left: 156px; top: 450px; display: grid; grid-template-columns: repeat(12, 62px); grid-auto-rows: 62px; gap: 10px; }
+  .grid i { border-radius: 14px; background: var(--g2); }
+  .grid i.on { background: var(--white); box-shadow: 0 0 34px rgba(255,255,255,.22); }
+  .grid i.blk { background: transparent; border: 2px dashed var(--g3); }
+  .g-days { position: absolute; left: 156px; top: 410px; display: grid; grid-template-columns: repeat(12, 62px); gap: 10px; text-align: center; }
+  .g-hours { position: absolute; left: 70px; top: 450px; display: grid; grid-auto-rows: 62px; gap: 10px; }
+  .g-days span, .g-hours span { font-family: "Geist Mono", monospace; font-size: 17px; color: var(--muted); letter-spacing: .06em; display: flex; align-items: center; }
+  .g-days span { justify-content: center; }
+  .legend { position: absolute; left: 156px; top: 1122px; display: flex; gap: 34px; font-family: "Geist Mono", monospace; font-size: 19px; color: var(--muted); }
+  .legend span { display: flex; align-items: center; gap: 12px; }
+  .legend i { width: 24px; height: 24px; border-radius: 7px; background: var(--g2); }
+  .legend i.on { background: var(--white); }
+  .legend i.blk { background: transparent; border: 2px dashed var(--g3); }
+
+  /* 05 · Um link */
+  .bar { position: absolute; left: 60px; right: 60px; top: 430px; height: 128px; border-radius: 999px; background: var(--white);
+    display: flex; align-items: center; gap: 24px; padding: 0 44px; box-shadow: 0 30px 70px rgba(20,20,20,.16), 0 0 0 2px var(--ink); }
+  .bar svg { width: 38px; height: 38px; stroke: var(--ink); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .bar .u { font-family: "Geist Mono", monospace; font-size: 44px; color: var(--g3); letter-spacing: -.02em; white-space: nowrap; }
+  .bar .u b { color: var(--ink); font-weight: 600; }
+  .caret { display: inline-block; width: 5px; height: 54px; background: var(--ink); vertical-align: -10px; margin-left: 4px; }
+  .where { position: absolute; left: 80px; right: 80px; top: 600px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .where .kicker { margin-right: 6px; }
+  .tag { padding: 12px 22px; border-radius: 999px; border: 2px solid var(--ink); font-size: 24px; font-weight: 600; }
+  .preview { position: absolute; left: 60px; right: 60px; top: 712px; border-radius: 44px; background: var(--ink); color: var(--white); padding: 40px 44px; overflow: hidden; }
+  .pv-head { display: flex; align-items: center; gap: 22px; }
+  .pv-av { width: 84px; height: 84px; border-radius: 50%; background: var(--white); color: var(--ink); display: grid; place-items: center; font-size: 30px; font-weight: 700; }
+  .pv-head h3 { font-size: 36px; font-weight: 600; letter-spacing: -.02em; }
+  .pv-head span { font-family: "Geist Mono", monospace; font-size: 20px; color: var(--muted); }
+  .pv-row { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; padding: 24px 28px; border-radius: 26px; background: var(--g2); border: 1px solid var(--g3); }
+  .pv-row:first-of-type { margin-top: 32px; }
+  .pv-row b { font-size: 28px; font-weight: 600; display: block; }
+  .pv-row span { font-size: 22px; color: var(--muted); }
+  .pv-row .r { padding: 12px 24px; border-radius: 999px; background: var(--white); color: var(--ink); font-size: 22px; font-weight: 700; }
+  .pv-row .r.ghost { background: transparent; color: var(--white); border: 1px solid var(--g3); }
+
+  /* 06 · Mesmo horário, duas realidades */
+  .top-half { position: absolute; inset: 0; background: var(--paper); color: var(--ink); clip-path: polygon(0 0, 100% 0, 100% 600px, 0 720px); }
+  .split-pill { position: absolute; left: 50%; top: 660px; transform: translate(-50%, -50%) rotate(-6.3deg); z-index: 5; padding: 14px 30px; border-radius: 999px;
+    background: var(--g2); color: var(--white); border: 2px solid var(--g3); font-family: "Geist Mono", monospace; font-size: 22px; letter-spacing: .14em; text-transform: uppercase; }
+  .bub { position: absolute; padding: 26px 34px; font-size: 40px; line-height: 1.2; max-width: 760px; }
+  .bub.in { background: var(--white); color: var(--ink); border-radius: 36px 36px 36px 10px; box-shadow: 0 16px 40px rgba(20,20,20,.1); }
+  .bub.out { background: var(--ink); color: var(--white); border-radius: 36px 36px 10px 36px; }
+  .bub small { display: block; margin-top: 6px; font-family: "Geist Mono", monospace; font-size: 18px; color: var(--muted); text-align: right; }
+  .typing { position: absolute; display: flex; gap: 10px; padding: 24px 30px; border-radius: 30px 30px 30px 8px; background: var(--white); }
+  .typing i { width: 14px; height: 14px; border-radius: 50%; background: var(--muted); }
+  .notif { position: absolute; left: 80px; right: 80px; display: flex; gap: 26px; align-items: center; padding: 30px 34px; border-radius: 36px;
+    background: var(--white); color: var(--ink); box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 0 120px rgba(255,255,255,.08); }
+  .notif .ic { width: 84px; height: 84px; border-radius: 22px; background: var(--ink); display: grid; place-items: center; flex: none; }
+  .notif .ic img { width: 48px; }
+  .notif b { display: block; font-size: 34px; letter-spacing: -.01em; }
+  .notif span { display: block; margin-top: 4px; font-size: 26px; color: var(--g3); }
+  .notif .t { margin-left: auto; align-self: flex-start; font-family: "Geist Mono", monospace; font-size: 20px; color: var(--muted); }
+
+  /* 07 · Para quem */
+  .areas { position: absolute; left: 80px; right: 80px; top: 408px; }
+  .area { display: grid; grid-template-columns: 70px 1fr; align-items: baseline; padding: 17px 0 15px; border-top: 1px solid var(--g3); }
+  .area:last-child { border-bottom: 1px solid var(--g3); }
+  .area .n { font-family: "Geist Mono", monospace; font-size: 20px; color: var(--muted); }
+  .area b { font-size: 46px; font-weight: 600; letter-spacing: -.03em; line-height: 1.05; color: var(--white); }
+  .area span { display: block; margin-top: 6px; font-family: "Geist Mono", monospace; font-size: 19px; color: var(--muted); letter-spacing: .02em; }
+</style>
+</head>
+<body>
+
+<!-- 01 · Bilhete: a reserva vira um ingresso -->
+<section class="card light" id="card-01-bilhete" data-ticket="main"></section>
+
+<!-- 02 · Relógio: a agenda aberta 24h -->
+<section class="card dark" id="card-02-24h">
+  <div class="kicker abs" style="left:80px;top:96px">Enquanto você dorme</div>
+  <h1 class="abs" style="left:76px;top:150px">Sua agenda<br><span class="mark">não dorme.</span></h1>
+  <svg class="dial" id="dial" viewBox="-400 -400 800 800"></svg>
+  <div class="dial-center"><b>24<span class="soft">h</span></b><span class="kicker">aberta para reservas</span></div>
+  <div class="callout" style="left:610px;top:430px;transform:rotate(3deg)">
+    <div class="ic"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></div>
+    <div><b>Nova reserva</b><span>02:14 · Consulta nutricional</span></div>
+  </div>
+  <div class="callout" style="left:70px;top:440px;transform:rotate(-3deg)">
+    <div class="ic"><img src="../../public/brand/agendfined-symbol-white.svg" alt=""></div>
+    <div><b>Nova reserva</b><span>22:05 · Treino funcional</span></div>
+  </div>
+  <footer class="foot" data-logo="white"></footer>
+</section>
+
+<!-- 03 · Manifesto: o que você aposenta -->
+<section class="card light" id="card-03-aposente">
+  <div class="kicker abs" style="left:80px;top:96px">Pode aposentar:</div>
+  <div class="strikes">
+    <span class="strike" style="--r:-2deg">Caderninho</span>
+    <span class="strike" style="--r:1.5deg;margin-left:160px">Planilha</span>
+    <span class="strike soft" style="--r:-1deg;margin-left:40px">“Tem horário?”</span>
+    <span class="strike" style="--r:2deg;margin-left:230px">Áudio de 3 min</span>
+    <span class="strike" style="--r:-1.5deg;margin-left:20px">Horário duplicado</span>
+    <span class="strike soft" style="--r:1deg;margin-left:200px">Cliente que some</span>
+  </div>
+  <div class="adopt">
+    <img src="../../public/brand/agendfined-symbol-white.svg" alt="">
+    <div><h2>Fica só <span class="soft">um link.</span></h2><p>Seus clientes reservam sozinhos, 24h por dia.</p></div>
+  </div>
+  <footer class="foot" data-logo="black"></footer>
+</section>
+
+<!-- 04 · Grade: as reservas desenham um check -->
+<section class="card dark" id="card-04-agenda-cheia">
+  <div class="kicker abs" style="left:80px;top:96px">Duas semanas de agenda</div>
+  <h1 class="abs" style="left:76px;top:150px">Agenda cheia,<br><span class="soft">sem</span> <span class="mark">mensagens.</span></h1>
+  <div class="g-days" id="g-days"></div>
+  <div class="g-hours" id="g-hours"></div>
+  <div class="grid" id="grid"></div>
+  <div class="legend"><span><i class="on"></i>Reservado pelo link</span><span><i></i>Livre</span><span><i class="blk"></i>Bloqueio</span></div>
+  <footer class="foot" data-logo="white"></footer>
+</section>
+
+<!-- 05 · Um link: o negócio inteiro numa URL -->
+<section class="card light" id="card-05-um-link">
+  <div class="kicker abs" style="left:80px;top:96px">Bio, WhatsApp, Google</div>
+  <h1 class="abs" style="left:76px;top:150px">Seu negócio<br><span class="soft">inteiro em</span> <span class="mark">um link.</span></h1>
+  <div class="bar">
+    <svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+    <div class="u">agendfined.com.br/<b>dra-camila</b><span class="caret"></span></div>
+  </div>
+  <div class="where"><span class="kicker">Cole onde quiser</span><span class="tag">Bio do Instagram</span><span class="tag">WhatsApp</span><span class="tag">Google</span></div>
+  <div class="preview">
+    <div class="pv-head"><div class="pv-av">CN</div><div><h3>Dra. Camila Nunes · Nutrição</h3><span>nutricionista · reserva em 3 toques</span></div></div>
+    <div class="pv-row"><div><b>Primeira consulta</b><span>60 min · R$ 220</span></div><div class="r">Reservar</div></div>
+    <div class="pv-row"><div><b>Retorno</b><span>40 min · R$ 150</span></div><div class="r ghost">Reservar</div></div>
+  </div>
+  <footer class="foot" data-logo="black"></footer>
+</section>
+
+<!-- 06 · Mesmo horário, duas realidades -->
+<section class="card dark" id="card-06-23h47">
+  <div class="top-half">
+    <div class="kicker abs" style="left:80px;top:96px;color:#333">23:47 · sem AgendFined</div>
+    <div class="bub in" style="left:80px;top:160px">Ainda tem vaga na aula de amanhã?</div>
+    <div class="bub out" style="right:80px;top:300px">Deixa eu ver aqui e já te falo<small>23:52</small></div>
+    <div class="typing" style="left:80px;top:450px"><i></i><i></i><i></i></div>
+  </div>
+  <div class="split-pill">Mesmo horário</div>
+  <div class="kicker abs" style="left:80px;top:790px">23:47 · com AgendFined</div>
+  <div class="notif" style="top:850px">
+    <div class="ic"><img src="../../public/brand/agendfined-symbol-white.svg" alt=""></div>
+    <div><b>Nova reserva confirmada</b><span>Amanhã, 07:00 · Aula de pilates</span></div>
+    <div class="t">agora</div>
+  </div>
+  <div class="abs" style="left:80px;top:1060px;font-size:60px;font-weight:600;letter-spacing:-.03em;line-height:1.05">E você? <span class="soft">Dormindo.</span></div>
+  <footer class="foot" data-logo="white"></footer>
+</section>
+
+<!-- 07 · Para quem: todas as áreas -->
+<section class="card dark" id="card-07-para-quem">
+  <div class="kicker abs" style="left:80px;top:96px">Para quem é</div>
+  <h1 class="abs" style="left:76px;top:150px">Para quem atende<br><span class="soft">com</span> <span class="mark">hora marcada.</span></h1>
+  <div class="areas">
+    <div class="area"><span class="n">01</span><div><b>Barbearias</b><span>corte · barba · pigmentação</span></div></div>
+    <div class="area"><span class="n">02</span><div><b>Salões de beleza</b><span>escova · coloração · unhas</span></div></div>
+    <div class="area"><span class="n">03</span><div><b>Clínicas</b><span>consultas · retornos · avaliações</span></div></div>
+    <div class="area"><span class="n">04</span><div><b>Estúdios</b><span>pilates · yoga · tatuagem</span></div></div>
+    <div class="area"><span class="n">05</span><div><b>Personal trainers</b><span>treinos · avaliações físicas</span></div></div>
+    <div class="area"><span class="n">06</span><div><b>Consultorias</b><span>reuniões · diagnósticos · mentorias</span></div></div>
+    <div class="area"><span class="n">07</span><div><b>Profissionais autônomos</b><span>qualquer serviço com hora marcada</span></div></div>
+  </div>
+  <footer class="foot" data-logo="white"></footer>
+</section>
+
+<script>
+  // Elementos gerados com valores determinísticos (o render sai sempre igual).
+  const rnd = (i) => { const x = Math.sin(i * 12.9898) * 43758.5453; return x - Math.floor(x); };
+
+  // Bilhetes: o card 01 e a série por área usam o mesmo molde.
+  const TICKETS = {
+    main: { kicker: 'Reserva nº 0417 · confirmada', h: ['Reservou.<br>Confirmou.', 'E você nem', 'pegou o celular.'],
+      biz: 'Studio Bella · Salão', time: '15:00', day: 'SEX<br>17 OUT', svc: 'Escova + hidratação', who: 'Juliana P.', price: 'R$ 90', code: 'AB12-CD34' },
+    barbearias: { kicker: 'Para barbearias', h: ['Cliente marcou.', 'E você não largou', 'a navalha.'],
+      biz: 'Barbearia Navalha', time: '15:00', day: 'SEX<br>17 OUT', svc: 'Corte + barba', who: 'Lucas M.', price: 'R$ 70', code: 'BN47-KQ21' },
+    saloes: { kicker: 'Para salões de beleza', h: ['Escova marcada.', 'E você com as', 'mãos livres.'],
+      biz: 'Studio Bella · Salão', time: '10:30', day: 'SÁB<br>18 OUT', svc: 'Escova + hidratação', who: 'Juliana P.', price: 'R$ 90', code: 'SB82-HX05' },
+    clinicas: { kicker: 'Para clínicas', h: ['Consulta marcada.', 'Sem fila no', 'telefone.'],
+      biz: 'Clínica Vida Plena', time: '09:00', day: 'SEG<br>20 OUT', svc: 'Primeira consulta', who: 'Marcos T.', price: 'R$ 220', code: 'CV19-PR63' },
+    autonomos: { kicker: 'Para profissionais autônomos', h: ['Horário vendido.', 'Enquanto você', 'trabalha.'],
+      biz: 'Ana Lima · Manicure', time: '14:00', day: 'QUI<br>16 OUT', svc: 'Pé e mão', who: 'Carla S.', price: 'R$ 55', code: 'AL64-MN38' },
+    estudios: { kicker: 'Para estúdios', h: ['Aula marcada.', 'Turma cheia,', 'sem planilha.'],
+      biz: 'Studio Equilíbrio Pilates', time: '07:00', day: 'TER<br>21 OUT', svc: 'Aula de pilates', who: 'Fernanda R.', price: 'R$ 60', code: 'SE07-PL52' },
+    personal: { kicker: 'Para personal trainers', h: ['Treino marcado.', 'Sem o famoso', '“que horas dá?”'],
+      biz: 'Rafa Souza · Personal', time: '06:30', day: 'QUA<br>22 OUT', svc: 'Treino funcional', who: 'Diego A.', price: 'R$ 80', code: 'RS63-TF90' },
+    consultorias: { kicker: 'Para consultorias', h: ['Reunião marcada.', 'Sem vinte', 'e-mails.'],
+      biz: 'Norte Consultoria', time: '16:00', day: 'QUI<br>23 OUT', svc: 'Diagnóstico inicial', who: 'Paula V.', price: 'R$ 250', code: 'NC16-DG44' },
+  };
+  const AREAS = [['area-1-barbearias', 'barbearias'], ['area-2-saloes', 'saloes'], ['area-3-clinicas', 'clinicas'], ['area-4-estudios', 'estudios'],
+    ['area-5-personal', 'personal'], ['area-6-consultorias', 'consultorias'], ['area-7-autonomos', 'autonomos']];
+  for (const [id, key] of AREAS) document.body.insertAdjacentHTML('beforeend', `<section class="card light" id="${id}" data-ticket="${key}"></section>`);
+  document.querySelectorAll('[data-ticket]').forEach((card) => {
+    const t = TICKETS[card.dataset.ticket], dy = card.dataset.ticket === 'main' ? 0 : -50;
+    card.innerHTML = `
+      <div class="kicker abs" style="left:80px;top:96px">${t.kicker}</div>
+      <h1 class="abs" style="left:76px;top:150px">${t.h[0]}<br><span class="soft">${t.h[1]}</span><br><span class="mark">${t.h[2]}</span></h1>
+      <div class="ticket ghost-a" style="left:140px;top:${640 + dy}px;transform:rotate(4deg)"></div>
+      <div class="ticket ghost-b" style="left:120px;top:${655 + dy}px;transform:rotate(-1deg)"></div>
+      <div class="ticket main" style="left:100px;top:${670 + dy}px;transform:rotate(-6deg)">
+        <div class="t-main">
+          <div class="t-top"><span class="kicker">Reserva confirmada</span><div class="t-ok"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div></div>
+          <div class="t-biz">${t.biz}</div>
+          <div class="t-when"><div class="t-time">${t.time}</div><div class="t-day">${t.day}</div></div>
+          <div class="t-grid"><div><span>SERVIÇO</span><b>${t.svc}</b></div><div><span>CLIENTE</span><b>${t.who}</b></div><div><span>VALOR</span><b>${t.price}</b></div></div>
+        </div>
+        <div class="t-stub"><div class="barcode"></div><div class="t-code">${t.code}</div></div>
+      </div>
+      <footer class="foot" data-logo="black"></footer>`;
+  });
+  document.querySelectorAll('.barcode').forEach((el, b) => {
+    el.innerHTML = Array.from({ length: 34 }, (_, i) => `<i style="height:${[2, 3, 5, 2, 7, 3][Math.floor(rnd(i + 3 + b * 41) * 6)]}px"></i>`).join('');
+  });
+
+  // Rodapé conforme a versão: orgânico (link na bio) ou anúncio pago (só o site)
+  const version = new URLSearchParams(location.search).get('v') === 'anuncio' ? 'anuncio' : 'organico';
+  document.querySelectorAll('footer.foot').forEach((f) => {
+    const cta = version === 'anuncio' ? '<span class="url">agendfined.com.br</span>' : '<b>Comece grátis</b><span class="sep">·</span>link na bio';
+    f.innerHTML = `<img src="../../public/brand/agendfined-${f.dataset.logo}.svg" alt="AgendFined"><div class="cta">${cta}</div>`;
+  });
+
+  // 02: mostrador com 48 meias horas; reservas acesas
+  {
+    const booked = new Set([4, 13, 18, 19, 20, 22, 23, 24, 26, 27, 28, 30, 31, 33, 34, 35, 36, 38, 39, 41, 44]);
+    let svg = '<circle r="392" fill="none" stroke="#242424" stroke-width="2"/><circle r="250" fill="none" stroke="#242424" stroke-width="2" stroke-dasharray="2 12"/>';
+    for (let i = 0; i < 48; i++) {
+      const a = (i / 48) * Math.PI * 2, s = Math.sin(a), c = -Math.cos(a), on = booked.has(i);
+      const r1 = on ? 290 : 300, r2 = 352;
+      svg += `<line x1="${s * r1}" y1="${c * r1}" x2="${s * r2}" y2="${c * r2}" stroke="${on ? '#fff' : '#333'}" stroke-width="${on ? 14 : 8}" stroke-linecap="round"${on ? ' style="filter:drop-shadow(0 0 10px rgba(255,255,255,.45))"' : ''}/>`;
+    }
+    for (const [h, lbl] of [[0, '00h'], [6, '06h'], [12, '12h'], [18, '18h']]) {
+      const a = (h / 24) * Math.PI * 2;
+      svg += `<text x="${Math.sin(a) * 222}" y="${-Math.cos(a) * 222 + 8}" text-anchor="middle" font-family="Geist Mono" font-size="22" fill="#b0b0b0">${lbl}</text>`;
+    }
+    document.getElementById('dial').innerHTML = svg;
+  }
+
+  // 04: grade 12 dias × 10 horários; as reservas desenham um check
+  {
+    const COLS = 12, ROWS = 9;
+    const segDist = (px, py, ax, ay, bx, by) => {
+      const dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
+      return Math.hypot(px - ax - t * dx, py - ay - t * dy);
+    };
+    let cells = '';
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      const d = Math.min(segDist(c, r, 1.2, 4.0, 4.2, 7.0), segDist(c, r, 4.2, 7.0, 10.4, 0.8));
+      const on = d < .75, blk = !on && [7, 31, 58, 92, 103].includes(r * COLS + c);
+      cells += `<i class="${on ? 'on' : blk ? 'blk' : ''}"></i>`;
+    }
+    document.getElementById('grid').innerHTML = cells;
+    const days = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+    document.getElementById('g-days').innerHTML = [...days, ...days].map((d) => `<span>${d}</span>`).join('');
+    document.getElementById('g-hours').innerHTML = Array.from({ length: ROWS }, (_, i) => `<span>${String(8 + i).padStart(2, '0')}h</span>`).join('');
+  }
+</script>
+</body>
+</html>

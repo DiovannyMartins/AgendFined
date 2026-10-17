@@ -10,6 +10,9 @@ function snapshot(id: string, overrides: Partial<Preapproval> = {}): Preapproval
     currentPeriodStart: null,
     currentPeriodEnd: null,
     transactionAmount: 19,
+    currencyId: "BRL",
+    frequency: 1,
+    frequencyType: "months",
     ...overrides,
   };
 }

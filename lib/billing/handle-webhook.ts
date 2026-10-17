@@ -6,7 +6,9 @@
 //     The negócio's other pending checkouts (left payable by a retry) are
 //     cancelled. A paid superseded checkout becomes the current subscription
 //     while the current one is unpaid; when the current one is already paid,
-//     the extra one is cancelled and reported as a double charge.
+//     the extra one is cancelled and reported as a double charge. A first
+//     authorization whose terms are not the plan's (below the current price,
+//     or not BRL monthly) is refused: cancelled and reported for a refund.
 //   * `paused`/`cancelled` (incl. a failed recurring payment, which Mercado Pago
 //     surfaces as `paused`) -> start a 7-day grace period. The business stays
 //     Pro during the grace; the downgrade happens after it expires (the
@@ -28,8 +30,12 @@ export interface PreapprovalResource {
   externalReference: string | null;
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
-  // The recurring charge in reais, fixed when the checkout was created.
+  // The recurring terms, fixed when the checkout was created: the charge in
+  // reais, its currency and how often it repeats. Null when omitted.
   transactionAmount: number | null;
+  currencyId: string | null;
+  frequency: number | null;
+  frequencyType: string | null;
 }
 
 export interface WebhookEvent {
@@ -87,12 +93,15 @@ export interface HandleWebhookDeps {
   // the charge is reported for a manual refund.
   currentPriceCents: number;
   reportStalePriceCharge: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
+  // A checkout whose currency or frequency is not what the PROFISSIONAL plan
+  // sells (BRL, monthly) is refused the same way.
+  reportUnexpectedTermsCharge: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
   graceDays?: number;
   now?: () => Date;
 }
 
 export type HandleWebhookResult =
-  | { ok: true; applied: "authorized" | "duplicate" | "stale_price" | "grace" | "closed" | "pending" | "ignored" }
+  | { ok: true; applied: "authorized" | "duplicate" | "stale_price" | "unexpected_terms" | "grace" | "closed" | "pending" | "ignored" }
   | { ok: false; code: string; message: string };
 
 const DEFAULT_GRACE_DAYS = 7;
@@ -141,23 +150,23 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
 
   // Only the first authorization is checked: an assinatura already authorized
   // at an older price keeps renewing at that price.
-  if (
-    preapproval.status === "authorized" &&
-    sub.status === "pending" &&
-    preapproval.transactionAmount !== null &&
-    Math.round(preapproval.transactionAmount * 100) < deps.currentPriceCents
-  ) {
-    await deps.reportStalePriceCharge({ businessId, mpPreapprovalId: event.dataId });
+  const refusal =
+    preapproval.status === "authorized" && sub.status === "pending"
+      ? refuseCheckoutTerms(preapproval, deps.currentPriceCents)
+      : null;
+  if (refusal) {
+    const report = refusal === "stale_price" ? deps.reportStalePriceCharge : deps.reportUnexpectedTermsCharge;
+    await report({ businessId, mpPreapprovalId: event.dataId });
     try {
       await deps.cancelPreapproval(event.dataId);
     } catch (err) {
       return {
         ok: false,
         code: "PROVIDER_ERROR",
-        message: err instanceof Error ? err.message : "Não foi possível cancelar o checkout com preço antigo.",
+        message: err instanceof Error ? err.message : "Não foi possível cancelar o checkout recusado.",
       };
     }
-    return { ok: true, applied: "stale_price" };
+    return { ok: true, applied: refusal };
   }
 
   const now = deps.now?.() ?? new Date();
@@ -242,4 +251,25 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
     return { ok: true, applied: "grace" };
   }
   return { ok: true, applied: "pending" };
+}
+
+// Whether a checkout's recurring terms differ from what the PROFISSIONAL plan
+// sells: a charge below the current price (created before a price change), or
+// a currency or frequency other than BRL monthly. A term the provider omits is
+// not held against the checkout.
+function refuseCheckoutTerms(
+  preapproval: PreapprovalResource,
+  currentPriceCents: number,
+): "stale_price" | "unexpected_terms" | null {
+  if (preapproval.transactionAmount !== null && Math.round(preapproval.transactionAmount * 100) < currentPriceCents) {
+    return "stale_price";
+  }
+  if (
+    (preapproval.currencyId !== null && preapproval.currencyId !== "BRL") ||
+    (preapproval.frequency !== null && preapproval.frequency !== 1) ||
+    (preapproval.frequencyType !== null && preapproval.frequencyType !== "months")
+  ) {
+    return "unexpected_terms";
+  }
+  return null;
 }

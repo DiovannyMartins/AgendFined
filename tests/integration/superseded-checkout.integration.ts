@@ -37,12 +37,16 @@ function notify(mpPreapprovalId: string) {
       currentPeriodStart: null,
       currentPeriodEnd: null,
       transactionAmount: 19.9,
+      currencyId: "BRL",
+      frequency: 1,
+      frequencyType: "months",
     }),
     ...createWebhookPersistence(),
     cancelPreapproval,
     reportDoubleCharge,
     currentPriceCents: 1990,
     reportStalePriceCharge: () => undefined,
+    reportUnexpectedTermsCharge: () => undefined,
     now: () => NOW,
   });
 }

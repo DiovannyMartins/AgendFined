@@ -143,20 +143,35 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
         id?: string;
         status?: string;
         external_reference?: string | null;
-        auto_recurring?: { start_date?: string | null; end_date?: string | null; transaction_amount?: number | null };
+        auto_recurring?: {
+          start_date?: string | null;
+          end_date?: string | null;
+          transaction_amount?: number | null;
+          currency_id?: string | null;
+          frequency?: number | null;
+          frequency_type?: string | null;
+        };
       };
+      // Every caller applies this snapshot to the preapproval it asked for, so a
+      // response about any other one (or none) must never be used.
+      if (body.id !== id) {
+        throw new Error("Mercado Pago preapproval response does not match the requested id");
+      }
       const status = body.status;
       if (status !== "pending" && status !== "authorized" && status !== "paused" && status !== "cancelled") {
         throw new Error("Mercado Pago preapproval response missing a valid status");
       }
       return {
-        id: body.id ?? id,
+        id,
         status,
         externalReference: body.external_reference ?? null,
         currentPeriodStart: body.auto_recurring?.start_date ?? null,
         currentPeriodEnd: body.auto_recurring?.end_date ?? null,
         transactionAmount:
           typeof body.auto_recurring?.transaction_amount === "number" ? body.auto_recurring.transaction_amount : null,
+        currencyId: body.auto_recurring?.currency_id ?? null,
+        frequency: typeof body.auto_recurring?.frequency === "number" ? body.auto_recurring.frequency : null,
+        frequencyType: body.auto_recurring?.frequency_type ?? null,
       };
     },
 

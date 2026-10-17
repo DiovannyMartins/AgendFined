@@ -117,6 +117,8 @@ export async function runMercadoPagoWebhook(
     currentPriceCents: getProPriceCents(),
     reportStalePriceCharge: (input) =>
       console.error(JSON.stringify({ event: "billing_stale_price_charge", ...input })),
+    reportUnexpectedTermsCharge: (input) =>
+      console.error(JSON.stringify({ event: "billing_unexpected_terms_charge", ...input })),
     graceDays: config.graceDays,
   });
 }

@@ -10,6 +10,9 @@ function makePreapproval(status: PreapprovalResource["status"], overrides: Parti
     currentPeriodStart: null,
     currentPeriodEnd: null,
     transactionAmount: 19.9,
+    currencyId: "BRL",
+    frequency: 1,
+    frequencyType: "months",
     ...overrides,
   };
 }
@@ -39,6 +42,7 @@ function makeDeps(overrides: Partial<HandleWebhookDeps> = {}) {
     cancelPreapproval: vi.fn(async () => undefined),
     reportDoubleCharge: vi.fn(),
     reportStalePriceCharge: vi.fn(),
+    reportUnexpectedTermsCharge: vi.fn(),
     currentPriceCents: 1990,
     now: () => NOW,
     ...overrides,
@@ -415,5 +419,24 @@ describe("handleWebhook stale-price checkouts", () => {
     expect(result).toEqual({ ok: true, applied: "authorized" });
     expect(deps.cancelPreapproval).not.toHaveBeenCalled();
     expect(deps.reportStalePriceCharge).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleWebhook unexpected checkout terms", () => {
+  it.each([
+    ["a currency other than BRL", { currencyId: "USD" }],
+    ["a charge that is not monthly", { frequencyType: "days" }],
+    ["a charge every two months", { frequency: 2 }],
+  ])("refuses a first authorization with %s: cancels it and reports a refund", async (_label, terms) => {
+    const deps = makeDeps({
+      getPreapproval: vi.fn(async () => makePreapproval("authorized", terms)),
+    });
+
+    const result = await handleWebhook(deps);
+
+    expect(result).toEqual({ ok: true, applied: "unexpected_terms" });
+    expect(deps.applySnapshot).not.toHaveBeenCalled();
+    expect(deps.cancelPreapproval).toHaveBeenCalledWith("mp_1");
+    expect(deps.reportUnexpectedTermsCharge).toHaveBeenCalledWith({ businessId: "biz_1", mpPreapprovalId: "mp_1" });
   });
 });

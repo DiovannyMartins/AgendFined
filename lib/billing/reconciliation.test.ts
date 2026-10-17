@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { reconcileBilling, type BillingReconciliationDependencies, type ReconciliationAttempt } from "./reconciliation";
 import type { Preapproval } from "./provider";
 
-const snapshot: Preapproval = { id: "mp_1", status: "authorized", externalReference: "attempt_1", currentPeriodStart: null, currentPeriodEnd: null, transactionAmount: null };
+const snapshot: Preapproval = { id: "mp_1", status: "authorized", externalReference: "attempt_1", currentPeriodStart: null, currentPeriodEnd: null, transactionAmount: null, currencyId: null, frequency: null, frequencyType: null };
 const attempt = (overrides: Partial<ReconciliationAttempt> = {}): ReconciliationAttempt => ({
   id: "attempt_1", businessId: "biz_1", status: "unknown", providerPreapprovalId: "mp_1", expectedSubscriptionId: null,
   updatedAt: new Date().toISOString(), ...overrides,

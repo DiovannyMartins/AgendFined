@@ -62,6 +62,7 @@ O teste `tests/sql/reconciliation-scheduler.sql` verifica a requisição real en
 5. O fluxo de assinatura deve ser validado com uma conta de teste adequada antes de qualquer cobrança real. Os scripts existentes são `scripts/setup-mercadopago.sh` e `scripts/setup-mercadopago-prod.sh`.
 6. Quando uma assinatura é autorizada, o webhook cancela os outros checkouts pendentes do negócio. Se o cliente pagou dois checkouts, o extra é cancelado e o log da Vercel registra o evento `billing_double_charge` com `businessId` e `mpPreapprovalId`. A cobrança já feita nesse checkout precisa ser estornada manualmente no painel do Mercado Pago.
 7. Um checkout guarda o preço de quando foi criado. A cada execução do cron de reconciliação, os checkouts pendentes com valor diferente de `MERCADO_PAGO_PRO_AMOUNT_CENTS` têm o valor atualizado no Mercado Pago (até 20 por execução; se o Mercado Pago recusar, o checkout é cancelado). A resposta da rota traz o resumo em `repricing`. Se ainda assim um checkout for pago abaixo do preço atual, ele não ativa o PROFISSIONAL: é cancelado e o log registra `billing_stale_price_charge` para estorno manual. Quem já assinava por um preço anterior continua renovando por ele.
+8. Pelo mesmo caminho, uma primeira autorização com moeda diferente de BRL ou cobrança que não seja mensal não ativa o PROFISSIONAL: o checkout é cancelado e o log registra `billing_unexpected_terms_charge` para estorno manual. Uma resposta do Mercado Pago sobre um checkout diferente do consultado é recusada, e o webhook ou o cron tentam de novo.
 
 ## Resend
 

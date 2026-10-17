@@ -157,6 +157,9 @@ describe("createMercadoPagoProvider", () => {
       currentPeriodStart: "2026-09-01T00:00:00.000Z",
       currentPeriodEnd: "2026-10-01T00:00:00.000Z",
       transactionAmount: null,
+      currencyId: null,
+      frequency: null,
+      frequencyType: null,
     });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.mercadopago.com/preapproval/mp_1");
@@ -177,6 +180,38 @@ describe("createMercadoPagoProvider", () => {
 
     await expect(provider.getPreapproval("mp_1")).resolves.toEqual(
       expect.objectContaining({ id: "mp_1", status: "pending", transactionAmount: 19 }),
+    );
+  });
+
+  it("rejects a response that describes another preapproval", async () => {
+    stubFetch(async () => jsonResponse({ id: "mp_other", status: "authorized" }));
+
+    const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });
+
+    await expect(provider.getPreapproval("mp_1")).rejects.toThrow("does not match the requested id");
+  });
+
+  it("rejects a response without a preapproval id", async () => {
+    stubFetch(async () => jsonResponse({ status: "authorized" }));
+
+    const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });
+
+    await expect(provider.getPreapproval("mp_1")).rejects.toThrow("does not match the requested id");
+  });
+
+  it("reads the currency and the billing frequency of a preapproval", async () => {
+    stubFetch(async () =>
+      jsonResponse({
+        id: "mp_1",
+        status: "authorized",
+        auto_recurring: { transaction_amount: 19.9, currency_id: "BRL", frequency: 1, frequency_type: "months" },
+      }),
+    );
+
+    const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });
+
+    await expect(provider.getPreapproval("mp_1")).resolves.toEqual(
+      expect.objectContaining({ currencyId: "BRL", frequency: 1, frequencyType: "months" }),
     );
   });
 

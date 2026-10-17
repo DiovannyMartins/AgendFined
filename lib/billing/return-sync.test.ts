@@ -32,6 +32,9 @@ describe("syncReturnedSubscription", () => {
         currentPeriodStart: "2026-09-21T00:00:00.000Z",
         currentPeriodEnd: "2026-10-21T00:00:00.000Z",
         transactionAmount: null,
+        currencyId: null,
+        frequency: null,
+        frequencyType: null,
       })),
       applySnapshot,
     });

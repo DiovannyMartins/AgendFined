@@ -123,6 +123,14 @@ export function zonedTimeToUtc(date: string, time: string, timezone: string = AP
   return new Date(zonedTimeToUtcMs(date, time, timezone)).toISOString();
 }
 
+// Wall-clock "YYYY-MM-DDTHH:MM[:SS]" (e.g. from datetime-local) read in
+// `timezone`, as a UTC ISO instant. Seconds are ignored, matching the minute
+// granularity of slots.
+export function localDateTimeToUtc(value: string, timezone: string = APP_TIMEZONE): string {
+  const [date, time] = value.split("T");
+  return zonedTimeToUtc(date, time.slice(0, 5), timezone);
+}
+
 // Inclusive start / exclusive end of the local calendar day `date`,
 // expressed as UTC instants.
 export function localDayRangeUtc(date: string, timezone: string = APP_TIMEZONE): { start: string; end: string } {

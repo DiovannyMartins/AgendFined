@@ -1,9 +1,11 @@
+import { existsSync } from "node:fs";
 import { loadEnvFile } from "node:process";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database-types";
 import { decideIntegrationWrites } from "../support/remote-write-guard";
 
-loadEnvFile(".env.local");
+// CI has no .env.local; the local stack's keys come from test-integration-local.
+if (existsSync(".env.local")) loadEnvFile(".env.local");
 
 // Every integration file imports this module, so refusing here stops the suite
 // before it writes to a remote project (use `npm run test:integration:local`).

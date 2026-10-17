@@ -28,3 +28,18 @@ jobs:
       - run: npx next typegen
       - run: npm run typecheck
       - run: npm test
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Applies supabase/migrations and seed.sql; the suite needs only db, auth,
+      # PostgREST and the gateway.
+      - run: npx supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta,realtime,storage-api
+      - run: npm run test:integration:local

@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createMercadoPagoProvider } from "./mercado-pago";
 import { reconcileBilling, type ReconciliationAttempt, type ReconciliationBusiness, type ReconciliationSubscription } from "./reconciliation";
+import { createCheckoutTermsReporting } from "./webhook-server";
 
 export function gracePeriodForSnapshot(status: "pending" | "authorized" | "paused" | "cancelled", existing: string | null | undefined): string | null {
   return status === "authorized" ? null : (existing ?? null);
@@ -59,5 +60,6 @@ export async function runBoundedReconciliation() {
     },
     applySnapshot: async () => undefined,
     report: async report => console.info(JSON.stringify({ event: "reconciliation_report", ...report })),
+    ...createCheckoutTermsReporting(),
   });
 }

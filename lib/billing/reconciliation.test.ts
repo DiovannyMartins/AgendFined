@@ -15,6 +15,7 @@ function deps(overrides: Partial<BillingReconciliationDependencies> = {}): Billi
     claim: vi.fn(async () => true), release: vi.fn(async () => undefined),
     markAttempt: vi.fn(async () => undefined), reconcileAttempt: vi.fn(async () => undefined),
     applySnapshot: vi.fn(async () => undefined), report: vi.fn(async () => undefined),
+    currentPriceCents: 1990, reportStalePriceCharge: vi.fn(), reportUnexpectedTermsCharge: vi.fn(),
     ...overrides,
   };
 }
@@ -103,5 +104,29 @@ describe("billing reconciliation fencing and correlation", () => {
 
   it("is safe to rerun after the provider snapshot is already linked", async () => {
     const d = deps({ attempts: [attempt({ status: "linked" })] }); await reconcileBilling(d); expect(d.reconcileAttempt).not.toHaveBeenCalled();
+  });
+});
+
+describe("billing reconciliation of a checkout paid with terms the plan does not sell", () => {
+  const stalePaid: Preapproval = { ...snapshot, transactionAmount: 19, currencyId: "BRL", frequency: 1, frequencyType: "months" };
+
+  it("reports the charge, cancels the checkout and reconciles it as cancelled instead of activating it", async () => {
+    const d = deps({ provider: { createPreapproval: vi.fn(), getPreapproval: vi.fn(async () => stalePaid), cancelPreapproval: vi.fn(async () => undefined), updatePreapprovalAmount: vi.fn() } });
+
+    await reconcileBilling(d);
+
+    expect(d.reportStalePriceCharge).toHaveBeenCalledWith({ businessId: "biz_1", mpPreapprovalId: "mp_1" });
+    expect(d.provider.cancelPreapproval).toHaveBeenCalledWith("mp_1");
+    expect(d.reconcileAttempt).toHaveBeenCalledWith(expect.objectContaining({ id: "attempt_1" }), { ...stalePaid, status: "cancelled" }, expect.any(String));
+  });
+
+  it("leaves the attempt for the next run when the cancel fails", async () => {
+    const d = deps({ provider: { createPreapproval: vi.fn(), getPreapproval: vi.fn(async () => stalePaid), cancelPreapproval: vi.fn(async () => { throw new Error("Mercado Pago preapproval cancel failed (500)"); }), updatePreapprovalAmount: vi.fn() } });
+
+    await reconcileBilling(d);
+
+    expect(d.reportStalePriceCharge).toHaveBeenCalledWith({ businessId: "biz_1", mpPreapprovalId: "mp_1" });
+    expect(d.reconcileAttempt).not.toHaveBeenCalled();
+    expect(d.release).toHaveBeenCalled();
   });
 });

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createMercadoPagoProvider } from "./mercado-pago";
+import { createMercadoPagoProvider, MercadoPagoAmbiguousError } from "./mercado-pago";
+import type { BillingProvider } from "./provider";
 
 type FetchMock = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -250,6 +251,26 @@ describe("createMercadoPagoProvider", () => {
       await vi.advanceTimersByTimeAsync(1000);
       await expect(outcome).resolves.toEqual(expect.objectContaining({ message: expect.stringMatching(/timed out|abort/i) }));
       expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    ["amount update", (provider: BillingProvider) => provider.updatePreapprovalAmount("mp_1", 1990)],
+    ["cancel", (provider: BillingProvider) => provider.cancelPreapproval("mp_1")],
+  ])("gives up on a slow preapproval %s after 10 seconds, as an ambiguous outcome", async (_operation, call) => {
+    vi.useFakeTimers();
+    try {
+      stubFetch(async (_url, init) => await new Promise<Response>((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => reject(init.signal?.reason ?? new Error("aborted")));
+      }));
+      const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });
+      const outcome = call(provider).then(() => "resolved", (error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(10_000);
+      const settled = await Promise.race([outcome, Promise.resolve("still waiting")]);
+      expect(settled).toBeInstanceOf(MercadoPagoAmbiguousError);
+      expect(settled).toEqual(expect.objectContaining({ message: expect.stringMatching(/timed out/i) }));
     } finally {
       vi.useRealTimers();
     }

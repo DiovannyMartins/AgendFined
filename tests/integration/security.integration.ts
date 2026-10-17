@@ -384,6 +384,11 @@ describe("rate limiting (§40)", () => {
   it("resets once the window expires", async () => {
     const key = `test:${stamp}:expiry`;
     const windowSeconds = 3;
+    // check_booking_rate_limit counts per clock-aligned bucket
+    // (floor(epoch / window) * window), so start right after a bucket boundary
+    // to keep the first two calls in the same bucket.
+    const windowMs = windowSeconds * 1000;
+    await new Promise((r) => setTimeout(r, windowMs - (Date.now() % windowMs) + 250));
     const first = await admin.rpc("check_booking_rate_limit", { p_key: key, p_limit: 1, p_window_seconds: windowSeconds });
     expect(first.data).toBe(true);
     const second = await admin.rpc("check_booking_rate_limit", { p_key: key, p_limit: 1, p_window_seconds: windowSeconds });

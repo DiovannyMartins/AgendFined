@@ -129,6 +129,7 @@ describe("issue #23 billing: assinatura + RLS", () => {
       })),
       getPreapproval: vi.fn(),
       cancelPreapproval: vi.fn(),
+      updatePreapprovalAmount: vi.fn(),
     };
     const idempotencyKey = `billing-upgrade-${stamp}`;
     const claimAttempt: StartUpgradeDeps["claimAttempt"] = async (input) => {

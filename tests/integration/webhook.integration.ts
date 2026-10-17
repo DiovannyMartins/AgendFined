@@ -30,6 +30,10 @@ function stubPreapproval(status: PreapprovalResource["status"]): PreapprovalReso
     externalReference: businessId,
     currentPeriodStart: null,
     currentPeriodEnd: null,
+    transactionAmount: 19.9,
+    currencyId: "BRL",
+    frequency: 1,
+    frequencyType: "months",
   };
 }
 
@@ -38,6 +42,11 @@ async function run(event: { type: string; dataId: string }, status: PreapprovalR
     event,
     getPreapproval: async () => stubPreapproval(status),
     ...createWebhookPersistence(),
+    cancelPreapproval: async () => undefined,
+    reportDoubleCharge: () => undefined,
+    currentPriceCents: 1990,
+    reportStalePriceCharge: () => undefined,
+    reportUnexpectedTermsCharge: () => undefined,
     now: () => NOW,
   });
 }

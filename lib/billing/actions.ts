@@ -7,7 +7,7 @@ import { getCurrentBusiness } from "@/lib/business/queries";
 import { createMercadoPagoProvider } from "./mercado-pago";
 import { fetchCurrentSubscription } from "./get-subscription";
 import { syncReturnedSubscription } from "./return-sync";
-import { createWebhookPersistence } from "./webhook-server";
+import { createCheckoutTermsReporting, createWebhookPersistence } from "./webhook-server";
 import { revalidatePath } from "next/cache";
 import {
   startUpgrade as buildStartUpgrade,
@@ -217,6 +217,8 @@ export async function syncCurrentSubscriptionAfterReturn(): Promise<void> {
     fetchSubscription: fetchCurrentSubscription,
     getPreapproval: provider.getPreapproval,
     applySnapshot: persistence.applySnapshot,
+    cancelPreapproval: (mpPreapprovalId) => provider.cancelPreapproval(mpPreapprovalId),
+    ...createCheckoutTermsReporting(),
   });
   revalidatePath("/dashboard/configuracoes");
 }

@@ -6,7 +6,7 @@ import type { BillingProvider, CreatePreapprovalResult } from "./provider";
 const BUSINESS = { id: "biz_1", plan: "free" as const };
 
 function makeProvider(result: CreatePreapprovalResult): BillingProvider {
-  return { createPreapproval: vi.fn(async () => result), getPreapproval: vi.fn(), cancelPreapproval: vi.fn() };
+  return { createPreapproval: vi.fn(async () => result), getPreapproval: vi.fn(), cancelPreapproval: vi.fn(), updatePreapprovalAmount: vi.fn() };
 }
 
 function makeAttempt(overrides: Record<string, unknown> = {}) {
@@ -65,7 +65,7 @@ describe("startUpgrade with billing_attempts", () => {
   it("marks a clearly rejected provider request failed", async () => {
     const provider = {
       createPreapproval: vi.fn(async () => { throw new Error("Mercado Pago preapproval failed (400)"); }),
-      getPreapproval: vi.fn(), cancelPreapproval: vi.fn(),
+      getPreapproval: vi.fn(), cancelPreapproval: vi.fn(), updatePreapprovalAmount: vi.fn(),
     } satisfies BillingProvider;
     const deps = makeDeps({ provider });
     const result = await startUpgrade(deps);
@@ -76,7 +76,7 @@ describe("startUpgrade with billing_attempts", () => {
   it("marks an ambiguous provider response unknown", async () => {
     const provider = {
       createPreapproval: vi.fn(async () => { throw new MercadoPagoAmbiguousError("timeout"); }),
-      getPreapproval: vi.fn(), cancelPreapproval: vi.fn(),
+      getPreapproval: vi.fn(), cancelPreapproval: vi.fn(), updatePreapprovalAmount: vi.fn(),
     } satisfies BillingProvider;
     const deps = makeDeps({ provider });
     const result = await startUpgrade(deps);

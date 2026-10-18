@@ -55,7 +55,7 @@ describe("parseWaitlistInput (INC-3)", () => {
   it("rejects a non-phone with a pt-BR error on the phone field", () => {
     expect(parseWaitlistInput({ ...valid, customerPhone: "abcdefgh" })).toMatchObject({
       ok: false,
-      fieldErrors: { customerPhone: ["O telefone deve ter apenas números, como (11) 98888-7777."] },
+      fieldErrors: { customerPhone: ["Informe um telefone válido com DDD, como (11) 98888-7777."] },
     });
     expect(parseWaitlistInput({ ...valid, customerPhone: "12345678" })).toMatchObject({
       ok: false,

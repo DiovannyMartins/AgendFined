@@ -168,7 +168,7 @@ export const customerPhoneSchema = z
   .trim()
   .min(1, { error: "Informe seu telefone.", abort: true })
   .max(30, { error: "O telefone não pode passar de 30 caracteres.", abort: true })
-  .regex(/^\+?[\d\s().-]+$/, { error: "O telefone deve ter apenas números, como (11) 98888-7777.", abort: true })
+  .regex(/^\+?[\d\s().-]+$/, { error: "Informe um telefone válido com DDD, como (11) 98888-7777.", abort: true })
   .transform((value, ctx) => {
     const digits = value.replace(/\D/g, "");
     if (value.startsWith("+") && !digits.startsWith("55")) {

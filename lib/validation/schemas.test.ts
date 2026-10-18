@@ -242,7 +242,7 @@ describe("customer phone (reserva pública)", () => {
   });
 
   it("rejects letters with a pt-BR message", () => {
-    expect(phoneError("abcdefgh")).toEqual(["O telefone deve ter apenas números, como (11) 98888-7777."]);
+    expect(phoneError("abcdefgh")).toEqual(["Informe um telefone válido com DDD, como (11) 98888-7777."]);
   });
 
   it("rejects a number without DDD", () => {

@@ -7,7 +7,7 @@ import { canTransition, isTooEarlyFor, type BookingStatus } from "@/lib/bookings
 import { bookingStatusSchema } from "@/lib/validation/schemas";
 import { classifyCancellationReason } from "@/lib/bookings/classification";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
-import { sendBookingCancellationEmail } from "@/lib/email/booking-cancellation";
+import { sendBusinessCancelledEmail } from "@/lib/email/booking-cancellation";
 import { buildPublicBookingUrl } from "@/lib/bookings/public-booking-url";
 
 export async function updateBookingStatus(
@@ -68,7 +68,7 @@ export async function updateBookingStatus(
   // Best effort, like the confirmação por e-mail: a delivery failure never
   // undoes the cancellation, it is only logged.
   if (nextStatus === "cancelled" && booking.customer_email_snapshot) {
-    const emailResult = await sendBookingCancellationEmail({
+    const emailResult = await sendBusinessCancelledEmail({
       customerName: booking.customer_name_snapshot,
       customerEmail: booking.customer_email_snapshot,
       businessName: business.name,

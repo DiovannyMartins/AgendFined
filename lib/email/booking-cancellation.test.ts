@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { sendBookingCancellationEmail, sendCustomerCancellationEmail } from "@/lib/email/booking-cancellation";
+import { sendBusinessCancelledEmail, sendCustomerCancellationEmail } from "@/lib/email/booking-cancellation";
 
 const input = {
   customerName: "Ana & João <cliente>",
@@ -17,14 +17,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("sendBookingCancellationEmail", () => {
+describe("sendBusinessCancelledEmail", () => {
   it("tells the cliente which reserva was cancelled and how to reserve again", async () => {
     vi.stubEnv("RESEND_API_KEY", "re_test_key");
     vi.stubEnv("RESEND_FROM_EMAIL", "AgendFined <reservas@example.com>");
     const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(sendBookingCancellationEmail(input)).resolves.toEqual({ sent: true });
+    await expect(sendBusinessCancelledEmail(input)).resolves.toEqual({ sent: true });
 
     const request = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect(request).toMatchObject({
@@ -55,7 +55,7 @@ describe("sendBookingCancellationEmail", () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await sendBookingCancellationEmail(input);
+    await sendBusinessCancelledEmail(input);
 
     const body = fetchMock.mock.calls[0][1].body as string;
     expect(body).not.toContain("cancel=");
@@ -68,7 +68,7 @@ describe("sendBookingCancellationEmail", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(sendBookingCancellationEmail(input)).resolves.toEqual({ sent: false, reason: "not_configured" });
+    await expect(sendBusinessCancelledEmail(input)).resolves.toEqual({ sent: false, reason: "not_configured" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -77,7 +77,7 @@ describe("sendBookingCancellationEmail", () => {
     vi.stubEnv("RESEND_FROM_EMAIL", "AgendFined <reservas@example.com>");
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
 
-    await expect(sendBookingCancellationEmail(input)).resolves.toEqual({ sent: false, reason: "provider_error" });
+    await expect(sendBusinessCancelledEmail(input)).resolves.toEqual({ sent: false, reason: "provider_error" });
   });
 });
 

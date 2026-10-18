@@ -141,7 +141,7 @@ async function sendCancellationEmail(input: BookingCancellation, wording: Wordin
   return sendEmail({ to: input.customerEmail, subject: wording.subject, text, html });
 }
 
-export function sendBookingCancellationEmail(input: BookingCancellation): Promise<SendResult> {
+export function sendBusinessCancelledEmail(input: BookingCancellation): Promise<SendResult> {
   return sendCancellationEmail(input, BUSINESS_CANCELLED);
 }
 

@@ -85,6 +85,7 @@ export function AgendaList({
         <div className="space-y-3">
           {filtered.map((booking) => {
             const status = statusLabel(booking.status);
+            const note = booking.customer_note?.trim();
             return (
               <div
                 key={booking.id}
@@ -111,6 +112,12 @@ export function AgendaList({
                         ? ` · ${CANCELLATION_REASON_CATEGORY_LABELS[booking.cancel_reason_category as CancellationReasonCategory] ?? "categoria assistida"}`
                         : ""}
                     </p>
+                  )}
+                  {note && (
+                    <div className="mt-2 rounded-lg bg-muted/40 px-3 py-2 text-sm">
+                      <p className="text-xs font-medium text-muted-foreground">Observação:</p>
+                      <p className="mt-0.5 whitespace-pre-line break-words">{note}</p>
+                    </div>
                   )}
                   {booking.customer_note_requires_follow_up && (
                     <p className="mt-1 text-xs font-medium text-amber-700">

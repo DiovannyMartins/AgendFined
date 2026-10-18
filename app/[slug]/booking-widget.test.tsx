@@ -54,6 +54,41 @@ describe("BookingWidget", () => {
     expect(screen.getByRole("button", { name: "09:00" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("shows the selected slot as a pt-BR date", async () => {
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
+    fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-20" } });
+    fireEvent.click(await screen.findByRole("button", { name: "09:00" }));
+
+    expect(screen.getByText("Horário selecionado: terça-feira, 20/10/2026 às 09:00 (Corte)")).toBeInTheDocument();
+  });
+
+  it("asks consent for the e-mail as a required field", () => {
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
+
+    const consent = screen.getByRole("checkbox", { name: /Autorizo o tratamento/ });
+    expect(consent).toHaveAccessibleName(expect.stringContaining("(nome, telefone e e-mail)"));
+    expect(consent).not.toHaveAccessibleName(expect.stringContaining("se informado"));
+  });
+
+  it("says once, in a live region, that the date has no slots", async () => {
+    mockedGetSlotsForDate.mockResolvedValue({ available: [] });
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
+    fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-20" } });
+
+    const messages = await screen.findAllByText(/Nenhum horário disponível nesta data/);
+    expect(messages).toHaveLength(1);
+    expect(messages[0].closest("[aria-live]")).not.toBeNull();
+  });
+
+  it("explains an invalid date instead of blaming the business", async () => {
+    mockedGetSlotsForDate.mockResolvedValue({ available: [], error: "validation" });
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
+    fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-20" } });
+
+    expect(await screen.findByText("Não foi possível consultar esta data. Confira a data escolhida e tente novamente.")).toBeInTheDocument();
+    expect(screen.queryByText(/encontrar este serviço ou negócio/)).not.toBeInTheDocument();
+  });
+
   it("asks the browser for a phone keyboard and contact autofill", () => {
     render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
 
@@ -102,6 +137,28 @@ describe("BookingWidget", () => {
     expect(screen.getByRole("button", { name: "09:30" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.queryByRole("button", { name: "Entrar na lista de espera" })).not.toBeInTheDocument();
     expect(screen.queryByText(/lista de espera/i)).not.toBeInTheDocument();
+  });
+
+  it("with a waitlist, a taken slot leaves the slot list but stays on offer for the waitlist", async () => {
+    mockedCreateBooking.mockResolvedValue({
+      ok: false,
+      code: "slot_taken",
+      message: "Esse horário acabou de ser reservado.",
+    });
+    mockedJoinWaitlist.mockResolvedValue({ ok: true, message: "Você entrou na lista de espera deste horário." });
+    mockedGetSlotsForDate.mockResolvedValueOnce({ available: ["09:00", "09:30"] });
+    mockedGetSlotsForDate.mockResolvedValueOnce({ available: ["09:30"] });
+
+    await fillAndSubmit("Maria Souza");
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "09:00" })).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "09:30" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("O horário de terça-feira, 20/10/2026 às 09:00 acabou de ser reservado.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Entrar na lista de espera" }));
+
+    await waitFor(() =>
+      expect(mockedJoinWaitlist).toHaveBeenCalledWith(expect.objectContaining({ date: "2026-10-20", startTime: "09:00" })),
+    );
   });
 
   it("drops the chosen slot when the server says it no longer exists", async () => {

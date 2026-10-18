@@ -13,7 +13,7 @@ import { loginSchema, type LoginInput } from "@/lib/validation/schemas";
 
 const INITIAL: ActionResult = { ok: true, data: undefined };
 
-export function LoginForm() {
+export function LoginForm({ notice }: { notice?: string }) {
   const [state, setState] = useState<ActionResult>(INITIAL);
   const [pending, startTransition] = useTransition();
   const captcha = useAuthTurnstile();
@@ -44,6 +44,11 @@ export function LoginForm() {
         <CardDescription>Acesse seu painel do AgendFined.</CardDescription>
       </CardHeader>
       <CardContent>
+        {notice && (
+          <p role="status" className="mb-4 rounded-md border bg-muted px-3 py-2 text-sm">
+            {notice}
+          </p>
+        )}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm font-medium">

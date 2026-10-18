@@ -7,6 +7,17 @@ import { canTransition, isTooEarlyFor, type BookingStatus } from "@/lib/bookings
 import { bookingStatusSchema } from "@/lib/validation/schemas";
 import { classifyCancellationReason } from "@/lib/bookings/classification";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
+import { sendBusinessCancelledEmail } from "@/lib/email/booking-cancellation";
+
+function buildPublicBookingUrl(slug: string): string {
+  let origin: URL;
+  try {
+    origin = new URL(process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000");
+  } catch {
+    origin = new URL("http://localhost:3000");
+  }
+  return new URL(`/${encodeURIComponent(slug)}`, origin).toString();
+}
 
 export async function updateBookingStatus(
   _prev: { ok: boolean; message?: string },
@@ -32,7 +43,7 @@ export async function updateBookingStatus(
 
   const { data: booking, error: fetchError } = await supabase
     .from("bookings")
-    .select("id, status, start_at")
+    .select("id, status, start_at, public_code, customer_name_snapshot, customer_email_snapshot, service_name_snapshot")
     .eq("id", id)
     .eq("business_id", business.id)
     .maybeSingle();
@@ -61,6 +72,24 @@ export async function updateBookingStatus(
   if (error) return { ok: false, message: "Não foi possível atualizar a reserva." };
   if (!updated || updated.length === 0) {
     return { ok: false, message: "A reserva foi alterada por outra operação. Atualize a página e tente novamente." };
+  }
+
+  // Best effort, like the confirmação por e-mail: a delivery failure never
+  // undoes the cancellation, it is only logged.
+  if (nextStatus === "cancelled" && booking.customer_email_snapshot) {
+    const emailResult = await sendBusinessCancelledEmail({
+      customerName: booking.customer_name_snapshot,
+      customerEmail: booking.customer_email_snapshot,
+      businessName: business.name,
+      serviceName: booking.service_name_snapshot,
+      startAt: booking.start_at,
+      timezone: business.timezone,
+      publicCode: booking.public_code,
+      rebookUrl: buildPublicBookingUrl(business.slug),
+    });
+    if (!emailResult.sent) {
+      console.error("booking_cancellation_email_failed", { bookingId: id, reason: emailResult.reason });
+    }
   }
 
   if (nextStatus === "cancelled" && cancelReason) {

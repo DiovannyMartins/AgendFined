@@ -1,4 +1,5 @@
 import { formatWhen } from "@/lib/format/when";
+import { escapeHtml, sendEmail, type SendResult } from "@/lib/email/resend";
 
 type BookingConfirmation = {
   customerName: string;
@@ -10,20 +11,6 @@ type BookingConfirmation = {
   confirmationUrl: string;
   timezone?: string;
 };
-
-type SendResult = { sent: true } | { sent: false; reason: "not_configured" | "provider_error" };
-
-const HTML_ENTITIES: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (character) => HTML_ENTITIES[character]);
-}
 
 function buildBookingConfirmationHtml(input: BookingConfirmation, formattedWhen: string): string {
   const customerName = escapeHtml(input.customerName);
@@ -112,10 +99,6 @@ function buildBookingConfirmationHtml(input: BookingConfirmation, formattedWhen:
 }
 
 export async function sendBookingConfirmationEmail(input: BookingConfirmation): Promise<SendResult> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM_EMAIL;
-  if (!apiKey || !from) return { sent: false, reason: "not_configured" };
-
   const formattedWhen = formatWhen(input.startAt, input.timezone);
   const text = [
     `Olá, ${input.customerName}!`,
@@ -131,24 +114,5 @@ export async function sendBookingConfirmationEmail(input: BookingConfirmation): 
   ].join("\n");
   const html = buildBookingConfirmationHtml(input, formattedWhen);
 
-  try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to: [input.customerEmail],
-        subject: "Sua reserva foi confirmada",
-        text,
-        html,
-      }),
-      signal: AbortSignal.timeout(8_000),
-    });
-    return response.ok ? { sent: true } : { sent: false, reason: "provider_error" };
-  } catch {
-    return { sent: false, reason: "provider_error" };
-  }
+  return sendEmail({ to: input.customerEmail, subject: "Sua reserva foi confirmada", text, html });
 }

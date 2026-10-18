@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ALLOWED_TRANSITIONS, canTransition, isTerminal } from "@/lib/bookings/transitions";
+import { ALLOWED_TRANSITIONS, canTransition, isTerminal, isTooEarlyFor } from "@/lib/bookings/transitions";
 
 describe("canTransition (§11.2)", () => {
   it("confirmed can go to completed, cancelled, no_show", () => {
@@ -39,5 +39,24 @@ describe("ALLOWED_TRANSITIONS table", () => {
       cancelled: [],
       no_show: [],
     });
+  });
+});
+
+describe("isTooEarlyFor (#78)", () => {
+  const startAt = "2026-10-19T15:00:00.000Z";
+
+  it("blocks completed and no_show before the reserva starts", () => {
+    const before = new Date("2026-10-19T14:59:59.000Z");
+    expect(isTooEarlyFor("completed", startAt, before)).toBe(true);
+    expect(isTooEarlyFor("no_show", startAt, before)).toBe(true);
+  });
+
+  it("allows completed and no_show from the start instant on", () => {
+    expect(isTooEarlyFor("completed", startAt, new Date(startAt))).toBe(false);
+    expect(isTooEarlyFor("no_show", startAt, new Date("2026-10-19T16:00:00.000Z"))).toBe(false);
+  });
+
+  it("never blocks cancelling", () => {
+    expect(isTooEarlyFor("cancelled", startAt, new Date("2026-10-01T00:00:00.000Z"))).toBe(false);
   });
 });

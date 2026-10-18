@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { createClient } from "@/lib/supabase/server";
-import { canTransition, type BookingStatus } from "@/lib/bookings/transitions";
+import { canTransition, isTooEarlyFor, type BookingStatus } from "@/lib/bookings/transitions";
 import { bookingStatusSchema } from "@/lib/validation/schemas";
 import { classifyCancellationReason } from "@/lib/bookings/classification";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
@@ -32,7 +32,7 @@ export async function updateBookingStatus(
 
   const { data: booking, error: fetchError } = await supabase
     .from("bookings")
-    .select("id, status")
+    .select("id, status, start_at")
     .eq("id", id)
     .eq("business_id", business.id)
     .maybeSingle();
@@ -42,6 +42,9 @@ export async function updateBookingStatus(
   const current = booking.status as BookingStatus;
   if (!canTransition(current, nextStatus)) {
     return { ok: false, message: `Não é possível mudar de "${current}" para "${nextStatus}".` };
+  }
+  if (isTooEarlyFor(nextStatus, booking.start_at, new Date())) {
+    return { ok: false, message: "Só é possível marcar após o início do atendimento." };
   }
 
   const { error, data: updated } = await supabase

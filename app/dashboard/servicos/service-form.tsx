@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { formatPriceInput } from "@/lib/format/currency";
 import { createService, updateService, type ActionResult } from "@/lib/services/actions";
 import { serviceFormSchema, type ServiceFormValues } from "@/lib/validation/schemas";
 
@@ -44,7 +45,7 @@ export function ServiceForm({ service }: { service?: ServiceRow }) {
       name: service?.name ?? "",
       description: service?.description ?? "",
       durationMinutes: service?.durationMinutes ?? 30,
-      price: service ? (service.priceCents / 100).toFixed(2) : "",
+      price: service ? formatPriceInput(service.priceCents) : "",
     },
   });
 
@@ -109,7 +110,17 @@ export function ServiceForm({ service }: { service?: ServiceRow }) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="price">Preço (R$)</Label>
-              <Input id="price" type="text" inputMode="decimal" placeholder="49.90" {...register("price")} />
+              <Input
+                id="price"
+                type="text"
+                inputMode="decimal"
+                placeholder="49,90"
+                aria-describedby="price-hint"
+                {...register("price")}
+              />
+              <p id="price-hint" className="text-xs text-muted-foreground">
+                Use vírgula para os centavos, como 49,90.
+              </p>
               {errors.price && <p className="text-sm text-destructive">{errors.price.message}</p>}
             </div>
           </div>

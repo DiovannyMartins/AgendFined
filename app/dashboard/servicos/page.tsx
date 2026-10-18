@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBusiness } from "@/lib/business/queries";
+import { formatCurrencyBRL } from "@/lib/format/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles } from "lucide-react";
@@ -71,7 +72,7 @@ export default async function ServicosPage() {
                 </div>
                 <p className="mt-0.5 truncate text-sm text-muted-foreground">
                   {service.description || "Sem descrição"} · {service.duration_minutes} min ·{" "}
-                  {(service.price_cents / 100).toFixed(2).replace(".", ",")} R$
+                  {formatCurrencyBRL(service.price_cents)}
                 </p>
               </div>
               <div className="flex items-center gap-3">

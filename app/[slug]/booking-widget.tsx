@@ -11,6 +11,7 @@ import { TurnstileWidget } from "@/components/turnstile-widget";
 import { createBooking, joinWaitlist } from "@/lib/booking/actions";
 import { getSlotsForDate } from "@/lib/availability/actions";
 import { toLocalDate } from "@/lib/booking/availability";
+import { formatCurrencyBRL } from "@/lib/format/currency";
 import { cn } from "@/lib/utils";
 import { trackAnalyticsEvent } from "@/lib/analytics";
 import { buildPrivateConfirmationPath } from "@/lib/bookings/private-confirmation";
@@ -288,7 +289,7 @@ export function BookingWidget({
           >
             {services.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name} · {s.durationMinutes} min · R$ {(s.priceCents / 100).toFixed(2).replace(".", ",")}
+                {s.name} · {s.durationMinutes} min · {formatCurrencyBRL(s.priceCents)}
               </option>
             ))}
           </select>

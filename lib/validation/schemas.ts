@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isValidPublicCode, normalizePublicCode } from "@/lib/bookings/public-code";
 import { isValidTimeZone } from "@/lib/app-timezone";
+import { PRICE_INPUT_PATTERN } from "@/lib/format/currency";
 import { RESERVED_SLUG_MESSAGE, isReservedSlug } from "@/lib/business/reserved-slugs";
 
 export const loginSchema = z.object({
@@ -26,81 +27,113 @@ export type SignupInput = z.infer<typeof signupSchema>;
 
 export const emailSchema = z.string().trim().max(254).email("Informe um e-mail válido.");
 
-export const businessSchema = z.object({
-  name: z.string().trim().min(2).max(100),
+// Dashboard schemas: their messages are shown verbatim in the forms, so every
+// rule carries a pt-BR message and none falls back to Zod's English default.
+
+// An integer within [min, max]; one message covers a blank/NaN input, a
+// fraction and both bounds, since the fix is the same for all of them.
+const wholeNumber = (min: number, max: number, message: string) =>
+  z.number({ error: message }).int(message).min(min, message).max(max, message);
+
+const descriptionField = z
+  .string()
+  .trim()
+  .max(500, "A descrição não pode passar de 500 caracteres.")
+  // nullish: accepts "", null (empty in the form maps to null server-side) and
+  // undefined, so the optional description can genuinely be left blank.
+  .nullish();
+
+const businessFields = {
+  name: z
+    .string()
+    .trim()
+    .min(2, "Informe um nome com pelo menos 2 caracteres.")
+    .max(100, "O nome não pode passar de 100 caracteres."),
   slug: z
     .string()
     .trim()
-    .min(3)
-    .max(50)
+    .min(3, "O slug deve ter pelo menos 3 caracteres.")
+    .max(50, "O slug não pode passar de 50 caracteres.")
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug inválido: apenas letras minúsculas, números e hífen."),
-  phone: z.string().trim().min(8).max(20),
-  slotIntervalMinutes: z.number().int().min(1, "O intervalo deve ser de pelo menos 1 minuto.").max(1440, "O intervalo não pode passar de 1440 minutos."),
-  minNoticeMinutes: z.number().int().min(0).max(10080),
-  bookingWindowDays: z.number().int().min(1).max(365),
-  timezone: z.string().trim().min(1).refine(isValidTimeZone, "Informe um fuso horário IANA válido."),
-  // nullish: accepts "", null (empty in the form maps to null server-side) and
-  // undefined, so the optional description can genuinely be left blank.
-  description: z.string().trim().max(500).nullish(),
+  phone: z
+    .string()
+    .trim()
+    .min(8, "Informe um telefone válido.")
+    .max(20, "O telefone não pode passar de 20 caracteres."),
+  minNoticeMinutes: wholeNumber(0, 10080, "Informe uma antecedência entre 0 e 10080 minutos."),
+  bookingWindowDays: wholeNumber(1, 365, "Informe uma janela entre 1 e 365 dias."),
+  description: descriptionField,
+};
+
+const SLOT_INTERVAL_MESSAGE = "Use um intervalo entre 1 e 1440 minutos.";
+
+export const businessSchema = z.object({
+  ...businessFields,
+  slotIntervalMinutes: wholeNumber(1, 1440, SLOT_INTERVAL_MESSAGE),
+  timezone: z
+    .string()
+    .trim()
+    .min(1, "Escolha um fuso horário.")
+    .refine(isValidTimeZone, "Informe um fuso horário IANA válido."),
 });
 export type BusinessInput = z.infer<typeof businessSchema>;
 
 // Client-side form schema for the business setup form (React Hook Form).
 // Mirrors businessSchema but with string-typed fields to match native inputs.
 export const businessFormSchema = z.object({
-  name: z.string().trim().min(2).max(100),
-  slug: z
-    .string()
-    .trim()
-    .min(3)
-    .max(50)
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug inválido: apenas letras minúsculas, números e hífen.")
-    // Same rule upsertBusiness enforces server-side, shown inline before submit.
-    .refine((slug) => !isReservedSlug(slug), RESERVED_SLUG_MESSAGE),
-  phone: z.string().trim().min(8).max(20),
+  ...businessFields,
+  // Same rule upsertBusiness enforces server-side, shown inline before submit.
+  slug: businessFields.slug.refine((slug) => !isReservedSlug(slug), RESERVED_SLUG_MESSAGE),
   slotIntervalMinutes: z
     .string()
     .regex(/^\d+$/, "Informe um número inteiro de minutos.")
-    .refine((value) => Number(value) >= 1 && Number(value) <= 1440, "Use um intervalo entre 1 e 1440 minutos."),
-  minNoticeMinutes: z.number().int().min(0).max(10080),
-  bookingWindowDays: z.number().int().min(1).max(365),
+    .refine((value) => Number(value) >= 1 && Number(value) <= 1440, SLOT_INTERVAL_MESSAGE),
   timezone: z.string().trim().min(1, "Escolha um fuso horário."),
-  description: z.string().trim().max(500).nullish(),
 });
 export type BusinessFormValues = z.infer<typeof businessFormSchema>;
 
+const serviceFields = {
+  name: z
+    .string()
+    .trim()
+    .min(2, "Informe um nome com pelo menos 2 caracteres.")
+    .max(80, "O nome não pode passar de 80 caracteres."),
+  description: descriptionField,
+  durationMinutes: wholeNumber(5, 480, "Informe uma duração entre 5 e 480 minutos."),
+};
+
 export const serviceSchema = z.object({
-  name: z.string().trim().min(2).max(80),
-  description: z.string().trim().max(500).nullish(),
-  durationMinutes: z.number().int().min(5).max(480),
-  priceCents: z.number().int().min(0),
+  ...serviceFields,
+  priceCents: z.number({ error: "Informe um preço válido." }).int("Informe um preço válido.").min(0, "Informe um preço válido."),
 });
 export type ServiceInput = z.infer<typeof serviceSchema>;
 
-// Client-side form schema for services (React Hook Form). priceCents is entered
-// in reais (e.g. "49.90") and converted to cents in the server action.
+// Client-side form schema for services (React Hook Form). The price is entered
+// in reais, with a comma or a dot ("49,90" or "49.90"), and converted to
+// centavos by parsePriceToCents in the server action.
 export const serviceFormSchema = z.object({
-  name: z.string().trim().min(2).max(80),
-  description: z.string().trim().max(500).nullish(),
-  durationMinutes: z.number().int().min(5).max(480),
-  price: z.string().trim().regex(/^\d+(\.\d{1,2})?$/, "Informe um preço válido."),
+  ...serviceFields,
+  price: z.string().trim().regex(PRICE_INPUT_PATTERN, "Informe um preço válido, como 49,90."),
 });
 export type ServiceFormValues = z.infer<typeof serviceFormSchema>;
 
+const TIME_PATTERN = /^\d{2}:\d{2}$/;
+
 export const availabilitySchema = z
   .object({
-    weekday: z.number().int().min(1).max(7),
-    startTime: z.string().regex(/^\d{2}:\d{2}$/),
-    endTime: z.string().regex(/^\d{2}:\d{2}$/),
+    weekday: wholeNumber(1, 7, "Escolha um dia da semana válido."),
+    startTime: z.string().regex(TIME_PATTERN, "Informe um horário de início válido."),
+    endTime: z.string().regex(TIME_PATTERN, "Informe um horário de fim válido."),
   })
   .superRefine((val, ctx) => {
     const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
-    // §8.5/§9.3: a faixa must end after it starts and must not cross midnight.
+    // §8.5/§9.3: a faixa must end after it starts, which also rules out
+    // crossing midnight (22:00 → 02:00 ends "before" it starts).
     if (toMin(val.startTime) >= toMin(val.endTime)) {
       ctx.addIssue({
         code: "custom",
         path: ["endTime"],
-        message: "O fim deve ser depois do início e a faixa não pode atravessar a meia-noite.",
+        message: "O fim deve ser depois do início.",
       });
     }
   });
@@ -121,7 +154,7 @@ const localDateTimeSchema = z
 export const blockSchema = z.object({
   startAt: localDateTimeSchema,
   endAt: localDateTimeSchema,
-  reason: z.string().trim().max(120).nullish(),
+  reason: z.string().trim().max(120, "O motivo não pode passar de 120 caracteres.").nullish(),
 });
 export type BlockInput = z.infer<typeof blockSchema>;
 

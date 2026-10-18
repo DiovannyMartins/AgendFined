@@ -4,12 +4,12 @@ import { ArrowUpRight, Banknote, CalendarX2, Crown, MailCheck, Percent, UserX } 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getBillingReport } from "@/lib/reports/get-report";
+import { formatCurrencyBRL } from "@/lib/format/currency";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
 import {
   DEFAULT_RANGE_KEY,
   RANGE_KEYS,
   RANGE_LABELS,
-  formatCurrencyBRL,
   formatRate,
   type BillingReport,
 } from "@/lib/reports/reports";

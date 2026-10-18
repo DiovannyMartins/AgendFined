@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isValidPublicCode, normalizePublicCode } from "@/lib/bookings/public-code";
 import { isValidTimeZone } from "@/lib/app-timezone";
+import { RESERVED_SLUG_MESSAGE, isReservedSlug } from "@/lib/business/reserved-slugs";
 
 export const loginSchema = z.object({
   email: z.string().trim().max(254).email("Informe um e-mail válido."),
@@ -53,7 +54,9 @@ export const businessFormSchema = z.object({
     .trim()
     .min(3)
     .max(50)
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug inválido: apenas letras minúsculas, números e hífen."),
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug inválido: apenas letras minúsculas, números e hífen.")
+    // Same rule upsertBusiness enforces server-side, shown inline before submit.
+    .refine((slug) => !isReservedSlug(slug), RESERVED_SLUG_MESSAGE),
   phone: z.string().trim().min(8).max(20),
   slotIntervalMinutes: z
     .string()

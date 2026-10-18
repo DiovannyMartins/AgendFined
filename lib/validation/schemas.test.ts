@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   availabilitySchema,
   bookingSchema,
+  businessFormSchema,
   businessSchema,
   loginSchema,
   publicAvailabilitySchema,
@@ -24,6 +25,14 @@ describe("businessSchema", () => {
 
   it("accepts a valid business", () => {
     expect(businessSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("rejects a reserved slug in the setup/settings form", () => {
+    const result = businessFormSchema.safeParse({ ...valid, slug: "recuperar-senha", slotIntervalMinutes: "30" });
+    expect(result.success).toBe(false);
+    expect(result.error?.flatten().fieldErrors.slug).toEqual([
+      "Este endereço está reservado. Escolha outro slug.",
+    ]);
   });
 
   it("rejects an invalid slug (uppercase)", () => {

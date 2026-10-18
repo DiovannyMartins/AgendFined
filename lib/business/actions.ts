@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { businessSchema } from "@/lib/validation/schemas";
 import { getBookingWindowLimitDays } from "@/lib/plan/plan";
+import { RESERVED_SLUG_MESSAGE, isReservedSlug } from "@/lib/business/reserved-slugs";
 
 export type ActionResult<T = undefined, E = undefined> =
   | { ok: true; data: T }
@@ -14,25 +15,6 @@ export type ActionResult<T = undefined, E = undefined> =
       fieldErrors?: Record<string, string[]>;
       details?: E;
     };
-
-// §9.1 reserved slugs. Kept module-internal (not exported) because a "use server"
-// file may only export async functions.
-const RESERVED_SLUGS = [
-  "login",
-  "cadastro",
-  "dashboard",
-  "api",
-  "admin",
-  "suporte",
-  "termos",
-  "privacidade",
-  "pricing",
-  "precos",
-  "recursos",
-  "favicon",
-  "robots",
-  "sitemap",
-];
 
 type BusinessPayload = {
   id?: string;
@@ -73,12 +55,12 @@ export async function upsertBusiness(
     };
   }
 
-  if (RESERVED_SLUGS.includes(parsed.data.slug)) {
+  if (isReservedSlug(parsed.data.slug)) {
     return {
       ok: false,
       code: "SLUG_RESERVED",
-      message: "Este endereço está reservado. Escolha outro slug.",
-      fieldErrors: { slug: ["Slug reservado."] },
+      message: RESERVED_SLUG_MESSAGE,
+      fieldErrors: { slug: [RESERVED_SLUG_MESSAGE] },
     };
   }
 

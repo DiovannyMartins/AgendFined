@@ -33,7 +33,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     ".claude/**",
-    "design/anuncio/render/**",
+    // Material de marketing, mantido só localmente (ver .gitignore).
+    "design/**",
   ]),
 ]);
 

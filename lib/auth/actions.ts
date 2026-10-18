@@ -18,6 +18,22 @@ const genericError = (message: string): { ok: false; code: string; message: stri
   message,
 });
 
+const PASSWORD_POLICY_MESSAGE =
+  "Escolha uma senha com pelo menos 8 caracteres, uma letra maiúscula, uma letra minúscula, um número e um símbolo.";
+
+// The app checks the password policy before calling Supabase Auth, but Auth
+// enforces its own copy (config.toml / dashboard). If they drift apart, point
+// the user at the password field instead of failing generically.
+function weakPasswordError(error: { code?: string }): ActionResult | null {
+  if (error.code !== "weak_password") return null;
+  return {
+    ok: false,
+    code: "WEAK_PASSWORD",
+    message: "Revise os campos destacados.",
+    fieldErrors: { password: [PASSWORD_POLICY_MESSAGE] },
+  };
+}
+
 // Supabase Auth verifies the Turnstile token itself when CAPTCHA protection is
 // enabled for the project; tokens are single-use, so the app never pre-verifies.
 function captchaToken(formData: FormData): string | undefined {
@@ -62,7 +78,7 @@ export async function signup(_prev: ActionResult, formData: FormData): Promise<A
   });
 
   if (error) {
-    return {
+    return weakPasswordError(error) ?? {
       ok: false,
       code: "SIGNUP_FAILED",
       message: "Não foi possível criar a conta. Verifique os dados e tente novamente.",
@@ -184,15 +200,14 @@ export async function updatePassword(_prev: ActionResult, formData: FormData): P
     return {
       ok: false,
       code: "VALIDATION",
-      message:
-        "Escolha uma senha com pelo menos 8 caracteres, uma letra maiúscula, uma letra minúscula, um número e um símbolo.",
+      message: PASSWORD_POLICY_MESSAGE,
       fieldErrors: { password: parsedPassword.error.issues.map((issue) => issue.message) },
     };
   }
 
   const { data, error } = await supabase.auth.updateUser({ password });
   if (error) {
-    return genericError("Não foi possível redefinir a senha.");
+    return weakPasswordError(error) ?? genericError("Não foi possível redefinir a senha.");
   }
 
   auditSecurityEvent("auth.password_changed", data.user.id);

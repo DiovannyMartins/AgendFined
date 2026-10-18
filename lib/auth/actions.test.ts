@@ -6,6 +6,8 @@ const auth = {
   signInWithPassword: vi.fn(),
   signUp: vi.fn(),
   resetPasswordForEmail: vi.fn(),
+  getUser: vi.fn(),
+  updateUser: vi.fn(),
   mfa: { getAuthenticatorAssuranceLevel: vi.fn() },
 };
 
@@ -23,7 +25,7 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const { login, requestPasswordReset, signup } = await import("./actions");
+const { login, requestPasswordReset, signup, updatePassword } = await import("./actions");
 
 const INITIAL = { ok: true as const, data: undefined };
 
@@ -85,6 +87,29 @@ describe("signup", () => {
   });
 });
 
+describe("signup with a password Supabase Auth considers weak", () => {
+  it("reports the problem on the password field instead of the generic failure", async () => {
+    auth.signUp.mockResolvedValue({
+      error: { code: "weak_password", message: "Password should be at least 15 characters.", reasons: ["length"] },
+    });
+
+    const result = await signup(
+      INITIAL,
+      form({ email: "novo@agendfined.dev", password: "BetaTeste#2026", displayName: "Ana", cfTurnstileToken: "tok" }),
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: "WEAK_PASSWORD",
+      fieldErrors: {
+        password: [
+          "Escolha uma senha com pelo menos 8 caracteres, uma letra maiúscula, uma letra minúscula, um número e um símbolo.",
+        ],
+      },
+    });
+  });
+});
+
 describe("requestPasswordReset", () => {
   it("sends the Turnstile token to Supabase Auth", async () => {
     vi.stubEnv("APP_URL", "https://agendfined.dev");
@@ -98,5 +123,27 @@ describe("requestPasswordReset", () => {
       captchaToken: "tok-reset",
     });
     vi.unstubAllEnvs();
+  });
+});
+
+describe("updatePassword with a password Supabase Auth considers weak", () => {
+  it("reports the problem on the password field instead of the generic failure", async () => {
+    auth.getUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
+    auth.updateUser.mockResolvedValue({
+      data: { user: null },
+      error: { code: "weak_password", message: "Password should be at least 15 characters.", reasons: ["length"] },
+    });
+
+    const result = await updatePassword(INITIAL, form({ password: "BetaTeste#2026" }));
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: "WEAK_PASSWORD",
+      fieldErrors: {
+        password: [
+          "Escolha uma senha com pelo menos 8 caracteres, uma letra maiúscula, uma letra minúscula, um número e um símbolo.",
+        ],
+      },
+    });
   });
 });

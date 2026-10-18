@@ -26,6 +26,7 @@ export function UpdatePasswordForm() {
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<Values>({ resolver: zodResolver(schema) });
 
@@ -48,6 +49,8 @@ export function UpdatePasswordForm() {
         return;
       }
       setState(result);
+      const passwordError = result.ok ? undefined : result.fieldErrors?.password?.[0];
+      if (passwordError) setError("password", { message: passwordError });
       setSubmitted(true);
     });
   }

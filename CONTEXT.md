@@ -57,7 +57,7 @@ Código de 8 caracteres em Crockford base32 padrão (alfabeto `0123456789ABCDEFG
 _Avoid_: Token, link de confirmação, código de rastreio
 
 **Token de cancelamento**:
-Capability HMAC-SHA256 derivada do public_code com segredo server-only; seu detentor (a tela de confirmação) cancela a própria reserva. Nunca é armazenado, nunca expõe dados pessoais e não é retornado pela consulta pública.
+Capability aleatória de 256 bits, independente do public_code, entregue uma única vez ao cliente (tela de confirmação e link do e-mail); seu detentor cancela a própria reserva. Só o digest SHA-256 é armazenado; o token nunca expõe dados pessoais e não é retornado pela consulta pública.
 _Avoid_: Token de sessão, código de cancelamento, hash
 
 **Lista de espera**:

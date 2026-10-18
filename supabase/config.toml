@@ -152,6 +152,12 @@ max_indexes = 5
 enabled = true
 # `supabase config push` applies this block to the linked hosted project. Keep
 # the canonical production URL here and allow local development explicitly below.
+# Local Auth emails still land on localhost: signup and password recovery pass
+# `emailRedirectTo`/`redirectTo` built from APP_URL (lib/auth/actions.ts), and
+# site_url is only the fallback when a link has no allowed redirect. To use
+# localhost as the fallback while debugging, change site_url in your working
+# copy only, restart with `supabase stop && supabase start`, and never commit
+# or `config push` that change.
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
 site_url = "https://agendfined.com.br"

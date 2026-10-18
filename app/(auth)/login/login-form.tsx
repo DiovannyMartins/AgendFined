@@ -13,7 +13,7 @@ import { loginSchema, type LoginInput } from "@/lib/validation/schemas";
 
 const INITIAL: ActionResult = { ok: true, data: undefined };
 
-export function LoginForm({ notice }: { notice?: string }) {
+export function LoginForm({ notice, next }: { notice?: string; next?: string }) {
   const [state, setState] = useState<ActionResult>(INITIAL);
   const [pending, startTransition] = useTransition();
   const captcha = useAuthTurnstile();
@@ -30,6 +30,7 @@ export function LoginForm({ notice }: { notice?: string }) {
       fd.set("email", values.email);
       fd.set("password", values.password);
       fd.set("cfTurnstileToken", captcha.token);
+      if (next) fd.set("next", next);
       const result = await login(INITIAL, fd);
       setState(result);
       captcha.renew();

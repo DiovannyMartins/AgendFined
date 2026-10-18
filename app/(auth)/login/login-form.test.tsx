@@ -28,4 +28,14 @@ describe("LoginForm", () => {
     expect(await screen.findByRole("button", { name: "Entrando..." })).toBeInTheDocument();
     expect(screen.queryByText("E-mail ou senha incorretos.")).not.toBeInTheDocument();
   });
+
+  it("envia o destino recebido junto com o login", async () => {
+    mockedLogin.mockResolvedValueOnce({ ok: false, code: "INVALID_CREDENTIALS", message: "E-mail ou senha incorretos." });
+    render(<LoginForm next="/dashboard/agenda" />);
+
+    await submit();
+    await screen.findByText("E-mail ou senha incorretos.");
+
+    expect((mockedLogin.mock.lastCall?.[1] as FormData).get("next")).toBe("/dashboard/agenda");
+  });
 });

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { Reveal } from "@/components/reveal";
+import { safeInternalPath } from "@/lib/auth/assurance";
 import { LoginForm } from "./login-form";
 
 // Erros que chegam por query string (ex.: /auth/callback quando o link de
@@ -15,10 +16,13 @@ export const metadata: Metadata = { title: "Entrar — AgendFined" };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string | string[] }>;
 }) {
-  const { error } = await searchParams;
+  const { error, next } = await searchParams;
   const notice = error ? NOTICES[error] : undefined;
+  // O proxy manda rotas protegidas sem sessão para /login?next=<rota>. A action
+  // valida de novo; aqui só evitamos repassar destinos externos ao formulário.
+  const returnTo = typeof next === "string" ? safeInternalPath(next, "") || undefined : undefined;
 
   return (
     <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4 py-12">
@@ -28,7 +32,7 @@ export default async function LoginPage({
         </Link>
       </Reveal>
       <Reveal delay={80} className="w-full max-w-md">
-        <LoginForm notice={notice} />
+        <LoginForm notice={notice} next={returnTo} />
       </Reveal>
       <Reveal delay={160}>
         <p className="mt-6 text-sm text-muted-foreground">

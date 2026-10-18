@@ -4,6 +4,8 @@
 
 O AgendFined sincroniza reservas confirmadas em uma única direção: AgendFined → Google Calendar. A sincronização acontece imediatamente após criação ou cancelamento de uma reserva e também pelo scheduler de reconciliação, que funciona como rede de segurança.
 
+O evento só é removido quando a reserva é cancelada (ou deixa de existir). Reservas concluídas ou marcadas como no-show mantêm o evento como estava, para o histórico do proprietário no Google Calendar; o AgendFined não recria nem altera esses eventos.
+
 O AgendFined não lê eventos existentes do Google Calendar. Ao desconectar, o acesso é revogado e a conexão local é removida; eventos que já foram criados no Google Calendar permanecem lá.
 
 ### Fusos horários

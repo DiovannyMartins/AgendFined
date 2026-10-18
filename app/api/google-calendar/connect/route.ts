@@ -3,20 +3,20 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { isProPlan } from "@/lib/plan/plan";
 import { buildGoogleCalendarAuthorizationUrl } from "@/lib/google-calendar/oauth";
+import type { GoogleCalendarCallbackStatus } from "@/lib/google-calendar/callback-status";
 
 export const runtime = "nodejs";
 
+function settingsRedirect(request: NextRequest, status: GoogleCalendarCallbackStatus) {
+  const destination = new URL("/dashboard/configuracoes", request.url);
+  destination.searchParams.set("calendar", status);
+  return NextResponse.redirect(destination);
+}
+
 export async function GET(request: NextRequest) {
   const business = await getCurrentBusiness();
-  const destination = new URL("/dashboard/configuracoes", request.url);
-  if (!business) {
-    destination.searchParams.set("calendar", "unauthorized");
-    return NextResponse.redirect(destination);
-  }
-  if (!isProPlan(business.plan)) {
-    destination.searchParams.set("calendar", "upgrade_required");
-    return NextResponse.redirect(destination);
-  }
+  if (!business) return settingsRedirect(request, "unauthorized");
+  if (!isProPlan(business.plan)) return settingsRedirect(request, "upgrade_required");
 
   const state = randomBytes(32).toString("hex");
   try {
@@ -30,7 +30,6 @@ export async function GET(request: NextRequest) {
     });
     return response;
   } catch {
-    destination.searchParams.set("calendar", "not_configured");
-    return NextResponse.redirect(destination);
+    return settingsRedirect(request, "not_configured");
   }
 }

@@ -12,6 +12,7 @@ import { isProPlan } from "@/lib/plan/plan";
 
 const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 const REFRESH_MARGIN_MS = 60_000;
+const SYNC_LOOKBACK_MS = 60 * 60 * 1000;
 
 type BookingForCalendar = {
   id: string;
@@ -120,8 +121,36 @@ async function accessTokenFor(connection: Connection): Promise<string> {
   return tokens.access_token;
 }
 
-function isSyncable(booking: BookingForCalendar): boolean {
-  return booking.status === "confirmed" && new Date(booking.end_at).getTime() >= Date.now() - 60 * 60 * 1000;
+type CalendarAction = "upsert" | "delete" | "keep";
+
+// Only a missing or cancelled booking leaves the owner's calendar. Completed
+// and no-show bookings record what happened, so their event stays untouched,
+// and so does the event of a confirmed booking that has already ended.
+function calendarActionFor(booking: Pick<BookingForCalendar, "status" | "end_at"> | null): CalendarAction {
+  if (!booking || booking.status === "cancelled") return "delete";
+  if (booking.status === "confirmed" && new Date(booking.end_at).getTime() >= Date.now() - SYNC_LOOKBACK_MS) return "upsert";
+  return "keep";
+}
+
+function eventsPath(calendarId: string): string {
+  return `/calendars/${encodeURIComponent(calendarId)}/events`;
+}
+
+async function upsertEvent(accessToken: string, calendarId: string, booking: BookingForCalendar, timezone: string): Promise<void> {
+  const event = calendarEvent(booking, timezone);
+  const updated = await googleRequest(accessToken, `${eventsPath(calendarId)}/${encodeURIComponent(event.id)}`, { method: "PUT", body: JSON.stringify(event) });
+  if (updated.status === 404) {
+    const inserted = await googleRequest(accessToken, eventsPath(calendarId), { method: "POST", body: JSON.stringify(event) });
+    if (inserted.status < 200 || inserted.status >= 300) throw new Error("GOOGLE_CALENDAR_EVENT_INSERT_FAILED");
+  } else if (updated.status < 200 || updated.status >= 300) {
+    throw new Error("GOOGLE_CALENDAR_EVENT_UPDATE_FAILED");
+  }
+}
+
+async function deleteEvent(accessToken: string, calendarId: string, bookingId: string): Promise<boolean> {
+  const response = await googleRequest(accessToken, `${eventsPath(calendarId)}/${encodeURIComponent(googleEventId(bookingId))}`, { method: "DELETE" });
+  if (response.status !== 204 && response.status !== 404) throw new Error("GOOGLE_CALENDAR_EVENT_DELETE_FAILED");
+  return response.status === 204;
 }
 
 export async function syncGoogleCalendarBooking(businessId: string, bookingId: string): Promise<void> {
@@ -136,22 +165,14 @@ export async function syncGoogleCalendarBooking(businessId: string, bookingId: s
     .maybeSingle();
   if (error) throw new Error("GOOGLE_CALENDAR_BOOKING_LOAD_FAILED");
 
+  const action = calendarActionFor(booking);
+  if (action === "keep") return;
   const accessToken = await accessTokenFor(connection);
-  const eventPath = `/calendars/${encodeURIComponent(connection.calendar_id)}/events/${encodeURIComponent(googleEventId(bookingId))}`;
-  if (!booking || !isSyncable(booking)) {
-    const deleted = await googleRequest(accessToken, eventPath, { method: "DELETE" });
-    if (deleted.status !== 204 && deleted.status !== 404) throw new Error("GOOGLE_CALENDAR_EVENT_DELETE_FAILED");
+  if (!booking || action === "delete") {
+    await deleteEvent(accessToken, connection.calendar_id, bookingId);
     return;
   }
-
-  const event = calendarEvent(booking, connection.business_timezone);
-  const updated = await googleRequest(accessToken, eventPath, { method: "PUT", body: JSON.stringify(event) });
-  if (updated.status === 404) {
-    const inserted = await googleRequest(accessToken, `/calendars/${encodeURIComponent(connection.calendar_id)}/events`, { method: "POST", body: JSON.stringify(event) });
-    if (inserted.status < 200 || inserted.status >= 300) throw new Error("GOOGLE_CALENDAR_EVENT_INSERT_FAILED");
-  } else if (updated.status < 200 || updated.status >= 300) {
-    throw new Error("GOOGLE_CALENDAR_EVENT_UPDATE_FAILED");
-  }
+  await upsertEvent(accessToken, connection.calendar_id, booking, connection.business_timezone);
 }
 
 export async function syncGoogleCalendarForBusiness(businessId: string): Promise<{ synced: number; deleted: number }> {
@@ -171,31 +192,22 @@ export async function syncGoogleCalendarForBusiness(businessId: string): Promise
     }
     const [{ data: upcoming, error: upcomingError }, { data: cancelled, error: cancelledError }] = await Promise.all([
       admin.from("bookings").select("id,start_at,end_at,status,service_name_snapshot,customer_name_snapshot,customer_note")
-        .eq("business_id", businessId).eq("status", "confirmed").gte("end_at", new Date(Date.now() - 60 * 60 * 1000).toISOString()).order("start_at").limit(250),
-      admin.from("bookings").select("id").eq("business_id", businessId).eq("status", "cancelled").gte("end_at", new Date(Date.now() - 60 * 60 * 1000).toISOString()).limit(250),
+        .eq("business_id", businessId).eq("status", "confirmed").gte("end_at", new Date(Date.now() - SYNC_LOOKBACK_MS).toISOString()).order("start_at").limit(250),
+      admin.from("bookings").select("id,status,end_at").eq("business_id", businessId).eq("status", "cancelled").gte("end_at", new Date(Date.now() - SYNC_LOOKBACK_MS).toISOString()).limit(250),
     ]);
     if (upcomingError || cancelledError) throw new Error("GOOGLE_CALENDAR_BOOKINGS_LOAD_FAILED");
 
     let synced = 0;
     for (const booking of (upcoming ?? []) as BookingForCalendar[]) {
-      const event = calendarEvent(booking, connection.business_timezone);
-      const path = `/calendars/${encodeURIComponent(connection.calendar_id)}/events/${encodeURIComponent(event.id)}`;
-      const updated = await googleRequest(accessToken, path, { method: "PUT", body: JSON.stringify(event) });
-      if (updated.status === 404) {
-        const inserted = await googleRequest(accessToken, `/calendars/${encodeURIComponent(connection.calendar_id)}/events`, { method: "POST", body: JSON.stringify(event) });
-        if (inserted.status < 200 || inserted.status >= 300) throw new Error("GOOGLE_CALENDAR_EVENT_INSERT_FAILED");
-      } else if (updated.status < 200 || updated.status >= 300) {
-        throw new Error("GOOGLE_CALENDAR_EVENT_UPDATE_FAILED");
-      }
+      if (calendarActionFor(booking) !== "upsert") continue;
+      await upsertEvent(accessToken, connection.calendar_id, booking, connection.business_timezone);
       synced += 1;
     }
 
     let deleted = 0;
     for (const booking of cancelled ?? []) {
-      const path = `/calendars/${encodeURIComponent(connection.calendar_id)}/events/${encodeURIComponent(googleEventId(booking.id))}`;
-      const response = await googleRequest(accessToken, path, { method: "DELETE" });
-      if (response.status !== 204 && response.status !== 404) throw new Error("GOOGLE_CALENDAR_EVENT_DELETE_FAILED");
-      if (response.status === 204) deleted += 1;
+      if (calendarActionFor(booking) !== "delete") continue;
+      if (await deleteEvent(accessToken, connection.calendar_id, booking.id)) deleted += 1;
     }
 
     const { error: updateError } = await admin.from("google_calendar_connections").update({ last_sync_at: new Date().toISOString(), last_error: null }).eq("id", connection.id);

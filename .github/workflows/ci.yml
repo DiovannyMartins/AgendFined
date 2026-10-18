@@ -40,4 +40,5 @@ jobs:
       # Applies supabase/migrations and seed.sql; the suite needs only db, auth,
       # PostgREST and the gateway.
       - run: npx supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta,realtime,storage-api
+      - run: docker exec -i supabase_db_projeto psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 < tests/sql/normalize-customer-phones.sql
       - run: npm run test:integration:local

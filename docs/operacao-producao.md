@@ -52,6 +52,16 @@ npx supabase db push --linked
 
 O teste `tests/sql/reconciliation-scheduler.sql` verifica a requisição real enfileirada e reverte a transação antes do envio. Execute com `npx supabase db query --linked --file tests/sql/reconciliation-scheduler.sql`. Ele exige a URL e o segredo já configurados no Vault e não revela seus valores.
 
+### Telefone do cliente
+
+A migration `20261017030000_normalize_customer_phones.sql` grava os telefones de `customers` e `waitlist_entries` na forma canônica do #81 (só dígitos, DDD + número) e junta os clientes e entradas da lista de espera que passam a ter o mesmo telefone. Faça o deploy do código do #81 antes ou junto com a migration. Se reservas ou entradas da lista de espera forem gravadas no formato antigo entre a migration e o deploy, rode de novo no SQL Editor:
+
+```sql
+select private.normalize_customer_phones();
+```
+
+A função devolve quantos telefones foram normalizados, quantas linhas foram juntadas e quantos telefones não normalizam (esses ficam como estão). O teste `tests/sql/normalize-customer-phones.sql` roda só no Supabase local, dentro de uma transação revertida.
+
 ## Mercado Pago
 
 1. Use o Access Token de produção (`APP_USR-*`) em `MERCADO_PAGO_ACCESS_TOKEN`; não use token `TEST-*` no lançamento.

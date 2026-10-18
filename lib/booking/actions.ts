@@ -27,7 +27,7 @@ import {
 } from "@/lib/booking/availability";
 import { enforceRateLimit, enforceConsultRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 import { verifyTurnstile } from "@/lib/booking/anti-bot";
-import { getEffectiveBookingWindowDays } from "@/lib/plan/plan";
+import { assertProPlan, getEffectiveBookingWindowDays } from "@/lib/plan/plan";
 import type { Plan } from "@/lib/plan/plan";
 import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
 import {
@@ -445,6 +445,17 @@ export async function joinWaitlist(input: {
   const preamble = await resolvePublicBusinessAndRateLimit(input.slug, input.cfTurnstileToken);
   if (!preamble.ok) return preamble.result;
   const { business } = preamble;
+
+  // Waitlist management is a PROFISSIONAL feature (ADR 0008): a Grátis business
+  // has nobody to follow the request up, so the entry is refused before any
+  // write. The message never names the plan to the customer.
+  if (!assertProPlan(business).ok) {
+    return {
+      ok: false,
+      code: "waitlist_unavailable",
+      message: "Esse horário acabou de ser reservado. Escolha outro.",
+    };
+  }
 
   const startAt = zonedTimeToUtc(input.date, input.startTime, business.timezone);
 

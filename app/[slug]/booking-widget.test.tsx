@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingWidget } from "./booking-widget";
 import { createBooking, joinWaitlist } from "@/lib/booking/actions";
+import { getSlotsForDate } from "@/lib/availability/actions";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/turnstile-widget", () => ({ TurnstileWidget: () => null }));
@@ -12,13 +13,14 @@ vi.mock("@/lib/availability/actions", () => ({
 
 const mockedCreateBooking = vi.mocked(createBooking);
 const mockedJoinWaitlist = vi.mocked(joinWaitlist);
+const mockedGetSlotsForDate = vi.mocked(getSlotsForDate);
 
 const services = [
   { id: "svc-1", name: "Corte", description: null, durationMinutes: 30, priceCents: 5000 },
 ];
 
-async function fillAndSubmit(customerName: string) {
-  render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} />);
+async function fillAndSubmit(customerName: string, offersWaitlist = true) {
+  render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist={offersWaitlist} />);
   fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-20" } });
   fireEvent.click(await screen.findByRole("button", { name: "09:00" }));
   fireEvent.change(screen.getByLabelText("Nome"), { target: { value: customerName } });
@@ -32,6 +34,7 @@ describe("BookingWidget", () => {
   beforeEach(() => {
     mockedCreateBooking.mockReset();
     mockedJoinWaitlist.mockReset();
+    mockedGetSlotsForDate.mockReset().mockResolvedValue({ available: ["09:00", "09:30"] });
   });
 
   it("shows the server's field error next to the name and keeps the chosen slot", async () => {
@@ -52,7 +55,7 @@ describe("BookingWidget", () => {
   });
 
   it("asks the browser for a phone keyboard and contact autofill", () => {
-    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} />);
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
 
     const phone = screen.getByLabelText("Telefone / WhatsApp");
     expect(phone).toHaveAttribute("type", "tel");
@@ -81,6 +84,24 @@ describe("BookingWidget", () => {
     const phone = screen.getByLabelText("Telefone / WhatsApp");
     await waitFor(() => expect(phone).toHaveAttribute("aria-invalid", "true"));
     expect(phone).toHaveAccessibleDescription("Informe um telefone com DDD.");
+  });
+
+  it("without a waitlist, a taken slot only asks for another one and reloads the slots", async () => {
+    mockedCreateBooking.mockResolvedValue({
+      ok: false,
+      code: "slot_taken",
+      message: "Esse horário não está mais disponível. Escolha outro.",
+    });
+    mockedGetSlotsForDate.mockResolvedValueOnce({ available: ["09:00", "09:30"] });
+    mockedGetSlotsForDate.mockResolvedValueOnce({ available: ["09:30"] });
+
+    await fillAndSubmit("Maria Souza", false);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Esse horário acabou de ser reservado. Escolha outro.");
+    await waitFor(() => expect(screen.queryByRole("button", { name: "09:00" })).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "09:30" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("button", { name: "Entrar na lista de espera" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/lista de espera/i)).not.toBeInTheDocument();
   });
 
   it("drops the chosen slot when the server says it no longer exists", async () => {

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { isProPlan } from "@/lib/plan/plan";
 import { BookingWidget } from "./booking-widget";
 import { CalendarClock } from "lucide-react";
 
@@ -53,6 +55,15 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
   });
   if (servicesError) throw new Error("PUBLIC_SERVICES_LOOKUP_FAILED");
 
+  // The plan stays server-side: the widget only learns whether the waitlist can
+  // be offered. A failed lookup fails closed (no waitlist), like the plan gate.
+  const { data: planRow } = await createAdminClient()
+    .from("businesses")
+    .select("plan")
+    .eq("id", business.id)
+    .maybeSingle();
+  const offersWaitlist = isProPlan(planRow?.plan);
+
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-muted/30">
       <div className="mx-auto max-w-5xl px-4 py-12 lg:px-6">
@@ -70,6 +81,7 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
           businessId={business.id}
           slug={slug}
           timezone={business.timezone}
+          offersWaitlist={offersWaitlist}
           services={(services ?? []).map((s) => ({
             id: s.id,
             name: s.name,

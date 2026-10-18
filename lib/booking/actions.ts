@@ -30,7 +30,7 @@ import { verifyTurnstile } from "@/lib/booking/anti-bot";
 import { assertProPlan, getEffectiveBookingWindowDays } from "@/lib/plan/plan";
 import type { Plan } from "@/lib/plan/plan";
 import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
-import { sendCustomerCancellationEmail } from "@/lib/email/booking-cancellation";
+import { sendCustomerCancelledEmail } from "@/lib/email/booking-cancellation";
 import {
   classifyCancellationReason,
   classifyCustomerNote,
@@ -39,6 +39,7 @@ import {
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
 import { buildPrivateConfirmationUrl } from "@/lib/bookings/private-confirmation";
 import { buildPublicBookingUrl } from "@/lib/bookings/public-booking-url";
+import { resolveAppOrigin } from "@/lib/app-origin";
 
 export type ActionResult = {
   ok: boolean;
@@ -211,7 +212,7 @@ export async function createBooking(input: {
       timezone: business.timezone,
       publicCode: data.public_code,
       confirmationUrl: buildPrivateConfirmationUrl(
-        process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        resolveAppOrigin(),
         input.slug,
         data.public_code,
         cancelToken,
@@ -389,7 +390,7 @@ export async function cancelPublicBooking(
       .eq("id", cancelled.business_id)
       .maybeSingle();
     if (business) {
-      const emailResult = await sendCustomerCancellationEmail({
+      const emailResult = await sendCustomerCancelledEmail({
         customerName: cancelled.customer_name_snapshot,
         customerEmail: cancelled.customer_email_snapshot,
         businessName: business.name,
@@ -397,10 +398,7 @@ export async function cancelPublicBooking(
         startAt: cancelled.start_at,
         timezone: business.timezone,
         publicCode: cancelled.public_code,
-        rebookUrl: buildPublicBookingUrl(
-          process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-          business.slug,
-        ),
+        rebookUrl: buildPublicBookingUrl(resolveAppOrigin(), business.slug),
       });
       if (!emailResult.sent) {
         console.error("booking_cancellation_email_failed", { bookingId: cancelled.id, reason: emailResult.reason });

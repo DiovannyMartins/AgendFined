@@ -3,13 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 type SendResult = { sent: true } | { sent: false; reason: "not_configured" | "provider_error" };
 type RpcResult = { data: unknown; error: { message: string } | null };
 
-const { state, sendCustomerCancellationEmail } = vi.hoisted(() => ({
+const { state, sendCustomerCancelledEmail } = vi.hoisted(() => ({
   state: {
     business: null as Record<string, unknown> | null,
     rpcCalls: [] as { name: string; args: Record<string, unknown> }[],
     rpcResults: {} as Record<string, RpcResult>,
   },
-  sendCustomerCancellationEmail: vi.fn<(input: unknown) => Promise<SendResult>>(async () => ({ sent: true })),
+  sendCustomerCancelledEmail: vi.fn<(input: unknown) => Promise<SendResult>>(async () => ({ sent: true })),
 }));
 
 vi.mock("@/lib/booking/anti-bot", () => ({ verifyTurnstile: async () => ({ ok: true }) }));
@@ -24,7 +24,7 @@ vi.mock("@/lib/bookings/classification", () => ({
   classifyOperationalError: vi.fn(async () => null),
 }));
 vi.mock("@/lib/google-calendar/sync", () => ({ syncGoogleCalendarBooking: vi.fn() }));
-vi.mock("@/lib/email/booking-cancellation", () => ({ sendCustomerCancellationEmail }));
+vi.mock("@/lib/email/booking-cancellation", () => ({ sendCustomerCancelledEmail }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => {
     const query = {
@@ -216,8 +216,8 @@ describe("cancelPublicBooking", () => {
     state.rpcCalls = [];
     state.business = { name: "Barbearia Demo", slug: "barbearia-demo", timezone: "America/Fortaleza" };
     state.rpcResults = { cancel_booking_by_public_code: { data: cancelledBooking, error: null } };
-    sendCustomerCancellationEmail.mockClear();
-    sendCustomerCancellationEmail.mockResolvedValue({ sent: true });
+    sendCustomerCancelledEmail.mockClear();
+    sendCustomerCancelledEmail.mockResolvedValue({ sent: true });
   });
 
   afterEach(() => {
@@ -229,8 +229,8 @@ describe("cancelPublicBooking", () => {
     const result = await cancelPublicBooking({ status: "idle" }, cancelForm());
 
     expect(result).toEqual({ status: "done" });
-    expect(sendCustomerCancellationEmail).toHaveBeenCalledTimes(1);
-    expect(sendCustomerCancellationEmail).toHaveBeenCalledWith({
+    expect(sendCustomerCancelledEmail).toHaveBeenCalledTimes(1);
+    expect(sendCustomerCancelledEmail).toHaveBeenCalledWith({
       customerName: "Maria Souza",
       customerEmail: "maria@example.com",
       businessName: "Barbearia Demo",
@@ -245,7 +245,7 @@ describe("cancelPublicBooking", () => {
   it("never passes the cancel token or the cancel reason to the e-mail", async () => {
     await cancelPublicBooking({ status: "idle" }, cancelForm("Imprevisto no trabalho"));
 
-    const emailInput = JSON.stringify(sendCustomerCancellationEmail.mock.calls[0][0]);
+    const emailInput = JSON.stringify(sendCustomerCancelledEmail.mock.calls[0][0]);
     expect(emailInput).not.toContain(token);
     expect(emailInput).not.toContain("confirmacao");
     expect(emailInput).not.toContain("Imprevisto");
@@ -260,7 +260,7 @@ describe("cancelPublicBooking", () => {
     const result = await cancelPublicBooking({ status: "idle" }, cancelForm());
 
     expect(result).toEqual({ status: "done" });
-    expect(sendCustomerCancellationEmail).not.toHaveBeenCalled();
+    expect(sendCustomerCancelledEmail).not.toHaveBeenCalled();
   });
 
   it("does not e-mail when the cancellation is rejected", async () => {
@@ -269,11 +269,11 @@ describe("cancelPublicBooking", () => {
     const result = await cancelPublicBooking({ status: "idle" }, cancelForm());
 
     expect(result).toMatchObject({ status: "error", code: "INVALID_TOKEN" });
-    expect(sendCustomerCancellationEmail).not.toHaveBeenCalled();
+    expect(sendCustomerCancelledEmail).not.toHaveBeenCalled();
   });
 
   it("keeps the cancellation when the e-mail fails and logs it without the token", async () => {
-    sendCustomerCancellationEmail.mockResolvedValue({ sent: false, reason: "provider_error" });
+    sendCustomerCancelledEmail.mockResolvedValue({ sent: false, reason: "provider_error" });
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const result = await cancelPublicBooking({ status: "idle" }, cancelForm());

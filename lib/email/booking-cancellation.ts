@@ -145,6 +145,6 @@ export function sendBusinessCancelledEmail(input: BookingCancellation): Promise<
   return sendCancellationEmail(input, BUSINESS_CANCELLED);
 }
 
-export function sendCustomerCancellationEmail(input: BookingCancellation): Promise<SendResult> {
+export function sendCustomerCancelledEmail(input: BookingCancellation): Promise<SendResult> {
   return sendCancellationEmail(input, CUSTOMER_CANCELLED);
 }

@@ -9,6 +9,7 @@ import { classifyCancellationReason } from "@/lib/bookings/classification";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
 import { sendBusinessCancelledEmail } from "@/lib/email/booking-cancellation";
 import { buildPublicBookingUrl } from "@/lib/bookings/public-booking-url";
+import { resolveAppOrigin } from "@/lib/app-origin";
 
 export async function updateBookingStatus(
   _prev: { ok: boolean; message?: string },
@@ -76,10 +77,7 @@ export async function updateBookingStatus(
       startAt: booking.start_at,
       timezone: business.timezone,
       publicCode: booking.public_code,
-      rebookUrl: buildPublicBookingUrl(
-        process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-        business.slug,
-      ),
+      rebookUrl: buildPublicBookingUrl(resolveAppOrigin(), business.slug),
     });
     if (!emailResult.sent) {
       console.error("booking_cancellation_email_failed", { bookingId: id, reason: emailResult.reason });

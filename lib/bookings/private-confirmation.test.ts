@@ -21,7 +21,7 @@ describe("private confirmation navigation", () => {
 
   it("builds email links with the same fragment-only capability contract", () => {
     const url = new URL(
-      buildPrivateConfirmationUrl("https://agenda.example/base", "barbearia", "65925DBB", TOKEN),
+      buildPrivateConfirmationUrl(new URL("https://agenda.example/base"), "barbearia", "65925DBB", TOKEN),
     );
 
     expect(url.origin).toBe("https://agenda.example");

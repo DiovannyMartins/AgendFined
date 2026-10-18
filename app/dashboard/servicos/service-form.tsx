@@ -119,7 +119,7 @@ export function ServiceForm({ service }: { service?: ServiceRow }) {
                 {...register("price")}
               />
               <p id="price-hint" className="text-xs text-muted-foreground">
-                Use vírgula para os centavos, como 49,90.
+                Use vírgula para os centavos, como 49,90 ou 1.234,56.
               </p>
               {errors.price && <p className="text-sm text-destructive">{errors.price.message}</p>}
             </div>

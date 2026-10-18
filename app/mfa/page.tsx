@@ -4,7 +4,8 @@ import { BrandLogo } from "@/components/brand-logo";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MfaPanel } from "./mfa-panel";
-import { safeInternalPath } from "@/lib/auth/assurance";
+import { requiresMfaChallenge, safeInternalPath } from "@/lib/auth/assurance";
+import { logout } from "@/lib/auth/actions";
 
 export const metadata: Metadata = {
   title: "Autenticação em duas etapas — AgendFined",
@@ -39,6 +40,19 @@ export default async function MfaPage({
           returnTo={returnTo}
         />
       </div>
+      {/* While the code is pending the painel sends the owner straight back
+          here, so the way out is signing out instead of a link to it. */}
+      {requiresMfaChallenge(assurance) ? (
+        <form action={logout} className="mt-6">
+          <button type="submit" className="text-sm font-medium text-muted-foreground hover:text-foreground hover:underline">
+            Sair da conta
+          </button>
+        </form>
+      ) : (
+        <Link href="/dashboard" className="mt-6 text-sm font-medium text-muted-foreground hover:text-foreground hover:underline">
+          ← Voltar ao painel
+        </Link>
+      )}
     </main>
   );
 }

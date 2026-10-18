@@ -13,6 +13,7 @@ import { publicDocumentTitle } from "@/lib/bookings/public-status";
 import { consultBooking } from "@/lib/booking/actions";
 import type { ConsultState } from "@/lib/bookings/lookup";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
+import { formatPhoneBR } from "@/lib/format/phone";
 
 const INITIAL: ConsultState = { status: "idle" };
 
@@ -71,7 +72,7 @@ function ConsultarFormInner({ slug, timezone, onReset }: { slug: string; timezon
           <div className="border-t border-border pt-3">
             <p className="text-sm font-medium">{booking.businessName}</p>
             <p className="text-sm text-muted-foreground">
-              {booking.businessSlug} · {booking.businessPhone}
+              {formatPhoneBR(booking.businessPhone)}
             </p>
           </div>
         </div>

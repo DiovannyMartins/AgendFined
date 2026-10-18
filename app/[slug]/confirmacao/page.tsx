@@ -10,6 +10,7 @@ import { publicCodeSchema } from "@/lib/validation/schemas";
 import { enforceConsultRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { publicDocumentTitle } from "@/lib/bookings/public-status";
+import { formatPhoneBR } from "@/lib/format/phone";
 
 // Shared by generateMetadata and the page within one request, so the lookup
 // (and its rate-limit hit) runs once while the <title> follows the status.
@@ -64,7 +65,7 @@ async function ConfirmationContent({ code, slug }: { code: string; slug: string 
             <div className="border-t border-border pt-3">
               <p className="text-sm font-medium">{booking.business_name}</p>
               <p className="text-sm text-muted-foreground">
-                {booking.business_slug} · {booking.business_phone}
+                {formatPhoneBR(booking.business_phone)}
               </p>
             </div>
           </div>

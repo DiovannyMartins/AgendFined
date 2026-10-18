@@ -3,6 +3,7 @@
 // constraint keeps one row per person per business). `buildCustomerHistory`
 // groups the business's bookings under the customer they belong to. It is pure
 // and injected-fetch-free so it can be unit-tested without a database.
+import { matchesPhone } from "@/lib/format/phone";
 import type { BookingStatus } from "@/lib/bookings/transitions";
 
 export type CustomerRow = {
@@ -52,6 +53,7 @@ export function filterCustomers(customers: CustomerRow[], query: string): Custom
   const q = query.trim().toLowerCase();
   if (!q) return customers;
   return customers.filter((c) =>
+    matchesPhone(c.phone, q) ||
     [c.name, c.phone, c.email ?? ""].some((value) => value.toLowerCase().includes(q)),
   );
 }

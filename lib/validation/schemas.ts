@@ -43,6 +43,42 @@ const descriptionField = z
   // undefined, so the optional description can genuinely be left blank.
   .nullish();
 
+// Phone of a negócio or of a cliente (reserva, lista de espera): a Brazilian
+// number (fixo or celular, with or without +55), stored as national digits
+// (DDD + número) so the agenda and the waitlist dedup see a single canonical
+// form and every screen formats it the same way (lib/format/phone.ts).
+const INVALID_BRAZILIAN_PHONE = "Informe um telefone brasileiro válido, como (11) 98888-7777.";
+
+export const brazilianPhoneSchema = z
+  .string()
+  .trim()
+  .min(1, { error: "Informe seu telefone.", abort: true })
+  .max(30, { error: "O telefone não pode passar de 30 caracteres.", abort: true })
+  .regex(/^\+?[\d\s().-]+$/, { error: "Informe um telefone válido com DDD, como (11) 98888-7777.", abort: true })
+  .transform((value, ctx) => {
+    const digits = value.replace(/\D/g, "");
+    if (value.startsWith("+") && !digits.startsWith("55")) {
+      ctx.issues.push({ code: "custom", input: value, message: INVALID_BRAZILIAN_PHONE });
+      return z.NEVER;
+    }
+    // 12-13 digits can only be 55 + DDD + número; 11 digits starting with 55
+    // is a celular from DDD 55, so the country code is stripped by length.
+    const national = digits.length >= 12 && digits.startsWith("55") ? digits.slice(2) : digits;
+    if (national.length < 10 || national.length > 11) {
+      ctx.issues.push({ code: "custom", input: value, message: "Informe um telefone com DDD." });
+      return z.NEVER;
+    }
+    // DDDs never contain a zero; celulares have 9 digits starting with 9 and
+    // fixos have 8 digits starting with 2-5.
+    if (!/^[1-9]{2}(9\d{8}|[2-5]\d{7})$/.test(national)) {
+      ctx.issues.push({ code: "custom", input: value, message: INVALID_BRAZILIAN_PHONE });
+      return z.NEVER;
+    }
+    return national;
+  });
+
+export const customerPhoneSchema = brazilianPhoneSchema;
+
 const businessFields = {
   name: z
     .string()
@@ -55,11 +91,7 @@ const businessFields = {
     .min(3, "O slug deve ter pelo menos 3 caracteres.")
     .max(50, "O slug não pode passar de 50 caracteres.")
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug inválido: apenas letras minúsculas, números e hífen."),
-  phone: z
-    .string()
-    .trim()
-    .min(8, "Informe um telefone válido.")
-    .max(20, "O telefone não pode passar de 20 caracteres."),
+  phone: brazilianPhoneSchema,
   minNoticeMinutes: wholeNumber(0, 10080, "Informe uma antecedência entre 0 e 10080 minutos."),
   bookingWindowDays: wholeNumber(1, 365, "Informe uma janela entre 1 e 365 dias."),
   description: descriptionField,
@@ -109,7 +141,7 @@ export const serviceSchema = z.object({
 export type ServiceInput = z.infer<typeof serviceSchema>;
 
 // Client-side form schema for services (React Hook Form). The price is entered
-// in reais, with a comma or a dot ("49,90" or "49.90"), and converted to
+// in reais ("49,90", "49.90" or "1.234,56", see PRICE_INPUT_PATTERN) and converted to
 // centavos by parsePriceToCents in the server action.
 export const serviceFormSchema = z.object({
   ...serviceFields,
@@ -157,39 +189,6 @@ export const blockSchema = z.object({
   reason: z.string().trim().max(120, "O motivo não pode passar de 120 caracteres.").nullish(),
 });
 export type BlockInput = z.infer<typeof blockSchema>;
-
-// Customer phone of a reserva or lista de espera entry: a Brazilian number
-// (fixo or celular, with or without +55), stored as national digits (DDD +
-// número) so the agenda and the waitlist dedup see a single canonical form.
-const INVALID_BRAZILIAN_PHONE = "Informe um telefone brasileiro válido, como (11) 98888-7777.";
-
-export const customerPhoneSchema = z
-  .string()
-  .trim()
-  .min(1, { error: "Informe seu telefone.", abort: true })
-  .max(30, { error: "O telefone não pode passar de 30 caracteres.", abort: true })
-  .regex(/^\+?[\d\s().-]+$/, { error: "Informe um telefone válido com DDD, como (11) 98888-7777.", abort: true })
-  .transform((value, ctx) => {
-    const digits = value.replace(/\D/g, "");
-    if (value.startsWith("+") && !digits.startsWith("55")) {
-      ctx.issues.push({ code: "custom", input: value, message: INVALID_BRAZILIAN_PHONE });
-      return z.NEVER;
-    }
-    // 12-13 digits can only be 55 + DDD + número; 11 digits starting with 55
-    // is a celular from DDD 55, so the country code is stripped by length.
-    const national = digits.length >= 12 && digits.startsWith("55") ? digits.slice(2) : digits;
-    if (national.length < 10 || national.length > 11) {
-      ctx.issues.push({ code: "custom", input: value, message: "Informe um telefone com DDD." });
-      return z.NEVER;
-    }
-    // DDDs never contain a zero; celulares have 9 digits starting with 9 and
-    // fixos have 8 digits starting with 2-5.
-    if (!/^[1-9]{2}(9\d{8}|[2-5]\d{7})$/.test(national)) {
-      ctx.issues.push({ code: "custom", input: value, message: INVALID_BRAZILIAN_PHONE });
-      return z.NEVER;
-    }
-    return national;
-  });
 
 export const bookingSchema = z.object({
   serviceId: z.string().uuid(),

@@ -13,6 +13,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { filterCustomers, type CustomerHistory } from "@/lib/customers/history";
+import { formatPhoneBR } from "@/lib/format/phone";
 import { statusLabel } from "@/lib/bookings/status";
 import { formatWhen } from "@/lib/format/when";
 import { semanticSearchCustomers } from "@/lib/customers/search";
@@ -96,7 +97,7 @@ export function ClientsList({
                       <p className="font-medium">{customer.name}</p>
                       <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
-                          <Phone className="size-3.5" /> {customer.phone}
+                          <Phone className="size-3.5" /> {formatPhoneBR(customer.phone)}
                         </span>
                         {customer.email && (
                           <span className="inline-flex items-center gap-1">
@@ -116,7 +117,7 @@ export function ClientsList({
                     <DialogTitle>{customer.name}</DialogTitle>
                     <DialogDescription>
                       <span className="inline-flex items-center gap-1">
-                        <Phone className="size-3.5" /> {customer.phone}
+                        <Phone className="size-3.5" /> {formatPhoneBR(customer.phone)}
                       </span>
                       {customer.email && (
                         <span className="ml-3 inline-flex items-center gap-1">

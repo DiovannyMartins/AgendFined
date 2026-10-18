@@ -10,7 +10,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import { createBooking, joinWaitlist } from "@/lib/booking/actions";
 import { getSlotsForDate } from "@/lib/availability/actions";
-import { toLocalDate } from "@/lib/booking/availability";
+import { lastBookableDate, toLocalDate } from "@/lib/booking/availability";
 import { formatCurrencyBRL } from "@/lib/format/currency";
 import { formatSlotWhen } from "@/lib/format/when";
 import { cn } from "@/lib/utils";
@@ -37,12 +37,16 @@ export function BookingWidget({
   businessId,
   slug,
   timezone,
+  bookingWindowDays,
   services,
   offersWaitlist,
 }: {
   businessId: string;
   slug: string;
   timezone: string;
+  // Effective janela futura (configured days capped by the plan), used only to
+  // cap the date picker; the server enforces it on every lookup and reserva.
+  bookingWindowDays?: number;
   services: ServiceOption[];
   // Whether the business can follow up waitlist requests (PROFISSIONAL only).
   // The plan itself never reaches the customer-facing page.
@@ -80,6 +84,10 @@ export function BookingWidget({
     // same-day calendar date is valid when the business permits it.
     return toLocalDate(new Date(), timezone);
   }, [timezone]);
+  const maxDate = useMemo(
+    () => (bookingWindowDays === undefined ? undefined : lastBookableDate(new Date(), timezone, bookingWindowDays)),
+    [timezone, bookingWindowDays],
+  );
 
   function handleServiceChange(value: string) {
     setServiceId(value);
@@ -299,6 +307,7 @@ export function BookingWidget({
             type="date"
             value={date}
             min={minDate}
+            max={maxDate}
             onChange={(e) => handleDateChange(e.target.value)}
             className="[color-scheme:dark]"
           />

@@ -142,7 +142,7 @@ export async function deleteService(id: string): Promise<ActionResult> {
       ok: false,
       code: "HAS_SCHEDULED_BOOKINGS",
       message:
-        "Este serviço possui reservas agendadas e não pode ser excluído. Cancele ou conclua as reservas agendadas antes de excluir.",
+        "Este serviço possui reservas agendadas e não pode ser excluído. Cancele essas reservas ou aguarde até que aconteçam; para tirá-lo da página pública agora, desative o serviço.",
     };
   }
   if (result !== "DELETED") return { ok: false, code: "NOT_FOUND", message: "Serviço não encontrado." };

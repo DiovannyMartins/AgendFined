@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { StatusAction } from "./status-action";
 import type { AgendaBooking } from "@/lib/agenda/view";
 import { statusLabel } from "@/lib/bookings/status";
+import { formatPhoneBR, matchesPhone } from "@/lib/format/phone";
 import { formatPublicCode, matchesPublicCode } from "@/lib/bookings/public-code";
 import { CANCELLATION_REASON_CATEGORY_LABELS, type CancellationReasonCategory } from "@/lib/bookings/classification";
 
@@ -36,6 +37,7 @@ export function AgendaList({
     return bookings.filter(
       (b) =>
         matchesPublicCode(b.public_code ?? "", q) ||
+        matchesPhone(b.customer_phone_snapshot, q) ||
         [
           b.customer_name_snapshot,
           b.customer_phone_snapshot,
@@ -100,7 +102,7 @@ export function AgendaList({
                     {formatBookingTime(booking.start_at, timezone)} · {booking.duration_minutes_snapshot} min
                   </p>
                   <p className="mt-1 text-sm">
-                    {booking.customer_name_snapshot} · {booking.customer_phone_snapshot}
+                    {booking.customer_name_snapshot} · {formatPhoneBR(booking.customer_phone_snapshot)}
                   </p>
                   <p className="mt-1 font-mono text-xs text-muted-foreground">
                     Código: {formatPublicCode(booking.public_code ?? "")}

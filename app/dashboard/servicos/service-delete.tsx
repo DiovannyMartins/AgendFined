@@ -58,8 +58,8 @@ export function ServiceDelete({
                 {scheduledCount > 0
                   ? `${scheduledCount} reserva${scheduledCount === 1 ? "" : "s"} agendada${scheduledCount === 1 ? "" : "s"}`
                   : "reservas agendadas"}{" "}
-                e não pode ser excluído. Cancele ou conclua as reservas agendadas
-                antes de excluir.
+                e não pode ser excluído. Cancele essas reservas ou aguarde até que
+                aconteçam; para tirá-lo da página pública agora, desative o serviço.
               </>
             ) : (
               <>

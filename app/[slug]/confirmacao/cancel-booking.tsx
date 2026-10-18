@@ -72,6 +72,12 @@ export function CancelBooking({
           </form>
         </DialogContent>
       </Dialog>
+      {/* ADR 0005: the token is delivered once and scrubbed from the URL, so
+          the button does not come back after leaving or reloading the page. */}
+      <p className="mt-2 text-xs text-muted-foreground">
+        Este botão não aparece de novo se você sair ou recarregar a página. Para cancelar depois,
+        use o link do e-mail de confirmação.
+      </p>
     </div>
   );
 }

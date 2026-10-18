@@ -200,7 +200,7 @@ export async function createBlock(
     return {
       ok: false,
       code: "BOOKING_CONFLICT",
-      message: `Bloqueio conflita com reserva(s) futura(s): ${names}. Cancele/reagende antes.`,
+      message: `Bloqueio conflita com reserva(s) futura(s): ${names}. Cancele essas reservas ou escolha outro período.`,
     };
   }
 

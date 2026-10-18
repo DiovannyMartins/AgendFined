@@ -4,7 +4,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isProPlan } from "@/lib/plan/plan";
+import { hasActiveAvailability } from "@/lib/business/readiness";
 import { BookingWidget } from "./booking-widget";
+import { BookingUnavailable } from "./booking-unavailable";
 import { CalendarClock } from "lucide-react";
 
 export async function generateMetadata({
@@ -57,12 +59,14 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
 
   // The plan stays server-side: the widget only learns whether the waitlist can
   // be offered. A failed lookup fails closed (no waitlist), like the plan gate.
-  const { data: planRow } = await createAdminClient()
-    .from("businesses")
-    .select("plan")
-    .eq("id", business.id)
-    .maybeSingle();
+  const admin = createAdminClient();
+  const [{ data: planRow }, hasAvailability] = await Promise.all([
+    admin.from("businesses").select("plan").eq("id", business.id).maybeSingle(),
+    // Faixas are owner-only under RLS; only this boolean reaches the page.
+    hasActiveAvailability(admin, business.id),
+  ]);
   const offersWaitlist = isProPlan(planRow?.plan);
+  const activeServices = services ?? [];
 
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-muted/30">
@@ -77,19 +81,25 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
           )}
         </header>
 
-        <BookingWidget
-          businessId={business.id}
-          slug={slug}
-          timezone={business.timezone}
-          offersWaitlist={offersWaitlist}
-          services={(services ?? []).map((s) => ({
-            id: s.id,
-            name: s.name,
-            description: s.description,
-            durationMinutes: s.duration_minutes,
-            priceCents: s.price_cents,
-          }))}
-        />
+        {activeServices.length === 0 ? (
+          <BookingUnavailable reason="no_services" />
+        ) : !hasAvailability ? (
+          <BookingUnavailable reason="no_availability" />
+        ) : (
+          <BookingWidget
+            businessId={business.id}
+            slug={slug}
+            timezone={business.timezone}
+            offersWaitlist={offersWaitlist}
+            services={activeServices.map((s) => ({
+              id: s.id,
+              name: s.name,
+              description: s.description,
+              durationMinutes: s.duration_minutes,
+              priceCents: s.price_cents,
+            }))}
+          />
+        )}
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Já tem uma reserva?{" "}

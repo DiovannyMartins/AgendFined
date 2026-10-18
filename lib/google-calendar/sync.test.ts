@@ -198,13 +198,14 @@ describe("Google Calendar sync of a booking", () => {
     expect(fakes.googleCalls[0].method).toBe("DELETE");
   });
 
-  it("fails loudly when Google rejects the update", async () => {
-    installGoogleCalendarFakes({
+  it("fails loudly and records last_error when Google rejects the update", async () => {
+    const fakes = installGoogleCalendarFakes({
       bookings: [booking("booking", "confirmed")],
       google: call => call.method === "PUT" ? Response.json({ error: "forbidden" }, { status: 403 }) : undefined,
     });
 
     await expect(syncGoogleCalendarBooking("business", "booking")).rejects.toThrow("GOOGLE_CALENDAR_EVENT_UPDATE_FAILED");
+    expect(fakes.connectionUpdates).toEqual([{ last_error: "GOOGLE_CALENDAR_EVENT_UPDATE_FAILED" }]);
   });
 
   it("reconciles confirmed and cancelled bookings without touching completed ones", async () => {
@@ -268,6 +269,19 @@ describe("Google Calendar access token", () => {
     });
 
     await expect(syncGoogleCalendarForBusiness("business")).rejects.toThrow("GOOGLE_CALENDAR_TOKEN_REFRESH_FAILED");
+
+    expect(fakes.googleCalls).toEqual([]);
+    expect(fakes.connectionUpdates).toEqual([{ last_error: "GOOGLE_CALENDAR_TOKEN_REFRESH_FAILED" }]);
+  });
+
+  it("records a renewal failure in last_error when syncing a single booking", async () => {
+    const fakes = installGoogleCalendarFakes({
+      bookings: [booking("booking", "confirmed")],
+      tokenExpiresAt: new Date(Date.now() - 1_000).toISOString(),
+      tokenEndpoint: () => Response.json({ error: "invalid_grant" }, { status: 400 }),
+    });
+
+    await expect(syncGoogleCalendarBooking("business", "booking")).rejects.toThrow("GOOGLE_CALENDAR_TOKEN_REFRESH_FAILED");
 
     expect(fakes.googleCalls).toEqual([]);
     expect(fakes.connectionUpdates).toEqual([{ last_error: "GOOGLE_CALENDAR_TOKEN_REFRESH_FAILED" }]);

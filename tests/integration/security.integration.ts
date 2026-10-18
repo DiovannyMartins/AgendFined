@@ -352,6 +352,7 @@ describe("public lookup goes through the server layer (§16) and returns no PII"
     expect(row?.[0]).not.toHaveProperty("customer_email_snapshot");
     expect(row?.[0]).not.toHaveProperty("cancel_token_hash");
     expect(row?.[0]).not.toHaveProperty("owner_id");
+    expect(row?.[0]?.status).toBe("confirmed");
   });
 });
 

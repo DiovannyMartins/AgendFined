@@ -1,8 +1,10 @@
 import { publicCodeSchema } from "@/lib/validation/schemas";
+import type { BookingStatus } from "@/lib/bookings/transitions";
 
 // A found public booking, normalized to the shape the confirmation/consult
 // screen renders. It carries no customer personal data (§16: the public code
-// must never authorize access to customer data).
+// must never authorize access to customer data). The status lets the screen
+// tell a cancelled slot apart from a confirmed one.
 export type PublicBookingLookup = {
   serviceName: string;
   startAt: string;
@@ -10,6 +12,7 @@ export type PublicBookingLookup = {
   businessName: string;
   businessSlug: string;
   businessPhone: string;
+  status: BookingStatus;
   timezone?: string;
 };
 
@@ -22,6 +25,7 @@ export type PublicBookingRow = {
   business_slug: string;
   business_phone: string;
   business_timezone?: string;
+  status: BookingStatus;
 };
 
 // Fetcher injected at the db boundary so the lookup stays unit-testable.
@@ -73,6 +77,7 @@ export async function lookupBookingByPublicCode(
       businessName: data.business_name,
       businessSlug: data.business_slug,
       businessPhone: data.business_phone,
+      status: data.status,
       timezone: data.business_timezone,
     },
   };

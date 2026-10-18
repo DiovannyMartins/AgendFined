@@ -835,6 +835,7 @@ export type Database = {
           end_at: string
           service_name: string
           start_at: string
+          status: Database["public"]["Enums"]["booking_status"]
         }[]
       }
       get_public_business: {

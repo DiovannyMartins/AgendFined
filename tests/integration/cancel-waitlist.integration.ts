@@ -100,9 +100,11 @@ describe("cancel_booking_by_public_code (INC-3)", () => {
     // The freed slot can now be booked again at the same instant.
     const second = await createBookingAt(SLOT, "+5511980000002");
     expect(second.status).toBe("confirmed");
-    // And the cancelled original is still present (never deleted).
+    // And the cancelled original is still present (never deleted), and the
+    // public lookup reports it as cancelled (#110).
     const { data: row } = await admin.rpc("get_booking_by_public_code", { p_code: booking.public_code });
     expect(row?.[0]).toBeDefined();
+    expect(row?.[0]?.status).toBe("cancelled");
   });
 
   it("rejects cancelling a booking that is no longer confirmed", async () => {

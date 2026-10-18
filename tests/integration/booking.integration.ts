@@ -161,7 +161,7 @@ describe("createBooking RPC (§11.4)", () => {
     expect(String(error?.message).toLowerCase()).toMatch(/min_notice|before|past/i);
   });
 
-  it("public lookup exposes only non-personal data and no status (§16)", async () => {
+  it("public lookup exposes only non-personal data plus the status (§16, #110)", async () => {
     const { data: booking } = await admin.rpc("create_booking", {
       p_business_id: businessId,
       p_cancel_token_hash: "b".repeat(64),
@@ -187,8 +187,10 @@ describe("createBooking RPC (§11.4)", () => {
         "end_at",
         "service_name",
         "start_at",
+        "status",
       ].sort(),
     );
+    expect(lo?.status).toBe("confirmed");
   });
 
   it("the consultation rate limit is keyed per IP and separate from bookings (§16)", async () => {

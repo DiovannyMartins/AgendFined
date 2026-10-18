@@ -61,3 +61,6 @@ CONTEXT.md
 # product spec (kept local, not committed)
 documento-projeto.md
 .env*
+
+# marketing (vídeos, narração, cards, marca): fica só local, fora do repositório
+design/

@@ -24,6 +24,7 @@ export function LoginForm({ notice }: { notice?: string }) {
   } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
 
   function onSubmit(values: LoginInput) {
+    setState(INITIAL);
     startTransition(async () => {
       const fd = new FormData();
       fd.set("email", values.email);

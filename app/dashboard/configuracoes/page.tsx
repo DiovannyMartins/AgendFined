@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { BusinessForm } from "./business-form";
 import { AvailabilityForm, AvailabilityRow } from "./availability-form";
@@ -8,6 +9,8 @@ import Link from "next/link";
 import { isProPlan } from "@/lib/plan/plan";
 import { getGoogleCalendarConnectionStatus } from "@/lib/google-calendar/queries";
 import { GoogleCalendarSection } from "./google-calendar-section";
+
+export const metadata: Metadata = { title: "Configurações — AgendFined" };
 
 export default async function ConfiguracoesPage() {
   const business = await getCurrentBusiness();

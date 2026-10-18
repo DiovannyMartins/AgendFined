@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ConsultarForm } from "./consultar-form";
+
+export const metadata: Metadata = { title: "Consultar reserva — AgendFined" };
 
 export default async function ConsultarPage({
   params,

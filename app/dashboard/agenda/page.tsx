@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { redirect } from "next/navigation";
@@ -10,6 +11,8 @@ import { getGcalExport } from "@/lib/gcal/get-export";
 import { isUpcomingConfirmed } from "@/lib/gcal/export";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
 import { AgendaView } from "./agenda-view";
+
+export const metadata: Metadata = { title: "Reservas — AgendFined" };
 
 export default async function AgendaPage() {
   const business = await getCurrentBusiness();

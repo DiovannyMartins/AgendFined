@@ -57,6 +57,8 @@ export function ClientsList({
           <Search className="size-4 text-muted-foreground" />
         </span>
         <Input
+          type="search"
+          aria-label="Buscar clientes"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);

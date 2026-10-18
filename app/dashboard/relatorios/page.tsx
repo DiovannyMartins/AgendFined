@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowUpRight, Banknote, CalendarX2, Crown, MailCheck, Percent, UserX } from "lucide-react";
@@ -14,6 +15,8 @@ import {
   type BillingReport,
 } from "@/lib/reports/reports";
 import { cn } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Relatórios — AgendFined" };
 
 export default async function RelatoriosPage({
   searchParams,

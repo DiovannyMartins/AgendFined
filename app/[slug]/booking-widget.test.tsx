@@ -70,6 +70,16 @@ describe("BookingWidget", () => {
     expect(consent).not.toHaveAccessibleName(expect.stringContaining("se informado"));
   });
 
+  it("associates the consent text to the checkbox explicitly", () => {
+    const { container } = render(
+      <BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />,
+    );
+
+    const consent = screen.getByRole("checkbox", { name: /Autorizo o tratamento/ });
+    expect(consent.id).not.toBe("");
+    expect(container.querySelector(`label[for="${consent.id}"]`)).toHaveTextContent(/Autorizo o tratamento/);
+  });
+
   it("says once, in a live region, that the date has no slots", async () => {
     mockedGetSlotsForDate.mockResolvedValue({ available: [] });
     render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);

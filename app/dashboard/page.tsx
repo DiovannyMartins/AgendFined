@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
@@ -6,6 +7,8 @@ import { Sparkles, CalendarDays, Blocks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { DownloadPublicLinkQRButton, PublicLinkQR } from "@/components/public-link-qr";
+
+export const metadata: Metadata = { title: "Painel — AgendFined" };
 
 export default async function DashboardHome() {
   const business = await getCurrentBusiness();

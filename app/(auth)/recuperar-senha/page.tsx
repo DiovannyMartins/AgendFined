@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { ForgotPasswordForm } from "./forgot-password-form";
+
+export const metadata: Metadata = { title: "Recuperar senha — AgendFined" };
 
 export default function RecuperarSenhaPage() {
   return (

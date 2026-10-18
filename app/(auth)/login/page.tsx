@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { Reveal } from "@/components/reveal";
@@ -8,6 +9,8 @@ import { LoginForm } from "./login-form";
 const NOTICES: Record<string, string> = {
   auth: "Não conseguimos concluir o acesso por este link. Seu e-mail pode já ter sido confirmado: entre com seu e-mail e senha para continuar.",
 };
+
+export const metadata: Metadata = { title: "Entrar — AgendFined" };
 
 export default async function LoginPage({
   searchParams,

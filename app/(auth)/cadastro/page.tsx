@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { Reveal } from "@/components/reveal";
 import { SignupForm } from "./signup-form";
+
+export const metadata: Metadata = { title: "Criar conta — AgendFined" };
 
 export default function CadastroPage() {
   return (

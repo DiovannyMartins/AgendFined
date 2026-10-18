@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type SendResult = { sent: true } | { sent: false; reason: "not_configured" | "provider_error" };
 type RpcResult = { data: unknown; error: { message: string } | null };
+type RecordedQuery = { table: string; filters: [string, unknown][]; update: Record<string, unknown> | null };
 
 const { state, sendCustomerCancelledEmail } = vi.hoisted(() => ({
   state: {
     business: null as Record<string, unknown> | null,
     rpcCalls: [] as { name: string; args: Record<string, unknown> }[],
     rpcResults: {} as Record<string, RpcResult>,
+    queries: [] as RecordedQuery[],
   },
   sendCustomerCancelledEmail: vi.fn<(input: unknown) => Promise<SendResult>>(async () => ({ sent: true })),
 }));
@@ -27,15 +29,22 @@ vi.mock("@/lib/google-calendar/sync", () => ({ syncGoogleCalendarBooking: vi.fn(
 vi.mock("@/lib/email/booking-cancellation", () => ({ sendCustomerCancelledEmail }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => {
-    const query = {
-      select: () => query,
-      eq: () => query,
-      update: () => query,
-      single: async () => ({ data: state.business, error: null }),
-      maybeSingle: async () => ({ data: state.business, error: null }),
+    const from = (table: string) => {
+      const recorded: RecordedQuery = { table, filters: [], update: null };
+      state.queries.push(recorded);
+      const query = {
+        select: () => query,
+        eq: (column: string, value: unknown) => (recorded.filters.push([column, value]), query),
+        update: (values: Record<string, unknown>) => ((recorded.update = values), query),
+        single: async () => ({ data: state.business, error: null }),
+        maybeSingle: async () => ({ data: state.business, error: null }),
+        then: (resolve: (value: { data: null; error: null }) => unknown) =>
+          Promise.resolve({ data: null, error: null }).then(resolve),
+      };
+      return query;
     };
     return {
-      from: () => query,
+      from,
       rpc: async (name: string, args: Record<string, unknown>) => {
         state.rpcCalls.push({ name, args });
         return state.rpcResults[name] ?? { data: "waitlist-entry-1", error: null };
@@ -45,6 +54,8 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 import { cancelPublicBooking, consultBooking, createBooking, joinWaitlist } from "@/lib/booking/actions";
+import { classifyCancellationReason } from "@/lib/bookings/classification";
+import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
 
 describe("consultBooking", () => {
   it("reports malformed codes before requiring anti-bot verification", async () => {
@@ -214,6 +225,7 @@ describe("cancelPublicBooking", () => {
   beforeEach(() => {
     vi.stubEnv("APP_URL", "https://agenda.example");
     state.rpcCalls = [];
+    state.queries = [];
     state.business = { name: "Barbearia Demo", slug: "barbearia-demo", timezone: "America/Fortaleza" };
     state.rpcResults = { cancel_booking_by_public_code: { data: cancelledBooking, error: null } };
     sendCustomerCancelledEmail.mockClear();
@@ -284,5 +296,43 @@ describe("cancelPublicBooking", () => {
       reason: "provider_error",
     });
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain(token);
+  });
+
+  it("logs the e-mail failure when the negócio cannot be loaded, keeping the cancellation", async () => {
+    state.business = null;
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await cancelPublicBooking({ status: "idle" }, cancelForm());
+
+    expect(result).toEqual({ status: "done" });
+    expect(sendCustomerCancelledEmail).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith("booking_cancellation_email_failed", {
+      bookingId: "booking-1",
+      reason: "business_not_found",
+    });
+  });
+
+  it("keeps the cancellation when building or sending the e-mail throws", async () => {
+    sendCustomerCancelledEmail.mockRejectedValue(new RangeError("Invalid time zone specified"));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await cancelPublicBooking({ status: "idle" }, cancelForm());
+
+    expect(result).toEqual({ status: "done" });
+    expect(consoleError).toHaveBeenCalledWith("booking_cancellation_email_failed", {
+      bookingId: "booking-1",
+      reason: "unexpected_error",
+    });
+  });
+
+  it("uses the reserva returned by the cancellation instead of reading bookings again", async () => {
+    vi.mocked(classifyCancellationReason).mockReturnValueOnce({ category: "schedule_conflict", confidence: 0.9 });
+
+    await cancelPublicBooking({ status: "idle" }, cancelForm("Imprevisto no trabalho"));
+
+    expect(syncGoogleCalendarBooking).toHaveBeenCalledWith("business-1", "booking-1");
+    expect(state.queries.filter((query) => query.table === "bookings")).toEqual([
+      { table: "bookings", filters: [["id", "booking-1"]], update: { cancel_reason_category: "schedule_conflict" } },
+    ]);
   });
 });

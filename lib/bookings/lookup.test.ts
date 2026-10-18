@@ -46,7 +46,7 @@ describe("lookupBookingByPublicCode", () => {
       called = true;
       return { data: row, error: null };
     };
-    const res = await lookupBookingByPublicCode(spy, "not-a-code");
+    const res = await lookupBookingByPublicCode(spy, "not_a_code");
     expect(called).toBe(false);
     expect(res).toMatchObject({ ok: false, code: "INVALID_CODE" });
   });

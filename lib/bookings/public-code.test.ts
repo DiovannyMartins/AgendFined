@@ -4,6 +4,7 @@ import {
   PUBLIC_CODE_LENGTH,
   formatPublicCode,
   isValidPublicCode,
+  matchesPublicCode,
   normalizePublicCode,
 } from "@/lib/bookings/public-code";
 
@@ -18,6 +19,15 @@ describe("normalizePublicCode", () => {
 
   it("is idempotent", () => {
     expect(normalizePublicCode(normalizePublicCode("ab12-cd34"))).toBe("AB12CD34");
+    expect(normalizePublicCode(normalizePublicCode("o6yt-wmwi"))).toBe("06YTWMW1");
+  });
+
+  // Crockford decoding: O reads as 0, I and L read as 1 (#84).
+  it("maps the Crockford look-alikes O→0 and I/L→1", () => {
+    expect(normalizePublicCode("o6yt-wmwi")).toBe("06YTWMW1");
+    expect(normalizePublicCode("O6YTWMWL")).toBe("06YTWMW1");
+    expect(normalizePublicCode("06yt wmw1")).toBe("06YTWMW1");
+    expect(normalizePublicCode("oil0-OIL1")).toBe("01100111");
   });
 });
 
@@ -42,11 +52,15 @@ describe("isValidPublicCode", () => {
     expect(isValidPublicCode("ab12-cd34")).toBe(true);
   });
 
+  it("accepts O, I and L typed in place of 0 and 1", () => {
+    expect(isValidPublicCode("O6YT-WMWI")).toBe(true);
+    expect(isValidPublicCode("O6YTWMWL")).toBe(true);
+  });
+
   it("rejects characters outside the Crockford alphabet", () => {
-    // 0/O, 1/I/L are deliberately excluded.
-    expect(isValidPublicCode("AB12CD0O")).toBe(false);
-    expect(isValidPublicCode("AB12CD1I")).toBe(false);
-    expect(isValidPublicCode("AB12CDEL")).toBe(false);
+    // U has no Crockford decoding; punctuation is not a separator.
+    expect(isValidPublicCode("AB12CD3U")).toBe(false);
+    expect(isValidPublicCode("AB12CD3*")).toBe(false);
   });
 
   it("rejects wrong lengths", () => {
@@ -56,6 +70,23 @@ describe("isValidPublicCode", () => {
 
   it("rejects empty", () => {
     expect(isValidPublicCode("")).toBe(false);
+  });
+});
+
+describe("matchesPublicCode", () => {
+  it("matches a partial or full query however it was typed", () => {
+    expect(matchesPublicCode("06YTWMW1", "06yt")).toBe(true);
+    expect(matchesPublicCode("06YTWMW1", "O6YT-WMWI")).toBe(true);
+    expect(matchesPublicCode("06YTWMW1", "yt wm")).toBe(true);
+  });
+
+  it("does not match a different code", () => {
+    expect(matchesPublicCode("06YTWMW1", "06YX")).toBe(false);
+  });
+
+  it("does not match a query that is only separators", () => {
+    expect(matchesPublicCode("06YTWMW1", " - ")).toBe(false);
+    expect(matchesPublicCode("06YTWMW1", "")).toBe(false);
   });
 });
 

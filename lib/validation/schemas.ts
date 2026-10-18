@@ -216,9 +216,9 @@ export const waitlistSchema = bookingSchema.pick({
 export type WaitlistInput = z.infer<typeof waitlistSchema>;
 
 // Public reservation code. An 8-char Crockford base32 code (XXXX-XXXX on screen),
-// normalized (hyphens/spaces stripped, uppercased) before validation. It is used
-// only on the public confirmation screen and must never authorize access to
-// customer data.
+// normalized (hyphens/spaces stripped, uppercased, O→0 and I/L→1) before
+// validation. It is used only on the public confirmation screen and must never
+// authorize access to customer data.
 export const publicCodeSchema = z
   .string()
   .trim()

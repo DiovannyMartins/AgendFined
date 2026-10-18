@@ -4,7 +4,17 @@ import { useEffect, useState } from "react";
 import { readPrivateCancelCapability } from "@/lib/bookings/private-confirmation";
 import { CancelBooking } from "./cancel-booking";
 
-export function PrivateCancellation({ code }: { code: string }) {
+// The capability is always captured and scrubbed from the URL, but the cancel
+// control is only offered while the reserva is still confirmed.
+export function PrivateCancellation({
+  code,
+  canCancel,
+  onCancelled,
+}: {
+  code: string;
+  canCancel: boolean;
+  onCancelled: () => void;
+}) {
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,5 +46,5 @@ export function PrivateCancellation({ code }: { code: string }) {
     };
   }, []);
 
-  return token ? <CancelBooking code={code} token={token} /> : null;
+  return token && canCancel ? <CancelBooking code={code} token={token} onCancelled={onCancelled} /> : null;
 }

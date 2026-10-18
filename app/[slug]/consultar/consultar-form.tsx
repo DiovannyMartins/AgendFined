@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import { CopyCode } from "@/components/copy-code";
+import { PublicBookingStatus } from "@/components/public-booking-status";
+import { publicDocumentTitle } from "@/lib/bookings/public-status";
 import { consultBooking } from "@/lib/booking/actions";
 import type { ConsultState } from "@/lib/bookings/lookup";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
@@ -33,6 +35,18 @@ function ConsultarFormInner({ slug, timezone, onReset }: { slug: string; timezon
     if (state.status === "success") resultHeading.current?.focus();
   }, [state.status]);
 
+  // The tab title follows the found reserva's status, and reverts when the
+  // customer goes back to consult another code.
+  const foundStatus = state.status === "success" ? state.booking.status : null;
+  useEffect(() => {
+    if (!foundStatus) return;
+    const previous = document.title;
+    document.title = publicDocumentTitle(foundStatus);
+    return () => {
+      document.title = previous;
+    };
+  }, [foundStatus]);
+
   if (state.status === "success") {
     const booking = state.booking;
     const bookingTimezone = booking.timezone ?? timezone ?? APP_TIMEZONE;
@@ -45,7 +59,7 @@ function ConsultarFormInner({ slug, timezone, onReset }: { slug: string; timezon
 
     return (
       <div className="w-full rounded-2xl border border-border bg-background p-8 text-center shadow-sm">
-        <h1 ref={resultHeading} tabIndex={-1} className="text-xl font-semibold outline-none">Reserva encontrada</h1>
+        <PublicBookingStatus status={booking.status} headingRef={resultHeading} />
         <div className="mt-6 space-y-3 rounded-xl bg-muted/40 p-5 text-left">
           <div className="flex items-center gap-2 font-medium">
             <CalendarClock className="size-5 text-primary" />

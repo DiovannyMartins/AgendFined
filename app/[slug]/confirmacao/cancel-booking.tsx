@@ -17,8 +17,20 @@ const INITIAL: CancelState = { status: "idle" };
 
 // The token is an independent private capability issued once at creation. The
 // public booking code alone cannot reproduce it.
-export function CancelBooking({ code, token }: { code: string; token: string }) {
-  const [state, formAction, pending] = useActionState(cancelPublicBooking, INITIAL);
+export function CancelBooking({
+  code,
+  token,
+  onCancelled,
+}: {
+  code: string;
+  token: string;
+  onCancelled?: () => void;
+}) {
+  const [state, formAction, pending] = useActionState(async (prev: CancelState, formData: FormData) => {
+    const next = await cancelPublicBooking(prev, formData);
+    if (next.status === "done") onCancelled?.();
+    return next;
+  }, INITIAL);
 
   if (state.status === "done") {
     return (

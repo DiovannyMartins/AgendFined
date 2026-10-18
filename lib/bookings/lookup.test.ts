@@ -14,6 +14,7 @@ const row = {
   business_name: "Barbearia Demo",
   business_slug: "barbearia-demo",
   business_phone: "+5511987654321",
+  status: "confirmed" as const,
 };
 
 const fetcher: LookupFetcher = async () => ({ data: row, error: null });
@@ -30,8 +31,16 @@ describe("lookupBookingByPublicCode", () => {
         businessName: "Barbearia Demo",
         businessSlug: "barbearia-demo",
         businessPhone: "+5511987654321",
+        status: "confirmed",
       },
     });
+  });
+
+  it("carries the booking status so the UI can tell a cancelled booking apart", async () => {
+    for (const status of ["cancelled", "completed", "no_show"] as const) {
+      const res = await lookupBookingByPublicCode(async () => ({ data: { ...row, status }, error: null }), "AB12CD34");
+      expect(res).toMatchObject({ ok: true, data: { status } });
+    }
   });
 
   it("returns NOT_FOUND when no booking matches the code", async () => {
@@ -70,6 +79,7 @@ describe("toConsultState", () => {
           businessName: "Barbearia Demo",
           businessSlug: "barbearia-demo",
           businessPhone: "+5511987654321",
+          status: "cancelled",
         },
       }),
     ).toEqual({
@@ -81,6 +91,7 @@ describe("toConsultState", () => {
         businessName: "Barbearia Demo",
         businessSlug: "barbearia-demo",
         businessPhone: "+5511987654321",
+        status: "cancelled",
       },
     });
   });

@@ -19,7 +19,6 @@ const ROUTES: [string, () => Promise<{ metadata?: Metadata }>, string][] = [
   ["/dashboard/bloqueios", () => import("./dashboard/bloqueios/page"), "Bloqueios — AgendFined"],
   ["/dashboard/configuracoes", () => import("./dashboard/configuracoes/page"), "Configurações — AgendFined"],
   ["/[slug]/consultar", () => import("./[slug]/consultar/page"), "Consultar reserva — AgendFined"],
-  ["/[slug]/confirmacao", () => import("./[slug]/confirmacao/page"), "Reserva confirmada — AgendFined"],
   ["/termos", () => import("./termos/page"), "Termos de Uso — AgendFined"],
   ["/privacidade", () => import("./privacidade/page"), "Política de Privacidade — AgendFined"],
 ];

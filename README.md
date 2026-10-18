@@ -33,7 +33,7 @@ Plataforma SaaS de agendamento online para profissionais e pequenos negócios. O
 - **Disponibilidade inteligente**: janela futura, antecedência mínima e intervalo de slots configuráveis por negócio.
 - **Validação server-side**: revalidação atômica da disponibilidade no servidor, protegida contra sobreposições.
 - **Dashboard do profissional**: gerencie negócio, serviços, disponibilidade e reservas, com blocos/manutenções de agenda.
-- **Fuso fixo America/Sao_Paulo**: datas armazenadas em UTC e exibidas no horário de Brasília.
+- **Fuso por negócio**: datas armazenadas em UTC e exibidas no fuso configurado pelo negócio (padrão America/Sao_Paulo).
 - **Anti-bot**: gate de Cloudflare Turnstile no fluxo público de reserva.
 - **Histórico estável**: snapshots de serviço (nome, preço, duração) preservam o histórico da reserva.
 - **Plano PROFISSIONAL (R$ 19,90/mês, Mercado Pago)**: relatórios, lembretes automáticos, gestão da lista de espera e exportação da agenda (Google Calendar/.ics). O plano Grátis contém o núcleo completo de agendamento.
@@ -152,11 +152,14 @@ Supabase, Mercado Pago, Resend e Vercel, e não envia secrets para o repositóri
 
 ## Principais decisões técnicas
 
-- **Fuso fixo America/Sao_Paulo**: datas gravadas em UTC, exibidas no horário de Brasília.
+O contexto e as alternativas de cada decisão estão nos ADRs em [`docs/adr/`](docs/adr/README.md).
+
+- **Fuso por negócio**: datas gravadas em UTC, interpretadas e exibidas no fuso IANA do negócio.
 - **Snapshots de reserva**: nome/preço/duração do serviço são copiados no momento da reserva; alterações futuras não mudam o histórico.
 - **Exclusion constraint** em `bookings` para impedir sobreposição sob concorrência.
 - **Service role server-only** no fluxo público, com validação estrita antes da escrita.
-- **Desativação em vez de exclusão** de serviços com histórico.
+- **Exclusão de serviço preserva o histórico**: a reserva mantém o snapshot e perde só o vínculo; a exclusão é bloqueada enquanto houver reserva agendada.
+- **Token de cancelamento independente** do código público, persistido só como digest SHA-256.
 
 ## Deploy
 

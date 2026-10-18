@@ -96,7 +96,7 @@ describe("createBooking", () => {
     const result = await createBooking({ ...validInput, customerPhone: "abcdefgh" });
 
     expect(result.fieldErrors).toEqual({
-      customerPhone: ["O telefone deve ter apenas números, como (11) 98888-7777."],
+      customerPhone: ["Informe um telefone válido com DDD, como (11) 98888-7777."],
     });
   });
 });

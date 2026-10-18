@@ -7,10 +7,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { adoptGoogleCalendarTimezone, disconnectGoogleCalendar, syncGoogleCalendarNow, type GoogleCalendarActionState } from "@/lib/google-calendar/actions";
 import type { GoogleCalendarConnectionStatus } from "@/lib/google-calendar/queries";
+import { googleCalendarCallbackNotice } from "@/lib/google-calendar/callback-status";
 
 const INITIAL: GoogleCalendarActionState = { ok: true };
 
-export function GoogleCalendarSection({ connection, isPro }: { connection: GoogleCalendarConnectionStatus; isPro: boolean }) {
+const NOTICE_CLASS = {
+  success: "text-emerald-600",
+  info: "text-muted-foreground",
+  error: "text-destructive",
+} as const;
+
+export function GoogleCalendarSection({ connection, isPro, callbackStatus }: { connection: GoogleCalendarConnectionStatus; isPro: boolean; callbackStatus?: string }) {
+  const notice = googleCalendarCallbackNotice(callbackStatus);
   const [syncState, syncAction, syncPending] = useActionState(syncGoogleCalendarNow, INITIAL);
   const [disconnectState, disconnectAction, disconnectPending] = useActionState(disconnectGoogleCalendar, INITIAL);
   const [timezoneState, timezoneAction, timezonePending] = useActionState(adoptGoogleCalendarTimezone, INITIAL);
@@ -24,6 +32,11 @@ export function GoogleCalendarSection({ connection, isPro }: { connection: Googl
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {notice && (
+          <p role={notice.tone === "error" ? "alert" : "status"} className={`text-sm ${NOTICE_CLASS[notice.tone]}`}>
+            {notice.message}
+          </p>
+        )}
         {!isPro ? (
           <p className="text-sm text-muted-foreground">Recurso disponível no plano PROFISSIONAL.</p>
         ) : connection ? (

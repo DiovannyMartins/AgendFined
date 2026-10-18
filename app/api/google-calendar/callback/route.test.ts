@@ -1,0 +1,139 @@
+// @vitest-environment node
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
+import { decryptGoogleToken } from "@/lib/google-calendar/oauth";
+
+const { getCurrentBusiness, getUser, syncGoogleCalendarForBusiness } = vi.hoisted(() => ({
+  getCurrentBusiness: vi.fn(),
+  getUser: vi.fn(),
+  syncGoogleCalendarForBusiness: vi.fn(),
+}));
+
+vi.mock("@/lib/business/queries", () => ({ getCurrentBusiness }));
+vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({ auth: { getUser } })) }));
+vi.mock("@/lib/google-calendar/sync", () => ({ syncGoogleCalendarForBusiness }));
+
+import { GET } from "./route";
+
+const STATE_COOKIE = "agendfined_google_calendar_oauth_state";
+
+function callback(query: string, cookie: string | null = "business.expected-state") {
+  return new NextRequest(`https://agenda.example/api/google-calendar/callback${query}`, {
+    headers: cookie ? { cookie: `${STATE_COOKIE}=${cookie}` } : {},
+  });
+}
+
+function calendarStatus(response: Response) {
+  return new URL(response.headers.get("location")!).searchParams.get("calendar");
+}
+
+let tokenExchanges: URLSearchParams[];
+let savedConnections: Record<string, unknown>[];
+
+beforeEach(() => {
+  tokenExchanges = [];
+  savedConnections = [];
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://database.example");
+  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-only-key");
+  vi.stubEnv("GOOGLE_CALENDAR_CLIENT_ID", "client-id");
+  vi.stubEnv("GOOGLE_CALENDAR_CLIENT_SECRET", "client-secret");
+  vi.stubEnv("GOOGLE_CALENDAR_REDIRECT_URI", "https://agenda.example/api/google-calendar/callback");
+  vi.stubEnv("GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY", Buffer.alloc(32, 3).toString("base64"));
+  getCurrentBusiness.mockResolvedValue({ id: "business", plan: "pro" });
+  getUser.mockResolvedValue({ data: { user: { id: "owner" } } });
+  syncGoogleCalendarForBusiness.mockResolvedValue({ synced: 0, deleted: 0 });
+  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+    if (url.href === "https://oauth2.googleapis.com/token") {
+      tokenExchanges.push(new URLSearchParams(String(init?.body)));
+      return Response.json({ access_token: "ya29.access", refresh_token: "1//refresh", expires_in: 3600, scope: "openid email https://www.googleapis.com/auth/calendar.events" });
+    }
+    if (url.hostname === "openidconnect.googleapis.com") return Response.json({ email: "dono@example.com" });
+    if (url.pathname.endsWith("/google_calendar_connections")) {
+      if (init?.method === "POST") {
+        savedConnections.push(JSON.parse(String(init.body)));
+        return new Response(null, { status: 201 });
+      }
+      return Response.json([]);
+    }
+    throw new Error(`Unexpected request: ${url.href}`);
+  }));
+});
+
+afterEach(() => {
+  vi.clearAllMocks();
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
+
+describe("Google Calendar OAuth callback", () => {
+  it.each([
+    ["the state cookie is missing", "?state=expected-state&code=auth-code", null],
+    ["the state differs from the cookie", "?state=forged-state&code=auth-code", "business.expected-state"],
+    ["the state parameter is missing", "?code=auth-code", "business.expected-state"],
+    ["the code is missing", "?state=expected-state", "business.expected-state"],
+  ])("rejects the callback when %s", async (_label, query, cookie) => {
+    const response = await GET(callback(query, cookie));
+
+    expect(calendarStatus(response)).toBe("invalid_state");
+    expect(tokenExchanges).toEqual([]);
+  });
+
+  it("reports a cancelled consent when Google returns access_denied", async () => {
+    const response = await GET(callback("?state=expected-state&error=access_denied"));
+
+    expect(calendarStatus(response)).toBe("cancelled");
+    expect(response.headers.get("set-cookie")).toContain(`${STATE_COOKIE}=;`);
+    expect(tokenExchanges).toEqual([]);
+  });
+
+  it("does not trust an error from a callback whose state is forged", async () => {
+    const response = await GET(callback("?state=forged-state&error=access_denied"));
+
+    expect(calendarStatus(response)).toBe("invalid_state");
+  });
+
+  it("refuses to connect the calendar to a different business", async () => {
+    getCurrentBusiness.mockResolvedValue({ id: "other-business", plan: "pro" });
+
+    const response = await GET(callback("?state=expected-state&code=auth-code"));
+
+    expect(calendarStatus(response)).toBe("unauthorized");
+    expect(tokenExchanges).toEqual([]);
+  });
+
+  it("refuses to connect on the free plan", async () => {
+    getCurrentBusiness.mockResolvedValue({ id: "business", plan: "free" });
+
+    const response = await GET(callback("?state=expected-state&code=auth-code"));
+
+    expect(calendarStatus(response)).toBe("unauthorized");
+    expect(tokenExchanges).toEqual([]);
+  });
+
+  it("stores only encrypted tokens and starts the first sync", async () => {
+    const response = await GET(callback("?state=expected-state&code=auth-code"));
+
+    expect(calendarStatus(response)).toBe("connected");
+    expect(response.headers.get("set-cookie")).toContain(`${STATE_COOKIE}=;`);
+    expect(tokenExchanges[0].get("code")).toBe("auth-code");
+    expect(tokenExchanges[0].get("redirect_uri")).toBe("https://agenda.example/api/google-calendar/callback");
+    expect(savedConnections).toHaveLength(1);
+    const saved = savedConnections[0];
+    expect(saved).toMatchObject({ business_id: "business", google_email: "dono@example.com", calendar_id: "primary", last_error: null });
+    expect(JSON.stringify(saved)).not.toMatch(/ya29\.access|1\/\/refresh/);
+    expect(decryptGoogleToken(String(saved.access_token_ciphertext))).toBe("ya29.access");
+    expect(decryptGoogleToken(String(saved.refresh_token_ciphertext))).toBe("1//refresh");
+    expect(response.headers.get("location")).not.toContain("ya29");
+    expect(syncGoogleCalendarForBusiness).toHaveBeenCalledWith("business");
+  });
+
+  it("reports a failed connection when Google rejects the code", async () => {
+    vi.mocked(fetch).mockImplementationOnce(async () => Response.json({ error: "invalid_grant" }, { status: 400 }));
+
+    const response = await GET(callback("?state=expected-state&code=auth-code"));
+
+    expect(calendarStatus(response)).toBe("connection_failed");
+    expect(savedConnections).toEqual([]);
+  });
+});

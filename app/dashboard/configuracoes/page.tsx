@@ -12,7 +12,12 @@ import { GoogleCalendarSection } from "./google-calendar-section";
 
 export const metadata: Metadata = { title: "Configurações — AgendFined" };
 
-export default async function ConfiguracoesPage() {
+export default async function ConfiguracoesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ calendar?: string }>;
+}) {
+  const { calendar } = await searchParams;
   const business = await getCurrentBusiness();
   if (!business) redirect("/dashboard/setup");
 
@@ -43,7 +48,7 @@ export default async function ConfiguracoesPage() {
 
       <PlanSection business={{ id: business.id, plan: business.plan }} />
 
-      <GoogleCalendarSection connection={googleCalendar} isPro={isProPlan(business.plan)} />
+      <GoogleCalendarSection connection={googleCalendar} isPro={isProPlan(business.plan)} callbackStatus={calendar} />
 
       <section className="space-y-2">
         <h2 className="text-xl font-semibold">Segurança da conta</h2>

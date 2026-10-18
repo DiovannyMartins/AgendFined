@@ -10,10 +10,11 @@ import {
   GOOGLE_CALENDAR_SCOPE,
 } from "@/lib/google-calendar/oauth";
 import { syncGoogleCalendarForBusiness } from "@/lib/google-calendar/sync";
+import type { GoogleCalendarCallbackStatus } from "@/lib/google-calendar/callback-status";
 
 export const runtime = "nodejs";
 
-function settingsRedirect(request: NextRequest, status: string) {
+function settingsRedirect(request: NextRequest, status: GoogleCalendarCallbackStatus) {
   const destination = new URL("/dashboard/configuracoes", request.url);
   destination.searchParams.set("calendar", status);
   return NextResponse.redirect(destination);
@@ -22,11 +23,17 @@ function settingsRedirect(request: NextRequest, status: string) {
 export async function GET(request: NextRequest) {
   const stateCookie = request.cookies.get("agendfined_google_calendar_oauth_state")?.value;
   const state = request.nextUrl.searchParams.get("state");
-  const code = request.nextUrl.searchParams.get("code");
-  if (!stateCookie || !state || !code) return settingsRedirect(request, "invalid_state");
+  if (!stateCookie || !state) return settingsRedirect(request, "invalid_state");
   const [businessId, expectedState] = stateCookie.split(".");
   if (!businessId || state !== expectedState) return settingsRedirect(request, "invalid_state");
-  if (request.nextUrl.searchParams.get("error")) return settingsRedirect(request, "cancelled");
+  // Google answers a denied consent with ?error=access_denied and no code.
+  if (request.nextUrl.searchParams.get("error")) {
+    const cancelled = settingsRedirect(request, "cancelled");
+    cancelled.cookies.delete("agendfined_google_calendar_oauth_state");
+    return cancelled;
+  }
+  const code = request.nextUrl.searchParams.get("code");
+  if (!code) return settingsRedirect(request, "invalid_state");
 
   const business = await getCurrentBusiness();
   if (!business || business.id !== businessId || !isProPlan(business.plan)) return settingsRedirect(request, "unauthorized");

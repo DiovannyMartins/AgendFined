@@ -153,26 +153,38 @@ async function deleteEvent(accessToken: string, calendarId: string, bookingId: s
   return response.status === 204;
 }
 
+// Settings shows last_error to the owner, so every failed sync records it,
+// whether it came from a single booking or from the batch.
+async function recordSyncError(connectionId: string, error: unknown): Promise<void> {
+  const message = error instanceof Error ? error.message : "GOOGLE_CALENDAR_SYNC_FAILED";
+  await createAdminClient().from("google_calendar_connections").update({ last_error: message }).eq("id", connectionId);
+}
+
 export async function syncGoogleCalendarBooking(businessId: string, bookingId: string): Promise<void> {
   const connection = await loadConnection(businessId);
   if (!connection) return;
   const admin = createAdminClient();
-  const { data: booking, error } = await admin
-    .from("bookings")
-    .select("id,start_at,end_at,status,service_name_snapshot,customer_name_snapshot,customer_note")
-    .eq("id", bookingId)
-    .eq("business_id", businessId)
-    .maybeSingle();
-  if (error) throw new Error("GOOGLE_CALENDAR_BOOKING_LOAD_FAILED");
+  try {
+    const { data: booking, error } = await admin
+      .from("bookings")
+      .select("id,start_at,end_at,status,service_name_snapshot,customer_name_snapshot,customer_note")
+      .eq("id", bookingId)
+      .eq("business_id", businessId)
+      .maybeSingle();
+    if (error) throw new Error("GOOGLE_CALENDAR_BOOKING_LOAD_FAILED");
 
-  const action = calendarActionFor(booking);
-  if (action === "keep") return;
-  const accessToken = await accessTokenFor(connection);
-  if (!booking || action === "delete") {
-    await deleteEvent(accessToken, connection.calendar_id, bookingId);
-    return;
+    const action = calendarActionFor(booking);
+    if (action === "keep") return;
+    const accessToken = await accessTokenFor(connection);
+    if (!booking || action === "delete") {
+      await deleteEvent(accessToken, connection.calendar_id, bookingId);
+      return;
+    }
+    await upsertEvent(accessToken, connection.calendar_id, booking, connection.business_timezone);
+  } catch (error) {
+    await recordSyncError(connection.id, error);
+    throw error;
   }
-  await upsertEvent(accessToken, connection.calendar_id, booking, connection.business_timezone);
 }
 
 export async function syncGoogleCalendarForBusiness(businessId: string): Promise<{ synced: number; deleted: number }> {
@@ -214,8 +226,7 @@ export async function syncGoogleCalendarForBusiness(businessId: string): Promise
     if (updateError) throw new Error("GOOGLE_CALENDAR_SYNC_STATUS_SAVE_FAILED");
     return { synced, deleted };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "GOOGLE_CALENDAR_SYNC_FAILED";
-    await admin.from("google_calendar_connections").update({ last_error: message }).eq("id", connection.id);
+    await recordSyncError(connection.id, error);
     throw error;
   }
 }

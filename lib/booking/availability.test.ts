@@ -3,6 +3,7 @@ import {
   computeAvailableSlots,
   generateSlotStartTimes,
   isWithinWindow,
+  lastBookableDate,
   isValidSlot,
   localDayRangeUtc,
   overlaps,
@@ -57,6 +58,23 @@ describe("isWithinWindow", () => {
   it("rejects a past date", () => {
     const now = new Date("2026-09-01T12:00:00Z");
     expect(isWithinWindow("2026-08-01", rules, now)).toBe(false);
+  });
+});
+
+describe("lastBookableDate", () => {
+  it("is the business-local today plus the janela", () => {
+    // 01:00 UTC is still the previous day in São Paulo.
+    expect(lastBookableDate(new Date("2026-10-19T01:00:00Z"), "America/Sao_Paulo", 60)).toBe("2026-12-17");
+    expect(lastBookableDate(new Date("2026-10-18T12:00:00Z"), "America/Sao_Paulo", 0)).toBe("2026-10-18");
+  });
+
+  it("is the last date isWithinWindow accepts", () => {
+    const now = new Date("2026-09-01T12:00:00Z");
+    const rules: BusinessRules = { slotIntervalMinutes: 30, minNoticeMinutes: 0, bookingWindowDays: 90 };
+    const last = lastBookableDate(now, undefined, 90);
+    expect(isWithinWindow(last, rules, now)).toBe(true);
+    expect(isWithinWindow("2026-12-01", rules, now)).toBe(false);
+    expect(last).toBe("2026-11-30");
   });
 });
 

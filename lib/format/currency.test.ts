@@ -25,8 +25,15 @@ describe("parsePriceToCents", () => {
     expect(parsePriceToCents("4,35")).toBe(435);
   });
 
+  it("accepts dots grouping the reais", () => {
+    expect(parsePriceToCents("1.234,56")).toBe(123456);
+    expect(parsePriceToCents("1.234")).toBe(123400);
+    expect(parsePriceToCents("12.345.678,9")).toBe(1234567890);
+    expect(parsePriceToCents("1.23")).toBe(123);
+  });
+
   it("rejects anything that is not a plain amount in reais", () => {
-    for (const input of ["", "abc", "-1", "49,901", "49,", ",90", "1.234,56", "R$ 49,90", "49 90"]) {
+    for (const input of ["", "abc", "-1", "49,901", "49,", ",90", "R$ 49,90", "49 90", "1,234.56", "1.234.56", "1.23,45", "12.34.567"]) {
       expect(parsePriceToCents(input), input).toBeNull();
     }
   });

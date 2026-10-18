@@ -19,6 +19,7 @@ import { upsertBusiness, type ActionResultState } from "@/lib/business/actions";
 import { businessFormSchema, type BusinessFormValues } from "@/lib/validation/schemas";
 import { getBookingWindowLimitDays, type Plan } from "@/lib/plan/plan";
 import { trackAnalyticsEvent } from "@/lib/analytics";
+import { formatPhoneBR } from "@/lib/format/phone";
 import { APP_TIMEZONE, TIMEZONE_OPTIONS } from "@/lib/app-timezone";
 
 const INITIAL: ActionResultState = { ok: true, data: undefined };
@@ -61,7 +62,7 @@ export function BusinessForm({
     defaultValues: {
       name: String(initial?.name ?? ""),
       slug,
-      phone: String(initial?.phone ?? ""),
+      phone: initial?.phone ? formatPhoneBR(initial.phone) : "",
       slotIntervalMinutes: String(initial?.slotIntervalMinutes ?? 30),
       minNoticeMinutes: Number(initial?.minNoticeMinutes ?? 120),
       bookingWindowDays: Math.min(Number(initial?.bookingWindowDays ?? 60), bookingWindowLimitDays),
@@ -91,6 +92,13 @@ export function BusinessForm({
     });
   }
 
+  // A submit blocked by client validation never reaches the server, so the
+  // previous server result would linger next to fields the owner already fixed.
+  function onInvalid() {
+    setState(INITIAL);
+    setSubmitted(false);
+  }
+
   const fieldErrors = state.ok ? {} : (state.fieldErrors ?? {});
 
   return (
@@ -102,7 +110,7 @@ export function BusinessForm({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+        <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-6" noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="name">Nome do negócio</Label>
@@ -136,7 +144,7 @@ export function BusinessForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="phone">Telefone / WhatsApp</Label>
-              <Input id="phone" {...register("phone")} />
+              <Input id="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="(11) 98888-7777" {...register("phone")} />
               {(errors.phone || fieldErrors.phone) && (
                 <p className="text-sm text-destructive">
                   {errors.phone?.message ?? fieldErrors.phone?.[0]}

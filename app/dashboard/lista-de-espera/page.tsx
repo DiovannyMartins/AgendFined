@@ -6,6 +6,7 @@ import { UpgradePrompt } from "@/components/upgrade-prompt";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { getWaitlistManagement } from "@/lib/waitlist/get-management";
 import { formatWhen } from "@/lib/format/when";
+import { formatPhoneBR } from "@/lib/format/phone";
 import { waitlistStatusLabel } from "@/lib/waitlist/status";
 import type { ManageWaitlistEntry } from "@/lib/waitlist/manage";
 import { WaitlistActions } from "./waitlist-actions";
@@ -72,7 +73,7 @@ function EntriesList({ entries, timezone }: { entries: ManageWaitlistEntry[]; ti
                 {formatWhen(entry.start_at, timezone)}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {entry.customer_name} · {entry.customer_phone}
+                {entry.customer_name} · {formatPhoneBR(entry.customer_phone)}
                 {entry.customer_email ? ` · ${entry.customer_email}` : ""}
               </p>
             </div>

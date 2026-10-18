@@ -100,7 +100,7 @@ export async function upsertBusiness(
       return {
         ok: false,
         code: "TIMEZONE_HAS_BOOKINGS",
-        message: "Cancele ou conclua as reservas futuras antes de alterar o fuso horário do negócio.",
+        message: "O fuso horário não pode ser alterado enquanto houver reservas futuras. Cancele essas reservas ou aguarde até que aconteçam.",
         fieldErrors: { timezone: ["Há reservas futuras neste negócio."] },
       };
     }
@@ -154,6 +154,15 @@ export async function upsertBusiness(
 function mapDbError(error: { code?: string; message: string }): ActionResultState {
   if (error.code === "23505") {
     return { ok: false, code: "SLUG_TAKEN", message: "Este endereço já está em uso." };
+  }
+  // public.reject_reserved_business_slug: the database copy of RESERVED_SLUGS.
+  if (error.message.includes("BUSINESS_SLUG_RESERVED")) {
+    return {
+      ok: false,
+      code: "SLUG_RESERVED",
+      message: RESERVED_SLUG_MESSAGE,
+      fieldErrors: { slug: [RESERVED_SLUG_MESSAGE] },
+    };
   }
   return { ok: false, code: "DB_ERROR", message: "Não foi possível salvar. Tente novamente." };
 }

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isProPlan } from "@/lib/plan/plan";
+import { getEffectiveBookingWindowDays, isProPlan } from "@/lib/plan/plan";
 import { hasActiveAvailability } from "@/lib/business/readiness";
 import { BookingWidget } from "./booking-widget";
 import { BookingUnavailable } from "./booking-unavailable";
@@ -61,11 +61,16 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
   // be offered. A failed lookup fails closed (no waitlist), like the plan gate.
   const admin = createAdminClient();
   const [{ data: planRow }, hasAvailability] = await Promise.all([
-    admin.from("businesses").select("plan").eq("id", business.id).maybeSingle(),
+    admin.from("businesses").select("plan, booking_window_days").eq("id", business.id).maybeSingle(),
     // Faixas are owner-only under RLS; only this boolean reaches the page.
     hasActiveAvailability(admin, business.id),
   ]);
   const offersWaitlist = isProPlan(planRow?.plan);
+  // The janela only caps the date picker (open when the lookup failed); the
+  // server still enforces the janela on every lookup and reserva.
+  const bookingWindowDays = planRow
+    ? getEffectiveBookingWindowDays(planRow.plan, planRow.booking_window_days)
+    : undefined;
   const activeServices = services ?? [];
 
   return (
@@ -90,6 +95,7 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
             businessId={business.id}
             slug={slug}
             timezone={business.timezone}
+            bookingWindowDays={bookingWindowDays}
             offersWaitlist={offersWaitlist}
             services={activeServices.map((s) => ({
               id: s.id,

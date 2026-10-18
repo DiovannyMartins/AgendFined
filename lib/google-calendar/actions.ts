@@ -81,7 +81,7 @@ export async function adoptGoogleCalendarTimezone(
     .eq("status", "confirmed")
     .gt("start_at", new Date().toISOString());
   if ((count ?? 0) > 0) {
-    return { ok: false, message: "Não alterei o fuso porque há reservas futuras. Cancele ou conclua essas reservas antes." };
+    return { ok: false, message: "Não alterei o fuso porque há reservas futuras. Cancele essas reservas ou aguarde até que aconteçam." };
   }
   const { error } = await admin
     .from("businesses")

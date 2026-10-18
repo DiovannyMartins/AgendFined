@@ -98,12 +98,18 @@ export function toLocalDate(date: Date, timezone: string = APP_TIMEZONE): string
   return `${map.year}-${map.month}-${map.day}`;
 }
 
+// Last calendar date (YYYY-MM-DD, business-local) inside the janela futura.
+export function lastBookableDate(now: Date, timezone: string | undefined, bookingWindowDays: number): string {
+  const windowEnd = new Date(toLocalDate(now, timezone) + "T00:00:00Z");
+  windowEnd.setUTCDate(windowEnd.getUTCDate() + bookingWindowDays);
+  return windowEnd.toISOString().slice(0, 10);
+}
+
 export function isWithinWindow(date: string, rules: BusinessRules, now: Date): boolean {
   const [y, m, d] = date.split("-").map(Number);
   const target = new Date(Date.UTC(y, m - 1, d));
   const today = new Date(toLocalDate(now, rules.timezone) + "T00:00:00Z");
-  const windowEnd = new Date(today);
-  windowEnd.setUTCDate(windowEnd.getUTCDate() + rules.bookingWindowDays);
+  const windowEnd = new Date(lastBookableDate(now, rules.timezone, rules.bookingWindowDays) + "T00:00:00Z");
   return target >= today && target <= windowEnd;
 }
 

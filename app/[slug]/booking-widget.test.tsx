@@ -54,6 +54,19 @@ describe("BookingWidget", () => {
     expect(screen.getByRole("button", { name: "09:00" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("limits the date picker to the janela futura", () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-18T12:00:00Z") });
+    try {
+      render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" bookingWindowDays={60} services={services} offersWaitlist />);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const date = screen.getByLabelText("Escolha a data");
+    expect(date).toHaveAttribute("min", "2026-10-18");
+    expect(date).toHaveAttribute("max", "2026-12-17");
+  });
+
   it("shows the selected slot as a pt-BR date", async () => {
     render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
     fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-20" } });

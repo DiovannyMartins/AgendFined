@@ -99,7 +99,7 @@ async function main() {
       owner_id: user.id,
       name: "Barbearia Demo",
       slug: DEMO_BUSINESS_SLUG,
-      phone: "+5511999999999",
+      phone: "11999999999",
     },
     { onConflict: "id" },
   );

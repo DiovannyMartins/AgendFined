@@ -3,7 +3,20 @@ import { BrandLogo } from "@/components/brand-logo";
 import { Reveal } from "@/components/reveal";
 import { LoginForm } from "./login-form";
 
-export default function LoginPage() {
+// Erros que chegam por query string (ex.: /auth/callback quando o link de
+// confirmação é aberto em outro navegador ou já expirou).
+const NOTICES: Record<string, string> = {
+  auth: "Não conseguimos concluir o acesso por este link. Seu e-mail pode já ter sido confirmado: entre com seu e-mail e senha para continuar.",
+};
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+  const notice = error ? NOTICES[error] : undefined;
+
   return (
     <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4 py-12">
       <Reveal variant="down">
@@ -12,7 +25,7 @@ export default function LoginPage() {
         </Link>
       </Reveal>
       <Reveal delay={80} className="w-full max-w-md">
-        <LoginForm />
+        <LoginForm notice={notice} />
       </Reveal>
       <Reveal delay={160}>
         <p className="mt-6 text-sm text-muted-foreground">

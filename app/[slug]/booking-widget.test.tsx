@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingWidget } from "./booking-widget";
-import { createBooking } from "@/lib/booking/actions";
+import { createBooking, joinWaitlist } from "@/lib/booking/actions";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/turnstile-widget", () => ({ TurnstileWidget: () => null }));
@@ -11,6 +11,7 @@ vi.mock("@/lib/availability/actions", () => ({
 }));
 
 const mockedCreateBooking = vi.mocked(createBooking);
+const mockedJoinWaitlist = vi.mocked(joinWaitlist);
 
 const services = [
   { id: "svc-1", name: "Corte", description: null, durationMinutes: 30, priceCents: 5000 },
@@ -30,6 +31,7 @@ async function fillAndSubmit(customerName: string) {
 describe("BookingWidget", () => {
   beforeEach(() => {
     mockedCreateBooking.mockReset();
+    mockedJoinWaitlist.mockReset();
   });
 
   it("shows the server's field error next to the name and keeps the chosen slot", async () => {
@@ -47,6 +49,38 @@ describe("BookingWidget", () => {
     expect(nameInput).toHaveAccessibleDescription("Informe seu nome completo.");
     expect(screen.getByLabelText("Telefone / WhatsApp")).not.toHaveAttribute("aria-invalid");
     expect(screen.getByRole("button", { name: "09:00" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("asks the browser for a phone keyboard and contact autofill", () => {
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} />);
+
+    const phone = screen.getByLabelText("Telefone / WhatsApp");
+    expect(phone).toHaveAttribute("type", "tel");
+    expect(phone).toHaveAttribute("inputmode", "tel");
+    expect(phone).toHaveAttribute("autocomplete", "tel");
+    expect(screen.getByLabelText("Nome")).toHaveAttribute("autocomplete", "name");
+    expect(screen.getByLabelText("E-mail para confirmação")).toHaveAttribute("autocomplete", "email");
+  });
+
+  it("shows the waitlist's field error next to the phone", async () => {
+    mockedCreateBooking.mockResolvedValue({
+      ok: false,
+      code: "slot_taken",
+      message: "Esse horário acabou de ser reservado. Escolha outro.",
+    });
+    mockedJoinWaitlist.mockResolvedValue({
+      ok: false,
+      code: "validation",
+      message: "Revise os campos destacados.",
+      fieldErrors: { customerPhone: ["Informe um telefone com DDD."] },
+    });
+
+    await fillAndSubmit("Maria Souza");
+    fireEvent.click(await screen.findByRole("button", { name: "Entrar na lista de espera" }));
+
+    const phone = screen.getByLabelText("Telefone / WhatsApp");
+    await waitFor(() => expect(phone).toHaveAttribute("aria-invalid", "true"));
+    expect(phone).toHaveAccessibleDescription("Informe um telefone com DDD.");
   });
 
   it("drops the chosen slot when the server says it no longer exists", async () => {

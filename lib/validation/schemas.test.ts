@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import {
   availabilitySchema,
   bookingSchema,
   businessSchema,
   loginSchema,
   publicAvailabilitySchema,
+  publicBookingSchema,
   publicCodeSchema,
   serviceSchema,
   signupSchema,
@@ -191,5 +193,58 @@ describe("availabilitySchema (§8.5 faixas)", () => {
 
   it("rejects a zero-length faixa", () => {
     expect(availabilitySchema.safeParse({ ...valid, startTime: "09:00", endTime: "09:00" }).success).toBe(false);
+  });
+});
+
+describe("customer phone (reserva pública)", () => {
+  const valid = {
+    serviceId: "00000000-0000-0000-0000-000000000000",
+    startAt: "2026-09-10T12:00:00.000Z",
+    customerName: "Maria",
+    customerPhone: "(11) 98888-7777",
+    customerEmail: "maria@example.com",
+  };
+
+  function phoneError(customerPhone: string) {
+    const parsed = publicBookingSchema.safeParse({ ...valid, customerPhone });
+    return parsed.success ? undefined : z.flattenError(parsed.error).fieldErrors.customerPhone;
+  }
+
+  it.each([
+    ["(11) 98888-7777", "11988887777"],
+    ["11988887777", "11988887777"],
+    ["+55 11 98888-7777", "11988887777"],
+    ["5511988887777", "11988887777"],
+    ["(21) 3333-4444", "2133334444"],
+    ["+55 (21) 3333-4444", "2133334444"],
+    ["(55) 99999-8888", "55999998888"],
+  ])("accepts %s and stores it as %s", (customerPhone, stored) => {
+    const parsed = publicBookingSchema.safeParse({ ...valid, customerPhone });
+    expect(parsed.success && parsed.data.customerPhone).toBe(stored);
+  });
+
+  it("rejects letters with a pt-BR message", () => {
+    expect(phoneError("abcdefgh")).toEqual(["O telefone deve ter apenas números, como (11) 98888-7777."]);
+  });
+
+  it("rejects a number without DDD", () => {
+    expect(phoneError("12345678")).toEqual(["Informe um telefone com DDD."]);
+    expect(phoneError("98888-7777")).toEqual(["Informe um telefone com DDD."]);
+  });
+
+  it.each([
+    ["(01) 98888-7777", "DDD with a zero"],
+    ["(10) 98888-7777", "DDD with a zero"],
+    ["(11) 88888-7777", "11-digit number that is not a celular"],
+    ["(11) 9888-7777", "10-digit number that is not a fixo"],
+    ["(11) 1888-7777", "fixo starting with 1"],
+    ["+1 415 555 2671", "foreign country code"],
+    ["+351 912 345 678", "foreign country code"],
+  ])("rejects %s (%s)", (customerPhone) => {
+    expect(phoneError(customerPhone)).toEqual(["Informe um telefone brasileiro válido, como (11) 98888-7777."]);
+  });
+
+  it("asks for the phone when it is blank", () => {
+    expect(phoneError("   ")).toEqual(["Informe seu telefone."]);
   });
 });

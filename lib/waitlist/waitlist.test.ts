@@ -47,6 +47,22 @@ describe("parseWaitlistInput (INC-3)", () => {
     expect(parseWaitlistInput({ ...valid, customerPhone: "123" }).ok).toBe(false);
   });
 
+  it("stores the customer phone in the same normalized form as a reserva", () => {
+    const res = parseWaitlistInput({ ...valid, customerPhone: "+55 (11) 98888-7777" });
+    expect(res.ok && res.data.customerPhone).toBe("11988887777");
+  });
+
+  it("rejects a non-phone with a pt-BR error on the phone field", () => {
+    expect(parseWaitlistInput({ ...valid, customerPhone: "abcdefgh" })).toMatchObject({
+      ok: false,
+      fieldErrors: { customerPhone: ["O telefone deve ter apenas números, como (11) 98888-7777."] },
+    });
+    expect(parseWaitlistInput({ ...valid, customerPhone: "12345678" })).toMatchObject({
+      ok: false,
+      fieldErrors: { customerPhone: ["Informe um telefone com DDD."] },
+    });
+  });
+
   it("rejects a non-datetime startAt", () => {
     expect(parseWaitlistInput({ ...valid, startAt: "not-a-date" }).ok).toBe(false);
   });

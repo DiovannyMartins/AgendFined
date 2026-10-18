@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { consultBooking, createBooking } from "@/lib/booking/actions";
+import { consultBooking, createBooking, joinWaitlist } from "@/lib/booking/actions";
 
 describe("consultBooking", () => {
   it("reports malformed codes before requiring anti-bot verification", async () => {
@@ -59,5 +59,35 @@ describe("createBooking", () => {
     const result = await createBooking({ ...validInput, customerEmail: "" });
 
     expect(result.fieldErrors).toEqual({ customerEmail: ["Informe seu e-mail."] });
+  });
+
+  it("rejects a phone made of letters", async () => {
+    const result = await createBooking({ ...validInput, customerPhone: "abcdefgh" });
+
+    expect(result.fieldErrors).toEqual({
+      customerPhone: ["O telefone deve ter apenas números, como (11) 98888-7777."],
+    });
+  });
+});
+
+describe("joinWaitlist", () => {
+  const validInput = {
+    slug: "barbearia",
+    serviceId: "8f14e45f-ceea-467f-a8c8-2a1a0c6e3f4b",
+    date: "2026-10-20",
+    startTime: "09:00",
+    customerName: "Maria Souza",
+    customerPhone: "11987654321",
+  };
+
+  it("rejects an invalid phone with a pt-BR error on the phone field", async () => {
+    const result = await joinWaitlist({ ...validInput, customerPhone: "12345678" });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "validation",
+      message: "Revise os campos destacados.",
+      fieldErrors: { customerPhone: ["Informe um telefone com DDD."] },
+    });
   });
 });

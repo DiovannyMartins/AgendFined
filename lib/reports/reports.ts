@@ -145,13 +145,6 @@ export function buildBillingReport(
   };
 }
 
-export function formatCurrencyBRL(cents: number): string {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(cents / 100);
-}
-
 // Raw rate (0..1) -> whole-percent string for the dashboard ("33%").
 export function formatRate(rate: number): string {
   return `${Math.round(rate * 100)}%`;

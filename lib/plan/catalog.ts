@@ -4,6 +4,7 @@
 // (lib/billing/plans re-exports it). `plan.ts` is the behavioral gate seam; this
 // file is only the catalog, so the two never drift.
 import "server-only";
+import { formatCurrencyBRL } from "@/lib/format/currency";
 import type { Plan } from "./plan";
 
 export interface PlanInfo {
@@ -21,10 +22,6 @@ export function getProPriceCents(): number {
     throw new Error("MERCADO_PAGO_PRO_AMOUNT_CENTS must be an integer between 100 and 1000000.");
   }
   return cents;
-}
-
-function formatBrl(cents: number): string {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
 }
 
 export const PLAN_INFO: Record<Plan, PlanInfo> = {
@@ -46,7 +43,7 @@ export const PLAN_INFO: Record<Plan, PlanInfo> = {
   },
   pro: {
     name: "PROFISSIONAL",
-    price: formatBrl(getProPriceCents()),
+    price: formatCurrencyBRL(getProPriceCents()),
     period: "/mês",
     description:
       "Inclui todos os recursos do plano Grátis, além de funcionalidades avançadas para otimizar a gestão do seu negócio.",

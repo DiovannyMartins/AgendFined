@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
   availabilitySchema,
+  blockSchema,
   bookingSchema,
   businessFormSchema,
   businessSchema,
@@ -9,6 +10,7 @@ import {
   publicAvailabilitySchema,
   publicBookingSchema,
   publicCodeSchema,
+  serviceFormSchema,
   serviceSchema,
   signupSchema,
   passwordSchema,
@@ -263,4 +265,107 @@ describe("customer phone (reserva pública)", () => {
   it("asks for the phone when it is blank", () => {
     expect(phoneError("   ")).toEqual(["Informe seu telefone."]);
   });
+});
+
+describe("serviceFormSchema price (formato brasileiro)", () => {
+  const valid = { name: "Corte", description: "", durationMinutes: 30 };
+
+  it("accepts comma and dot as the decimal separator", () => {
+    for (const price of ["49,90", "49.90", "49", "0,5"]) {
+      expect(serviceFormSchema.safeParse({ ...valid, price }).success, price).toBe(true);
+    }
+  });
+
+  it("rejects an invalid price with a pt-BR example", () => {
+    const result = serviceFormSchema.safeParse({ ...valid, price: "49,901" });
+    expect(result.error?.flatten().fieldErrors.price).toEqual(["Informe um preço válido, como 49,90."]);
+  });
+});
+
+describe("availabilitySchema inverted faixa", () => {
+  it("says the end must come after the start", () => {
+    const result = availabilitySchema.safeParse({ weekday: 2, startTime: "18:00", endTime: "08:00" });
+    expect(result.error?.issues.map((issue) => issue.message)).toEqual(["O fim deve ser depois do início."]);
+  });
+});
+
+// Dashboard forms show schema messages verbatim, so none of them may fall back
+// to Zod's default (English) text.
+describe("dashboard schemas speak pt-BR", () => {
+  const ENGLISH = /\b(invalid|too (small|big)|expected|received|required|must|string|number)\b/i;
+  const long = (n: number) => "a".repeat(n);
+
+  const service = { name: "Corte", description: "", durationMinutes: 30, priceCents: 4990 };
+  const serviceForm = { name: "Corte", description: "", durationMinutes: 30, price: "49,90" };
+  const business = {
+    name: "Barbearia Demo",
+    slug: "barbearia-demo",
+    phone: "+5511999999999",
+    slotIntervalMinutes: 30,
+    minNoticeMinutes: 120,
+    bookingWindowDays: 60,
+    timezone: "America/Sao_Paulo",
+    description: "",
+  };
+  const businessForm = { ...business, slotIntervalMinutes: "30" };
+  const availability = { weekday: 2, startTime: "08:00", endTime: "18:00" };
+  const block = { startAt: "2026-10-19T12:00", endAt: "2026-10-19T13:00", reason: "" };
+
+  const serviceFields = [
+    { name: "" },
+    { name: "a" },
+    { name: long(81) },
+    { description: long(501) },
+    { durationMinutes: 0 },
+    { durationMinutes: 481 },
+    { durationMinutes: 7.5 },
+    { durationMinutes: Number.NaN },
+  ];
+  const businessFields = [
+    { name: "a" },
+    { name: long(101) },
+    { slug: "ab" },
+    { slug: long(51) },
+    { phone: "123" },
+    { phone: "1".repeat(21) },
+    { minNoticeMinutes: -1 },
+    { minNoticeMinutes: 10081 },
+    { minNoticeMinutes: 1.5 },
+    { minNoticeMinutes: Number.NaN },
+    { bookingWindowDays: 0 },
+    { bookingWindowDays: 366 },
+    { bookingWindowDays: Number.NaN },
+    { timezone: "" },
+    { description: long(501) },
+  ];
+
+  const cases: [string, z.ZodType, Record<string, unknown>, Record<string, unknown>[]][] = [
+    ["serviceSchema", serviceSchema, service, [...serviceFields, { priceCents: -1 }, { priceCents: Number.NaN }, { priceCents: 1.5 }]],
+    ["serviceFormSchema", serviceFormSchema, serviceForm, [...serviceFields, { price: "abc" }]],
+    ["businessSchema", businessSchema, business, [...businessFields, { slotIntervalMinutes: Number.NaN }, { slotIntervalMinutes: 1.5 }]],
+    ["businessFormSchema", businessFormSchema, businessForm, [...businessFields, { slotIntervalMinutes: "" }]],
+    [
+      "availabilitySchema",
+      availabilitySchema,
+      availability,
+      [{ weekday: 0 }, { weekday: 8 }, { weekday: Number.NaN }, { startTime: "8" }, { endTime: "" }],
+    ],
+    ["blockSchema", blockSchema, block, [{ startAt: "" }, { endAt: "amanhã" }, { reason: long(121) }]],
+  ];
+
+  for (const [label, schema, valid, overrides] of cases) {
+    it(`${label} accepts its valid sample`, () => {
+      expect(schema.safeParse(valid).success).toBe(true);
+    });
+
+    for (const override of overrides) {
+      it(`${label} rejects ${JSON.stringify(override).slice(0, 60)} in pt-BR`, () => {
+        const result = schema.safeParse({ ...valid, ...override });
+        expect(result.success).toBe(false);
+        for (const issue of result.error?.issues ?? []) {
+          expect(issue.message).not.toMatch(ENGLISH);
+        }
+      });
+    }
+  }
 });

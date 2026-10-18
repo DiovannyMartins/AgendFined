@@ -47,7 +47,7 @@ vi.mock("@/lib/supabase/server", () => ({
   }),
 }));
 
-import { createBlock } from "./actions";
+import { createBlock, setAvailability, updateAvailability } from "./actions";
 import { computeAvailableSlots, toUtcRange } from "@/lib/booking/availability";
 
 function blockForm(startAt: string, endAt: string, reason = "") {
@@ -146,5 +146,27 @@ describe("createBlock", () => {
 
     expect(result).toMatchObject({ ok: false, code: "VALIDATION" });
     expect(state.inserts).toEqual([]);
+  });
+});
+
+describe("availability faixa validation", () => {
+  function faixaForm(startTime: string, endTime: string) {
+    const formData = new FormData();
+    formData.set("weekday", "2");
+    formData.set("startTime", startTime);
+    formData.set("endTime", endTime);
+    return formData;
+  }
+
+  it("explains an inverted faixa when adding it", async () => {
+    const result = await setAvailability({ ok: true, data: undefined }, faixaForm("18:00", "08:00"));
+
+    expect(result).toMatchObject({ ok: false, code: "VALIDATION", message: "O fim deve ser depois do início." });
+  });
+
+  it("explains an inverted faixa when editing it", async () => {
+    const result = await updateAvailability("faixa-1", { ok: true, data: undefined }, faixaForm("18:00", "08:00"));
+
+    expect(result).toMatchObject({ ok: false, code: "VALIDATION", message: "O fim deve ser depois do início." });
   });
 });

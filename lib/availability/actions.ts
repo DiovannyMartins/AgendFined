@@ -27,7 +27,9 @@ export async function setAvailability(
     return {
       ok: false,
       code: "VALIDATION",
-      message: "Revise os campos de disponibilidade.",
+      // Every availabilitySchema message is pt-BR and names the problem (e.g. an
+      // inverted faixa), so it is shown as is instead of a generic hint.
+      message: parsed.error.issues[0]?.message ?? "Revise os campos de disponibilidade.",
       fieldErrors: parsed.error.flatten().fieldErrors,
     };
   }
@@ -83,7 +85,9 @@ export async function updateAvailability(
     return {
       ok: false,
       code: "VALIDATION",
-      message: "Revise os campos de disponibilidade.",
+      // Every availabilitySchema message is pt-BR and names the problem (e.g. an
+      // inverted faixa), so it is shown as is instead of a generic hint.
+      message: parsed.error.issues[0]?.message ?? "Revise os campos de disponibilidade.",
       fieldErrors: parsed.error.flatten().fieldErrors,
     };
   }

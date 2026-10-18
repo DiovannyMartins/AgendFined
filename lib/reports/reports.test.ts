@@ -4,7 +4,6 @@ import {
   buildBillingReport,
   buildBillingReportResult,
   filterBookingsByRange,
-  formatCurrencyBRL,
   formatRate,
   resolveRange,
   type FetchReportBookings,
@@ -117,8 +116,7 @@ describe("resolveRange", () => {
 });
 
 describe("format helpers", () => {
-  it("formats cents as BRL and rates as whole-percent", () => {
-    expect(formatCurrencyBRL(10500)).toContain("105,00");
+  it("formats rates as whole-percent", () => {
     expect(formatRate(1 / 3)).toBe("33%");
     expect(formatRate(0)).toBe("0%");
     expect(formatRate(1)).toBe("100%");

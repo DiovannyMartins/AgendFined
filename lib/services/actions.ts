@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { serviceSchema } from "@/lib/validation/schemas";
+import { parsePriceToCents } from "@/lib/format/currency";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import type { ActionResult } from "@/lib/business/actions";
 
@@ -22,7 +23,9 @@ function parseService(formData: FormData): ServicePayload {
     name: String(formData.get("name") ?? ""),
     description: String(formData.get("description") ?? "") || null,
     durationMinutes: Number(formData.get("durationMinutes") ?? 0),
-    priceCents: price ? Math.round(Number(price) * 100) : 0,
+    // "49,90" and "49.90" are both 4990; an unparseable price becomes NaN so
+    // serviceSchema rejects it instead of storing a wrong amount.
+    priceCents: price ? (parsePriceToCents(price) ?? Number.NaN) : 0,
   };
 }
 

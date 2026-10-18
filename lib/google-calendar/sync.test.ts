@@ -256,7 +256,7 @@ describe("Google Calendar access token", () => {
     expect(JSON.stringify(saved)).not.toContain("renewed-token");
     expect(decryptGoogleToken(String(saved.access_token_ciphertext))).toBe("renewed-token");
     const authorization = vi.mocked(fetch).mock.calls
-      .filter(([input]) => String(input).startsWith("https://www.googleapis.com"))
+      .filter(([input]) => new URL(String(input)).hostname === "www.googleapis.com")
       .map(([, init]) => (init?.headers as Record<string, string>).Authorization);
     expect(authorization).toEqual(["Bearer renewed-token"]);
   });

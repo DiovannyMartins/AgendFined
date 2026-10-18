@@ -21,6 +21,7 @@ type FieldErrors = Partial<Record<CustomerField, string>>;
 // Server errors meaning the chosen slot itself is gone; any other failure keeps
 // it so the customer can fix the form and retry. `slot_taken` has its own branch.
 const SLOT_GONE_CODES = new Set(["no_availability", "booking_window", "service_not_found"]);
+const SLOT_TAKEN_MESSAGE = "Esse horário acabou de ser reservado. Escolha outro.";
 
 type ServiceOption = {
   id: string;
@@ -35,11 +36,15 @@ export function BookingWidget({
   slug,
   timezone,
   services,
+  offersWaitlist,
 }: {
   businessId: string;
   slug: string;
   timezone: string;
   services: ServiceOption[];
+  // Whether the business can follow up waitlist requests (PROFISSIONAL only).
+  // The plan itself never reaches the customer-facing page.
+  offersWaitlist: boolean;
 }) {
   const router = useRouter();
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
@@ -115,6 +120,15 @@ export function BookingWidget({
     setTurnstileRound((round) => round + 1);
   }
 
+  function refreshSlots(forDate: string) {
+    getSlotsForDate(businessId, serviceId, forDate)
+      .then((r) => {
+        setSlots(r.available ?? []);
+        setAvailabilityError(r.error ? "Não foi possível atualizar os horários." : null);
+      })
+      .catch(() => setAvailabilityError("Não foi possível atualizar os horários."));
+  }
+
   function resetWaitlist() {
     setLastAttempt(null);
     setWaitlistOffered(false);
@@ -179,12 +193,18 @@ export function BookingWidget({
     if (result.ok && result.publicCode && result.cancelToken) {
       trackAnalyticsEvent("booking_complete", { method: "public_form" });
       router.push(buildPrivateConfirmationPath(slug, result.publicCode, result.cancelToken));
-    } else if (result.code === "slot_taken") {
+    } else if (result.code === "slot_taken" && offersWaitlist) {
       // INC-3: the slot was lost to another reservation — offer the waitlist.
       setError(result.message ?? "Esse horário não está mais disponível.");
       setLastAttempt({ date, startTime: slot });
       setWaitlistOffered(true);
       setWaitlistSubmitted(null);
+      resetTurnstile();
+    } else if (result.code === "slot_taken") {
+      // Without a waitlist there is nothing to promise: ask for another slot.
+      setError(SLOT_TAKEN_MESSAGE);
+      setSelectedSlot(null);
+      refreshSlots(date);
       resetTurnstile();
     } else if (result.code === "validation") {
       // Validation runs before the anti-bot gate, so the Turnstile token is
@@ -220,18 +240,14 @@ export function BookingWidget({
       setWaitlistSubmitted(res.message ?? "Você entrou na lista de espera deste horário.");
       setSelectedSlot(null);
       setSlots([]);
-    } else if (res.code === "slot_free") {
-      // The slot was freed mid-flow: drop the waitlist offer and refresh the
-      // slots so the customer can book it directly.
+    } else if (res.code === "slot_free" || res.code === "waitlist_unavailable") {
+      // The slot was freed mid-flow, or the business can no longer take
+      // waitlist requests: drop the offer and refresh the slots so the
+      // customer can pick one directly.
       setWaitlistOffered(false);
-      setError(res.message ?? "Esse horário está livre.");
+      setError(res.message ?? (res.code === "slot_free" ? "Esse horário está livre." : SLOT_TAKEN_MESSAGE));
       setSelectedSlot(null);
-      getSlotsForDate(businessId, serviceId, lastAttempt.date)
-        .then((r) => {
-          setSlots(r.available ?? []);
-          setAvailabilityError(r.error ? "Não foi possível atualizar os horários." : null);
-        })
-        .catch(() => setAvailabilityError("Não foi possível atualizar os horários."));
+      refreshSlots(lastAttempt.date);
     } else if (res.code === "validation" && res.fieldErrors) {
       // Checked before the anti-bot gate: the token is unspent and the offer stays.
       setError(res.message ?? "Revise os campos destacados.");

@@ -1,4 +1,35 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { state } = vi.hoisted(() => ({
+  state: {
+    business: null as Record<string, unknown> | null,
+    rpcCalls: [] as { name: string; args: Record<string, unknown> }[],
+  },
+}));
+
+vi.mock("@/lib/booking/anti-bot", () => ({ verifyTurnstile: async () => ({ ok: true }) }));
+vi.mock("@/lib/booking/rate-limit", () => ({
+  getClientIp: async () => "203.0.113.7",
+  enforceRateLimit: async () => true,
+  enforceConsultRateLimit: async () => true,
+}));
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: () => {
+    const query = {
+      select: () => query,
+      eq: () => query,
+      single: async () => ({ data: state.business, error: null }),
+    };
+    return {
+      from: () => query,
+      rpc: async (name: string, args: Record<string, unknown>) => {
+        state.rpcCalls.push({ name, args });
+        return { data: "waitlist-entry-1", error: null };
+      },
+    };
+  },
+}));
+
 import { consultBooking, createBooking, joinWaitlist } from "@/lib/booking/actions";
 
 describe("consultBooking", () => {
@@ -88,6 +119,59 @@ describe("joinWaitlist", () => {
       code: "validation",
       message: "Revise os campos destacados.",
       fieldErrors: { customerPhone: ["Informe um telefone com DDD."] },
+    });
+  });
+
+  describe("plan gate", () => {
+    const futureInput = { ...validInput, date: "2030-01-15" };
+    const business = {
+      id: "business-1",
+      name: "Barbearia",
+      slot_interval_minutes: 30,
+      min_notice_minutes: 0,
+      booking_window_days: 365,
+      timezone: "America/Sao_Paulo",
+    };
+
+    beforeEach(() => {
+      state.rpcCalls = [];
+    });
+
+    it("refuses a Grátis business without writing anything", async () => {
+      state.business = { ...business, plan: "free" };
+
+      const result = await joinWaitlist(futureInput);
+
+      expect(result).toMatchObject({ ok: false, code: "waitlist_unavailable" });
+      expect(result.message).not.toMatch(/plano|grátis|pro/i);
+      expect(state.rpcCalls).toEqual([]);
+    });
+
+    it("fails closed when the business has no plan", async () => {
+      state.business = { ...business, plan: null };
+
+      const result = await joinWaitlist(futureInput);
+
+      expect(result).toMatchObject({ ok: false, code: "waitlist_unavailable" });
+      expect(state.rpcCalls).toEqual([]);
+    });
+
+    it("keeps adding PROFISSIONAL customers to the waitlist", async () => {
+      state.business = { ...business, plan: "pro" };
+
+      const result = await joinWaitlist(futureInput);
+
+      expect(result).toEqual({ ok: true, message: "Você entrou na lista de espera deste horário." });
+      expect(state.rpcCalls).toEqual([
+        {
+          name: "join_waitlist",
+          args: expect.objectContaining({
+            p_business_id: "business-1",
+            p_service_id: validInput.serviceId,
+            p_start_at: "2030-01-15T12:00:00.000Z",
+          }),
+        },
+      ]);
     });
   });
 });

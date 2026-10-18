@@ -1,3 +1,5 @@
+import "server-only";
+
 // Shared delivery for transactional emails sent to the cliente. Sending is best
 // effort: callers decide how to log a failure, and nothing here ever throws.
 export type SendResult = { sent: true } | { sent: false; reason: "not_configured" | "provider_error" };

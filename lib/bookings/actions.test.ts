@@ -12,19 +12,19 @@ type BookingRow = {
 
 type SendResult = { sent: true } | { sent: false; reason: "not_configured" | "provider_error" };
 
-const { state, sendBookingCancellationEmail } = vi.hoisted(() => ({
+const { state, sendBusinessCancelledEmail } = vi.hoisted(() => ({
   state: {
     booking: null as BookingRow | null,
     updates: [] as Record<string, unknown>[],
     conflict: false,
   },
-  sendBookingCancellationEmail: vi.fn<(input: unknown) => Promise<SendResult>>(async () => ({ sent: true })),
+  sendBusinessCancelledEmail: vi.fn<(input: unknown) => Promise<SendResult>>(async () => ({ sent: true })),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/bookings/classification", () => ({ classifyCancellationReason: vi.fn(async () => null) }));
 vi.mock("@/lib/google-calendar/sync", () => ({ syncGoogleCalendarBooking: vi.fn() }));
-vi.mock("@/lib/email/booking-cancellation", () => ({ sendBookingCancellationEmail }));
+vi.mock("@/lib/email/booking-cancellation", () => ({ sendBusinessCancelledEmail }));
 vi.mock("@/lib/business/queries", () => ({
   getCurrentBusiness: async () => ({
     id: "business-1",
@@ -84,8 +84,8 @@ describe("updateBookingStatus", () => {
     };
     state.updates = [];
     state.conflict = false;
-    sendBookingCancellationEmail.mockClear();
-    sendBookingCancellationEmail.mockResolvedValue({ sent: true });
+    sendBusinessCancelledEmail.mockClear();
+    sendBusinessCancelledEmail.mockResolvedValue({ sent: true });
   });
 
   afterEach(() => {
@@ -129,8 +129,8 @@ describe("updateBookingStatus", () => {
 
     await expect(updateBookingStatus({ ok: true }, form)).resolves.toEqual({ ok: true });
 
-    expect(sendBookingCancellationEmail).toHaveBeenCalledTimes(1);
-    expect(sendBookingCancellationEmail).toHaveBeenCalledWith({
+    expect(sendBusinessCancelledEmail).toHaveBeenCalledTimes(1);
+    expect(sendBusinessCancelledEmail).toHaveBeenCalledWith({
       customerName: "Ana",
       customerEmail: "ana@example.com",
       businessName: "Barbearia Demo",
@@ -140,13 +140,13 @@ describe("updateBookingStatus", () => {
       publicCode: "65925DBB",
       rebookUrl: "https://agenda.example/barbearia-demo",
     });
-    expect(JSON.stringify(sendBookingCancellationEmail.mock.calls[0])).not.toContain("Imprevisto interno");
+    expect(JSON.stringify(sendBusinessCancelledEmail.mock.calls[0])).not.toContain("Imprevisto interno");
   });
 
   it("keeps the cancellation and logs the failure when the email is not sent", async () => {
     vi.setSystemTime(new Date("2026-10-17T12:00:00.000Z"));
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    sendBookingCancellationEmail.mockResolvedValue({ sent: false, reason: "provider_error" });
+    sendBusinessCancelledEmail.mockResolvedValue({ sent: false, reason: "provider_error" });
 
     await expect(updateBookingStatus({ ok: true }, statusForm("cancelled"))).resolves.toEqual({ ok: true });
 
@@ -163,7 +163,7 @@ describe("updateBookingStatus", () => {
 
     await expect(updateBookingStatus({ ok: true }, statusForm("cancelled"))).resolves.toEqual({ ok: true });
 
-    expect(sendBookingCancellationEmail).not.toHaveBeenCalled();
+    expect(sendBusinessCancelledEmail).not.toHaveBeenCalled();
   });
 
   it("skips the email when the cancellation loses the race to another operation", async () => {
@@ -173,7 +173,7 @@ describe("updateBookingStatus", () => {
     const result = await updateBookingStatus({ ok: true }, statusForm("cancelled"));
 
     expect(result.ok).toBe(false);
-    expect(sendBookingCancellationEmail).not.toHaveBeenCalled();
+    expect(sendBusinessCancelledEmail).not.toHaveBeenCalled();
   });
 
   it.each(["completed", "no_show"])("does not send a cancellation email when marking %s", async (status) => {
@@ -181,6 +181,6 @@ describe("updateBookingStatus", () => {
 
     await updateBookingStatus({ ok: true }, statusForm(status));
 
-    expect(sendBookingCancellationEmail).not.toHaveBeenCalled();
+    expect(sendBusinessCancelledEmail).not.toHaveBeenCalled();
   });
 });

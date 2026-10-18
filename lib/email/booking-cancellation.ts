@@ -103,7 +103,7 @@ function buildBookingCancellationHtml(input: BookingCancellation, formattedWhen:
 </html>`;
 }
 
-export async function sendBookingCancellationEmail(input: BookingCancellation): Promise<SendResult> {
+export async function sendBusinessCancelledEmail(input: BookingCancellation): Promise<SendResult> {
   const formattedWhen = formatWhen(input.startAt, input.timezone);
   const text = [
     `Olá, ${input.customerName}!`,

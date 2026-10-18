@@ -1,5 +1,6 @@
 import { loadEnvFile } from "node:process";
 import { createClient } from "@supabase/supabase-js";
+import { DEMO_BUSINESS_ID, DEMO_SERVICE_IDS } from "./seed-demo-ids.mjs";
 
 try {
   loadEnvFile(".env.local");
@@ -36,12 +37,7 @@ const DEMO_EMAIL = "demo.local@agendfined.invalid";
 const DEMO_PASSWORD = process.env.LOCAL_DEMO_PASSWORD;
 if (!DEMO_PASSWORD) throw new Error("LOCAL_DEMO_PASSWORD não está definida em .env.local.");
 const DEMO_PROFILE_NAME = "Demo Barber";
-const DEMO_BUSINESS_ID = "10000000-0000-0000-0000-000000000001";
 const DEMO_BUSINESS_SLUG = "barbearia-demo";
-const DEMO_SERVICE_IDS = [
-  "20000000-0000-0000-0000-000000000001",
-  "20000000-0000-0000-0000-000000000002",
-];
 
 async function findDemoUser() {
   for (let page = 1; ; page += 1) {
@@ -80,6 +76,21 @@ async function main() {
   if (businessLookupError) throw new Error(`Falha ao procurar negócio demo: ${businessLookupError.message}`);
   if (existingBusiness && existingBusiness.owner_id !== user.id) {
     throw new Error("O negócio demo existente pertence a outro usuário; nenhuma reassociação foi feita.");
+  }
+
+  // Bancos semeados antes da troca para UUIDs válidos têm o negócio demo com o
+  // ID antigo; owner_id e slug são únicos, então o upsert abaixo falharia.
+  const { data: ownedBusiness, error: ownedLookupError } = await admin
+    .from("businesses")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (ownedLookupError) throw new Error(`Falha ao procurar negócio do usuário demo: ${ownedLookupError.message}`);
+  if (ownedBusiness && ownedBusiness.id !== DEMO_BUSINESS_ID) {
+    throw new Error(
+      `O usuário demo já tem um negócio com outro ID (${ownedBusiness.id}), provavelmente de um seed antigo. ` +
+        "Rode `npx supabase db reset` e depois `npm run seed:local`.",
+    );
   }
 
   const { error: businessError } = await admin.from("businesses").upsert(

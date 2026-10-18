@@ -2,10 +2,10 @@ import { formatPublicCode } from "@/lib/bookings/public-code";
 import { escapeHtml, sendEmail, type SendResult } from "@/lib/email/resend";
 import { formatWhen } from "@/lib/format/when";
 
-// Sent when the negócio cancels a reserva from the dashboard. It deliberately
-// carries no cancel token (the reserva is already cancelled) and no cancel
-// reason: the reason is typed as an internal note and was never promised to
-// the cliente.
+// Sent when a reserva is cancelled, either by the negócio from the dashboard or
+// by the cliente through the private cancellation link. It deliberately carries
+// no cancel token or private link (the reserva is already cancelled) and no
+// cancel reason, which was never promised back to the cliente.
 type BookingCancellation = {
   customerName: string;
   customerEmail: string;
@@ -17,7 +17,26 @@ type BookingCancellation = {
   rebookUrl: string;
 };
 
-function buildBookingCancellationHtml(input: BookingCancellation, formattedWhen: string): string {
+// Only the wording changes with who cancelled; the reserva details are the same.
+type Wording = {
+  subject: string;
+  heading: string;
+  intro: (businessName: string) => string;
+};
+
+const BUSINESS_CANCELLED: Wording = {
+  subject: "Sua reserva foi cancelada",
+  heading: "Sua reserva foi cancelada.",
+  intro: (businessName) => `${businessName} cancelou a sua reserva. Você não precisa comparecer neste horário.`,
+};
+
+const CUSTOMER_CANCELLED: Wording = {
+  subject: "Você cancelou sua reserva",
+  heading: "Você cancelou sua reserva.",
+  intro: (businessName) => `Você cancelou sua reserva com ${businessName}. O horário foi liberado.`,
+};
+
+function buildBookingCancellationHtml(input: BookingCancellation, wording: Wording, formattedWhen: string): string {
   const customerName = escapeHtml(input.customerName);
   const businessName = escapeHtml(input.businessName);
   const serviceName = escapeHtml(input.serviceName);
@@ -30,7 +49,7 @@ function buildBookingCancellationHtml(input: BookingCancellation, formattedWhen:
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sua reserva foi cancelada</title>
+    <title>${escapeHtml(wording.subject)}</title>
   </head>
   <body style="margin:0;background-color:#141414;color:#eeeeee;font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background-color:#141414;">
@@ -50,8 +69,8 @@ function buildBookingCancellationHtml(input: BookingCancellation, formattedWhen:
             <tr>
               <td style="padding:36px 32px 32px;">
                 <p style="margin:0 0 12px;color:#b0b0b0;font-size:13px;line-height:20px;">CANCELAMENTO DE RESERVA</p>
-                <h1 style="margin:0;color:#eeeeee;font-size:28px;font-weight:700;line-height:36px;letter-spacing:-0.6px;">Sua reserva foi cancelada.</h1>
-                <p style="margin:16px 0 0;color:#b0b0b0;font-size:16px;line-height:25px;">Olá, ${customerName}! ${businessName} cancelou a sua reserva. Você não precisa comparecer neste horário.</p>
+                <h1 style="margin:0;color:#eeeeee;font-size:28px;font-weight:700;line-height:36px;letter-spacing:-0.6px;">${escapeHtml(wording.heading)}</h1>
+                <p style="margin:16px 0 0;color:#b0b0b0;font-size:16px;line-height:25px;">Olá, ${customerName}! ${wording.intro(businessName)}</p>
 
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin-top:28px;border:1px solid #333333;border-radius:9px;border-collapse:separate;background-color:#242424;">
                   <tr>
@@ -103,12 +122,12 @@ function buildBookingCancellationHtml(input: BookingCancellation, formattedWhen:
 </html>`;
 }
 
-export async function sendBusinessCancelledEmail(input: BookingCancellation): Promise<SendResult> {
+async function sendCancellationEmail(input: BookingCancellation, wording: Wording): Promise<SendResult> {
   const formattedWhen = formatWhen(input.startAt, input.timezone);
   const text = [
     `Olá, ${input.customerName}!`,
     "",
-    `${input.businessName} cancelou a sua reserva. Você não precisa comparecer neste horário.`,
+    wording.intro(input.businessName),
     `Negócio: ${input.businessName}`,
     `Serviço: ${input.serviceName}`,
     `Data e horário: ${formattedWhen}`,
@@ -117,7 +136,15 @@ export async function sendBusinessCancelledEmail(input: BookingCancellation): Pr
     `Reservar outro horário: ${input.rebookUrl}`,
     `Em caso de dúvida, fale diretamente com ${input.businessName}.`,
   ].join("\n");
-  const html = buildBookingCancellationHtml(input, formattedWhen);
+  const html = buildBookingCancellationHtml(input, wording, formattedWhen);
 
-  return sendEmail({ to: input.customerEmail, subject: "Sua reserva foi cancelada", text, html });
+  return sendEmail({ to: input.customerEmail, subject: wording.subject, text, html });
+}
+
+export function sendBusinessCancelledEmail(input: BookingCancellation): Promise<SendResult> {
+  return sendCancellationEmail(input, BUSINESS_CANCELLED);
+}
+
+export function sendCustomerCancelledEmail(input: BookingCancellation): Promise<SendResult> {
+  return sendCancellationEmail(input, CUSTOMER_CANCELLED);
 }

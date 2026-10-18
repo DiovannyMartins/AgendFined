@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { sendBusinessCancelledEmail } from "@/lib/email/booking-cancellation";
+import { sendBusinessCancelledEmail, sendCustomerCancelledEmail } from "@/lib/email/booking-cancellation";
 
 const input = {
   customerName: "Ana & João <cliente>",
@@ -78,5 +78,59 @@ describe("sendBusinessCancelledEmail", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
 
     await expect(sendBusinessCancelledEmail(input)).resolves.toEqual({ sent: false, reason: "provider_error" });
+  });
+});
+
+describe("sendCustomerCancelledEmail", () => {
+  it("confirms to the cliente that they cancelled the reserva themselves", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "AgendFined <reservas@example.com>");
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(sendCustomerCancelledEmail(input)).resolves.toEqual({ sent: true });
+
+    const request = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(request).toMatchObject({
+      from: "AgendFined <reservas@example.com>",
+      to: ["ana@example.com"],
+      subject: "Você cancelou sua reserva",
+    });
+    expect(request.text).toContain("Ana & João <cliente>");
+    expect(request.text).toContain("Você cancelou sua reserva com Barbearia \"Demo\"");
+    expect(request.text).not.toContain("cancelou a sua reserva");
+    expect(request.text).toContain("Corte <premium>");
+    expect(request.text).toContain("10/05/2026 às 15:00");
+    expect(request.text).toContain("6592-5DBB");
+    expect(request.text).toContain(input.rebookUrl);
+    expect(request.html).toContain("Você cancelou sua reserva.");
+    expect(request.html).toContain("Ana &amp; João &lt;cliente&gt;");
+    expect(request.html).toContain("Barbearia &quot;Demo&quot;");
+    expect(request.html).toContain("Corte &lt;premium&gt;");
+    expect(request.html).toContain("10/05/2026 às 15:00");
+    expect(request.html).toContain("6592-5DBB");
+    expect(request.html).toContain("https://agenda.example/barbearia?ref=cancelamento&amp;x=1");
+    expect(request.html).not.toContain("<cliente>");
+  });
+
+  it("never carries a cancel capability", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "AgendFined <reservas@example.com>");
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await sendCustomerCancelledEmail(input);
+
+    const body = fetchMock.mock.calls[0][1].body as string;
+    expect(body).not.toContain("cancel=");
+    expect(body).not.toContain("confirmacao");
+  });
+
+  it("keeps provider failures non-throwing", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "AgendFined <reservas@example.com>");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+
+    await expect(sendCustomerCancelledEmail(input)).resolves.toEqual({ sent: false, reason: "provider_error" });
   });
 });

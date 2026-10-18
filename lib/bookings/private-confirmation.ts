@@ -11,17 +11,11 @@ export function buildPrivateConfirmationPath(
 }
 
 export function buildPrivateConfirmationUrl(
-  configuredOrigin: string,
+  origin: URL,
   slug: string,
   publicCode: string,
   cancelToken: string,
 ): string {
-  let origin: URL;
-  try {
-    origin = new URL(configuredOrigin);
-  } catch {
-    origin = new URL("http://localhost:3000");
-  }
   return new URL(buildPrivateConfirmationPath(slug, publicCode, cancelToken), origin).toString();
 }
 

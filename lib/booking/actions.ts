@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { Database } from "@/lib/supabase/database-types";
 import { z } from "zod";
 import {
   customerDetailsSchema,
@@ -30,6 +31,7 @@ import { verifyTurnstile } from "@/lib/booking/anti-bot";
 import { assertProPlan, getEffectiveBookingWindowDays } from "@/lib/plan/plan";
 import type { Plan } from "@/lib/plan/plan";
 import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
+import { sendCustomerCancelledEmail } from "@/lib/email/booking-cancellation";
 import {
   classifyCancellationReason,
   classifyCustomerNote,
@@ -37,6 +39,8 @@ import {
 } from "@/lib/bookings/classification";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
 import { buildPrivateConfirmationUrl } from "@/lib/bookings/private-confirmation";
+import { buildPublicBookingUrl } from "@/lib/bookings/public-booking-url";
+import { resolveAppOrigin } from "@/lib/app-origin";
 
 export type ActionResult = {
   ok: boolean;
@@ -209,7 +213,7 @@ export async function createBooking(input: {
       timezone: business.timezone,
       publicCode: data.public_code,
       confirmationUrl: buildPrivateConfirmationUrl(
-        process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        resolveAppOrigin(),
         input.slug,
         data.public_code,
         cancelToken,
@@ -355,7 +359,7 @@ export async function cancelPublicBooking(
     };
   }
 
-  const { error } = await supabase.rpc("cancel_booking_by_public_code", {
+  const { data: cancelled, error } = await supabase.rpc("cancel_booking_by_public_code", {
     p_code: parsed.data,
     p_cancel_token_hash: hashCancelToken(token),
     p_cancel_reason: reason,
@@ -363,37 +367,64 @@ export async function cancelPublicBooking(
 
   if (error) return cancellationRejected();
 
-  const { data: cancelledBooking } = await supabase
-    .from("bookings")
-    .select("id,business_id")
-    .eq("public_code", parsed.data)
-    .maybeSingle();
-  if (cancelledBooking) {
-    try {
-      await syncGoogleCalendarBooking(cancelledBooking.business_id, cancelledBooking.id);
-    } catch (syncError) {
-      console.error("google_calendar_booking_sync_failed", { bookingId: cancelledBooking.id, reason: syncError instanceof Error ? syncError.message : "unknown" });
-    }
+  // The RPC returns the row it just cancelled; it is the source of truth for
+  // everything that follows, so bookings is never read again here.
+  try {
+    await syncGoogleCalendarBooking(cancelled.business_id, cancelled.id);
+  } catch (syncError) {
+    console.error("google_calendar_booking_sync_failed", { bookingId: cancelled.id, reason: syncError instanceof Error ? syncError.message : "unknown" });
   }
+
+  await notifyCustomerCancelled(supabase, cancelled);
 
   if (reason) {
     const judgment = await classifyCancellationReason(reason);
     if (judgment && judgment.confidence >= 0.7) {
-      const { data: booking } = await supabase
+      await supabase
         .from("bookings")
-        .select("id")
-        .eq("public_code", parsed.data)
-        .maybeSingle();
-      if (booking) {
-        await supabase
-          .from("bookings")
-          .update({ cancel_reason_category: judgment.category })
-          .eq("id", booking.id);
-      }
+        .update({ cancel_reason_category: judgment.category })
+        .eq("id", cancelled.id);
     }
   }
 
   return { status: "done" };
+}
+
+// Only called for a cancellation that really happened. Best effort, like the
+// confirmação: no failure here (missing negócio, provider error or an
+// exception) ever undoes the cancellation; it is only logged. The e-mail never
+// carries the token, the private link or the cancel reason.
+async function notifyCustomerCancelled(
+  supabase: ServerClient,
+  cancelled: Database["public"]["Functions"]["cancel_booking_by_public_code"]["Returns"],
+): Promise<void> {
+  if (!cancelled.customer_email_snapshot) return;
+
+  const logFailure = (reason: string) =>
+    console.error("booking_cancellation_email_failed", { bookingId: cancelled.id, reason });
+
+  try {
+    const { data: business } = await supabase
+      .from("businesses")
+      .select("name, slug, timezone")
+      .eq("id", cancelled.business_id)
+      .maybeSingle();
+    if (!business) return logFailure("business_not_found");
+
+    const emailResult = await sendCustomerCancelledEmail({
+      customerName: cancelled.customer_name_snapshot,
+      customerEmail: cancelled.customer_email_snapshot,
+      businessName: business.name,
+      serviceName: cancelled.service_name_snapshot,
+      startAt: cancelled.start_at,
+      timezone: business.timezone,
+      publicCode: cancelled.public_code,
+      rebookUrl: buildPublicBookingUrl(resolveAppOrigin(), business.slug),
+    });
+    if (!emailResult.sent) logFailure(emailResult.reason);
+  } catch {
+    logFailure("unexpected_error");
+  }
 }
 
 function cancellationRejected(): CancelState {

@@ -1,7 +1,16 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -18,14 +27,14 @@ import {
   type ActionResult,
 } from "@/lib/availability/actions";
 
-export const WEEKDAYS: { value: number; label: string }[] = [
-  { value: 1, label: "1 - Domingo" },
-  { value: 2, label: "2 - Segunda" },
-  { value: 3, label: "3 - Terça" },
-  { value: 4, label: "4 - Quarta" },
-  { value: 5, label: "5 - Quinta" },
-  { value: 6, label: "6 - Sexta" },
-  { value: 7, label: "7 - Sábado" },
+export const WEEKDAYS: { value: number; label: string; name: string }[] = [
+  { value: 1, label: "1 - Domingo", name: "Domingo" },
+  { value: 2, label: "2 - Segunda", name: "Segunda" },
+  { value: 3, label: "3 - Terça", name: "Terça" },
+  { value: 4, label: "4 - Quarta", name: "Quarta" },
+  { value: 5, label: "5 - Quinta", name: "Quinta" },
+  { value: 6, label: "6 - Sexta", name: "Sexta" },
+  { value: 7, label: "7 - Sábado", name: "Sábado" },
 ];
 
 const INITIAL = { ok: true } as ActionResult;
@@ -82,14 +91,14 @@ export function AvailabilityRow({
   endTime: string;
 }) {
   const [editing, setEditing] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [state, formAction, pending] = useActionState(
     updateAvailability.bind(null, id),
     INITIAL,
   );
 
   const short = (t: string) => t.slice(0, 5);
-  const label = WEEKDAYS.find((d) => d.value === weekday)?.label ?? String(weekday);
+  const day = WEEKDAYS.find((d) => d.value === weekday);
+  const label = day?.label ?? String(weekday);
 
   useEffect(() => {
     if (!state.ok || state === INITIAL) return;
@@ -113,17 +122,10 @@ export function AvailabilityRow({
           >
             Editar
           </button>
-          <button
-            type="button"
-            disabled={deleting}
-            onClick={async () => {
-              setDeleting(true);
-              await deleteAvailability(id);
-            }}
-            className="text-muted-foreground hover:text-destructive disabled:opacity-50"
-          >
-            {deleting ? "Removendo..." : "Remover"}
-          </button>
+          <AvailabilityDelete
+            id={id}
+            range={`${day?.name ?? weekday}, ${short(startTime)} – ${short(endTime)}`}
+          />
         </div>
       </div>
     );
@@ -191,5 +193,71 @@ export function AvailabilityRow({
         </button>
       </div>
     </form>
+  );
+}
+
+// Remover uma faixa tira os horários da página pública na hora, então pede
+// confirmação como as outras ações destrutivas do painel.
+function AvailabilityDelete({ id, range }: { id: string; range: string }) {
+  const [open, setOpen] = useState(false);
+  const [state, setState] = useState<ActionResult>(INITIAL);
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setState(INITIAL);
+      }}
+    >
+      <DialogTrigger
+        render={
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-destructive"
+          />
+        }
+      >
+        Remover
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Remover faixa</DialogTitle>
+          <DialogDescription>
+            Tem certeza que deseja remover a faixa {range}? Esses horários deixam de
+            aparecer na sua página pública.
+          </DialogDescription>
+        </DialogHeader>
+        {!state.ok && <p className="text-sm text-destructive">{state.message}</p>}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancelar
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                let result: ActionResult;
+                try {
+                  result = await deleteAvailability(id);
+                } catch {
+                  result = {
+                    ok: false,
+                    code: "UNEXPECTED_ERROR",
+                    message: "Não foi possível remover a faixa. Tente novamente.",
+                  };
+                }
+                setState(result);
+                if (result.ok) setOpen(false);
+              })
+            }
+          >
+            {pending ? "Removendo..." : "Remover faixa"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

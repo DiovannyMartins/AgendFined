@@ -57,6 +57,34 @@ describe("login", () => {
       options: { captchaToken: "tok-login" },
     });
   });
+
+  it("returns the owner to the protected page they were sent away from", async () => {
+    auth.signInWithPassword.mockResolvedValue({ error: null });
+
+    await expect(
+      login(INITIAL, form({ email: "dono@agendfined.dev", password: "Senha-forte-1", next: "/dashboard/agenda" })),
+    ).rejects.toThrow("REDIRECT:/dashboard/agenda?login=1");
+  });
+
+  it.each(["//evil.com", "https://evil.com/dashboard"])("ignores the external destination %s", async (next) => {
+    auth.signInWithPassword.mockResolvedValue({ error: null });
+
+    await expect(
+      login(INITIAL, form({ email: "dono@agendfined.dev", password: "Senha-forte-1", next })),
+    ).rejects.toThrow(/^REDIRECT:\/dashboard\?login=1$/);
+  });
+
+  it("keeps the destination through the MFA challenge", async () => {
+    auth.signInWithPassword.mockResolvedValue({ error: null });
+    auth.mfa.getAuthenticatorAssuranceLevel.mockResolvedValue({
+      data: { currentLevel: "aal1", nextLevel: "aal2" },
+      error: null,
+    });
+
+    await expect(
+      login(INITIAL, form({ email: "dono@agendfined.dev", password: "Senha-forte-1", next: "/dashboard/agenda" })),
+    ).rejects.toThrow(/^REDIRECT:\/mfa\?next=%2Fdashboard%2Fagenda%3Flogin%3D1$/);
+  });
 });
 
 describe("login with a rejected CAPTCHA", () => {

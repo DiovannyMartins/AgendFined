@@ -35,7 +35,7 @@ import { consultBooking, createBooking, joinWaitlist } from "@/lib/booking/actio
 describe("consultBooking", () => {
   it("reports malformed codes before requiring anti-bot verification", async () => {
     const formData = new FormData();
-    formData.set("code", "not-a-code");
+    formData.set("code", "not_a_code");
 
     const result = await consultBooking({ status: "idle" }, formData);
 

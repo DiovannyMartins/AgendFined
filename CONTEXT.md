@@ -53,7 +53,7 @@ Cópia do nome, preço e duração do serviço no momento da reserva. Garante qu
 _Avoid_: Cópia, imagem, ponto no tempo
 
 **Código público (public_code)**:
-Código de 8 caracteres em Crockford base32 (sem 0/O, 1/I/L), armazenado sem hífen e exibido agrupado (AB12-CD34), usado para identificar a reserva na tela e no e-mail de confirmação. Nunca autoriza acesso a dados do cliente.
+Código de 8 caracteres em Crockford base32 padrão (alfabeto `0123456789ABCDEFGHJKMNPQRSTVWXYZ`: inclui 0 e 1, exclui O, I, L e U), armazenado sem hífen e exibido agrupado (AB12-CD34), usado para identificar a reserva na tela e no e-mail de confirmação. O código digitado é normalizado antes da busca: hífens e espaços são removidos, letras viram maiúsculas e as trocas previstas pelo Crockford são aplicadas (O→0, I/L→1), então `o6yt-wmwi` encontra `06YT-WMW1`. Nunca autoriza acesso a dados do cliente.
 _Avoid_: Token, link de confirmação, código de rastreio
 
 **Token de cancelamento**:

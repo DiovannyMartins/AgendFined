@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { StatusAction } from "./status-action";
 import type { AgendaBooking } from "@/lib/agenda/view";
 import { statusLabel } from "@/lib/bookings/status";
-import { formatPublicCode } from "@/lib/bookings/public-code";
+import { formatPublicCode, matchesPublicCode } from "@/lib/bookings/public-code";
 import { CANCELLATION_REASON_CATEGORY_LABELS, type CancellationReasonCategory } from "@/lib/bookings/classification";
 
 type BookingRow = AgendaBooking;
@@ -33,13 +33,14 @@ export function AgendaList({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return bookings;
-    return bookings.filter((b) =>
-      [
-        b.public_code ?? "",
-        b.customer_name_snapshot,
-        b.customer_phone_snapshot,
-        b.service_name_snapshot,
-      ].some((value) => value.toLowerCase().includes(q)),
+    return bookings.filter(
+      (b) =>
+        matchesPublicCode(b.public_code ?? "", q) ||
+        [
+          b.customer_name_snapshot,
+          b.customer_phone_snapshot,
+          b.service_name_snapshot,
+        ].some((value) => value.toLowerCase().includes(q)),
     );
   }, [bookings, query]);
 

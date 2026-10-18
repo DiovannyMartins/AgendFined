@@ -155,8 +155,14 @@ describe("publicCodeSchema", () => {
     expect(parsed.data).toBe("AB12CD34");
   });
 
+  it("decodes the Crockford look-alikes O→0 and I/L→1", () => {
+    const parsed = publicCodeSchema.safeParse("o6yt-wmwi");
+    expect(parsed.success).toBe(true);
+    expect(parsed.data).toBe("06YTWMW1");
+  });
+
   it("rejects a string with invalid characters", () => {
-    expect(publicCodeSchema.safeParse("AB12CD0O").success).toBe(false);
+    expect(publicCodeSchema.safeParse("AB12CD3U").success).toBe(false);
   });
 
   it("rejects a wrong-length code", () => {
@@ -164,7 +170,8 @@ describe("publicCodeSchema", () => {
   });
 
   it("rejects a non-code string", () => {
-    expect(publicCodeSchema.safeParse("not-a-code").success).toBe(false);
+    // "not-a-code" would decode to the well-formed "N0TAC0DE".
+    expect(publicCodeSchema.safeParse("not_a_code").success).toBe(false);
   });
 
   it("rejects an empty code", () => {

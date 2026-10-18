@@ -122,6 +122,39 @@ export const blockSchema = z.object({
 });
 export type BlockInput = z.infer<typeof blockSchema>;
 
+// Customer phone of a reserva or lista de espera entry: a Brazilian number
+// (fixo or celular, with or without +55), stored as national digits (DDD +
+// número) so the agenda and the waitlist dedup see a single canonical form.
+const INVALID_BRAZILIAN_PHONE = "Informe um telefone brasileiro válido, como (11) 98888-7777.";
+
+export const customerPhoneSchema = z
+  .string()
+  .trim()
+  .min(1, { error: "Informe seu telefone.", abort: true })
+  .max(30, { error: "O telefone não pode passar de 30 caracteres.", abort: true })
+  .regex(/^\+?[\d\s().-]+$/, { error: "O telefone deve ter apenas números, como (11) 98888-7777.", abort: true })
+  .transform((value, ctx) => {
+    const digits = value.replace(/\D/g, "");
+    if (value.startsWith("+") && !digits.startsWith("55")) {
+      ctx.issues.push({ code: "custom", input: value, message: INVALID_BRAZILIAN_PHONE });
+      return z.NEVER;
+    }
+    // 12-13 digits can only be 55 + DDD + número; 11 digits starting with 55
+    // is a celular from DDD 55, so the country code is stripped by length.
+    const national = digits.length >= 12 && digits.startsWith("55") ? digits.slice(2) : digits;
+    if (national.length < 10 || national.length > 11) {
+      ctx.issues.push({ code: "custom", input: value, message: "Informe um telefone com DDD." });
+      return z.NEVER;
+    }
+    // DDDs never contain a zero; celulares have 9 digits starting with 9 and
+    // fixos have 8 digits starting with 2-5.
+    if (!/^[1-9]{2}(9\d{8}|[2-5]\d{7})$/.test(national)) {
+      ctx.issues.push({ code: "custom", input: value, message: INVALID_BRAZILIAN_PHONE });
+      return z.NEVER;
+    }
+    return national;
+  });
+
 export const bookingSchema = z.object({
   serviceId: z.string().uuid(),
   startAt: z.string().datetime(),
@@ -130,11 +163,7 @@ export const bookingSchema = z.object({
     .trim()
     .min(2, "Informe seu nome completo.")
     .max(100, "O nome não pode passar de 100 caracteres."),
-  customerPhone: z
-    .string()
-    .trim()
-    .min(8, "Informe um telefone com DDD.")
-    .max(20, "O telefone não pode passar de 20 caracteres."),
+  customerPhone: customerPhoneSchema,
   customerEmail: z.string().trim().email("Informe um e-mail válido.").optional().or(z.literal("")),
   customerNote: z.string().trim().max(500, "A observação não pode passar de 500 caracteres.").optional(),
 });
@@ -172,12 +201,14 @@ export type BookingStatus = z.infer<typeof bookingStatusSchema>;
 // contact details + the desired slot (service/start) so they can be offered a
 // re-opening. `start_at` is a UTC instant (ADR 0003), re-validated by the
 // server action that converts the business-local date+time selection.
-export const waitlistSchema = z.object({
-  serviceId: z.string().uuid(),
-  startAt: z.string().datetime(),
-  customerName: z.string().trim().min(2).max(100),
-  customerPhone: z.string().trim().min(8).max(20),
-  customerEmail: z.string().trim().email().optional().or(z.literal("")),
+// The customer fields share the reserva rules (and their pt-BR messages), so a
+// phone is normalized, and therefore deduplicated, the same way in both places.
+export const waitlistSchema = bookingSchema.pick({
+  serviceId: true,
+  startAt: true,
+  customerName: true,
+  customerPhone: true,
+  customerEmail: true,
 });
 export type WaitlistInput = z.infer<typeof waitlistSchema>;
 

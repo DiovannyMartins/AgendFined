@@ -203,6 +203,7 @@ export function BookingWidget({
     if (!serviceId || !lastAttempt) return;
     setWaitlistBusy(true);
     setError(null);
+    setFieldErrors({});
     const res = await joinWaitlist({
       slug,
       serviceId,
@@ -231,6 +232,10 @@ export function BookingWidget({
           setAvailabilityError(r.error ? "Não foi possível atualizar os horários." : null);
         })
         .catch(() => setAvailabilityError("Não foi possível atualizar os horários."));
+    } else if (res.code === "validation" && res.fieldErrors) {
+      // Checked before the anti-bot gate: the token is unspent and the offer stays.
+      setError(res.message ?? "Revise os campos destacados.");
+      setFieldErrors(firstFieldErrors(res.fieldErrors));
     } else {
       setError(res.message ?? "Não foi possível entrar na lista de espera.");
     }
@@ -331,6 +336,7 @@ export function BookingWidget({
             <Label htmlFor="customerName">Nome</Label>
             <Input
               id="customerName"
+              autoComplete="name"
               value={customerName}
               onChange={(e) => updateCustomerField("customerName", setCustomerName, e.target.value)}
               {...fieldErrorProps("customerName")}
@@ -342,6 +348,10 @@ export function BookingWidget({
             <Label htmlFor="customerPhone">Telefone / WhatsApp</Label>
             <Input
               id="customerPhone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="(11) 98888-7777"
               value={customerPhone}
               onChange={(e) => updateCustomerField("customerPhone", setCustomerPhone, e.target.value)}
               {...fieldErrorProps("customerPhone")}
@@ -354,6 +364,7 @@ export function BookingWidget({
             <Input
               id="customerEmail"
               type="email"
+              autoComplete="email"
               value={customerEmail}
               onChange={(e) => updateCustomerField("customerEmail", setCustomerEmail, e.target.value)}
               {...fieldErrorProps("customerEmail", "customerEmail-help")}

@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { waitlistSchema, type WaitlistInput } from "@/lib/validation/schemas";
 
 // Waitlist seam (INC-3). A customer who found their preferred slot occupied
@@ -38,7 +39,7 @@ export function parseWaitlistInput(raw: {
   customerEmail?: string;
 }):
   | { ok: true; data: WaitlistInput }
-  | { ok: false; message: string } {
+  | { ok: false; message: string; fieldErrors: Record<string, string[]> } {
   const parsed = waitlistSchema.safeParse({
     serviceId: raw.serviceId,
     startAt: raw.startAt,
@@ -47,7 +48,11 @@ export function parseWaitlistInput(raw: {
     customerEmail: raw.customerEmail || "",
   });
   if (!parsed.success) {
-    return { ok: false, message: parsed.error.issues[0]?.message ?? "Revise os dados." };
+    return {
+      ok: false,
+      message: parsed.error.issues[0]?.message ?? "Revise os dados.",
+      fieldErrors: z.flattenError(parsed.error).fieldErrors,
+    };
   }
   return { ok: true, data: parsed.data };
 }

@@ -2,7 +2,12 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
-import { customerDetailsSchema, publicBookingSchema, publicCodeSchema } from "@/lib/validation/schemas";
+import {
+  customerDetailsSchema,
+  publicBookingSchema,
+  publicCodeSchema,
+  waitlistSchema,
+} from "@/lib/validation/schemas";
 import {
   lookupBookingByPublicCode,
   toConsultState,
@@ -43,6 +48,12 @@ export type ActionResult = {
 };
 
 type ServerClient = ReturnType<typeof createAdminClient>;
+
+const waitlistCustomerSchema = waitlistSchema.pick({
+  customerName: true,
+  customerPhone: true,
+  customerEmail: true,
+});
 
 export async function createBooking(input: {
   slug: string;
@@ -409,6 +420,25 @@ export async function joinWaitlist(input: {
   customerEmail?: string;
   cfTurnstileToken?: string;
 }): Promise<ActionResult> {
+  // As in createBooking, the customer's own data is checked before the anti-bot
+  // gate so a typo neither spends the Turnstile token nor hides its field error.
+  const customer = waitlistCustomerSchema.safeParse(
+    {
+      customerName: input.customerName,
+      customerPhone: input.customerPhone,
+      customerEmail: input.customerEmail ?? "",
+    },
+    { error: () => "Revise este campo." },
+  );
+  if (!customer.success) {
+    return {
+      ok: false,
+      code: "validation",
+      message: "Revise os campos destacados.",
+      fieldErrors: z.flattenError(customer.error).fieldErrors,
+    };
+  }
+
   // Same server-authoritative preamble as createBooking: this is an anonymous
   // write, so anti-bot, business resolution and the fail-closed reservation
   // limiter apply identically.

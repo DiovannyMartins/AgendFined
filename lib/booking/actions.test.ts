@@ -1,10 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { state } = vi.hoisted(() => ({
+type SendResult = { sent: true } | { sent: false; reason: "not_configured" | "provider_error" };
+type RpcResult = { data: unknown; error: { message: string } | null };
+
+const { state, sendCustomerCancellationEmail } = vi.hoisted(() => ({
   state: {
     business: null as Record<string, unknown> | null,
     rpcCalls: [] as { name: string; args: Record<string, unknown> }[],
+    rpcResults: {} as Record<string, RpcResult>,
   },
+  sendCustomerCancellationEmail: vi.fn<(input: unknown) => Promise<SendResult>>(async () => ({ sent: true })),
 }));
 
 vi.mock("@/lib/booking/anti-bot", () => ({ verifyTurnstile: async () => ({ ok: true }) }));
@@ -13,24 +18,33 @@ vi.mock("@/lib/booking/rate-limit", () => ({
   enforceRateLimit: async () => true,
   enforceConsultRateLimit: async () => true,
 }));
+vi.mock("@/lib/bookings/classification", () => ({
+  classifyCancellationReason: vi.fn(async () => null),
+  classifyCustomerNote: vi.fn(async () => null),
+  classifyOperationalError: vi.fn(async () => null),
+}));
+vi.mock("@/lib/google-calendar/sync", () => ({ syncGoogleCalendarBooking: vi.fn() }));
+vi.mock("@/lib/email/booking-cancellation", () => ({ sendCustomerCancellationEmail }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => {
     const query = {
       select: () => query,
       eq: () => query,
+      update: () => query,
       single: async () => ({ data: state.business, error: null }),
+      maybeSingle: async () => ({ data: state.business, error: null }),
     };
     return {
       from: () => query,
       rpc: async (name: string, args: Record<string, unknown>) => {
         state.rpcCalls.push({ name, args });
-        return { data: "waitlist-entry-1", error: null };
+        return state.rpcResults[name] ?? { data: "waitlist-entry-1", error: null };
       },
     };
   },
 }));
 
-import { consultBooking, createBooking, joinWaitlist } from "@/lib/booking/actions";
+import { cancelPublicBooking, consultBooking, createBooking, joinWaitlist } from "@/lib/booking/actions";
 
 describe("consultBooking", () => {
   it("reports malformed codes before requiring anti-bot verification", async () => {
@@ -173,5 +187,102 @@ describe("joinWaitlist", () => {
         },
       ]);
     });
+  });
+});
+
+describe("cancelPublicBooking", () => {
+  const token = "A".repeat(43);
+  const cancelledBooking = {
+    id: "booking-1",
+    business_id: "business-1",
+    status: "cancelled",
+    start_at: "2026-10-20T12:00:00Z",
+    public_code: "65925DBB",
+    customer_name_snapshot: "Maria Souza",
+    customer_email_snapshot: "maria@example.com",
+    service_name_snapshot: "Corte",
+  };
+
+  function cancelForm(reason?: string): FormData {
+    const formData = new FormData();
+    formData.set("code", "65925DBB");
+    formData.set("token", token);
+    if (reason) formData.set("cancelReason", reason);
+    return formData;
+  }
+
+  beforeEach(() => {
+    vi.stubEnv("APP_URL", "https://agenda.example");
+    state.rpcCalls = [];
+    state.business = { name: "Barbearia Demo", slug: "barbearia-demo", timezone: "America/Fortaleza" };
+    state.rpcResults = { cancel_booking_by_public_code: { data: cancelledBooking, error: null } };
+    sendCustomerCancellationEmail.mockClear();
+    sendCustomerCancellationEmail.mockResolvedValue({ sent: true });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("e-mails the cliente once the reserva is cancelled, in the negócio's timezone", async () => {
+    const result = await cancelPublicBooking({ status: "idle" }, cancelForm());
+
+    expect(result).toEqual({ status: "done" });
+    expect(sendCustomerCancellationEmail).toHaveBeenCalledTimes(1);
+    expect(sendCustomerCancellationEmail).toHaveBeenCalledWith({
+      customerName: "Maria Souza",
+      customerEmail: "maria@example.com",
+      businessName: "Barbearia Demo",
+      serviceName: "Corte",
+      startAt: "2026-10-20T12:00:00Z",
+      timezone: "America/Fortaleza",
+      publicCode: "65925DBB",
+      rebookUrl: "https://agenda.example/barbearia-demo",
+    });
+  });
+
+  it("never passes the cancel token or the cancel reason to the e-mail", async () => {
+    await cancelPublicBooking({ status: "idle" }, cancelForm("Imprevisto no trabalho"));
+
+    const emailInput = JSON.stringify(sendCustomerCancellationEmail.mock.calls[0][0]);
+    expect(emailInput).not.toContain(token);
+    expect(emailInput).not.toContain("confirmacao");
+    expect(emailInput).not.toContain("Imprevisto");
+  });
+
+  it("does not e-mail when the reserva has no customer e-mail", async () => {
+    state.rpcResults.cancel_booking_by_public_code = {
+      data: { ...cancelledBooking, customer_email_snapshot: null },
+      error: null,
+    };
+
+    const result = await cancelPublicBooking({ status: "idle" }, cancelForm());
+
+    expect(result).toEqual({ status: "done" });
+    expect(sendCustomerCancellationEmail).not.toHaveBeenCalled();
+  });
+
+  it("does not e-mail when the cancellation is rejected", async () => {
+    state.rpcResults.cancel_booking_by_public_code = { data: null, error: { message: "CANCELLATION_REJECTED" } };
+
+    const result = await cancelPublicBooking({ status: "idle" }, cancelForm());
+
+    expect(result).toMatchObject({ status: "error", code: "INVALID_TOKEN" });
+    expect(sendCustomerCancellationEmail).not.toHaveBeenCalled();
+  });
+
+  it("keeps the cancellation when the e-mail fails and logs it without the token", async () => {
+    sendCustomerCancellationEmail.mockResolvedValue({ sent: false, reason: "provider_error" });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await cancelPublicBooking({ status: "idle" }, cancelForm());
+
+    expect(result).toEqual({ status: "done" });
+    expect(consoleError).toHaveBeenCalledWith("booking_cancellation_email_failed", {
+      bookingId: "booking-1",
+      reason: "provider_error",
+    });
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain(token);
   });
 });

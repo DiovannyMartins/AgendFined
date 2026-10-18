@@ -8,16 +8,7 @@ import { bookingStatusSchema } from "@/lib/validation/schemas";
 import { classifyCancellationReason } from "@/lib/bookings/classification";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
 import { sendBookingCancellationEmail } from "@/lib/email/booking-cancellation";
-
-function buildPublicBookingUrl(slug: string): string {
-  let origin: URL;
-  try {
-    origin = new URL(process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000");
-  } catch {
-    origin = new URL("http://localhost:3000");
-  }
-  return new URL(`/${encodeURIComponent(slug)}`, origin).toString();
-}
+import { buildPublicBookingUrl } from "@/lib/bookings/public-booking-url";
 
 export async function updateBookingStatus(
   _prev: { ok: boolean; message?: string },
@@ -85,7 +76,10 @@ export async function updateBookingStatus(
       startAt: booking.start_at,
       timezone: business.timezone,
       publicCode: booking.public_code,
-      rebookUrl: buildPublicBookingUrl(business.slug),
+      rebookUrl: buildPublicBookingUrl(
+        process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        business.slug,
+      ),
     });
     if (!emailResult.sent) {
       console.error("booking_cancellation_email_failed", { bookingId: id, reason: emailResult.reason });

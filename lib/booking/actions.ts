@@ -30,6 +30,7 @@ import { verifyTurnstile } from "@/lib/booking/anti-bot";
 import { assertProPlan, getEffectiveBookingWindowDays } from "@/lib/plan/plan";
 import type { Plan } from "@/lib/plan/plan";
 import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
+import { sendCustomerCancellationEmail } from "@/lib/email/booking-cancellation";
 import {
   classifyCancellationReason,
   classifyCustomerNote,
@@ -37,6 +38,7 @@ import {
 } from "@/lib/bookings/classification";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
 import { buildPrivateConfirmationUrl } from "@/lib/bookings/private-confirmation";
+import { buildPublicBookingUrl } from "@/lib/bookings/public-booking-url";
 
 export type ActionResult = {
   ok: boolean;
@@ -355,7 +357,7 @@ export async function cancelPublicBooking(
     };
   }
 
-  const { error } = await supabase.rpc("cancel_booking_by_public_code", {
+  const { data: cancelled, error } = await supabase.rpc("cancel_booking_by_public_code", {
     p_code: parsed.data,
     p_cancel_token_hash: hashCancelToken(token),
     p_cancel_reason: reason,
@@ -373,6 +375,36 @@ export async function cancelPublicBooking(
       await syncGoogleCalendarBooking(cancelledBooking.business_id, cancelledBooking.id);
     } catch (syncError) {
       console.error("google_calendar_booking_sync_failed", { bookingId: cancelledBooking.id, reason: syncError instanceof Error ? syncError.message : "unknown" });
+    }
+  }
+
+  // The RPC returns the row it just cancelled, so the e-mail only goes out for
+  // a cancellation that really happened. Best effort, like the confirmação: a
+  // delivery failure never undoes the cancellation, it is only logged. The
+  // e-mail never carries the token, the private link or the cancel reason.
+  if (cancelled?.customer_email_snapshot) {
+    const { data: business } = await supabase
+      .from("businesses")
+      .select("name, slug, timezone")
+      .eq("id", cancelled.business_id)
+      .maybeSingle();
+    if (business) {
+      const emailResult = await sendCustomerCancellationEmail({
+        customerName: cancelled.customer_name_snapshot,
+        customerEmail: cancelled.customer_email_snapshot,
+        businessName: business.name,
+        serviceName: cancelled.service_name_snapshot,
+        startAt: cancelled.start_at,
+        timezone: business.timezone,
+        publicCode: cancelled.public_code,
+        rebookUrl: buildPublicBookingUrl(
+          process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+          business.slug,
+        ),
+      });
+      if (!emailResult.sent) {
+        console.error("booking_cancellation_email_failed", { bookingId: cancelled.id, reason: emailResult.reason });
+      }
     }
   }
 

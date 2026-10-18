@@ -41,6 +41,20 @@ function captchaToken(formData: FormData): string | undefined {
   return token ? token.slice(0, 2048) : undefined;
 }
 
+// Email links (signup confirmation, password recovery) must land on
+// /auth/callback, the only route that exchanges the code for a session;
+// otherwise Supabase falls back to the bare Site URL (#87). The origin comes
+// from configuration, never from request headers.
+function authCallbackUrl(next: string): string | undefined {
+  const configured = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+  if (!configured) return undefined;
+  try {
+    return `${new URL(configured).origin}/auth/callback?next=${next}`;
+  } catch {
+    return undefined;
+  }
+}
+
 async function authRateLimit(action: "login" | "signup" | "passwordReset", email: string) {
   try {
     const admin = createAdminClient();
@@ -74,7 +88,11 @@ export async function signup(_prev: ActionResult, formData: FormData): Promise<A
   const { error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
-    options: { data: { displayName: parsed.data.displayName }, captchaToken: captchaToken(formData) },
+    options: {
+      data: { displayName: parsed.data.displayName },
+      captchaToken: captchaToken(formData),
+      emailRedirectTo: authCallbackUrl("/dashboard"),
+    },
   });
 
   if (error) {
@@ -146,10 +164,10 @@ export async function logout() {
 export async function requestPasswordReset(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const origin = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+  const redirectTo = authCallbackUrl("/redefinir-senha");
 
   const parsedEmail = emailSchema.safeParse(email);
-  if (!parsedEmail.success || !origin) {
+  if (!parsedEmail.success || !redirectTo) {
     return { ok: false, code: "VALIDATION", message: "Informe um e-mail válido.", fieldErrors: {} };
   }
 
@@ -161,7 +179,7 @@ export async function requestPasswordReset(_prev: ActionResult, formData: FormDa
   // Route the recovery callback through the existing code-exchange handler so the
   // session is established before the new-password form renders (§24).
   const { error } = await supabase.auth.resetPasswordForEmail(parsedEmail.data, {
-    redirectTo: `${origin}/auth/callback?next=/redefinir-senha`,
+    redirectTo,
     captchaToken: captchaToken(formData),
   });
 

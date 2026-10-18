@@ -158,6 +158,9 @@ site_url = "https://agendfined.com.br"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
+# Signup confirmation and password recovery emails return to
+# `${APP_URL}/auth/callback?next=…` (lib/auth/actions.ts); the `/**` globs cover
+# the query string. Do not point site_url at localhost: it is pushed to production.
 additional_redirect_urls = [
   "http://localhost:3000/**",
   "http://localhost:3000/auth/callback",

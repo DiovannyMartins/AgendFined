@@ -71,6 +71,7 @@ describe("login with a rejected CAPTCHA", () => {
 
 describe("signup", () => {
   it("sends the Turnstile token to Supabase Auth", async () => {
+    vi.stubEnv("APP_URL", "https://agendfined.dev");
     auth.signUp.mockResolvedValue({ error: null });
 
     const result = await signup(
@@ -82,8 +83,42 @@ describe("signup", () => {
     expect(auth.signUp).toHaveBeenCalledWith({
       email: "novo@agendfined.dev",
       password: "Senha-forte-1",
-      options: { data: { displayName: "Ana" }, captchaToken: "tok-signup" },
+      options: {
+        data: { displayName: "Ana" },
+        captchaToken: "tok-signup",
+        emailRedirectTo: "https://agendfined.dev/auth/callback?next=/dashboard",
+      },
     });
+    vi.unstubAllEnvs();
+  });
+});
+
+describe("signup confirmation link", () => {
+  // Without emailRedirectTo, Supabase sends the user to the bare Site URL
+  // (/?code=…), which never exchanges the code for a session (#87).
+  it("lands on the dashboard through the auth callback of the trusted app origin", async () => {
+    vi.stubEnv("APP_URL", "https://agendfined.com.br/");
+    auth.signUp.mockResolvedValue({ error: null });
+
+    await signup(INITIAL, form({ email: "novo@agendfined.dev", password: "Senha-forte-1", displayName: "Ana" }));
+
+    expect(auth.signUp.mock.calls[0][0].options.emailRedirectTo).toBe(
+      "https://agendfined.com.br/auth/callback?next=/dashboard",
+    );
+    vi.unstubAllEnvs();
+  });
+
+  it("falls back to NEXT_PUBLIC_APP_URL when APP_URL is not set", async () => {
+    vi.stubEnv("APP_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "http://localhost:3000");
+    auth.signUp.mockResolvedValue({ error: null });
+
+    await signup(INITIAL, form({ email: "novo@agendfined.dev", password: "Senha-forte-1", displayName: "Ana" }));
+
+    expect(auth.signUp.mock.calls[0][0].options.emailRedirectTo).toBe(
+      "http://localhost:3000/auth/callback?next=/dashboard",
+    );
+    vi.unstubAllEnvs();
   });
 });
 
@@ -122,6 +157,18 @@ describe("requestPasswordReset", () => {
       redirectTo: "https://agendfined.dev/auth/callback?next=/redefinir-senha",
       captchaToken: "tok-reset",
     });
+    vi.unstubAllEnvs();
+  });
+
+  it("points the recovery link at the new-password screen of the trusted app origin", async () => {
+    vi.stubEnv("APP_URL", "https://agendfined.com.br/");
+    auth.resetPasswordForEmail.mockResolvedValue({ error: null });
+
+    await requestPasswordReset(INITIAL, form({ email: "dono@agendfined.dev" }));
+
+    expect(auth.resetPasswordForEmail.mock.calls[0][1].redirectTo).toBe(
+      "https://agendfined.com.br/auth/callback?next=/redefinir-senha",
+    );
     vi.unstubAllEnvs();
   });
 });

@@ -132,7 +132,7 @@ export function AgendaView({
 
         <div className="flex flex-wrap items-center gap-3">
           <Select value={status} onValueChange={(v) => setStatus((v ?? "") as StatusFilter)} items={STATUS_ITEMS}>
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="w-full sm:w-40" aria-label="Filtrar por status">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>

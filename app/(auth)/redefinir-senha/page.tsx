@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { mfaChallengePath, requiresMfaChallenge } from "@/lib/auth/assurance";
 import { UpdatePasswordForm } from "./update-password-form";
+
+export const metadata: Metadata = { title: "Redefinir senha — AgendFined" };
 
 export default async function RedefinirSenhaPage() {
   const supabase = await createClient();

@@ -7,6 +7,7 @@ import { MfaPanel } from "./mfa-panel";
 import { safeInternalPath } from "@/lib/auth/assurance";
 
 export const metadata: Metadata = {
+  title: "Autenticação em duas etapas — AgendFined",
   robots: { index: false, follow: false },
 };
 

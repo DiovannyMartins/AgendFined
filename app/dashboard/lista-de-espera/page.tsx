@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +9,8 @@ import { formatWhen } from "@/lib/format/when";
 import { waitlistStatusLabel } from "@/lib/waitlist/status";
 import type { ManageWaitlistEntry } from "@/lib/waitlist/manage";
 import { WaitlistActions } from "./waitlist-actions";
+
+export const metadata: Metadata = { title: "Lista de espera — AgendFined" };
 
 export default async function ListaEsperaPage() {
   const business = await getCurrentBusiness();

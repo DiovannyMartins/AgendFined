@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { BusinessForm } from "../configuracoes/business-form";
+
+export const metadata: Metadata = { title: "Configurar negócio — AgendFined" };
 
 export default async function SetupPage() {
   return (

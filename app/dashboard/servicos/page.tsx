@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { formatCurrencyBRL } from "@/lib/format/currency";
@@ -7,6 +8,8 @@ import { Sparkles } from "lucide-react";
 import { ServiceForm } from "./service-form";
 import { ServiceToggle } from "./service-toggle";
 import { ServiceDelete } from "./service-delete";
+
+export const metadata: Metadata = { title: "Serviços — AgendFined" };
 
 export default async function ServicosPage() {
   const business = await getCurrentBusiness();

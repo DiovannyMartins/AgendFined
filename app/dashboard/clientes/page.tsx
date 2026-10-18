@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { redirect } from "next/navigation";
@@ -5,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users } from "lucide-react";
 import { buildCustomerHistory } from "@/lib/customers/history";
 import { ClientsList } from "./clients-list";
+
+export const metadata: Metadata = { title: "Clientes — AgendFined" };
 
 export default async function ClientesPage() {
   const business = await getCurrentBusiness();

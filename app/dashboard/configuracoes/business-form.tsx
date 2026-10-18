@@ -115,8 +115,14 @@ export function BusinessForm({
             </div>
             <div className="space-y-2">
               <Label htmlFor="slug">Endereço público (slug)</Label>
-              <Input id="slug" placeholder="minha-barbearia" autoComplete="off" {...register("slug")} />
-              <p className="text-xs text-muted-foreground">
+              <Input
+                id="slug"
+                placeholder="minha-barbearia"
+                autoComplete="off"
+                aria-describedby="slug-hint"
+                {...register("slug")}
+              />
+              <p id="slug-hint" className="text-xs text-muted-foreground">
                 Apenas minúsculas, números e hífen. Seu link: agendfined.com.br/{slug || "seu-slug"}
               </p>
               {(errors.slug || fieldErrors.slug) && (

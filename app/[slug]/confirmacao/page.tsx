@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -84,6 +85,8 @@ async function ConfirmationContent({ code, slug }: { code: string; slug: string 
     </main>
   );
 }
+
+export const metadata: Metadata = { title: "Reserva confirmada — AgendFined" };
 
 export default async function ConfirmationPage({
   params,

@@ -74,3 +74,11 @@ describe("AgendaView list view", () => {
     expect(screen.getByText(/Pedro/)).toBeInTheDocument();
   });
 });
+
+describe("AgendaView acessibilidade", () => {
+  it("dá nome ao filtro de status", () => {
+    render(<AgendaView bookings={[]} />);
+
+    expect(screen.getByRole("combobox", { name: "Filtrar por status" })).toBeInTheDocument();
+  });
+});

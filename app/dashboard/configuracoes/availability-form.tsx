@@ -41,7 +41,7 @@ export function AvailabilityForm() {
         <div className="space-y-2">
           <Label htmlFor="weekday">Dia da semana</Label>
           <Select name="weekday" defaultValue="2" items={WEEKDAY_ITEMS}>
-            <SelectTrigger>
+            <SelectTrigger id="weekday">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -142,7 +142,7 @@ export function AvailabilityRow({
             defaultValue={String(weekday)}
             items={WEEKDAY_ITEMS}
           >
-            <SelectTrigger>
+            <SelectTrigger id={`weekday-${id}`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

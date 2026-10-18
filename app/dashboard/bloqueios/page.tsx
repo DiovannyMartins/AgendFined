@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { BlockForm, BlockRow } from "./block-form";
+
+export const metadata: Metadata = { title: "Bloqueios — AgendFined" };
 
 export default async function BloqueiosPage() {
   const business = await getCurrentBusiness();

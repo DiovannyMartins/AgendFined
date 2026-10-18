@@ -440,26 +440,25 @@ export function BookingWidget({
           </div>
         )}
 
-        <div className="space-y-2">
-          <label className="flex items-start gap-2 text-sm text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={consent}
-              onChange={(e) => setConsent(e.target.checked)}
-              className="mt-0.5 size-4"
-            />
-            <span>
-              Autorizo o tratamento dos meus dados (nome, telefone e e-mail) para fins
-              de agendamento, conforme a{" "}
-              <Link href="/privacidade" className="font-medium text-foreground underline">
-                Política de Privacidade
-              </Link>{" "}
-              e os{" "}
-              <Link href="/termos" className="font-medium text-foreground underline">
-                Termos de Uso
-              </Link>
-              .
-            </span>
+        <div className="flex items-start gap-2 text-sm text-muted-foreground">
+          <input
+            id="consent"
+            type="checkbox"
+            checked={consent}
+            onChange={(e) => setConsent(e.target.checked)}
+            className="mt-0.5 size-4 shrink-0"
+          />
+          <label htmlFor="consent">
+            Autorizo o tratamento dos meus dados (nome, telefone e e-mail) para fins
+            de agendamento, conforme a{" "}
+            <Link href="/privacidade" className="font-medium text-foreground underline">
+              Política de Privacidade
+            </Link>{" "}
+            e os{" "}
+            <Link href="/termos" className="font-medium text-foreground underline">
+              Termos de Uso
+            </Link>
+            .
           </label>
         </div>
 

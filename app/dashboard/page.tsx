@@ -6,7 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles, CalendarDays, Blocks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCurrentBusiness } from "@/lib/business/queries";
+import { getBookingReadiness } from "@/lib/business/readiness";
+import { createClient } from "@/lib/supabase/server";
 import { DownloadPublicLinkQRButton, PublicLinkQR } from "@/components/public-link-qr";
+import { SetupChecklist } from "./setup-checklist";
 
 export const metadata: Metadata = { title: "Painel — AgendFined" };
 
@@ -14,6 +17,7 @@ export default async function DashboardHome() {
   const business = await getCurrentBusiness();
   if (!business) redirect("/dashboard/setup");
 
+  const readiness = await getBookingReadiness(await createClient(), business.id);
   const publicUrl = `/${business.slug}`;
 
   return (
@@ -53,6 +57,8 @@ export default async function DashboardHome() {
           </div>
         </div>
       </header>
+
+      <SetupChecklist {...readiness} />
 
       <div className="grid gap-4 sm:grid-cols-3">
         {[

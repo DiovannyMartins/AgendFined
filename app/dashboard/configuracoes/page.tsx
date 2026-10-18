@@ -56,7 +56,7 @@ export default async function ConfiguracoesPage({
         <Link href="/mfa" className="inline-block text-sm underline">Configurar autenticação em duas etapas</Link>
       </section>
 
-      <section>
+      <section id="disponibilidade" className="scroll-mt-20">
         <h2 className="text-xl font-semibold">Disponibilidade recorrente</h2>
         <p className="mt-1 text-muted-foreground">
           Defina as faixas de atendimento por dia da semana, em hora local do negócio.

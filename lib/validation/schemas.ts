@@ -125,10 +125,18 @@ export type BlockInput = z.infer<typeof blockSchema>;
 export const bookingSchema = z.object({
   serviceId: z.string().uuid(),
   startAt: z.string().datetime(),
-  customerName: z.string().trim().min(2).max(100),
-  customerPhone: z.string().trim().min(8).max(20),
-  customerEmail: z.string().trim().email().optional().or(z.literal("")),
-  customerNote: z.string().trim().max(500).optional(),
+  customerName: z
+    .string()
+    .trim()
+    .min(2, "Informe seu nome completo.")
+    .max(100, "O nome não pode passar de 100 caracteres."),
+  customerPhone: z
+    .string()
+    .trim()
+    .min(8, "Informe um telefone com DDD.")
+    .max(20, "O telefone não pode passar de 20 caracteres."),
+  customerEmail: z.string().trim().email("Informe um e-mail válido.").optional().or(z.literal("")),
+  customerNote: z.string().trim().max(500, "A observação não pode passar de 500 caracteres.").optional(),
 });
 export type BookingInput = z.infer<typeof bookingSchema>;
 
@@ -138,6 +146,7 @@ export const publicBookingSchema = bookingSchema.extend({
   customerEmail: z
     .string()
     .trim()
+    .min(1, { error: "Informe seu e-mail.", abort: true })
     .max(200, "O e-mail não pode passar de 200 caracteres.")
     .email("Informe um e-mail válido."),
 });
@@ -182,3 +191,12 @@ export const publicCodeSchema = z
   .transform((s) => normalizePublicCode(s))
   .refine(isValidPublicCode, "Informe um código de reserva válido.");
 export type PublicCodeInput = z.infer<typeof publicCodeSchema>;
+
+// The customer-provided part of a public reservation, validated on its own so
+// the booking page can show each error next to its field.
+export const customerDetailsSchema = publicBookingSchema.pick({
+  customerName: true,
+  customerPhone: true,
+  customerEmail: true,
+  customerNote: true,
+});

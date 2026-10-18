@@ -15,6 +15,13 @@ import { cn } from "@/lib/utils";
 import { trackAnalyticsEvent } from "@/lib/analytics";
 import { buildPrivateConfirmationPath } from "@/lib/bookings/private-confirmation";
 
+type CustomerField = "customerName" | "customerPhone" | "customerEmail" | "customerNote";
+type FieldErrors = Partial<Record<CustomerField, string>>;
+
+// Server errors meaning the chosen slot itself is gone; any other failure keeps
+// it so the customer can fix the form and retry. `slot_taken` has its own branch.
+const SLOT_GONE_CODES = new Set(["no_availability", "booking_window", "service_not_found"]);
+
 type ServiceOption = {
   id: string;
   name: string;
@@ -48,6 +55,7 @@ export function BookingWidget({
   const [consent, setConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileReady, setTurnstileReady] = useState(true);
   const [turnstileRound, setTurnstileRound] = useState(0);
@@ -80,6 +88,31 @@ export function BookingWidget({
     setSlots([]);
     setAvailabilityError(null);
     resetWaitlist();
+  }
+
+  function updateCustomerField(field: CustomerField, setValue: (value: string) => void, value: string) {
+    setValue(value);
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
+  function fieldErrorProps(field: CustomerField, describedBy?: string) {
+    const message = fieldErrors[field];
+    const ids = [describedBy, message ? `${field}-error` : undefined].filter(Boolean).join(" ");
+    return {
+      "aria-invalid": message ? true : undefined,
+      "aria-describedby": ids || undefined,
+    };
+  }
+
+  function resetTurnstile() {
+    setTurnstileToken("");
+    setTurnstileReady(!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
+    setTurnstileRound((round) => round + 1);
   }
 
   function resetWaitlist() {
@@ -130,6 +163,7 @@ export function BookingWidget({
     }
     setSubmitting(true);
     setError(null);
+    setFieldErrors({});
     const result = await createBooking({
       slug,
       serviceId,
@@ -151,12 +185,17 @@ export function BookingWidget({
       setLastAttempt({ date, startTime: slot });
       setWaitlistOffered(true);
       setWaitlistSubmitted(null);
-      setTurnstileToken("");
-      setTurnstileReady(!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
-      setTurnstileRound((round) => round + 1);
+      resetTurnstile();
+    } else if (result.code === "validation") {
+      // Validation runs before the anti-bot gate, so the Turnstile token is
+      // still unspent and the slot stays selected while the customer fixes it.
+      setError(result.message ?? "Revise os campos destacados.");
+      setFieldErrors(firstFieldErrors(result.fieldErrors));
     } else {
       setError(result.message ?? "Não foi possível concluir a reserva.");
-      setSelectedSlot(null);
+      if (result.code && SLOT_GONE_CODES.has(result.code)) setSelectedSlot(null);
+      // The server already spent this Turnstile token; a retry needs a new one.
+      resetTurnstile();
     }
   }
 
@@ -293,18 +332,22 @@ export function BookingWidget({
             <Input
               id="customerName"
               value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
+              onChange={(e) => updateCustomerField("customerName", setCustomerName, e.target.value)}
+              {...fieldErrorProps("customerName")}
               required
             />
+            <FieldError id="customerName-error" message={fieldErrors.customerName} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="customerPhone">Telefone / WhatsApp</Label>
             <Input
               id="customerPhone"
               value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
+              onChange={(e) => updateCustomerField("customerPhone", setCustomerPhone, e.target.value)}
+              {...fieldErrorProps("customerPhone")}
               required
             />
+            <FieldError id="customerPhone-error" message={fieldErrors.customerPhone} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="customerEmail">E-mail para confirmação</Label>
@@ -312,10 +355,11 @@ export function BookingWidget({
               id="customerEmail"
               type="email"
               value={customerEmail}
-              onChange={(e) => setCustomerEmail(e.target.value)}
-              aria-describedby="customerEmail-help"
+              onChange={(e) => updateCustomerField("customerEmail", setCustomerEmail, e.target.value)}
+              {...fieldErrorProps("customerEmail", "customerEmail-help")}
               required
             />
+            <FieldError id="customerEmail-error" message={fieldErrors.customerEmail} />
             <p id="customerEmail-help" className="text-xs text-muted-foreground">
               Enviaremos os dados da reserva para este endereço.
             </p>
@@ -327,9 +371,11 @@ export function BookingWidget({
           <Input
             id="customerNote"
             value={customerNote}
-            onChange={(e) => setCustomerNote(e.target.value)}
+            onChange={(e) => updateCustomerField("customerNote", setCustomerNote, e.target.value)}
+            {...fieldErrorProps("customerNote")}
             maxLength={500}
           />
+          <FieldError id="customerNote-error" message={fieldErrors.customerNote} />
         </div>
 
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
@@ -403,5 +449,23 @@ export function BookingWidget({
         )}
       </form>
     </div>
+  );
+}
+
+function firstFieldErrors(fieldErrors: Record<string, string[]> | undefined): FieldErrors {
+  const result: FieldErrors = {};
+  for (const field of ["customerName", "customerPhone", "customerEmail", "customerNote"] as const) {
+    const message = fieldErrors?.[field]?.[0];
+    if (message) result[field] = message;
+  }
+  return result;
+}
+
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p id={id} className="text-xs text-destructive">
+      {message}
+    </p>
   );
 }

@@ -1,7 +1,8 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { publicBookingSchema, publicCodeSchema } from "@/lib/validation/schemas";
+import { z } from "zod";
+import { customerDetailsSchema, publicBookingSchema, publicCodeSchema } from "@/lib/validation/schemas";
 import {
   lookupBookingByPublicCode,
   toConsultState,
@@ -36,6 +37,7 @@ export type ActionResult = {
   ok: boolean;
   code?: string;
   message?: string;
+  fieldErrors?: Record<string, string[]>;
   publicCode?: string;
   cancelToken?: string;
 };
@@ -53,6 +55,27 @@ export async function createBooking(input: {
   customerNote?: string;
   cfTurnstileToken?: string;
 }): Promise<ActionResult> {
+  // Validate the customer's own data before the anti-bot gate and the rate
+  // limit: a typo must not spend the single-use Turnstile token, and the
+  // per-field errors let the page keep the chosen slot while the customer fixes it.
+  const customer = customerDetailsSchema.safeParse(
+    {
+      customerName: input.customerName,
+      customerPhone: input.customerPhone,
+      customerEmail: input.customerEmail ?? "",
+      customerNote: input.customerNote || "",
+    },
+    { error: () => "Revise este campo." },
+  );
+  if (!customer.success) {
+    return {
+      ok: false,
+      code: "validation",
+      message: "Revise os campos destacados.",
+      fieldErrors: z.flattenError(customer.error).fieldErrors,
+    };
+  }
+
   // Server-authoritative flow: the admin client reads blocks/bookings of any
   // business (anonymous RLS would block those reads) for revalidation.
   const preamble = await resolvePublicBusinessAndRateLimit(input.slug, input.cfTurnstileToken);
@@ -73,7 +96,8 @@ export async function createBooking(input: {
     return {
       ok: false,
       code: "validation",
-      message: "Revise os dados. " + parsed.error.issues[0]?.message,
+      // Customer fields were validated above; only the service/slot can fail here.
+      message: "Não foi possível validar o serviço ou o horário. Escolha novamente.",
     };
   }
 

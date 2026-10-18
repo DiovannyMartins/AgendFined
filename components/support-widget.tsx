@@ -66,12 +66,14 @@ export function SupportWidget() {
             type="button"
             variant="outline"
             size="sm"
-            className="fixed right-4 bottom-4 z-40 gap-2 rounded-full bg-background/95 shadow-lg backdrop-blur sm:right-6 sm:bottom-6"
+            // On phones the button shrinks to an icon in the corner gutter so it
+            // does not cover form text (e.g. the public booking consent).
+            className="fixed right-2 bottom-2 z-40 gap-2 rounded-full bg-background/95 shadow-lg backdrop-blur max-sm:size-9 max-sm:px-0 sm:right-6 sm:bottom-6"
           />
         }
       >
         <HelpCircle className="size-4" />
-        <span>Suporte</span>
+        <span className="sr-only sm:not-sr-only">Suporte</span>
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>

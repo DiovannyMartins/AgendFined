@@ -12,6 +12,7 @@ import { createBooking, joinWaitlist } from "@/lib/booking/actions";
 import { getSlotsForDate } from "@/lib/availability/actions";
 import { toLocalDate } from "@/lib/booking/availability";
 import { formatCurrencyBRL } from "@/lib/format/currency";
+import { formatSlotWhen } from "@/lib/format/when";
 import { cn } from "@/lib/utils";
 import { trackAnalyticsEvent } from "@/lib/analytics";
 import { buildPrivateConfirmationPath } from "@/lib/bookings/private-confirmation";
@@ -150,6 +151,8 @@ export function BookingWidget({
               ? "Muitas consultas. Aguarde alguns minutos e tente novamente."
             : res.error === "booking_window"
               ? "Esta data está fora da janela de reservas do negócio. Escolha outra."
+            : res.error === "validation"
+              ? "Não foi possível consultar esta data. Confira a data escolhida e tente novamente."
             : res.error
               ? "Não foi possível encontrar este serviço ou negócio."
               : null,
@@ -197,9 +200,12 @@ export function BookingWidget({
     } else if (result.code === "slot_taken" && offersWaitlist) {
       // INC-3: the slot was lost to another reservation — offer the waitlist.
       setError(result.message ?? "Esse horário não está mais disponível.");
+      // The lost slot leaves the list; the offer keeps it in `lastAttempt`.
       setLastAttempt({ date, startTime: slot });
       setWaitlistOffered(true);
       setWaitlistSubmitted(null);
+      setSelectedSlot(null);
+      refreshSlots(date);
       resetTurnstile();
     } else if (result.code === "slot_taken") {
       // Without a waitlist there is nothing to promise: ask for another slot.
@@ -260,16 +266,7 @@ export function BookingWidget({
 
   const slot = selectedSlot;
 
-  // Announced politely to screen readers whenever the slot list changes.
-  const slotStatus = !date
-    ? ""
-    : isPending
-      ? "Carregando horários."
-      : availabilityError
-        ? availabilityError
-        : slots.length === 0
-          ? "Nenhum horário disponível nesta data."
-          : `${slots.length} ${slots.length === 1 ? "horário disponível" : "horários disponíveis"}.`;
+  const showSlots = Boolean(date) && !isPending && !availabilityError && slots.length > 0;
   const submitHint = !slot
     ? "Escolha um horário para confirmar."
     : !consent
@@ -309,18 +306,26 @@ export function BookingWidget({
 
         <fieldset className="space-y-2">
           <legend className="mb-2 text-sm leading-none font-medium">Horários disponíveis</legend>
-          <p className="sr-only" aria-live="polite" aria-atomic="true">{slotStatus}</p>
-          {!date ? (
-            <p className="text-sm text-muted-foreground">Selecione uma data para ver os horários.</p>
-          ) : isPending ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Spinner className="size-4" /> Carregando...
-            </div>
-          ) : availabilityError ? (
-            <p className="text-sm text-destructive">{availabilityError}</p>
-          ) : slots.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum horário disponível nesta data. Escolha outra.</p>
-          ) : (
+          {/* One live region announces every change of the slot list; each
+              message shows once (the slot count is for screen readers only). */}
+          <div aria-live="polite" aria-atomic="true" className="text-sm">
+            {!date ? (
+              <p className="text-muted-foreground">Selecione uma data para ver os horários.</p>
+            ) : isPending ? (
+              <p className="flex items-center gap-2 text-muted-foreground">
+                <Spinner className="size-4" aria-hidden="true" /> Carregando horários...
+              </p>
+            ) : availabilityError ? (
+              <p className="text-destructive">{availabilityError}</p>
+            ) : slots.length === 0 ? (
+              <p className="text-muted-foreground">Nenhum horário disponível nesta data. Escolha outra.</p>
+            ) : (
+              <p className="sr-only">
+                {slots.length} {slots.length === 1 ? "horário disponível" : "horários disponíveis"}.
+              </p>
+            )}
+          </div>
+          {showSlots && (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {slots.map((time) => (
                 <button
@@ -344,7 +349,7 @@ export function BookingWidget({
             </div>
           )}
           <p className="text-xs text-muted-foreground" aria-live="polite">
-            {slot && service ? `Horário selecionado: ${date} às ${slot} (${service.name})` : null}
+            {slot && service ? `Horário selecionado: ${formatSlotWhen(date, slot)} (${service.name})` : null}
           </p>
         </fieldset>
 
@@ -408,9 +413,12 @@ export function BookingWidget({
 
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
-        {waitlistOffered && (
+        {waitlistOffered && lastAttempt && (
           <div className="rounded-xl border border-border bg-muted/40 p-4">
-            <p className="text-sm font-medium">Esse horário acabou de ser reservado.</p>
+            {/* The lost slot already left the list, so name it here. */}
+            <p className="text-sm font-medium">
+              O horário de {formatSlotWhen(lastAttempt.date, lastAttempt.startTime)} acabou de ser reservado.
+            </p>
             <p className="mt-1 text-sm text-muted-foreground">
               Quer entrar na lista de espera? Se alguém cancelar, este horário fica em aberto.
             </p>
@@ -441,8 +449,8 @@ export function BookingWidget({
               className="mt-0.5 size-4"
             />
             <span>
-              Autorizo o tratamento dos meus dados (nome, telefone e, se informado,
-              e-mail) para fins de agendamento, conforme a{" "}
+              Autorizo o tratamento dos meus dados (nome, telefone e e-mail) para fins
+              de agendamento, conforme a{" "}
               <Link href="/privacidade" className="font-medium text-foreground underline">
                 Política de Privacidade
               </Link>{" "}

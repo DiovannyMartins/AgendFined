@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 // Cada rota precisa de um <title> próprio: leitores de tela e abas do navegador
 // anunciam o título, e repetir o da landing esconde onde a pessoa está.
@@ -23,11 +23,22 @@ const ROUTES: [string, () => Promise<{ metadata?: Metadata }>, string][] = [
   ["/privacidade", () => import("./privacidade/page"), "Política de Privacidade — AgendFined"],
 ];
 
-describe("títulos de página", () => {
-  it.each(ROUTES)("%s tem título próprio", async (_route, load, title) => {
-    const { metadata } = await load();
+// Importar as páginas a frio carrega uma árvore grande de módulos e, sob carga,
+// passa do testTimeout padrão. O aquecimento fica no beforeAll, com folga
+// própria, e cada caso só confere o título já carregado.
+const IMPORT_TIMEOUT_MS = 60_000;
 
-    expect(metadata?.title).toBe(title);
+describe("títulos de página", () => {
+  const loaded = new Map<string, { metadata?: Metadata }>();
+
+  beforeAll(async () => {
+    for (const [route, load] of ROUTES) {
+      loaded.set(route, await load());
+    }
+  }, IMPORT_TIMEOUT_MS);
+
+  it.each(ROUTES)("%s tem título próprio", (route, _load, title) => {
+    expect(loaded.get(route)?.metadata?.title).toBe(title);
   });
 
   it("não repete títulos entre rotas", () => {

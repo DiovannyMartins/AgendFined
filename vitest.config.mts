@@ -18,6 +18,11 @@ export default defineConfig({
         test: {
           name: "unit",
           environment: "jsdom",
+          // O padrão (núcleos - 1) disputa CPU com o `next dev` e cada worker
+          // jsdom é pesado para subir: workers estouravam o timeout de início
+          // e arquivos inteiros nem rodavam. Metade dos núcleos dá folga e,
+          // nesta suíte, ainda termina mais rápido que o padrão.
+          maxWorkers: "50%",
           globals: true,
           setupFiles: ["./tests/setup.ts"],
           include: [

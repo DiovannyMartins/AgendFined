@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCustomerHistory,
   filterCustomers,
+  searchCustomerHistory,
   type CustomerRow,
 } from "@/lib/customers/history";
 
@@ -47,5 +48,42 @@ describe("filterCustomers", () => {
 
   it("no match returns an empty list", () => {
     expect(filterCustomers([eli, ana], "zed")).toEqual([]);
+  });
+});
+
+describe("searchCustomerHistory", () => {
+  const joao: CustomerRow = { id: "c3", name: "João Reteste", phone: "+5511988887777", email: "joao@ex.com" };
+  const beta: CustomerRow = { id: "c4", name: "Cliente Beta", phone: "11977776666", email: "qa.beta@ex.com" };
+  const gama: CustomerRow = { id: "c5", name: "Cliente Gama", phone: "21966665555", email: null };
+  const delta: CustomerRow = { id: "c6", name: "Delta Beta", phone: "21955554444", email: null };
+  const bookings = [
+    { id: "b1", customer_id: "c3", start_at: "2026-09-01T10:00:00Z", status: "completed" as const, service_name_snapshot: "Corte", duration_minutes_snapshot: 30 },
+    { id: "b2", customer_id: "c5", start_at: "2026-09-02T10:00:00Z", status: "confirmed" as const, service_name_snapshot: "Barba", duration_minutes_snapshot: 15 },
+  ];
+  const history = buildCustomerHistory([joao, beta, gama, delta], bookings);
+  const ids = (query: string) => searchCustomerHistory(history, query)?.map((h) => h.customer.id);
+
+  it("a phone typed as the list shows it finds only that customer", () => {
+    expect(ids("(11) 98888-7777")).toEqual(["c3"]);
+    expect(ids("98888-7777")).toEqual(["c3"]);
+    expect(ids("98888")).toEqual(["c3"]);
+  });
+
+  it("a multi-word query requires every word to match", () => {
+    expect(ids("Cliente Beta")).toEqual(["c4"]);
+    expect(ids("joão corte")).toEqual(["c3"]);
+    expect(ids("joão barba")).toEqual([]);
+  });
+
+  it("single-word searches by name, email and booking history keep working", () => {
+    expect(ids("joão")).toEqual(["c3"]);
+    expect(ids("JOAO")).toEqual(["c3"]);
+    expect(ids("qa.beta@")).toEqual(["c4"]);
+    expect(ids("barba")).toEqual(["c5"]);
+  });
+
+  it("a query without usable words is not searched (null)", () => {
+    expect(searchCustomerHistory(history, "a")).toBeNull();
+    expect(searchCustomerHistory(history, "   ")).toBeNull();
   });
 });

@@ -3,7 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBusiness } from "@/lib/business/queries";
-import { buildCustomerHistory } from "@/lib/customers/history";
+import { buildCustomerHistory, searchCustomerHistory } from "@/lib/customers/history";
 import { enforceCustomerSearchRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 import { z } from "zod";
 
@@ -48,31 +48,11 @@ export async function semanticSearchCustomers(
   if (customersError || bookingsError) return null;
 
   const history = buildCustomerHistory(customers ?? [], bookings ?? []);
-  const normalizedQuery = normalize(boundedQuery);
-  const tokens = normalizedQuery.split(/\s+/).filter((token) => token.length >= 2);
-  if (tokens.length === 0) return null;
-
-  const matches = history.filter(({ customer, bookings: customerBookings }) => {
-    const searchable = normalize([
-      customer.name,
-      customer.phone,
-      customer.email ?? "",
-      ...customerBookings.flatMap((booking) => [booking.service_name_snapshot, booking.status]),
-    ].join(" "));
-    return searchable.includes(normalizedQuery) || tokens.some((token) => searchable.includes(token));
-  });
+  const matches = searchCustomerHistory(history, boundedQuery);
+  if (!matches) return null;
 
   return {
     ids: matches.map(({ customer }) => customer.id),
     confidence: matches.length > 0 ? 1 : 0,
   };
-}
-
-function normalize(value: string): string {
-  return value
-    .toLocaleLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9@+._-]+/g, " ")
-    .trim();
 }

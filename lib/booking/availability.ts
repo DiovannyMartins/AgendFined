@@ -20,11 +20,12 @@ export interface BusinessRules {
   timezone?: string;
 }
 
-// Overlap of two local wall-clock faixas represented as HH:MM. Valid only for
-// same-day intervals: §8.5 forbids a faixa crossing midnight, so HH:MM string
-// order is a faithful time order.
+// Half-open overlap of two local wall-clock faixas. Valid only for same-day
+// intervals: §8.5 forbids a faixa crossing midnight. Compared in minutes, not as
+// strings, because the DB returns "HH:MM:SS" while the form sends "HH:MM"
+// ("12:00:00" > "12:00" would reject a faixa touching another's end, #125).
 export function overlaps(a: TimeRange, b: TimeRange): boolean {
-  return a.start < b.end && a.end > b.start;
+  return timeToMinutes(a.start) < timeToMinutes(b.end) && timeToMinutes(a.end) > timeToMinutes(b.start);
 }
 
 // Half-open interval overlap in UTC (epoch ms). See §10.3.

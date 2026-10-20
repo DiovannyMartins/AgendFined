@@ -32,3 +32,9 @@ export const PUBLIC_STATUS_COPY: Record<BookingStatus, { title: string; descript
 export function publicDocumentTitle(status: BookingStatus): string {
   return `${PUBLIC_STATUS_COPY[status].title.replace(/!$/, "")} — AgendFined`;
 }
+
+// Label above the public code. Only a reserva that still happens is worth
+// keeping the code for; a cancelled or finished one just identifies it.
+export function publicCodeHint(status: BookingStatus): string {
+  return status === "confirmed" ? "Guarde o código da sua reserva" : "Código da reserva";
+}

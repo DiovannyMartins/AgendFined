@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Filter = [op: string, column: string, value: unknown];
 
@@ -75,7 +75,13 @@ function blockForm(startAt: string, endAt: string, reason = "") {
 }
 
 describe("createBlock", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-17T12:00:00Z"));
     state.business = { id: "business-1", timezone: "America/Sao_Paulo" };
     state.bookings = [];
     state.bookingFilters = [];
@@ -155,6 +161,21 @@ describe("createBlock", () => {
     expect(result).toMatchObject({ ok: false, code: "VALIDATION" });
     expect(state.inserts).toEqual([]);
     expect(state.bookingFilters).toEqual([]);
+  });
+
+  // #128: um bloqueio inteiramente no passado não bloqueia nada.
+  it("rejects a block that already ended", async () => {
+    const result = await createBlock({ ok: true, data: undefined }, blockForm("2026-10-16T12:00", "2026-10-16T13:00"));
+
+    expect(result).toMatchObject({ ok: false, code: "VALIDATION", message: expect.stringContaining("já passou") });
+    expect(state.inserts).toEqual([]);
+  });
+
+  it("accepts a block that is still under way", async () => {
+    // 08:00–10:00 em Brasília = 11:00–13:00Z; agora são 12:00Z.
+    const result = await createBlock({ ok: true, data: undefined }, blockForm("2026-10-17T08:00", "2026-10-17T10:00"));
+
+    expect(result).toEqual({ ok: true, data: undefined });
   });
 
   it("rejects an end that is not after the start", async () => {

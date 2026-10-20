@@ -26,6 +26,11 @@ export function parsePriceToCents(input: string): number | null {
   return Number(reais) * 100 + Number(centavos.padEnd(2, "0"));
 }
 
+// Highest price a serviço accepts (R$ 100.000,00). price_cents is a Postgres
+// integer, so anything far above this overflowed into a generic save error.
+export const MAX_PRICE_CENTS = 10_000_000;
+export const MAX_PRICE_MESSAGE = "O preço máximo é R$ 100.000,00.";
+
 // The value used to prefill the price field when editing a service.
 export function formatPriceInput(cents: number): string {
   return (cents / 100).toFixed(2).replace(".", ",");

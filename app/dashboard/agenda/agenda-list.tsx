@@ -25,9 +25,13 @@ function formatBookingTime(iso: string, timezone: string): string {
 export function AgendaList({
   bookings,
   timezone,
+  filterActive = false,
 }: {
   bookings: BookingRow[];
   timezone: string;
+  // True when the date/status filters narrowed `bookings`: an empty list then
+  // means "nothing matches", not "no reservations yet".
+  filterActive?: boolean;
 }) {
   const [query, setQuery] = useState("");
 
@@ -67,7 +71,13 @@ export function AgendaList({
         />
       </div>
 
-      {bookings.length === 0 ? (
+      {bookings.length === 0 && filterActive ? (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            Nenhuma reserva com esse filtro. Ajuste a data ou o status para ver outras reservas.
+          </CardContent>
+        </Card>
+      ) : bookings.length === 0 ? (
         <Card>
           <CardHeader className="items-center text-center">
             <CalendarDays className="size-8 text-muted-foreground" />

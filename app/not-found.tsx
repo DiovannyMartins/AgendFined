@@ -10,8 +10,9 @@ import {
   Sparkles,
 } from "lucide-react";
 
+// Decorative week without day numbers: fixed dates (12 to 18) went stale, and
+// this page is prerendered, so "today" would freeze at build time anyway.
 const week = ["S", "T", "Q", "Q", "S", "S", "D"];
-const days = ["12", "13", "14", "15", "16", "17", "18"];
 
 export default function NotFound() {
   return (
@@ -92,16 +93,16 @@ export default function NotFound() {
                         {day}
                       </div>
                     ))}
-                    {days.map((day, index) => (
+                    {week.map((day, index) => (
                       <div
-                        key={day}
+                        key={`cell-${day}-${index}`}
                         className={`flex aspect-square items-center justify-center rounded-xl border text-sm transition-colors ${
                           index === 2
                             ? "border-foreground bg-foreground font-semibold text-background shadow-[0_0_24px_rgba(255,255,255,0.16)]"
                             : "border-border/70 bg-muted/30 text-muted-foreground"
                         }`}
                       >
-                        {day}
+                        {index === 2 ? "?" : null}
                       </div>
                     ))}
                   </div>

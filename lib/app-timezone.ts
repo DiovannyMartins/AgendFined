@@ -17,6 +17,6 @@ export const TIMEZONE_OPTIONS = [
   { value: "America/Rio_Branco", label: "Rio Branco (GMT−5)" },
   { value: "America/Noronha", label: "Fernando de Noronha (GMT−2)" },
   { value: "UTC", label: "UTC" },
-  { value: "Europe/Lisbon", label: "Lisboa" },
-  { value: "America/New_York", label: "Nova York" },
+  { value: "Europe/Lisbon", label: "Lisboa (GMT+0; GMT+1 no verão)" },
+  { value: "America/New_York", label: "Nova York (GMT−5; GMT−4 no verão)" },
 ] as const;

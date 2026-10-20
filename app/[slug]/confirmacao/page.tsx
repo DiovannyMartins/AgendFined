@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import { Suspense, cache } from "react";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CalendarClock } from "lucide-react";
-import { CopyCode } from "@/components/copy-code";
 import { ConfirmationStatus } from "./confirmation-status";
 import { CurrentSlugRedirect } from "./current-slug-redirect";
 import { publicCodeSchema } from "@/lib/validation/schemas";
@@ -36,9 +35,9 @@ const loadConfirmation = cache(async (code: string) => {
   return { code: parsedCode.data, booking };
 });
 
-async function ConfirmationContent({ code, slug }: { code: string; slug: string }) {
-  const found = await loadConfirmation(code);
-  if (!found) notFound();
+type FoundConfirmation = NonNullable<Awaited<ReturnType<typeof loadConfirmation>>>;
+
+function ConfirmationContent({ found, slug }: { found: FoundConfirmation; slug: string }) {
   const { booking } = found;
   // Links sent before a slug change still carry the old slug. The code never
   // authorizes access to customer data (ADR 0004), so following it to the
@@ -76,11 +75,6 @@ async function ConfirmationContent({ code, slug }: { code: string; slug: string 
               </p>
             </div>
           </div>
-
-          <div className="mt-4 flex flex-col items-center gap-1.5">
-            <p className="text-xs text-muted-foreground">Guarde o código da sua reserva</p>
-            <CopyCode code={found.code} />
-          </div>
         </ConfirmationStatus>
         <div className="mt-6 flex flex-col gap-2 text-sm font-medium">
           <Link href={`/${slug}`} className="hover:underline">
@@ -111,9 +105,11 @@ export default async function ConfirmationPage({ params, searchParams }: Confirm
   const { code } = await searchParams;
   if (!code) notFound();
 
-  return (
-    <Suspense fallback={<div className="py-24 text-center text-muted-foreground">Carregando...</div>}>
-      <ConfirmationContent code={code} slug={slug} />
-    </Suspense>
-  );
+  // Resolve the code before rendering anything: a notFound() thrown inside a
+  // Suspense boundary arrives after the 200 status is already streamed, which
+  // turns an unknown code into a soft 404.
+  const found = await loadConfirmation(code);
+  if (!found) notFound();
+
+  return <ConfirmationContent found={found} slug={slug} />;
 }

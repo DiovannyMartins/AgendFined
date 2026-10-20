@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { Switch } from "@/components/ui/switch";
 import { toggleService } from "@/lib/services/actions";
 
-export function ServiceToggle({ id, isActive }: { id: string; isActive: boolean }) {
+export function ServiceToggle({ id, name, isActive }: { id: string; name: string; isActive: boolean }) {
   const [checked, setChecked] = useState(isActive);
   const [, startTransition] = useTransition();
 
@@ -17,7 +17,8 @@ export function ServiceToggle({ id, isActive }: { id: string; isActive: boolean 
           void toggleService(id, next);
         });
       }}
-      aria-label="Ativar serviço"
+      // Every row has a switch; the name tells a screen reader which one.
+      aria-label={`Ativar ${name}`}
     />
   );
 }

@@ -27,6 +27,8 @@ describe("ConfirmationStatus", () => {
     expect(screen.queryByText("Reserva confirmada!")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "simular cancelamento" })).not.toBeInTheDocument();
     expect(document.title).toBe("Reserva cancelada — AgendFined");
+    expect(screen.queryByText("Guarde o código da sua reserva")).not.toBeInTheDocument();
+    expect(screen.getByText("Código da reserva")).toBeInTheDocument();
   });
 
   it("does not offer cancellation for a booking that is no longer confirmed", () => {

@@ -29,6 +29,31 @@ function parseService(formData: FormData): ServicePayload {
   };
 }
 
+const DUPLICATE_NAME: ActionResult = {
+  ok: false,
+  code: "DUPLICATE_NAME",
+  message: "Já existe um serviço com esse nome.",
+  fieldErrors: { name: ["Já existe um serviço com esse nome. Use um nome diferente."] },
+};
+
+// Same name regardless of case and repeated spaces ("Corte" and " corte ").
+function serviceNameKey(name: string): string {
+  return name.trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
+}
+
+// Two serviços with the same name look identical in the public select, so a
+// name another serviço of the negócio already uses is refused.
+async function isServiceNameTaken(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  businessId: string,
+  name: string,
+  exceptId?: string,
+): Promise<boolean> {
+  const { data } = await supabase.from("services").select("id, name").eq("business_id", businessId);
+  const key = serviceNameKey(name);
+  return (data ?? []).some((service) => service.id !== exceptId && serviceNameKey(service.name) === key);
+}
+
 export async function createService(
   _prev: ActionResult,
   formData: FormData,
@@ -48,6 +73,8 @@ export async function createService(
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
 
   const supabase = await createClient();
+  if (await isServiceNameTaken(supabase, business.id, parsed.data.name)) return DUPLICATE_NAME;
+
   const { error } = await supabase.from("services").insert({
     business_id: business.id,
     name: parsed.data.name,
@@ -84,6 +111,8 @@ export async function updateService(
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
 
   const supabase = await createClient();
+  if (await isServiceNameTaken(supabase, business.id, parsed.data.name, id)) return DUPLICATE_NAME;
+
   const { error, data: updated } = await supabase
     .from("services")
     .update({

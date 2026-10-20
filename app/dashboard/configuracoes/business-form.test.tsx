@@ -46,6 +46,36 @@ describe("BusinessForm", () => {
     expect(screen.queryByText(/passa a redirecionar/)).not.toBeInTheDocument();
   });
 
+  // #128: a prévia acompanha o que está sendo digitado, não o slug salvo.
+  it("mostra a prévia do link com o slug digitado", () => {
+    render(<BusinessForm initial={initial} />);
+
+    fireEvent.change(screen.getByLabelText("Endereço público (slug)"), { target: { value: "barbearia-nova" } });
+
+    expect(screen.getByText(/Seu link: agendfined\.com\.br\/barbearia-nova/)).toBeInTheDocument();
+  });
+
+  it("é o título de nível 1 da página de configurações", () => {
+    render(<BusinessForm initial={initial} />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "Configurações do negócio" })).toBeInTheDocument();
+  });
+
+  it("mostra o slug em uso junto do campo", async () => {
+    vi.mocked(updateBusiness).mockResolvedValue({
+      ok: false,
+      code: "SLUG_TAKEN",
+      message: "Revise os campos destacados.",
+      fieldErrors: { slug: ["Este endereço já está em uso. Escolha outro."] },
+    });
+    render(<BusinessForm initial={initial} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+
+    const error = await screen.findByText("Este endereço já está em uso. Escolha outro.");
+    expect(error.parentElement).toContainElement(screen.getByLabelText("Endereço público (slug)"));
+  });
+
   it("descarta o erro do servidor quando a validação do cliente bloqueia o próximo envio", async () => {
     vi.mocked(updateBusiness).mockResolvedValue({
       ok: false,

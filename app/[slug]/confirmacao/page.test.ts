@@ -57,13 +57,12 @@ describe("confirmation page <title>", () => {
   });
 });
 
-type ContentProps = { code: string; slug: string };
-type ContentElement = ReactElement<ContentProps, (props: ContentProps) => Promise<ReactElement>>;
+type ContentProps = Record<string, unknown>;
+type ContentElement = ReactElement<ContentProps, (props: ContentProps) => ReactElement>;
 
-// Resolves the async content the page wraps in <Suspense>, one level deep.
+// Renders the content component the page returns, one level deep.
 async function renderContent(code: string, slug: string) {
-  const page = (await ConfirmationPage(props(code, slug))) as ReactElement<{ children: ContentElement }>;
-  const content = page.props.children;
+  const content = (await ConfirmationPage(props(code, slug))) as ContentElement;
   return content.type(content.props);
 }
 
@@ -86,6 +85,14 @@ describe("confirmation page after a slug change", () => {
     const element = await renderContent("65925DBB", "barbearia");
 
     expect(element.type).not.toBe(CurrentSlugRedirect);
+  });
+
+  // #128: an unknown code must answer HTTP 404, so the lookup runs before any
+  // streaming starts (a notFound() inside <Suspense> keeps the 200 status).
+  it("throws notFound from the page itself for an unknown code", async () => {
+    rpc.mockResolvedValue({ data: [], error: null });
+
+    await expect(ConfirmationPage(props("ZZZZZZZZ", "barbearia"))).rejects.toThrow();
   });
 
   it("still answers 404 when the code resolves to nothing", async () => {

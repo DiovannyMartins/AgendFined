@@ -4,7 +4,9 @@ import {
   bookingLocalTime,
   businessWeekday,
   dayGridTimes,
+  agendaSearchString,
   filterAgenda,
+  parseAgendaSearchParams,
   weekDateKeys,
   type AgendaBooking,
 } from "@/lib/agenda/view";
@@ -143,5 +145,33 @@ describe("filterAgenda", () => {
   it("no filters returns everything unchanged", () => {
     const bookings = [b({ id: "a" }), b({ id: "b" })];
     expect(filterAgenda(bookings, { filters: {} })).toEqual(bookings);
+  });
+});
+
+describe("parseAgendaSearchParams", () => {
+  it("reads a valid date and status from the URL", () => {
+    expect(parseAgendaSearchParams({ data: "2026-10-19", status: "completed" })).toEqual({
+      dateKey: "2026-10-19",
+      status: "completed",
+    });
+  });
+
+  it("ignores malformed dates and unknown statuses", () => {
+    expect(parseAgendaSearchParams({ data: "2026-02-31", status: "pending" })).toEqual({
+      dateKey: null,
+      status: null,
+    });
+    expect(parseAgendaSearchParams({ data: ["2026-10-19"], status: undefined })).toEqual({
+      dateKey: null,
+      status: null,
+    });
+  });
+
+  it("round-trips through agendaSearchString", () => {
+    const filters = { dateKey: "2026-10-19", status: "no_show" as const };
+    const query = agendaSearchString(filters);
+    expect(query).toBe("?data=2026-10-19&status=no_show");
+    expect(parseAgendaSearchParams(Object.fromEntries(new URLSearchParams(query)))).toEqual(filters);
+    expect(agendaSearchString({ dateKey: null, status: null })).toBe("");
   });
 });

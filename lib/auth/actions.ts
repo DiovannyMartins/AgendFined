@@ -124,7 +124,7 @@ export async function login(_prev: ActionResult, formData: FormData): Promise<Ac
     return { ok: false, code: allowed === false ? "RATE_LIMITED" : "RATE_LIMIT_UNAVAILABLE", message: "Muitas tentativas. Tente novamente mais tarde." };
   }
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data: signIn, error } = await supabase.auth.signInWithPassword({
     ...parsed.data,
     options: { captchaToken: captchaToken(formData) },
   });
@@ -143,14 +143,23 @@ export async function login(_prev: ActionResult, formData: FormData): Promise<Ac
   const safeNext = safeInternalPath(next);
   const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if (assuranceError) return genericError("Não foi possível verificar a segurança da sessão.");
-  auditSecurityEvent("auth.login");
-  const separator = safeNext.includes("?") ? "&" : "?";
-  const successfulLoginPath = `${safeNext}${separator}login=1`;
+  auditSecurityEvent("auth.login", signIn?.user?.id);
+  const successfulLoginPath = withLoginFlag(safeNext);
   redirect(
     requiresMfaChallenge(assurance)
       ? mfaChallengePath(successfulLoginPath)
       : successfulLoginPath,
   );
+}
+
+// Adds login=1 to the query string, before any #fragment: appended after it,
+// the flag became part of the fragment and never reached the page.
+function withLoginFlag(path: string): string {
+  const hashIndex = path.indexOf("#");
+  const beforeHash = hashIndex === -1 ? path : path.slice(0, hashIndex);
+  const hash = hashIndex === -1 ? "" : path.slice(hashIndex);
+  const separator = beforeHash.includes("?") ? "&" : "?";
+  return `${beforeHash}${separator}login=1${hash}`;
 }
 
 export async function logout() {

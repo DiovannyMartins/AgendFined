@@ -111,7 +111,11 @@ export function BusinessForm({
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle className="text-xl">Configurações do negócio</CardTitle>
+        {/* The settings page has no other title, so the card heading is its
+            h1; during setup the page already has one. */}
+        <CardTitle className="text-xl">
+          {creating ? <h2>Configurações do negócio</h2> : <h1>Configurações do negócio</h1>}
+        </CardTitle>
         <CardDescription>
           {slug ? "Atualize os dados do seu negócio." : "Vamos configurar seu perfil público."}
         </CardDescription>
@@ -138,7 +142,7 @@ export function BusinessForm({
                 {...register("slug")}
               />
               <p id="slug-hint" className="text-xs text-muted-foreground">
-                Apenas minúsculas, números e hífen. Seu link: agendfined.com.br/{slug || "seu-slug"}
+                Apenas minúsculas, números e hífen. Seu link: agendfined.com.br/{nextSlug.toLowerCase() || "seu-slug"}
               </p>
               {slugChanged && (
                 <p role="status" className="text-sm text-amber-700 dark:text-amber-400">

@@ -1,4 +1,6 @@
-import { CalendarOff } from "lucide-react";
+import { CalendarOff, MessageCircle, Phone } from "lucide-react";
+import { brazilianPhoneSchema } from "@/lib/validation/schemas";
+import { formatPhoneBR } from "@/lib/format/phone";
 
 // Shown instead of the booking form while the negócio cannot take reservas:
 // without an active serviço or without any faixa of disponibilidade recorrente,
@@ -15,8 +17,11 @@ const COPY = {
   },
 } as const;
 
-export function BookingUnavailable({ reason }: { reason: keyof typeof COPY }) {
+export function BookingUnavailable({ reason, phone }: { reason: keyof typeof COPY; phone?: string | null }) {
   const { title, description } = COPY[reason];
+  // "Fale diretamente com o negócio" needs a way to do it: the phone the
+  // negócio registered, as a call link and a WhatsApp link.
+  const national = phone ? brazilianPhoneSchema.safeParse(phone) : null;
   return (
     <section
       aria-labelledby="booking-unavailable-title"
@@ -29,6 +34,26 @@ export function BookingUnavailable({ reason }: { reason: keyof typeof COPY }) {
         {title}
       </h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">{description}</p>
+      {national?.success && (
+        <div className="mt-5 flex flex-col items-center justify-center gap-2 text-sm font-medium sm:flex-row sm:gap-4">
+          <a
+            href={`tel:+55${national.data}`}
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 hover:underline"
+          >
+            <Phone className="size-4" aria-hidden="true" />
+            {formatPhoneBR(national.data)}
+          </a>
+          <a
+            href={`https://wa.me/55${national.data}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 hover:underline"
+          >
+            <MessageCircle className="size-4" aria-hidden="true" />
+            Conversar no WhatsApp
+          </a>
+        </div>
+      )}
     </section>
   );
 }

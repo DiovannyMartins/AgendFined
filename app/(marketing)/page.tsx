@@ -275,7 +275,7 @@ export default function MarketingHome() {
               {[
                 { value: "24/7", label: "Sua agenda disponível" },
                 { value: "1 link", label: "Para compartilhar" },
-                { value: "0 conflito", label: "Entre horários" },
+                { value: "0 conflitos", label: "Entre horários" },
                 { value: "+ tempo", label: "Para o seu negócio" },
               ].map((item) => (
                 <div key={item.value} className="rounded-3xl border border-border bg-background/70 p-6 backdrop-blur-sm">

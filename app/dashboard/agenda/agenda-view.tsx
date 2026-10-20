@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { filterAgenda, type AgendaBooking } from "@/lib/agenda/view";
+import { agendaSearchString, filterAgenda, type AgendaBooking } from "@/lib/agenda/view";
 import type { BookingStatus } from "@/lib/bookings/transitions";
 import { STATUS_LABEL } from "@/lib/bookings/status";
 import { toLocalDate } from "@/lib/booking/availability";
@@ -40,14 +40,27 @@ function prioritizeConfirmed(bookings: AgendaBooking[]): AgendaBooking[] {
 export function AgendaView({
   bookings,
   timezone,
+  initialDate = null,
+  initialStatus = null,
 }: {
   bookings: AgendaBooking[];
   timezone?: string;
+  initialDate?: string | null;
+  initialStatus?: BookingStatus | null;
 }) {
   // The date is an optional filter. `null` means "all dates", so the list
   // ("Todas as reservas") shows every reservation until a date is picked.
-  const [dateFilter, setDateFilter] = useState<string | null>(null);
-  const [status, setStatus] = useState<StatusFilter>("");
+  const [dateFilter, setDateFilter] = useState<string | null>(initialDate);
+  const [status, setStatus] = useState<StatusFilter>(initialStatus ?? "");
+
+  // Mirror the filters in the URL so a reload (or a shared link) keeps them.
+  useEffect(() => {
+    const { pathname, search, hash } = window.location;
+    const query = agendaSearchString({ dateKey: dateFilter, status: status || null });
+    if (query !== search) {
+      window.history.replaceState(window.history.state, "", `${pathname}${query}${hash}`);
+    }
+  }, [dateFilter, status]);
 
   const businessTimezone = timezone ?? APP_TIMEZONE;
   const todayKey = toLocalDate(new Date(), businessTimezone);
@@ -121,11 +134,17 @@ export function AgendaView({
             size="sm"
             variant="outline"
             className="border-border bg-card/40"
+            aria-pressed={dateFilter === todayKey}
             onClick={() => setDateFilter(todayKey)}
           >
             Hoje
           </Button>
-          <Button size="sm" variant={dateFilter ? "outline" : "default"} onClick={() => setDateFilter(null)}>
+          <Button
+            size="sm"
+            variant={dateFilter ? "outline" : "default"}
+            aria-pressed={dateFilter === null}
+            onClick={() => setDateFilter(null)}
+          >
             Todas as datas
           </Button>
         </div>
@@ -148,7 +167,11 @@ export function AgendaView({
       </div>
 
       <div className="mt-4">
-        <AgendaList bookings={listBookings} timezone={businessTimezone} />
+        <AgendaList
+          bookings={listBookings}
+          timezone={businessTimezone}
+          filterActive={dateFilter !== null || status !== ""}
+        />
       </div>
     </div>
   );

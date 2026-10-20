@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { isValidPublicCode, normalizePublicCode } from "@/lib/bookings/public-code";
 import { isValidTimeZone } from "@/lib/app-timezone";
-import { PRICE_INPUT_PATTERN } from "@/lib/format/currency";
+import { MAX_PRICE_CENTS, MAX_PRICE_MESSAGE, PRICE_INPUT_PATTERN, parsePriceToCents } from "@/lib/format/currency";
 import { RESERVED_SLUG_MESSAGE, isReservedSlug } from "@/lib/business/reserved-slugs";
 
 export const loginSchema = z.object({
@@ -136,7 +136,11 @@ const serviceFields = {
 
 export const serviceSchema = z.object({
   ...serviceFields,
-  priceCents: z.number({ error: "Informe um preço válido." }).int("Informe um preço válido.").min(0, "Informe um preço válido."),
+  priceCents: z
+    .number({ error: "Informe um preço válido." })
+    .int("Informe um preço válido.")
+    .min(0, "Informe um preço válido.")
+    .max(MAX_PRICE_CENTS, MAX_PRICE_MESSAGE),
 });
 export type ServiceInput = z.infer<typeof serviceSchema>;
 
@@ -145,7 +149,11 @@ export type ServiceInput = z.infer<typeof serviceSchema>;
 // centavos by parsePriceToCents in the server action.
 export const serviceFormSchema = z.object({
   ...serviceFields,
-  price: z.string().trim().regex(PRICE_INPUT_PATTERN, "Informe um preço válido, como 49,90."),
+  price: z
+    .string()
+    .trim()
+    .regex(PRICE_INPUT_PATTERN, "Informe um preço válido, como 49,90.")
+    .refine((value) => (parsePriceToCents(value) ?? 0) <= MAX_PRICE_CENTS, MAX_PRICE_MESSAGE),
 });
 export type ServiceFormValues = z.infer<typeof serviceFormSchema>;
 

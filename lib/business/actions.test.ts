@@ -106,7 +106,11 @@ describe("createBusiness", () => {
       message: 'duplicate key value violates unique constraint "businesses_slug_key"',
     };
     const result = await createBusiness(INITIAL, form("barbearia-demo"));
-    expect(result).toMatchObject({ ok: false, code: "SLUG_TAKEN" });
+    expect(result).toMatchObject({
+      ok: false,
+      code: "SLUG_TAKEN",
+      fieldErrors: { slug: ["Este endereço já está em uso. Escolha outro."] },
+    });
   });
 });
 

@@ -37,7 +37,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
-    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { plan: "BASICO" } }) }) }) }),
+    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { plan: "BASICO", phone: "11988887777" } }) }) }) }),
   }),
 }));
 vi.mock("@/lib/business/readiness", () => ({
@@ -87,6 +87,18 @@ describe("página pública do negócio", () => {
 
     expect(screen.getByRole("form", { name: "Formulário de reserva" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 2 })).not.toBeInTheDocument();
+  });
+
+  it("mostra o telefone e o WhatsApp do negócio quando ainda não há serviços", async () => {
+    state.services = [];
+
+    await renderPage();
+
+    expect(screen.getByRole("link", { name: "(11) 98888-7777" })).toHaveAttribute("href", "tel:+5511988887777");
+    expect(screen.getByRole("link", { name: "Conversar no WhatsApp" })).toHaveAttribute(
+      "href",
+      "https://wa.me/5511988887777",
+    );
   });
 
   it("mantém o link para consultar uma reserva existente mesmo sem serviços", async () => {

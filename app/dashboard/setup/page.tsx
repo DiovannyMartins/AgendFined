@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { getCurrentBusiness } from "@/lib/business/queries";
 import { BusinessForm } from "../configuracoes/business-form";
 
 export const metadata: Metadata = { title: "Configurar negócio — AgendFined" };
 
 export default async function SetupPage() {
+  if (await getCurrentBusiness()) redirect("/dashboard");
+
   return (
     <div className="max-w-3xl">
       <div className="mb-8">

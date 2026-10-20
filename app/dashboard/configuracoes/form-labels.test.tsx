@@ -4,7 +4,7 @@ import { AvailabilityForm, AvailabilityRow } from "./availability-form";
 import { BusinessForm } from "./business-form";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
-vi.mock("@/lib/business/actions", () => ({ upsertBusiness: vi.fn() }));
+vi.mock("@/lib/business/actions", () => ({ createBusiness: vi.fn(), updateBusiness: vi.fn() }));
 vi.mock("@/lib/availability/actions", () => ({
   setAvailability: vi.fn(),
   updateAvailability: vi.fn(),

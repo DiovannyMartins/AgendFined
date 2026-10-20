@@ -24,6 +24,21 @@ import { APP_TIMEZONE, TIMEZONE_OPTIONS } from "@/lib/app-timezone";
 
 const INITIAL: ActionResultState = { ok: true, data: undefined };
 
+type BusinessField = keyof BusinessFormValues;
+
+// Visual order of the fields, so focus lands on the first invalid one the
+// owner would see after a submit rejected by the server.
+const FIELD_ORDER: BusinessField[] = [
+  "name",
+  "slug",
+  "phone",
+  "description",
+  "slotIntervalMinutes",
+  "minNoticeMinutes",
+  "bookingWindowDays",
+  "timezone",
+];
+
 type BusinessFormInitial = {
   name: string;
   slug: string;
@@ -57,6 +72,7 @@ export function BusinessForm({
     register,
     handleSubmit,
     control,
+    setFocus,
     formState: { errors },
   } = useForm<BusinessFormValues>({
     resolver: zodResolver(businessFormSchema),
@@ -92,6 +108,10 @@ export function BusinessForm({
       const result = await (creating ? createBusiness : updateBusiness)(INITIAL, fd);
       setState(result);
       setSubmitted(true);
+      if (!result.ok) {
+        const firstInvalid = FIELD_ORDER.find((field) => result.fieldErrors?.[field]?.length);
+        if (firstInvalid) setFocus(firstInvalid);
+      }
       if (result.ok && creating) {
         trackAnalyticsEvent("business_created", { method: "dashboard_form" });
         router.push("/dashboard");
@@ -107,6 +127,26 @@ export function BusinessForm({
   }
 
   const fieldErrors = state.ok ? {} : (state.fieldErrors ?? {});
+
+  function fieldError(field: BusinessField) {
+    return errors[field]?.message ?? fieldErrors[field]?.[0];
+  }
+
+  // Same contract as the public booking flow: the input announces it is
+  // invalid and points at its hint (if any) and at the message below it.
+  function fieldErrorProps(field: BusinessField, hintId?: string) {
+    const invalid = Boolean(fieldError(field));
+    const ids = [hintId, invalid ? `${field}-error` : undefined].filter(Boolean).join(" ");
+    return {
+      "aria-invalid": invalid ? true : undefined,
+      "aria-describedby": ids || undefined,
+    };
+  }
+
+  function renderFieldError(field: BusinessField) {
+    const message = fieldError(field);
+    return message ? <p id={`${field}-error`} className="text-sm text-destructive">{message}</p> : null;
+  }
 
   return (
     <Card className="w-full">
@@ -125,12 +165,8 @@ export function BusinessForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="name">Nome do negócio</Label>
-              <Input id="name" {...register("name")} />
-              {(errors.name || fieldErrors.name) && (
-                <p className="text-sm text-destructive">
-                  {errors.name?.message ?? fieldErrors.name?.[0]}
-                </p>
-              )}
+              <Input id="name" {...fieldErrorProps("name")} {...register("name")} />
+              {renderFieldError("name")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="slug">Endereço público (slug)</Label>
@@ -138,7 +174,7 @@ export function BusinessForm({
                 id="slug"
                 placeholder="minha-barbearia"
                 autoComplete="off"
-                aria-describedby="slug-hint"
+                {...fieldErrorProps("slug", "slug-hint")}
                 {...register("slug")}
               />
               <p id="slug-hint" className="text-xs text-muted-foreground">
@@ -152,29 +188,22 @@ export function BusinessForm({
                   foi divulgado (WhatsApp, Instagram, QR Code impresso).
                 </p>
               )}
-              {(errors.slug || fieldErrors.slug) && (
-                <p className="text-sm text-destructive">
-                  {errors.slug?.message ?? fieldErrors.slug?.[0]}
-                </p>
-              )}
+              {renderFieldError("slug")}
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="phone">Telefone / WhatsApp</Label>
-              <Input id="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="(11) 98888-7777" {...register("phone")} />
-              {(errors.phone || fieldErrors.phone) && (
-                <p className="text-sm text-destructive">
-                  {errors.phone?.message ?? fieldErrors.phone?.[0]}
-                </p>
-              )}
+              <Input id="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="(11) 98888-7777" {...fieldErrorProps("phone")} {...register("phone")} />
+              {renderFieldError("phone")}
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="description">Descrição (opcional)</Label>
-            <Textarea id="description" rows={3} maxLength={500} {...register("description")} />
+            <Textarea id="description" rows={3} maxLength={500} {...fieldErrorProps("description")} {...register("description")} />
+            {renderFieldError("description")}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
@@ -186,14 +215,11 @@ export function BusinessForm({
                 min={1}
                 max={1440}
                 step={1}
+                {...fieldErrorProps("slotIntervalMinutes", "slotIntervalMinutes-hint")}
                 {...register("slotIntervalMinutes")}
               />
-              <p className="text-xs text-muted-foreground">Informe qualquer valor inteiro entre 1 e 1440 minutos.</p>
-              {(errors.slotIntervalMinutes || fieldErrors.slotIntervalMinutes) && (
-                <p className="text-sm text-destructive">
-                  {errors.slotIntervalMinutes?.message ?? fieldErrors.slotIntervalMinutes?.[0]}
-                </p>
-              )}
+              <p id="slotIntervalMinutes-hint" className="text-xs text-muted-foreground">Informe qualquer valor inteiro entre 1 e 1440 minutos.</p>
+              {renderFieldError("slotIntervalMinutes")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="minNoticeMinutes">Antecedência (min)</Label>
@@ -202,13 +228,10 @@ export function BusinessForm({
                 type="number"
                 min={0}
                 max={10080}
+                {...fieldErrorProps("minNoticeMinutes")}
                 {...register("minNoticeMinutes", { valueAsNumber: true })}
               />
-              {(errors.minNoticeMinutes || fieldErrors.minNoticeMinutes) && (
-                <p className="text-sm text-destructive">
-                  {errors.minNoticeMinutes?.message ?? fieldErrors.minNoticeMinutes?.[0]}
-                </p>
-              )}
+              {renderFieldError("minNoticeMinutes")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="bookingWindowDays">Janela de reservas (dias)</Label>
@@ -217,16 +240,13 @@ export function BusinessForm({
                 type="number"
                 min={1}
                 max={bookingWindowLimitDays}
+                {...fieldErrorProps("bookingWindowDays", "bookingWindowDays-hint")}
                 {...register("bookingWindowDays", { valueAsNumber: true })}
               />
-              <p className="text-xs text-muted-foreground">
+              <p id="bookingWindowDays-hint" className="text-xs text-muted-foreground">
                 Seu plano permite reservas com até {bookingWindowLimitDays} dias de antecedência.
               </p>
-              {(errors.bookingWindowDays || fieldErrors.bookingWindowDays) && (
-                <p className="text-sm text-destructive">
-                  {errors.bookingWindowDays?.message ?? fieldErrors.bookingWindowDays?.[0]}
-                </p>
-              )}
+              {renderFieldError("bookingWindowDays")}
             </div>
           </div>
 
@@ -235,20 +255,17 @@ export function BusinessForm({
             <select
               id="timezone"
               className="flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3"
+              {...fieldErrorProps("timezone", "timezone-hint")}
               {...register("timezone")}
             >
               {timezoneOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
-            <p className="text-xs text-muted-foreground">
+            <p id="timezone-hint" className="text-xs text-muted-foreground">
               Os clientes, o painel, os lembretes e o Google Calendar usarão este fuso. A alteração é bloqueada enquanto houver reservas futuras.
             </p>
-            {(errors.timezone || fieldErrors.timezone) && (
-              <p className="text-sm text-destructive">
-                {errors.timezone?.message ?? fieldErrors.timezone?.[0]}
-              </p>
-            )}
+            {renderFieldError("timezone")}
           </div>
 
           {state.ok && submitted && !creating && (

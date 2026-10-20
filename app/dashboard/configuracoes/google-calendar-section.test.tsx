@@ -32,3 +32,14 @@ describe("GoogleCalendarSection callback notice", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });
+
+describe("GoogleCalendarSection connect link", () => {
+  // #136: um <a type="button"> confunde o leitor de tela e dispara o aviso do Base UI.
+  it("renders the connect action as a plain link", () => {
+    render(<GoogleCalendarSection connection={null} isPro />);
+
+    const link = screen.getByRole("link", { name: "Conectar Google Calendar" });
+    expect(link).toHaveAttribute("href", "/api/google-calendar/connect");
+    expect(link).not.toHaveAttribute("type");
+  });
+});

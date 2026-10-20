@@ -57,3 +57,41 @@ export function filterCustomers(customers: CustomerRow[], query: string): Custom
     [c.name, c.phone, c.email ?? ""].some((value) => value.toLowerCase().includes(q)),
   );
 }
+
+// Search behind "buscar também pelo histórico de reservas": name, phone, email
+// and the services/statuses of the customer's bookings. A query shaped like a
+// phone ("(11) 98888-7777") is compared digit-by-digit against the phone only,
+// so the DDD alone doesn't match every customer. Otherwise every word of the
+// query must appear (AND), so "Cliente Beta" doesn't bring all "cliente"s.
+// Returns null when the query has nothing searchable (no word of 2+ letters).
+export function searchCustomerHistory(history: CustomerHistory[], query: string): CustomerHistory[] | null {
+  if (/\d/.test(query) && matchesPhoneShape(query)) {
+    return history.filter(({ customer }) => matchesPhone(customer.phone, query));
+  }
+
+  const tokens = normalizeSearchText(query).split(" ").filter((token) => token.length >= 2);
+  if (tokens.length === 0) return null;
+
+  return history.filter(({ customer, bookings }) => {
+    const searchable = normalizeSearchText([
+      customer.name,
+      customer.phone,
+      customer.email ?? "",
+      ...bookings.flatMap((booking) => [booking.service_name_snapshot, booking.status]),
+    ].join(" "));
+    return tokens.every((token) => searchable.includes(token) || matchesPhone(customer.phone, token));
+  });
+}
+
+function matchesPhoneShape(query: string): boolean {
+  return /^[\d\s().+-]+$/.test(query.trim());
+}
+
+function normalizeSearchText(value: string): string {
+  return value
+    .toLocaleLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9@+._-]+/g, " ")
+    .trim();
+}

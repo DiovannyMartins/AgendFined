@@ -8,6 +8,8 @@ const { state } = vi.hoisted(() => ({
     bookings: [] as { id: string; customer_name_snapshot: string; start_at: string; end_at: string }[],
     bookingFilters: [] as Filter[],
     inserts: [] as Record<string, unknown>[],
+    faixas: [] as { id: string; start_time: string; end_time: string }[],
+    faixaWrites: [] as Record<string, unknown>[],
   },
 }));
 
@@ -24,6 +26,20 @@ vi.mock("@/lib/supabase/server", () => ({
             return { error: null };
           },
         };
+      }
+      if (table === "availability") {
+        // Postgres returns time columns as "HH:MM:SS", unlike the form's "HH:MM".
+        let excludedId: unknown;
+        const query = {
+          select: () => query,
+          eq: () => query,
+          neq: (_column: string, value: unknown) => ((excludedId = value), query),
+          insert: async (row: Record<string, unknown>) => (state.faixaWrites.push(row), { error: null }),
+          update: (row: Record<string, unknown>) => (state.faixaWrites.push(row), query),
+          then: (resolve: (value: { data: typeof state.faixas; error: null }) => unknown) =>
+            Promise.resolve({ data: state.faixas.filter((f) => f.id !== excludedId), error: null }).then(resolve),
+        };
+        return query;
       }
       // bookings conflict query: chainable filters, awaited at the end.
       const query = {
@@ -157,6 +173,44 @@ describe("availability faixa validation", () => {
     formData.set("endTime", endTime);
     return formData;
   }
+
+  beforeEach(() => {
+    state.business = { id: "business-1", timezone: "America/Sao_Paulo" };
+    state.faixas = [];
+    state.faixaWrites = [];
+  });
+
+  const morningAndAfternoon = [
+    { id: "manha", start_time: "08:00:00", end_time: "12:00:00" },
+    { id: "tarde", start_time: "14:00:00", end_time: "18:00:00" },
+  ];
+
+  it("adds a faixa touching the end of one and the start of another (#125)", async () => {
+    state.faixas = morningAndAfternoon;
+
+    const result = await setAvailability({ ok: true, data: undefined }, faixaForm("12:00", "14:00"));
+
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(state.faixaWrites).toEqual([{ business_id: "business-1", weekday: 2, start_time: "12:00", end_time: "14:00" }]);
+  });
+
+  it("edits a faixa into the gap between two adjacent ones (#125)", async () => {
+    state.faixas = [...morningAndAfternoon, { id: "almoco", start_time: "12:30:00", end_time: "13:30:00" }];
+
+    const result = await updateAvailability("almoco", { ok: true, data: undefined }, faixaForm("12:00", "14:00"));
+
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(state.faixaWrites).toEqual([{ weekday: 2, start_time: "12:00", end_time: "14:00" }]);
+  });
+
+  it("still rejects a faixa that really overlaps an existing one", async () => {
+    state.faixas = morningAndAfternoon;
+
+    const result = await setAvailability({ ok: true, data: undefined }, faixaForm("11:00", "15:00"));
+
+    expect(result).toMatchObject({ ok: false, code: "OVERLAP" });
+    expect(state.faixaWrites).toEqual([]);
+  });
 
   it("explains an inverted faixa when adding it", async () => {
     const result = await setAvailability({ ok: true, data: undefined }, faixaForm("18:00", "08:00"));

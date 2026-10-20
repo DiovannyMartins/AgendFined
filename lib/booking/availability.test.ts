@@ -20,6 +20,12 @@ describe("overlaps", () => {
   it("allows back-to-back appointments", () => {
     expect(overlaps({ start: "09:00", end: "10:00" }, { start: "10:00", end: "11:00" })).toBe(false);
   });
+
+  it("compares the DB's HH:MM:SS with the form's HH:MM by time, not by string (#125)", () => {
+    expect(overlaps({ start: "08:00:00", end: "12:00:00" }, { start: "12:00", end: "14:00" })).toBe(false);
+    expect(overlaps({ start: "14:00:00", end: "18:00:00" }, { start: "12:00", end: "14:00" })).toBe(false);
+    expect(overlaps({ start: "08:00:00", end: "12:00:00" }, { start: "11:00", end: "15:00" })).toBe(true);
+  });
 });
 
 describe("generateSlotStartTimes (spec §10.4 example)", () => {

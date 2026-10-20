@@ -1,9 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import Link from "next/link";
 import { CalendarSync, Unplug } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { adoptGoogleCalendarTimezone, disconnectGoogleCalendar, syncGoogleCalendarNow, type GoogleCalendarActionState } from "@/lib/google-calendar/actions";
 import type { GoogleCalendarConnectionStatus } from "@/lib/google-calendar/queries";
@@ -75,7 +74,9 @@ export function GoogleCalendarSection({ connection, isPro, callbackStatus }: { c
         ) : (
           <>
             <p className="text-sm text-muted-foreground">Conecte sua conta para criar e atualizar eventos automaticamente. O AgendFined não lê eventos existentes.</p>
-            <Button render={<Link href="/api/google-calendar/connect" />}>Conectar Google Calendar</Button>
+            {/* Plain <a>: the route handler redirects to Google's consent screen,
+                so it must be a full navigation and never prefetched. */}
+            <a href="/api/google-calendar/connect" className={buttonVariants()}>Conectar Google Calendar</a>
           </>
         )}
       </CardContent>

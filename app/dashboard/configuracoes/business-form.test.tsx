@@ -76,6 +76,64 @@ describe("BusinessForm", () => {
     expect(error.parentElement).toContainElement(screen.getByLabelText("Endereço público (slug)"));
   });
 
+  // #136: o leitor de tela precisa saber qual campo falhou, não só o resumo do rodapé.
+  it("liga o erro do slug em uso ao campo, preservando a dica", async () => {
+    vi.mocked(updateBusiness).mockResolvedValue({
+      ok: false,
+      code: "SLUG_TAKEN",
+      message: "Revise os campos destacados.",
+      fieldErrors: { slug: ["Este endereço já está em uso. Escolha outro."] },
+    });
+    render(<BusinessForm initial={initial} />);
+    const slugInput = screen.getByLabelText("Endereço público (slug)");
+    expect(slugInput).not.toHaveAttribute("aria-invalid");
+
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+
+    const error = await screen.findByText("Este endereço já está em uso. Escolha outro.");
+    expect(error).toHaveAttribute("id", "slug-error");
+    expect(slugInput).toHaveAttribute("aria-invalid", "true");
+    expect(slugInput).toHaveAttribute("aria-describedby", "slug-hint slug-error");
+    expect(slugInput).toHaveAccessibleDescription(/Seu link: .*Este endereço já está em uso\. Escolha outro\./);
+    await waitFor(() => expect(slugInput).toHaveFocus());
+  });
+
+  it("marca como inválidos os campos barrados pela validação do cliente", async () => {
+    render(<BusinessForm initial={initial} />);
+    const nameInput = screen.getByLabelText("Nome do negócio");
+    const phoneInput = screen.getByLabelText("Telefone / WhatsApp");
+
+    fireEvent.change(nameInput, { target: { value: "A" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+
+    const error = await screen.findByText("Informe um nome com pelo menos 2 caracteres.");
+    expect(error).toHaveAttribute("id", "name-error");
+    expect(nameInput).toHaveAttribute("aria-invalid", "true");
+    expect(nameInput).toHaveAttribute("aria-describedby", "name-error");
+    expect(nameInput).toHaveAccessibleDescription("Informe um nome com pelo menos 2 caracteres.");
+    expect(phoneInput).not.toHaveAttribute("aria-invalid");
+    expect(phoneInput).not.toHaveAttribute("aria-describedby");
+    expect(updateBusiness).not.toHaveBeenCalled();
+  });
+
+  it("mantém a dica no aria-describedby dos campos numéricos com erro", async () => {
+    vi.mocked(updateBusiness).mockResolvedValue({
+      ok: false,
+      code: "VALIDATION",
+      message: "A janela de reservas excede o limite do seu plano.",
+      fieldErrors: { bookingWindowDays: ["O limite do seu plano é de 90 dias."] },
+    });
+    render(<BusinessForm initial={initial} />);
+    const windowInput = screen.getByLabelText("Janela de reservas (dias)");
+    expect(windowInput).toHaveAttribute("aria-describedby", "bookingWindowDays-hint");
+
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+
+    await screen.findByText("O limite do seu plano é de 90 dias.");
+    expect(windowInput).toHaveAttribute("aria-invalid", "true");
+    expect(windowInput).toHaveAttribute("aria-describedby", "bookingWindowDays-hint bookingWindowDays-error");
+  });
+
   it("descarta o erro do servidor quando a validação do cliente bloqueia o próximo envio", async () => {
     vi.mocked(updateBusiness).mockResolvedValue({
       ok: false,

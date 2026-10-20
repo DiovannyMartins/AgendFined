@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getPublicBusinessOrRedirect } from "@/lib/business/public-business";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveBookingWindowDays, isProPlan } from "@/lib/plan/plan";
 import { hasActiveAvailability } from "@/lib/business/readiness";
@@ -46,11 +46,7 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
   const { slug } = await params;
   const supabase = await createClient();
 
-  const { data: businesses, error: businessError } = await supabase.rpc("get_public_business", { p_slug: slug });
-  if (businessError) throw new Error("PUBLIC_BUSINESS_LOOKUP_FAILED");
-  const business = businesses?.[0];
-
-  if (!business) notFound();
+  const business = await getPublicBusinessOrRedirect(supabase, slug);
 
   const { data: services, error: servicesError } = await supabase.rpc("get_public_services", {
     p_business_id: business.id,

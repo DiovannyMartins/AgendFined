@@ -300,6 +300,32 @@ export type Database = {
           },
         ]
       }
+      business_slug_history: {
+        Row: {
+          business_id: string
+          created_at: string
+          slug: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          slug: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_slug_history_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           business_id: string
@@ -846,6 +872,12 @@ export type Database = {
           name: string
           slug: string
           timezone: string
+        }[]
+      }
+      get_business_slug_redirect: {
+        Args: { p_slug: string }
+        Returns: {
+          slug: string
         }[]
       }
       get_public_services: {

@@ -72,10 +72,11 @@ export function BusinessForm({
     },
   });
 
-  // Confirmation links already sent follow the new slug, but the public link
-  // shared on WhatsApp, Instagram or a printed QR Code does not (#124).
+  // The previous slug redirects to the new one and stays reserved for this
+  // business (ADR 0007); confirmation links already sent follow it too (#124).
   const watchedSlug = useWatch({ control, name: "slug" });
-  const slugChanged = !creating && watchedSlug.trim() !== slug;
+  const nextSlug = watchedSlug.trim();
+  const slugChanged = !creating && nextSlug !== slug;
 
   function onSubmit(values: BusinessFormValues) {
     startTransition(async () => {
@@ -141,9 +142,10 @@ export function BusinessForm({
               </p>
               {slugChanged && (
                 <p role="status" className="text-sm text-amber-700 dark:text-amber-400">
-                  Ao salvar, o link agendfined.com.br/{slug} deixa de funcionar. Atualize-o onde ele foi
-                  divulgado (WhatsApp, Instagram, QR Code impresso). Os links de confirmação já enviados
-                  aos clientes continuam funcionando.
+                  Ao salvar, o link agendfined.com.br/{slug} passa a redirecionar para
+                  agendfined.com.br/{nextSlug || "seu-slug"} e continua reservado para o seu negócio. Os links de
+                  confirmação já enviados aos clientes continuam funcionando. Se quiser, atualize o link onde ele
+                  foi divulgado (WhatsApp, Instagram, QR Code impresso).
                 </p>
               )}
               {(errors.slug || fieldErrors.slug) && (

@@ -20,3 +20,4 @@ Os ADRs 0001 a 0006 foram registrados retroativamente em 17/10/2026, a partir do
 - [0004 — Código público curto em Crockford base32](0004-codigo-publico-crockford.md)
 - [0005 — Token de cancelamento independente, armazenado só como digest](0005-token-de-cancelamento.md)
 - [0006 — Leituras e escritas públicas por RPCs com allowlist](0006-rpcs-publicas-com-allowlist.md)
+- [0007 — Slug antigo reservado ao negócio e redirecionado ao atual](0007-slug-antigo-reservado-e-redirecionado.md)

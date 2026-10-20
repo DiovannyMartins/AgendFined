@@ -1,19 +1,38 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { state } = vi.hoisted(() => ({
+const barbearia = { id: "biz-1", name: "Barbearia", slug: "barbearia", description: null, timezone: "America/Sao_Paulo" };
+
+const { state, navigation } = vi.hoisted(() => ({
   state: {
+    businesses: [] as Array<Record<string, unknown>>,
+    previousSlugTarget: [] as Array<{ slug: string }>,
+    previousSlugError: null as { message: string } | null,
     services: [] as Array<Record<string, unknown>>,
     hasAvailability: true,
   },
+  navigation: {
+    permanentRedirect: vi.fn((path: string) => {
+      throw new Error(`NEXT_REDIRECT:308:${path}`);
+    }),
+    notFound: vi.fn(() => {
+      throw new Error("NEXT_NOT_FOUND");
+    }),
+  },
 }));
 
+vi.mock("next/navigation", () => navigation);
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
-    rpc: async (name: string) =>
-      name === "get_public_business"
-        ? { data: [{ id: "biz-1", name: "Barbearia", description: null, timezone: "America/Sao_Paulo" }], error: null }
-        : { data: state.services, error: null },
+    rpc: async (name: string) => {
+      if (name === "get_public_business") return { data: state.businesses, error: null };
+      if (name === "get_business_slug_redirect") {
+        return state.previousSlugError
+          ? { data: null, error: state.previousSlugError }
+          : { data: state.previousSlugTarget, error: null };
+      }
+      return { data: state.services, error: null };
+    },
   }),
 }));
 vi.mock("@/lib/supabase/admin", () => ({
@@ -30,12 +49,15 @@ import PublicPage from "./page";
 
 const corte = { id: "svc-1", name: "Corte", description: null, duration_minutes: 30, price_cents: 5000 };
 
-async function renderPage() {
-  render(await PublicPage({ params: Promise.resolve({ slug: "barbearia" }) }));
+async function renderPage(slug = "barbearia") {
+  render(await PublicPage({ params: Promise.resolve({ slug }) }));
 }
 
 describe("página pública do negócio", () => {
   beforeEach(() => {
+    state.businesses = [barbearia];
+    state.previousSlugTarget = [];
+    state.previousSlugError = null;
     state.services = [corte];
     state.hasAvailability = true;
   });
@@ -73,5 +95,27 @@ describe("página pública do negócio", () => {
     await renderPage();
 
     expect(screen.getByRole("link", { name: "Consultar reserva" })).toHaveAttribute("href", "/barbearia/consultar");
+  });
+
+  // Slug antigo (ADR 0007): o link divulgado antes da troca leva ao slug atual.
+  it("redireciona permanentemente um slug antigo para o slug atual", async () => {
+    state.businesses = [];
+    state.previousSlugTarget = [{ slug: "barbearia-nova" }];
+
+    await expect(renderPage("barbearia")).rejects.toThrow("NEXT_REDIRECT:308:/barbearia-nova");
+  });
+
+  it("dá 404 quando o slug não é atual nem antigo", async () => {
+    state.businesses = [];
+
+    await expect(renderPage("nao-existe")).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+
+  // O slug já não existe; uma falha só na busca do histórico não vira erro 500.
+  it("dá 404 quando a busca do slug antigo falha", async () => {
+    state.businesses = [];
+    state.previousSlugError = { message: "Could not find the function" };
+
+    await expect(renderPage("nao-existe")).rejects.toThrow("NEXT_NOT_FOUND");
   });
 });

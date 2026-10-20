@@ -28,19 +28,22 @@ describe("BusinessForm", () => {
     expect(screen.getByLabelText("Telefone / WhatsApp")).toHaveValue("(11) 99999-9999");
   });
 
-  // #124: trocar o slug derruba o link público já divulgado.
-  it("avisa sobre o link antigo antes de salvar um slug novo", () => {
+  // #124 / ADR 0007: o link antigo redireciona para o novo e fica reservado ao negócio.
+  it("explica o que acontece com o link antigo antes de salvar um slug novo", () => {
     render(<BusinessForm initial={initial} />);
-    expect(screen.queryByText(/deixa de funcionar/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/passa a redirecionar/)).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Endereço público (slug)"), { target: { value: "barbearia-nova" } });
 
-    expect(screen.getByText(/agendfined\.com\.br\/barbearia-demo deixa de funcionar/)).toBeInTheDocument();
-    expect(screen.getByText(/WhatsApp, Instagram/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/agendfined\.com\.br\/barbearia-demo passa a redirecionar para agendfined\.com\.br\/barbearia-nova/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/continua reservado para o seu negócio/)).toBeInTheDocument();
+    expect(screen.queryByText(/deixa de funcionar/)).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Endereço público (slug)"), { target: { value: "barbearia-demo" } });
 
-    expect(screen.queryByText(/deixa de funcionar/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/passa a redirecionar/)).not.toBeInTheDocument();
   });
 
   it("descarta o erro do servidor quando a validação do cliente bloqueia o próximo envio", async () => {

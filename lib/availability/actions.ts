@@ -182,6 +182,10 @@ export async function createBlock(
   if (Date.parse(endAt) <= Date.parse(startAt)) {
     return { ok: false, code: "VALIDATION", message: "O fim deve ser depois do início." };
   }
+  // A period that already ended blocks nothing; it only clutters the list.
+  if (Date.parse(endAt) <= Date.now()) {
+    return { ok: false, code: "VALIDATION", message: "Esse período já passou. Escolha um fim no futuro." };
+  }
 
   const supabase = await createClient();
 

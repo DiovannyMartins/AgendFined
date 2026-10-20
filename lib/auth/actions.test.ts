@@ -18,7 +18,8 @@ vi.mock("@/lib/booking/rate-limit", () => ({
   enforceMfaRateLimit: async () => true,
   getClientIp: async () => "203.0.113.7",
 }));
-vi.mock("@/lib/security/audit", () => ({ auditSecurityEvent: () => undefined }));
+const { auditSecurityEvent } = vi.hoisted(() => ({ auditSecurityEvent: vi.fn() }));
+vi.mock("@/lib/security/audit", () => ({ auditSecurityEvent }));
 vi.mock("next/navigation", () => ({
   redirect: (path: string) => {
     throw new Error(`REDIRECT:${path}`);
@@ -72,6 +73,25 @@ describe("login", () => {
     await expect(
       login(INITIAL, form({ email: "dono@agendfined.dev", password: "Senha-forte-1", next })),
     ).rejects.toThrow(/^REDIRECT:\/dashboard\?login=1$/);
+  });
+
+  // #128: o login=1 ia para depois do #, virando parte do fragmento.
+  it("adds the login flag before the fragment of the destination", async () => {
+    auth.signInWithPassword.mockResolvedValue({ error: null });
+
+    await expect(
+      login(INITIAL, form({ email: "dono@agendfined.dev", password: "Senha-forte-1", next: "/dashboard/clientes?x=1#y" })),
+    ).rejects.toThrow(/^REDIRECT:\/dashboard\/clientes\?x=1&login=1#y$/);
+  });
+
+  it("records who logged in in the audit event", async () => {
+    auth.signInWithPassword.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
+
+    await expect(
+      login(INITIAL, form({ email: "dono@agendfined.dev", password: "Senha-forte-1" })),
+    ).rejects.toThrow("REDIRECT:");
+
+    expect(auditSecurityEvent).toHaveBeenCalledWith("auth.login", "user-1");
   });
 
   it("keeps the destination through the MFA challenge", async () => {

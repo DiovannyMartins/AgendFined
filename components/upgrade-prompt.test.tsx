@@ -19,4 +19,12 @@ describe("UpgradePrompt (ADR 0008)", () => {
       "/dashboard/configuracoes#plano",
     );
   });
+
+  it("compact notice keeps the message and CTA without a page-level heading", () => {
+    render(<UpgradePrompt compact title="Exportação é PRO" description="Assine para exportar." />);
+
+    expect(screen.getByText("Exportação é PRO")).toBeInTheDocument();
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ver planos" })).toBeInTheDocument();
+  });
 });

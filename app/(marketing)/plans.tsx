@@ -32,7 +32,7 @@ const PLAN_COPY: Record<Plan, {
       "Serviços ilimitados": "Cadastre tudo o que você oferece.",
       "Clientes e histórico": "Mantenha informações importantes organizadas.",
       Bloqueios: "Proteja pausas, férias e horários pessoais.",
-      "Gestão de reservas": "Confirme e acompanhe cada reserva.",
+      "Gestão de reservas": "Reservas confirmadas na hora, acompanhadas em um só lugar.",
       "Cancelamento self-service": "Dê autonomia para seus clientes.",
     },
   },
@@ -154,7 +154,7 @@ export function Plans({ isAuthenticated }: { isAuthenticated?: boolean }) {
                   )}
                   <div className={cn("mt-3 flex items-center justify-center gap-2 text-[11px]", highlighted ? "text-primary-foreground/60" : "text-muted-foreground")}>
                     <ShieldCheck className="size-3.5" />
-                    Sem complicação para começar
+                    {highlighted ? "Cancele quando quiser" : "Sem complicação para começar"}
                   </div>
                 </article>
               </Reveal>

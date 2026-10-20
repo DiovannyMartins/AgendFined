@@ -49,6 +49,12 @@ export function ServiceForm({ service }: { service?: ServiceRow }) {
     },
   });
 
+  // Errors only the server can tell (a name already in use, a price above the
+  // limit) belong next to their field, like the client-side ones.
+  const serverErrors = state.ok ? undefined : state.fieldErrors;
+  const nameError = errors.name?.message ?? serverErrors?.name?.[0];
+  const priceError = errors.price?.message ?? serverErrors?.priceCents?.[0];
+
   function handleOpenChange(next: boolean) {
     setOpen(next);
     // O formulário de criação é reutilizado entre aberturas: sem reset, a
@@ -87,8 +93,8 @@ export function ServiceForm({ service }: { service?: ServiceRow }) {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           <div className="space-y-2">
             <Label htmlFor="name">Nome</Label>
-            <Input id="name" {...register("name")} />
-            {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+            <Input id="name" aria-invalid={nameError ? true : undefined} {...register("name")} />
+            {nameError && <p className="text-sm text-destructive">{nameError}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="description">Descrição (opcional)</Label>
@@ -116,15 +122,16 @@ export function ServiceForm({ service }: { service?: ServiceRow }) {
                 inputMode="decimal"
                 placeholder="49,90"
                 aria-describedby="price-hint"
+                aria-invalid={priceError ? true : undefined}
                 {...register("price")}
               />
               <p id="price-hint" className="text-xs text-muted-foreground">
                 Use vírgula para os centavos, como 49,90 ou 1.234,56.
               </p>
-              {errors.price && <p className="text-sm text-destructive">{errors.price.message}</p>}
+              {priceError && <p className="text-sm text-destructive">{priceError}</p>}
             </div>
           </div>
-          {!state.ok && <p className="text-sm text-destructive">{state.message}</p>}
+          {!state.ok && !serverErrors && <p className="text-sm text-destructive">{state.message}</p>}
           <Button type="submit" disabled={pending} className="w-full">
             {pending ? "Salvando..." : service ? "Salvar" : "Criar serviço"}
           </Button>

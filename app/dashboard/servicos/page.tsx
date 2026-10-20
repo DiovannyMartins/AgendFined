@@ -79,7 +79,7 @@ export default async function ServicosPage() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <ServiceToggle id={service.id} isActive={service.is_active} />
+                <ServiceToggle id={service.id} name={service.name} isActive={service.is_active} />
                 <ServiceForm
                   service={{
                     id: service.id,

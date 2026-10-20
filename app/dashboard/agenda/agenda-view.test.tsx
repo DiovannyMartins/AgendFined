@@ -75,6 +75,41 @@ describe("AgendaView list view", () => {
   });
 });
 
+describe("AgendaView filtros", () => {
+  it("diz que nada bate com o filtro quando há reservas fora dele", () => {
+    render(<AgendaView bookings={[booking({ id: "a" })]} initialStatus="completed" />);
+
+    expect(screen.getByText(/Nenhuma reserva com esse filtro/)).toBeInTheDocument();
+    expect(screen.queryByText(/Nenhuma reserva ainda/)).not.toBeInTheDocument();
+  });
+
+  it("começa com os filtros vindos da URL e os mantém na URL", () => {
+    const onDay = booking({ id: "a", start_at: "2026-09-20T11:00:00.000Z", customer_name_snapshot: "Joana" });
+    const offDay = booking({ id: "b", start_at: "2026-09-21T11:00:00.000Z", customer_name_snapshot: "Pedro" });
+
+    render(<AgendaView bookings={[onDay, offDay]} initialDate="2026-09-20" />);
+
+    expect(screen.getByText(/Joana/)).toBeInTheDocument();
+    expect(screen.queryByText(/Pedro/)).not.toBeInTheDocument();
+    expect(window.location.search).toBe("?data=2026-09-20");
+
+    fireEvent.click(screen.getByRole("button", { name: /Todas as datas/ }));
+    expect(window.location.search).toBe("");
+  });
+
+  it("informa qual atalho de data está ativo", () => {
+    render(<AgendaView bookings={[]} />);
+
+    expect(screen.getByRole("button", { name: "Todas as datas" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Hoje" })).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(screen.getByRole("button", { name: "Hoje" }));
+
+    expect(screen.getByRole("button", { name: "Hoje" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Todas as datas" })).toHaveAttribute("aria-pressed", "false");
+  });
+});
+
 describe("AgendaView acessibilidade", () => {
   it("dá nome ao filtro de status", () => {
     render(<AgendaView bookings={[]} />);

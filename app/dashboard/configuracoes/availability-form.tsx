@@ -27,19 +27,20 @@ import {
   type ActionResult,
 } from "@/lib/availability/actions";
 
-export const WEEKDAYS: { value: number; label: string; name: string }[] = [
-  { value: 1, label: "1 - Domingo", name: "Domingo" },
-  { value: 2, label: "2 - Segunda", name: "Segunda" },
-  { value: 3, label: "3 - Terça", name: "Terça" },
-  { value: 4, label: "4 - Quarta", name: "Quarta" },
-  { value: 5, label: "5 - Quinta", name: "Quinta" },
-  { value: 6, label: "6 - Sexta", name: "Sexta" },
-  { value: 7, label: "7 - Sábado", name: "Sábado" },
+// value is the DB weekday (Sunday=1 .. Saturday=7); only the name is shown.
+export const WEEKDAYS: { value: number; name: string }[] = [
+  { value: 1, name: "Domingo" },
+  { value: 2, name: "Segunda" },
+  { value: 3, name: "Terça" },
+  { value: 4, name: "Quarta" },
+  { value: 5, name: "Quinta" },
+  { value: 6, name: "Sexta" },
+  { value: 7, name: "Sábado" },
 ];
 
 const INITIAL = { ok: true } as ActionResult;
 
-const WEEKDAY_ITEMS = Object.fromEntries(WEEKDAYS.map((d) => [String(d.value), d.label]));
+const WEEKDAY_ITEMS = Object.fromEntries(WEEKDAYS.map((d) => [String(d.value), d.name]));
 
 export function AvailabilityForm() {
   const [state, formAction, pending] = useActionState(setAvailability, INITIAL);
@@ -56,7 +57,7 @@ export function AvailabilityForm() {
             <SelectContent>
               {WEEKDAYS.map((d) => (
                 <SelectItem key={d.value} value={String(d.value)}>
-                  {d.label}
+                  {d.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -98,7 +99,7 @@ export function AvailabilityRow({
 
   const short = (t: string) => t.slice(0, 5);
   const day = WEEKDAYS.find((d) => d.value === weekday);
-  const label = day?.label ?? String(weekday);
+  const label = day?.name ?? String(weekday);
 
   useEffect(() => {
     if (!state.ok || state === INITIAL) return;
@@ -118,7 +119,7 @@ export function AvailabilityRow({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="text-muted-foreground hover:text-foreground"
+            className="inline-flex min-h-6 items-center px-1 text-muted-foreground hover:text-foreground"
           >
             Editar
           </button>
@@ -150,7 +151,7 @@ export function AvailabilityRow({
             <SelectContent>
               {WEEKDAYS.map((d) => (
                 <SelectItem key={d.value} value={String(d.value)}>
-                  {d.label}
+                  {d.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -187,7 +188,7 @@ export function AvailabilityRow({
         <button
           type="button"
           onClick={() => setEditing(false)}
-          className="text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex min-h-6 items-center px-1 text-sm text-muted-foreground hover:text-foreground"
         >
           Cancelar
         </button>
@@ -215,7 +216,7 @@ function AvailabilityDelete({ id, range }: { id: string; range: string }) {
         render={
           <button
             type="button"
-            className="text-muted-foreground hover:text-destructive"
+            className="inline-flex min-h-6 items-center px-1 text-muted-foreground hover:text-destructive"
           />
         }
       >

@@ -57,7 +57,7 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
   // be offered. A failed lookup fails closed (no waitlist), like the plan gate.
   const admin = createAdminClient();
   const [{ data: planRow }, hasAvailability] = await Promise.all([
-    admin.from("businesses").select("plan, booking_window_days").eq("id", business.id).maybeSingle(),
+    admin.from("businesses").select("plan, booking_window_days, phone").eq("id", business.id).maybeSingle(),
     // Faixas are owner-only under RLS; only this boolean reaches the page.
     hasActiveAvailability(admin, business.id),
   ]);
@@ -83,9 +83,9 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
         </header>
 
         {activeServices.length === 0 ? (
-          <BookingUnavailable reason="no_services" />
+          <BookingUnavailable reason="no_services" phone={planRow?.phone} />
         ) : !hasAvailability ? (
-          <BookingUnavailable reason="no_availability" />
+          <BookingUnavailable reason="no_availability" phone={planRow?.phone} />
         ) : (
           <BookingWidget
             businessId={business.id}

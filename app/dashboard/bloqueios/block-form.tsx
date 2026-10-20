@@ -66,7 +66,7 @@ export function BlockRow({
       <button
         type="button"
         onClick={() => deleteBlock(id)}
-        className="shrink-0 text-muted-foreground hover:text-destructive"
+        className="inline-flex min-h-6 shrink-0 items-center px-1 text-muted-foreground hover:text-destructive"
       >
         Remover
       </button>

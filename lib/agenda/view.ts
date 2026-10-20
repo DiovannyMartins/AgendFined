@@ -81,7 +81,7 @@ export function bookingLocalTime(iso: string, timezone: string = APP_TIMEZONE): 
 }
 
 // DB weekday of a calendar date (Sunday=1 .. Saturday=7), matching the
-// availability convention the form stores (1 - Domingo, ... 7 - Sábado).
+// availability convention the form stores (1 = Domingo, ... 7 = Sábado).
 export function businessWeekday(dateKey: string): number {
   const [y, m, d] = dateKey.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 1;
@@ -129,4 +129,37 @@ export function filterAgenda(
     }
     return true;
   });
+}
+
+const BOOKING_STATUSES: readonly BookingStatus[] = ["confirmed", "completed", "cancelled", "no_show"];
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+// The agenda filters live in the URL (`?data=YYYY-MM-DD&status=completed`) so a
+// reload keeps them. Unknown or malformed values fall back to "all".
+export function parseAgendaSearchParams(params: {
+  data?: string | string[];
+  status?: string | string[];
+}): { dateKey: string | null; status: BookingStatus | null } {
+  const data = typeof params.data === "string" ? params.data : null;
+  const status = typeof params.status === "string" ? params.status : null;
+  return {
+    dateKey: data && DATE_KEY_PATTERN.test(data) && isRealDate(data) ? data : null,
+    status: BOOKING_STATUSES.includes(status as BookingStatus) ? (status as BookingStatus) : null,
+  };
+}
+
+// Query string ("" or "?…") for the agenda filters, the inverse of
+// `parseAgendaSearchParams`.
+export function agendaSearchString(filters: { dateKey: string | null; status: BookingStatus | null }): string {
+  const params = new URLSearchParams();
+  if (filters.dateKey) params.set("data", filters.dateKey);
+  if (filters.status) params.set("status", filters.status);
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+function isRealDate(dateKey: string): boolean {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
 }

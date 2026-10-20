@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import { CopyCode } from "@/components/copy-code";
 import { PublicBookingStatus } from "@/components/public-booking-status";
-import { publicDocumentTitle } from "@/lib/bookings/public-status";
+import { publicCodeHint, publicDocumentTitle } from "@/lib/bookings/public-status";
 import { consultBooking } from "@/lib/booking/actions";
 import type { ConsultState } from "@/lib/bookings/lookup";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
@@ -77,7 +77,7 @@ function ConsultarFormInner({ slug, timezone, onReset }: { slug: string; timezon
           </div>
         </div>
         <div className="mt-4 flex flex-col items-center gap-1.5">
-          <p className="text-xs text-muted-foreground">Guarde o código da sua reserva</p>
+          <p className="text-xs text-muted-foreground">{publicCodeHint(booking.status)}</p>
           <CopyCode code={code.trim()} />
         </div>
         <button

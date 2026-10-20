@@ -214,7 +214,13 @@ function checkBookingWindowLimit(
 
 function mapDbError(error: { code?: string; message: string }): ActionResultState {
   if (error.code === "23505") {
-    return { ok: false, code: "SLUG_TAKEN", message: "Este endereço já está em uso." };
+    // Shown next to the slug field; the footer only points there.
+    return {
+      ok: false,
+      code: "SLUG_TAKEN",
+      message: "Revise os campos destacados.",
+      fieldErrors: { slug: ["Este endereço já está em uso. Escolha outro."] },
+    };
   }
   // public.reject_reserved_business_slug: the database copy of RESERVED_SLUGS.
   if (error.message.includes("BUSINESS_SLUG_RESERVED")) {

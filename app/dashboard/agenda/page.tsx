@@ -3,10 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { CalendarDays, CalendarClock, Download } from "lucide-react";
 import { toLocalDate } from "@/lib/booking/availability";
-import { filterAgenda } from "@/lib/agenda/view";
+import { filterAgenda, parseAgendaSearchParams } from "@/lib/agenda/view";
 import { getGcalExport } from "@/lib/gcal/get-export";
 import { isUpcomingConfirmed } from "@/lib/gcal/export";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
@@ -14,7 +14,12 @@ import { AgendaView } from "./agenda-view";
 
 export const metadata: Metadata = { title: "Reservas — AgendFined" };
 
-export default async function AgendaPage() {
+export default async function AgendaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ data?: string | string[]; status?: string | string[] }>;
+}) {
+  const initialFilters = parseAgendaSearchParams(await searchParams);
   const business = await getCurrentBusiness();
   if (!business) redirect("/dashboard/setup");
 
@@ -53,24 +58,18 @@ export default async function AgendaPage() {
           <p className="mt-2 text-sm text-muted-foreground">Acompanhe e gerencie seus atendimentos.</p>
         </div>
         {exportResult.status === "ok" && exportResult.count > 0 && (
+          // A plain styled link: wrapping a <Button> in <a> nests a button in a
+          // link and trips Base UI's native-button check.
           <a
             href={`data:text/calendar;charset=utf-8,${encodeURIComponent(exportResult.icsFeed)}`}
             download="agendfined-agenda.ics"
+            className={buttonVariants({ size: "sm", variant: "outline" })}
           >
-            <Button size="sm" variant="outline">
-              <Download className="size-4" />
-              Exportar agenda (.ics)
-            </Button>
+            <Download className="size-4" />
+            Exportar agenda (.ics)
           </a>
         )}
       </div>
-
-      {exportResult.status === "upgrade_required" && (
-        <UpgradePrompt
-          title="Exportação de agenda é um recurso PROFISSIONAL"
-          description="Assine o PROFISSIONAL para exportar sua agenda em .ics, que você pode importar no Google Calendar."
-        />
-      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
@@ -102,7 +101,19 @@ export default async function AgendaPage() {
       <AgendaView
         bookings={list}
         timezone={business.timezone}
+        initialDate={initialFilters.dateKey}
+        initialStatus={initialFilters.status}
       />
+
+      {/* After the list, and compact: on a phone the reservations must stay
+          above the fold. */}
+      {exportResult.status === "upgrade_required" && (
+        <UpgradePrompt
+          compact
+          title="Exportação de agenda é um recurso PROFISSIONAL"
+          description="Assine o PROFISSIONAL para exportar sua agenda em .ics, que você pode importar no Google Calendar."
+        />
+      )}
     </div>
   );
 }

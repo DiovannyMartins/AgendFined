@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildPrivateConfirmationPath,
   buildPrivateConfirmationUrl,
+  moveConfirmationToSlug,
   readCancelTokenFromHash,
   readPrivateCancelCapability,
 } from "./private-confirmation";
@@ -36,5 +37,28 @@ describe("private confirmation navigation", () => {
 
   it("can consume a legacy query capability so the client can scrub old links", () => {
     expect(readPrivateCancelCapability("", `?code=65925DBB&cancel=${TOKEN}`)).toBe(TOKEN);
+  });
+});
+
+// #124: trocar o slug não pode quebrar links de confirmação já enviados.
+describe("moveConfirmationToSlug", () => {
+  it("moves an old-slug private link to the current slug keeping code and capability", () => {
+    const sent = buildPrivateConfirmationUrl(new URL("https://agenda.example"), "barbearia-demo", "AHTGQ1FY", TOKEN);
+
+    const url = new URL(moveConfirmationToSlug(sent, "barbearia-demo-nova"));
+
+    expect(url.origin).toBe("https://agenda.example");
+    expect(url.pathname).toBe("/barbearia-demo-nova/confirmacao");
+    expect(url.searchParams.get("code")).toBe("AHTGQ1FY");
+    expect(readCancelTokenFromHash(url.hash)).toBe(TOKEN);
+  });
+
+  it("keeps legacy query capabilities so the destination can consume and scrub them", () => {
+    const url = new URL(
+      moveConfirmationToSlug(`https://agenda.example/antigo/confirmacao?code=AHTGQ1FY&cancel=${TOKEN}`, "novo"),
+    );
+
+    expect(url.pathname).toBe("/novo/confirmacao");
+    expect(readPrivateCancelCapability(url.hash, url.search)).toBe(TOKEN);
   });
 });

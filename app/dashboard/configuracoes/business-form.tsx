@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,6 +56,7 @@ export function BusinessForm({
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<BusinessFormValues>({
     resolver: zodResolver(businessFormSchema),
@@ -70,6 +71,11 @@ export function BusinessForm({
       description: String(initial?.description ?? ""),
     },
   });
+
+  // Confirmation links already sent follow the new slug, but the public link
+  // shared on WhatsApp, Instagram or a printed QR Code does not (#124).
+  const watchedSlug = useWatch({ control, name: "slug" });
+  const slugChanged = !creating && watchedSlug.trim() !== slug;
 
   function onSubmit(values: BusinessFormValues) {
     startTransition(async () => {
@@ -133,6 +139,13 @@ export function BusinessForm({
               <p id="slug-hint" className="text-xs text-muted-foreground">
                 Apenas minúsculas, números e hífen. Seu link: agendfined.com.br/{slug || "seu-slug"}
               </p>
+              {slugChanged && (
+                <p role="status" className="text-sm text-amber-700 dark:text-amber-400">
+                  Ao salvar, o link agendfined.com.br/{slug} deixa de funcionar. Atualize-o onde ele foi
+                  divulgado (WhatsApp, Instagram, QR Code impresso). Os links de confirmação já enviados
+                  aos clientes continuam funcionando.
+                </p>
+              )}
               {(errors.slug || fieldErrors.slug) && (
                 <p className="text-sm text-destructive">
                   {errors.slug?.message ?? fieldErrors.slug?.[0]}

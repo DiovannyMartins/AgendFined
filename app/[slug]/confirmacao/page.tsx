@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { CalendarClock } from "lucide-react";
 import { CopyCode } from "@/components/copy-code";
 import { ConfirmationStatus } from "./confirmation-status";
+import { CurrentSlugRedirect } from "./current-slug-redirect";
 import { publicCodeSchema } from "@/lib/validation/schemas";
 import { enforceConsultRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
@@ -14,7 +15,7 @@ import { formatPhoneBR } from "@/lib/format/phone";
 
 // Shared by generateMetadata and the page within one request, so the lookup
 // (and its rate-limit hit) runs once while the <title> follows the status.
-const loadConfirmation = cache(async (code: string, slug: string) => {
+const loadConfirmation = cache(async (code: string) => {
   const parsedCode = publicCodeSchema.safeParse(code);
   if (!parsedCode.success) return null;
 
@@ -31,14 +32,20 @@ const loadConfirmation = cache(async (code: string, slug: string) => {
   const { data, error } = await supabase.rpc("get_booking_by_public_code", { p_code: parsedCode.data });
 
   const booking = data?.[0];
-  if (error || !booking || booking.business_slug !== slug) return null;
+  if (error || !booking) return null;
   return { code: parsedCode.data, booking };
 });
 
 async function ConfirmationContent({ code, slug }: { code: string; slug: string }) {
-  const found = await loadConfirmation(code, slug);
+  const found = await loadConfirmation(code);
   if (!found) notFound();
   const { booking } = found;
+  // Links sent before a slug change still carry the old slug. The code never
+  // authorizes access to customer data (ADR 0004), so following it to the
+  // current slug exposes nothing the code did not already resolve.
+  if (booking.business_slug !== slug) {
+    return <CurrentSlugRedirect slug={booking.business_slug} code={found.code} />;
+  }
 
   const dateStr = new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "full",
@@ -93,10 +100,9 @@ type ConfirmationPageProps = {
   searchParams: Promise<{ code?: string }>;
 };
 
-export async function generateMetadata({ params, searchParams }: ConfirmationPageProps): Promise<Metadata> {
-  const { slug } = await params;
+export async function generateMetadata({ searchParams }: ConfirmationPageProps): Promise<Metadata> {
   const { code } = await searchParams;
-  const found = code ? await loadConfirmation(code, slug) : null;
+  const found = code ? await loadConfirmation(code) : null;
   return { title: found ? publicDocumentTitle(found.booking.status) : "Reserva — AgendFined" };
 }
 

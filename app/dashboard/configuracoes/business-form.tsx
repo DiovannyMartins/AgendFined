@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { upsertBusiness, type ActionResultState } from "@/lib/business/actions";
+import { createBusiness, updateBusiness, type ActionResultState } from "@/lib/business/actions";
 import { businessFormSchema, type BusinessFormValues } from "@/lib/validation/schemas";
 import { getBookingWindowLimitDays, type Plan } from "@/lib/plan/plan";
 import { trackAnalyticsEvent } from "@/lib/analytics";
@@ -82,7 +82,7 @@ export function BusinessForm({
       fd.set("bookingWindowDays", String(values.bookingWindowDays));
       fd.set("description", values.description ?? "");
       fd.set("timezone", values.timezone);
-      const result = await upsertBusiness(INITIAL, fd);
+      const result = await (creating ? createBusiness : updateBusiness)(INITIAL, fd);
       setState(result);
       setSubmitted(true);
       if (result.ok && creating) {

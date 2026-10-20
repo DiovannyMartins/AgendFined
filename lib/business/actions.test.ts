@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { state } = vi.hoisted(() => ({
-  state: { existing: null as { id: string; plan: string } | null, writes: [] as string[] },
+  state: {
+    existing: null as { id: string; plan: string } | null,
+    writes: [] as string[],
+    insertError: null as { code?: string; message: string } | null,
+  },
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
@@ -22,16 +26,22 @@ vi.mock("@/lib/supabase/server", () => ({
         },
         insert: async () => {
           state.writes.push(`insert:${table}`);
+          return { error: state.insertError };
+        },
+        upsert: async () => {
+          state.writes.push(`upsert:${table}`);
           return { error: null };
         },
-        upsert: async () => ({ error: null }),
       };
       return chain;
     },
   }),
 }));
 
-import { upsertBusiness } from "./actions";
+import { createBusiness, updateBusiness } from "./actions";
+
+const INITIAL = { ok: true as const, data: undefined };
+const EXISTING = { id: "business-1", plan: "free" };
 
 function form(slug: string) {
   const fd = new FormData();
@@ -45,18 +55,19 @@ function form(slug: string) {
   return fd;
 }
 
-describe("upsertBusiness reserved slugs", () => {
-  beforeEach(() => {
-    state.existing = null;
-    state.writes = [];
-  });
+beforeEach(() => {
+  state.existing = null;
+  state.writes = [];
+  state.insertError = null;
+});
 
+describe("reserved slugs", () => {
   it.each([
-    ["creating (onboarding)", null],
-    ["editing (configurações)", { id: "business-1", plan: "free" }],
-  ])("rejects a reserved slug when %s", async (_label, existing) => {
+    ["creating (onboarding)", createBusiness, null],
+    ["editing (configurações)", updateBusiness, EXISTING],
+  ])("rejects a reserved slug when %s", async (_label, action, existing) => {
     state.existing = existing;
-    const result = await upsertBusiness({ ok: true, data: undefined }, form("recuperar-senha"));
+    const result = await action(INITIAL, form("recuperar-senha"));
     expect(result).toMatchObject({
       ok: false,
       code: "SLUG_RESERVED",
@@ -64,10 +75,52 @@ describe("upsertBusiness reserved slugs", () => {
     });
     expect(state.writes).toEqual([]);
   });
+});
 
-  it("saves a regular slug", async () => {
-    const result = await upsertBusiness({ ok: true, data: undefined }, form("barbearia-demo"));
+describe("createBusiness", () => {
+  it("creates the business for a new owner", async () => {
+    const result = await createBusiness(INITIAL, form("barbearia-demo"));
     expect(result).toEqual({ ok: true, data: undefined });
-    expect(state.writes).toEqual(["insert:businesses"]);
+    expect(state.writes).toEqual(["upsert:profiles", "insert:businesses"]);
+  });
+
+  it("refuses without writing anything when the owner already has a business", async () => {
+    state.existing = EXISTING;
+    const result = await createBusiness(INITIAL, form("outro-negocio-beta"));
+    expect(result).toMatchObject({ ok: false, code: "BUSINESS_EXISTS" });
+    expect(state.writes).toEqual([]);
+  });
+
+  it("refuses when a concurrent setup created the business first", async () => {
+    state.insertError = {
+      code: "23505",
+      message: 'duplicate key value violates unique constraint "businesses_owner_id_key"',
+    };
+    const result = await createBusiness(INITIAL, form("barbearia-demo"));
+    expect(result).toMatchObject({ ok: false, code: "BUSINESS_EXISTS" });
+  });
+
+  it("still reports a taken slug", async () => {
+    state.insertError = {
+      code: "23505",
+      message: 'duplicate key value violates unique constraint "businesses_slug_key"',
+    };
+    const result = await createBusiness(INITIAL, form("barbearia-demo"));
+    expect(result).toMatchObject({ ok: false, code: "SLUG_TAKEN" });
+  });
+});
+
+describe("updateBusiness", () => {
+  it("updates the existing business", async () => {
+    state.existing = EXISTING;
+    const result = await updateBusiness(INITIAL, form("barbearia-demo"));
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(state.writes).toEqual(["update:businesses"]);
+  });
+
+  it("never creates a business", async () => {
+    const result = await updateBusiness(INITIAL, form("barbearia-demo"));
+    expect(result).toMatchObject({ ok: false, code: "BUSINESS_NOT_FOUND" });
+    expect(state.writes).toEqual([]);
   });
 });

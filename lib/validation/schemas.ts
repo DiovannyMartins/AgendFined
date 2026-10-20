@@ -114,7 +114,7 @@ export type BusinessInput = z.infer<typeof businessSchema>;
 // Mirrors businessSchema but with string-typed fields to match native inputs.
 export const businessFormSchema = z.object({
   ...businessFields,
-  // Same rule upsertBusiness enforces server-side, shown inline before submit.
+  // Same rule createBusiness and updateBusiness enforce server-side, shown inline before submit.
   slug: businessFields.slug.refine((slug) => !isReservedSlug(slug), RESERVED_SLUG_MESSAGE),
   slotIntervalMinutes: z
     .string()

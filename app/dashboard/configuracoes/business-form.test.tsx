@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BusinessForm } from "./business-form";
-import { upsertBusiness } from "@/lib/business/actions";
+import { updateBusiness } from "@/lib/business/actions";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
-vi.mock("@/lib/business/actions", () => ({ upsertBusiness: vi.fn() }));
+vi.mock("@/lib/business/actions", () => ({ createBusiness: vi.fn(), updateBusiness: vi.fn() }));
 vi.mock("@/lib/analytics", () => ({ trackAnalyticsEvent: vi.fn() }));
 
 const initial = {
@@ -20,7 +20,7 @@ const initial = {
 };
 
 describe("BusinessForm", () => {
-  beforeEach(() => vi.mocked(upsertBusiness).mockReset());
+  beforeEach(() => vi.mocked(updateBusiness).mockReset());
 
   it("mostra o telefone salvo formatado", () => {
     render(<BusinessForm initial={initial} />);
@@ -29,7 +29,7 @@ describe("BusinessForm", () => {
   });
 
   it("descarta o erro do servidor quando a validação do cliente bloqueia o próximo envio", async () => {
-    vi.mocked(upsertBusiness).mockResolvedValue({
+    vi.mocked(updateBusiness).mockResolvedValue({
       ok: false,
       code: "VALIDATION",
       message: "A janela de reservas excede o limite do seu plano.",
@@ -48,6 +48,6 @@ describe("BusinessForm", () => {
       expect(screen.queryByText("O limite do seu plano é de 90 dias.")).not.toBeInTheDocument();
     });
     expect(screen.queryByText("A janela de reservas excede o limite do seu plano.")).not.toBeInTheDocument();
-    expect(upsertBusiness).toHaveBeenCalledTimes(1);
+    expect(updateBusiness).toHaveBeenCalledTimes(1);
   });
 });

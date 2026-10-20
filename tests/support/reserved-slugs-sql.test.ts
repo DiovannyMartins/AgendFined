@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { RESERVED_SLUGS } from "@/lib/business/reserved-slugs";
 
 // Static guard: public.reject_reserved_business_slug repeats RESERVED_SLUGS in
-// SQL, so the database refuses the same slugs as upsertBusiness. The latest
+// SQL, so the database refuses the same slugs as createBusiness and updateBusiness. The latest
 // migration that defines the function is the one in force.
 function latestSqlSlugs(): string[] {
   const dir = "supabase/migrations";

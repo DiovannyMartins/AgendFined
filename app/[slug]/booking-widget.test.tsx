@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingWidget } from "./booking-widget";
 import { createBooking, joinWaitlist } from "@/lib/booking/actions";
 import { getSlotsForDate } from "@/lib/availability/actions";
@@ -32,9 +32,15 @@ async function fillAndSubmit(customerName: string, offersWaitlist = true) {
 
 describe("BookingWidget", () => {
   beforeEach(() => {
+    // The date picker's min is "today": freeze it so 2026-10-20 stays a bookable future date.
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-18T12:00:00Z") });
     mockedCreateBooking.mockReset();
     mockedJoinWaitlist.mockReset();
     mockedGetSlotsForDate.mockReset().mockResolvedValue({ available: ["09:00", "09:30"] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("shows the server's field error next to the name and keeps the chosen slot", async () => {
@@ -55,12 +61,7 @@ describe("BookingWidget", () => {
   });
 
   it("limits the date picker to the janela futura", () => {
-    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-18T12:00:00Z") });
-    try {
-      render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" bookingWindowDays={60} services={services} offersWaitlist />);
-    } finally {
-      vi.useRealTimers();
-    }
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" bookingWindowDays={60} services={services} offersWaitlist />);
 
     const date = screen.getByLabelText("Escolha a data");
     expect(date).toHaveAttribute("min", "2026-10-18");

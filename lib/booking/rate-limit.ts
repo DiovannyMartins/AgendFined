@@ -24,6 +24,14 @@ export const CONSULT_RATE_LIMIT = {
   perIp: { limit: 12, windowSeconds: 60 * 15 },
 } as const;
 
+// Opening the confirmation screen (right after booking, reloads, the e-mail
+// link on several devices, mobile CGNAT) must not compete with the consult
+// form and cancellation for the same counter. The code space (ADR 0004) keeps
+// a larger per-IP budget far from a practical enumeration oracle.
+export const CONFIRMATION_RATE_LIMIT = {
+  perIp: { limit: 60, windowSeconds: 60 * 15 },
+} as const;
+
 // Public read/search actions are cheaper than a booking, but still execute
 // privileged database work. Keep their counters separate from booking writes so
 // one kind of traffic cannot starve another.
@@ -183,6 +191,13 @@ export async function enforceConsultRateLimit(
   });
   if (error) throw error;
   return data === true;
+}
+
+export async function enforceConfirmationRateLimit(
+  supabase: ServerClient,
+  ip: string,
+): Promise<boolean> {
+  return enforceWindows(supabase, [{ key: `ip:${ip}|confirmation`, ...CONFIRMATION_RATE_LIMIT.perIp }]);
 }
 
 async function enforceWindows(

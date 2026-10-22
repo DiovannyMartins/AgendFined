@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  CONFIRMATION_RATE_LIMIT,
   CONSULT_RATE_LIMIT,
   PUBLIC_READ_RATE_LIMIT,
   RATE_LIMIT,
   buildAvailabilityRateKeys,
   buildRateKeys,
   buildServiceSearchRateKeys,
+  enforceConfirmationRateLimit,
   enforceConsultRateLimit,
   enforceApiRateLimit,
   enforceBillingCheckoutRateLimit,
@@ -164,5 +166,25 @@ describe("enforceConsultRateLimit (§16 lookup)", () => {
   it("propagates an RPC error", async () => {
     const client = { rpc: vi.fn(async () => ({ data: null, error: new Error("boom") })) } as unknown as SupabaseClient<Database>;
     await expect(enforceConsultRateLimit(client, "1.2.3.4")).rejects.toThrow("boom");
+  });
+});
+
+// #140: abrir a confirmação não pode esgotar o contador da consulta e do cancelamento.
+describe("enforceConfirmationRateLimit", () => {
+  it("uses its own per-IP counter with a larger budget than consultation", async () => {
+    const rpc = vi.fn(async (_name: string, { p_key, p_limit }: { p_key: string; p_limit: number }) => {
+      expect(p_key).toBe("ip:1.2.3.4|confirmation");
+      expect(p_limit).toBe(CONFIRMATION_RATE_LIMIT.perIp.limit);
+      return { data: true, error: null };
+    });
+    const client = { rpc } as unknown as SupabaseClient<Database>;
+
+    await expect(enforceConfirmationRateLimit(client, "1.2.3.4")).resolves.toBe(true);
+    expect(CONFIRMATION_RATE_LIMIT.perIp.limit).toBeGreaterThan(CONSULT_RATE_LIMIT.perIp.limit);
+  });
+
+  it("propagates an RPC error so the caller can fail closed", async () => {
+    const client = { rpc: vi.fn(async () => ({ data: null, error: new Error("boom") })) } as unknown as SupabaseClient<Database>;
+    await expect(enforceConfirmationRateLimit(client, "1.2.3.4")).rejects.toThrow("boom");
   });
 });

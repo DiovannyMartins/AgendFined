@@ -58,10 +58,10 @@ export default function TermosPage() {
         <p>
           A assinatura pode ser cancelada pelo painel ou pelo canal oficial. Após o cancelamento,
           novas cobranças são interrompidas conforme o processamento do Mercado Pago e os recursos
-          PROFISSIONAL permanecem disponíveis por até 7 dias. Encerrado esse período sem uma nova
-          autorização, o negócio volta ao plano Grátis; reservas e dados já registrados são
-          preservados. Uma assinatura pausada por falha de pagamento também pode iniciar esse
-          período de carência. Esta carência operacional não substitui nem limita o direito de
+          PROFISSIONAL permanecem disponíveis até o fim do período mensal já pago, e por no mínimo
+          7 dias. Encerrado esse período sem uma nova autorização, o negócio volta ao plano Grátis;
+          reservas e dados já registrados são preservados. Uma assinatura pausada por falha de
+          pagamento inicia uma carência de 7 dias. Esta carência operacional não substitui nem limita o direito de
           arrependimento previsto na legislação aplicável.
         </p>
         <p>

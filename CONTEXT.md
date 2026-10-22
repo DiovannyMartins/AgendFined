@@ -87,7 +87,7 @@ O plano pago (R$ 19,90/mês) que destrava os recursos profissionais: relatórios
 _Avoid_: Pro, premium, avançado, plano pago
 
 **Assinatura**:
-O contrato recorrente mensal que mantém um negócio no plano PROFISSIONAL. Enquanto ativa, os recursos profissionais estão liberados; quando interrompida (após a carência), o negócio volta ao Grátis.
+O contrato recorrente mensal que mantém um negócio no plano PROFISSIONAL. Enquanto ativa, os recursos profissionais estão liberados; quando interrompida (após a carência), o negócio volta ao Grátis. A carência dura 7 dias depois de uma falha de pagamento; no cancelamento, vai até o fim do mês já pago e nunca é menor que 7 dias (ADR 0008).
 _Avoid_: Billing, pagamento, cobrança, subscription
 
 **Recurso profissional**:

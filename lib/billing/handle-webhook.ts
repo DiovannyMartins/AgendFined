@@ -10,8 +10,9 @@
 //     authorization whose terms are not the plan's (below the current price,
 //     or not BRL monthly) is refused: cancelled and reported for a refund.
 //   * `paused`/`cancelled` (incl. a failed recurring payment, which Mercado Pago
-//     surfaces as `paused`) -> start a 7-day grace period. The business stays
-//     Pro during the grace; the downgrade happens after it expires (the
+//     surfaces as `paused`) -> start a 7-day grace period. Cancelling a paid
+//     assinatura keeps the month already paid when it ends later (issue #142).
+//     The business stays Pro during the grace; the downgrade happens after it expires (the
 //     `downgrade_expired_subscriptions` RPC, scheduled via pg_cron). A checkout
 //     that was never paid closes without a grace.
 //   * `pending` -> just record the subscription status; never touches the plan.
@@ -21,6 +22,7 @@
 // path that makes a business Pro, and a missing/invalid status fails closed.
 import type { SubscriptionStatus } from "./types";
 import { refuseUnacceptedCheckout, type CheckoutTermsRefusal } from "./checkout-terms";
+import { graceEnd } from "./grace";
 
 // The current state of a preapproval, as read from the provider (`GET
 // /preapproval/{id}`). `externalReference` is the caller's `external_reference`,
@@ -105,9 +107,6 @@ export type HandleWebhookResult =
   | { ok: true; applied: "authorized" | "duplicate" | "stale_price" | "unexpected_terms" | "grace" | "closed" | "pending" | "ignored" }
   | { ok: false; code: string; message: string };
 
-const DEFAULT_GRACE_DAYS = 7;
-const MS_PER_DAY = 86_400_000;
-
 // The `type` values Mercado Pago sends for a preapproval (subscription)
 // lifecycle notification. Current accounts use `subscription_preapproval`; the
 // legacy value `preapproval` is kept for older integrations.
@@ -174,10 +173,14 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
   let gracePeriodEnd: string | null = null;
   if (!closedUnpaid && (preapproval.status === "paused" || preapproval.status === "cancelled")) {
     const existingGrace = sub.gracePeriodEnd ? new Date(sub.gracePeriodEnd) : null;
+    // Only a cancellation of an assinatura still authorized locally keeps the
+    // paid month; after a failed payment the next charge date was never paid.
+    const paidPeriodEnd =
+      preapproval.status === "cancelled" && sub.status === "authorized" ? preapproval.currentPeriodEnd : null;
     gracePeriodEnd =
       existingGrace && existingGrace.getTime() > now.getTime()
         ? existingGrace.toISOString()
-        : new Date(now.getTime() + (deps.graceDays ?? DEFAULT_GRACE_DAYS) * MS_PER_DAY).toISOString();
+        : graceEnd({ now, graceDays: deps.graceDays, paidPeriodEnd });
   }
 
   let superseded: SubscriptionForWebhook[] = [];

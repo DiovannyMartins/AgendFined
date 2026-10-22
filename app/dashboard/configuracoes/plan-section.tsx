@@ -144,7 +144,7 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
           {subscription?.status === "authorized" && (
             <div className="border-t border-border pt-4">
               <p className="text-sm text-muted-foreground">
-                A assinatura é recorrente mensal. Ao cancelar, novas cobranças são interrompidas conforme o processamento do Mercado Pago; os recursos PROFISSIONAL permanecem disponíveis por até 7 dias e depois o negócio volta ao Grátis.
+                A assinatura é recorrente mensal. Ao cancelar, novas cobranças são interrompidas conforme o processamento do Mercado Pago; os recursos PROFISSIONAL permanecem disponíveis até o fim do mês já pago, e por no mínimo 7 dias, e depois o negócio volta ao Grátis.
               </p>
               <CancelSubscriptionButton />
             </div>

@@ -144,7 +144,10 @@ describe("createMercadoPagoProvider", () => {
         id: "mp_1",
         status: "authorized",
         external_reference: "biz_1",
-        auto_recurring: { start_date: "2026-09-01T00:00:00.000Z", end_date: "2026-10-01T00:00:00.000Z" },
+        // A real assinatura without a final date has no `auto_recurring.end_date`;
+        // the paid period ends on `next_payment_date` (issue #142).
+        auto_recurring: { start_date: "2026-09-01T00:00:00.000Z" },
+        next_payment_date: "2026-10-01T00:00:00.000Z",
       }),
     );
 

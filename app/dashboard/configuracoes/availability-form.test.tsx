@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { deleteAvailability } from "@/lib/availability/actions";
-import { AvailabilityRow } from "./availability-form";
+import { deleteAvailability, setAvailability, updateAvailability } from "@/lib/availability/actions";
+import { AvailabilityForm, AvailabilityRow } from "./availability-form";
 
 vi.mock("@/lib/availability/actions", () => ({
   setAvailability: vi.fn(),
@@ -10,6 +10,9 @@ vi.mock("@/lib/availability/actions", () => ({
 }));
 
 const mockedDelete = vi.mocked(deleteAvailability);
+const mockedSet = vi.mocked(setAvailability);
+const mockedUpdate = vi.mocked(updateAvailability);
+const OVERLAP = { ok: false, code: "OVERLAP", message: "Este intervalo se sobrepõe a um já existente neste dia." } as const;
 
 function renderRow() {
   render(<AvailabilityRow id="faixa-1" weekday={3} startTime="08:00:00" endTime="12:30:00" />);
@@ -69,5 +72,48 @@ describe("remoção de faixa de disponibilidade", () => {
 
     expect(await screen.findByText("Não foi possível remover a faixa. Tente novamente.")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Remover faixa" })).toBeEnabled();
+  });
+});
+
+// React 19 resets uncontrolled fields after every <form action> submission;
+// on error the owner must still see what was sent (#148).
+describe("faixa com erro mantém o que foi digitado", () => {
+  it("nova faixa mantém início e fim depois de um erro de sobreposição", async () => {
+    mockedSet.mockResolvedValueOnce(OVERLAP);
+    render(<AvailabilityForm />);
+
+    fireEvent.change(screen.getByLabelText("Início"), { target: { value: "12:00" } });
+    fireEvent.change(screen.getByLabelText("Fim"), { target: { value: "13:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar faixa" }));
+
+    expect(await screen.findByText(OVERLAP.message)).toBeInTheDocument();
+    expect(screen.getByLabelText("Início")).toHaveValue("12:00");
+    expect(screen.getByLabelText("Fim")).toHaveValue("13:00");
+    const formData = mockedSet.mock.calls[0][1];
+    expect(formData.get("startTime")).toBe("12:00");
+    expect(formData.get("endTime")).toBe("13:00");
+  });
+
+  it("nova faixa volta ao padrão depois de adicionar com sucesso", async () => {
+    mockedSet.mockResolvedValueOnce({ ok: true, data: undefined });
+    render(<AvailabilityForm />);
+
+    fireEvent.change(screen.getByLabelText("Início"), { target: { value: "12:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar faixa" }));
+
+    await vi.waitFor(() => expect(mockedSet).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(screen.getByLabelText("Início")).toHaveValue("08:00"));
+  });
+
+  it("edição mantém os novos horários depois de um erro", async () => {
+    mockedUpdate.mockResolvedValueOnce(OVERLAP);
+    renderRow();
+
+    fireEvent.click(screen.getByRole("button", { name: "Editar" }));
+    fireEvent.change(screen.getByLabelText("Início"), { target: { value: "07:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+
+    expect(await screen.findByText(OVERLAP.message)).toBeInTheDocument();
+    expect(screen.getByLabelText("Início")).toHaveValue("07:00");
   });
 });

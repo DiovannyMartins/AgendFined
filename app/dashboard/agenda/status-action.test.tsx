@@ -76,6 +76,19 @@ describe("StatusAction", () => {
     expect(formData.get("status")).toBe(nextStatus);
   });
 
+  it("keeps the typed cancellation reason when cancelling fails (#148)", async () => {
+    vi.setSystemTime(new Date("2026-10-17T12:00:00.000Z"));
+    updateBookingStatus.mockResolvedValueOnce({ ok: false, message: "Não foi possível cancelar." } as never);
+    render(<StatusAction id="booking-1" status="confirmed" startAt={START_AT} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.change(await screen.findByLabelText("Motivo (opcional)"), { target: { value: "Cliente pediu" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar cancelamento" }));
+
+    expect(await screen.findByText("Não foi possível cancelar.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Motivo (opcional)")).toHaveValue("Cliente pediu");
+  });
+
   it("offers no action on a cancelled reserva", () => {
     vi.setSystemTime(new Date("2026-10-19T15:30:00.000Z"));
     const { container } = render(<StatusAction id="booking-1" status="cancelled" startAt={START_AT} />);

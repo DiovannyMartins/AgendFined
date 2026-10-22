@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Confirme seu novo e-mail.</title>
+  </head>
+  <body style="margin:0;background-color:#141414;color:#eeeeee;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background-color:#141414;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;border:1px solid #333333;border-radius:12px;border-collapse:separate;background-color:#1c1c1c;overflow:hidden;">
+            <tr>
+              <td style="padding:28px 32px 22px;border-bottom:1px solid #333333;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                  <tr>
+                    <td valign="middle" style="width:34px;height:34px;border-radius:9px;background-color:#ffffff;color:#111111;font-size:18px;font-weight:700;line-height:34px;text-align:center;">A</td>
+                    <td valign="middle" style="padding-left:10px;color:#eeeeee;font-size:17px;font-weight:700;letter-spacing:-0.2px;">AgendFined</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px;">
+                <p style="margin:0 0 12px;color:#b0b0b0;font-size:13px;line-height:20px;">TROCA DE E-MAIL</p>
+                <h1 style="margin:0;color:#eeeeee;font-size:28px;font-weight:700;line-height:36px;letter-spacing:-0.6px;">Confirme seu novo e-mail.</h1>
+                <p style="margin:16px 0 0;color:#b0b0b0;font-size:16px;line-height:25px;">Confirme a troca do e-mail da sua conta no AgendFined de {{ .Email }} para {{ .NewEmail }}.</p>
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:28px;border-collapse:separate;">
+                  <tr>
+                    <td style="border-radius:8px;background-color:#ffffff;">
+                      <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:12px 18px;color:#111111;font-size:14px;font-weight:700;text-decoration:none;">Confirmar troca de e-mail</a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:18px 0 0;color:#b0b0b0;font-size:13px;line-height:20px;">Se o botão não funcionar, copie e cole este endereço no navegador:<br><a href="{{ .ConfirmationURL }}" style="color:#eeeeee;word-break:break-all;">{{ .ConfirmationURL }}</a></p>
+                <p style="margin:18px 0 0;color:#b0b0b0;font-size:14px;line-height:22px;">Se você não pediu essa troca, ignore este e-mail e considere alterar sua senha.</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 32px;border-top:1px solid #333333;">
+                <p style="margin:0;color:#b0b0b0;font-size:12px;line-height:18px;">Enviado por AgendFined · Reservas online para profissionais.</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

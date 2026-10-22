@@ -275,4 +275,42 @@ describe("block vs future booking conflict (§9.4)", () => {
     expect(error).not.toBeNull();
     expect(String(error?.message).toLowerCase()).toMatch(/overlap|book|block|conflit/i);
   });
+
+  // #143: "fechei o resto do dia" over reservas that already happened.
+  it("accepts a block starting in the past over reservas that can no longer happen", async () => {
+    async function pastBooking(slot: string, phone: string, minutesAgo: number) {
+      const { data: booking, error } = await admin.rpc("create_booking", {
+        p_business_id: businessId,
+        p_cancel_token_hash: "d".repeat(64),
+        p_service_id: serviceId,
+        p_start_at: slot,
+        p_customer_name: "Cliente Passado",
+        p_customer_phone: phone,
+      });
+      expect(error).toBeNull();
+      const startAt = new Date(Date.now() - minutesAgo * 60_000);
+      const { error: moveError } = await admin
+        .from("bookings")
+        .update({ start_at: startAt.toISOString(), end_at: new Date(startAt.getTime() + 30 * 60_000).toISOString() })
+        .eq("id", booking!.id);
+      expect(moveError).toBeNull();
+      return booking!.id as string;
+    }
+    const completedId = await pastBooking(futureSlot(3, 14), "+5511977770001", 180);
+    const endedId = await pastBooking(futureSlot(3, 15), "+5511977770002", 120);
+    await admin.from("bookings").update({ status: "completed" }).eq("id", completedId);
+
+    const owner = await anonClientForUser(EMAIL, PASSWORD);
+    const { error } = await owner.from("availability_blocks").insert({
+      business_id: businessId,
+      start_at: new Date(Date.now() - 240 * 60_000).toISOString(),
+      end_at: new Date(Date.now() + 60 * 60_000).toISOString(),
+      reason: "fechei o resto do dia",
+    });
+    expect(error).toBeNull();
+
+    // The confirmed one already ended; marking it later must still work.
+    const { error: markError } = await admin.from("bookings").update({ status: "completed" }).eq("id", endedId);
+    expect(markError).toBeNull();
+  });
 });

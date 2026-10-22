@@ -18,10 +18,12 @@ import { isTooEarlyFor } from "@/lib/bookings/transitions";
 
 const INITIAL: { ok: boolean; message?: string } = { ok: true };
 export function StatusAction({ id, status, startAt }: { id: string; status: string; startAt: string }) {
+  // Keyed by status so the dialog closes once the correction lands.
+  if (status === "completed" || status === "no_show") return <CorrectionDialog key={status} id={id} status={status} />;
   if (status !== "confirmed") return null;
 
-  // Concluir and No-show are terminal and only make sense once the reserva has
-  // started (#78); the server enforces the same rule.
+  // Concluir and No-show only make sense once the reserva has started (#78);
+  // the server enforces the same rule.
   const started = !isTooEarlyFor("completed", startAt, new Date());
 
   return (
@@ -33,7 +35,7 @@ export function StatusAction({ id, status, startAt }: { id: string; status: stri
         label="Concluir"
         variant="secondary"
         title="Concluir reserva"
-        description="A reserva será marcada como concluída. Essa ação não pode ser desfeita."
+        description="A reserva será marcada como concluída. Se for engano, use Corrigir status para trocar por no-show."
         confirmLabel="Confirmar conclusão"
       />
       <OutcomeDialog
@@ -43,7 +45,7 @@ export function StatusAction({ id, status, startAt }: { id: string; status: stri
         label="No-show"
         variant="outline"
         title="Marcar no-show"
-        description="A reserva será marcada como no-show (o cliente não compareceu). Essa ação não pode ser desfeita."
+        description="A reserva será marcada como no-show (o cliente não compareceu). Se for engano, use Corrigir status para trocar por concluída."
         confirmLabel="Confirmar no-show"
       />
       <CancelDialog id={id} />
@@ -99,6 +101,49 @@ function OutcomeDialog({
             <DialogClose render={<Button type="button" variant="outline" />}>Voltar</DialogClose>
             <Button type="submit" disabled={pending}>
               {pending ? "Salvando..." : confirmLabel}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// completed and no_show can be corrected into each other (#145): the
+// appointment already happened, only its desfecho changes.
+const CORRECTION = {
+  completed: {
+    nextStatus: "no_show",
+    description: "A reserva está como concluída. Se o cliente não compareceu, marque como no-show.",
+    confirmLabel: "Marcar como no-show",
+  },
+  no_show: {
+    nextStatus: "completed",
+    description: "A reserva está como no-show. Se o cliente foi atendido, marque como concluída.",
+    confirmLabel: "Marcar como concluída",
+  },
+} as const;
+
+function CorrectionDialog({ id, status }: { id: string; status: keyof typeof CORRECTION }) {
+  const [state, formAction, pending] = useActionState(updateBookingStatus, INITIAL);
+  const correction = CORRECTION[status];
+
+  return (
+    <Dialog>
+      <DialogTrigger render={<Button size="sm" variant="outline" />}>Corrigir status</DialogTrigger>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Corrigir status</DialogTitle>
+          <DialogDescription>{correction.description}</DialogDescription>
+        </DialogHeader>
+        <form action={formAction} className="space-y-4">
+          <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="status" value={correction.nextStatus} />
+          {state.ok === false && <p className="text-sm text-destructive">{state.message}</p>}
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline" />}>Voltar</DialogClose>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Salvando..." : correction.confirmLabel}
             </Button>
           </DialogFooter>
         </form>

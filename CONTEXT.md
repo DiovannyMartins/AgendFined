@@ -37,7 +37,7 @@ Um horário de início possível em que um serviço pode começar. Deriva da fai
 _Avoid_: Horário, intervalo, vaga, time
 
 **Reserva**:
-O compromisso confirmado de um cliente com um serviço em um horário. Nasce como confirmed e passa por um ciclo de vida (confirmed → completed, cancelled ou no_show).
+O compromisso confirmado de um cliente com um serviço em um horário. Nasce como confirmed e passa por um ciclo de vida (confirmed → completed, cancelled ou no_show). Sai de confirmed uma única vez e nunca volta. completed e no_show registram o desfecho de um atendimento que já começou, então o dono pode corrigir um pelo outro ("Corrigir status" na agenda); cancelled é final, porque o horário pode já ter sido reaproveitado.
 _Avoid_: Agendamento, marcação, booking, appointment
 
 **Antecedência**:
@@ -65,7 +65,7 @@ Fila de clientes que desejam um horário específico (serviço + início) quando
 _Avoid_: Fila, agendamento pendente, banco de espera
 
 **No-show**:
-Reserva em que o cliente não compareceu. Estado terminal que permanece no histórico.
+Reserva em que o cliente não compareceu. Permanece no histórico; se marcado por engano, pode ser corrigido para completed (e vice-versa), mas nunca volta a confirmed.
 _Avoid_: Falta, ausência, não comparecimento
 
 **Fuso do negócio**:

@@ -12,10 +12,19 @@ describe("canTransition (§11.2)", () => {
     expect(canTransition("confirmed", "confirmed")).toBe(false);
   });
 
-  it("terminal states cannot transition", () => {
+  it("completed and no_show can be corrected into each other (#145)", () => {
+    expect(canTransition("completed", "no_show")).toBe(true);
+    expect(canTransition("no_show", "completed")).toBe(true);
+  });
+
+  it("never reopens a reserva or leaves cancelled", () => {
     expect(canTransition("completed", "confirmed")).toBe(false);
+    expect(canTransition("no_show", "confirmed")).toBe(false);
+    expect(canTransition("completed", "cancelled")).toBe(false);
+    expect(canTransition("no_show", "cancelled")).toBe(false);
     expect(canTransition("cancelled", "confirmed")).toBe(false);
-    expect(canTransition("no_show", "completed")).toBe(false);
+    expect(canTransition("cancelled", "completed")).toBe(false);
+    expect(canTransition("cancelled", "no_show")).toBe(false);
   });
 });
 
@@ -35,9 +44,9 @@ describe("ALLOWED_TRANSITIONS table", () => {
   it("matches the spec §11.2 transitions", () => {
     expect(ALLOWED_TRANSITIONS).toEqual({
       confirmed: ["completed", "cancelled", "no_show"],
-      completed: [],
+      completed: ["no_show"],
       cancelled: [],
-      no_show: [],
+      no_show: ["completed"],
     });
   });
 });

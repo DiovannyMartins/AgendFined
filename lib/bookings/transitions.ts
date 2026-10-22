@@ -1,11 +1,14 @@
 export type BookingStatus = "confirmed" | "completed" | "cancelled" | "no_show";
 
-// §11.2 Transitions permitted by the MVP.
+// §11.2 Transitions permitted by the MVP. A reserva leaves confirmed once and
+// never returns. completed and no_show both record an appointment that already
+// happened, so a wrong click can be corrected between them (#145); cancelled
+// stays final because the horário may already have been rebooked.
 export const ALLOWED_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   confirmed: ["completed", "cancelled", "no_show"],
-  completed: [],
+  completed: ["no_show"],
   cancelled: [],
-  no_show: [],
+  no_show: ["completed"],
 };
 
 export function canTransition(from: BookingStatus, to: BookingStatus): boolean {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mfaChallengePath, requiresMfaChallenge, safeInternalPath } from "./assurance";
+import { mfaChallengePath, requestPathOf, requiresMfaChallenge, safeInternalPath } from "./assurance";
 
 describe("authentication assurance policy", () => {
   it.each(["/\t/example.org", "/\n/example.org", "/\r/example.org", "/dashboard\u0000"])("rejects control characters in return path %j", (path) => {
@@ -23,5 +23,23 @@ describe("authentication assurance policy", () => {
     expect(safeInternalPath("//evil.example", "/dashboard")).toBe("/dashboard");
     expect(safeInternalPath("/\\evil.example", "/dashboard")).toBe("/dashboard");
     expect(safeInternalPath("/dashboard\\evil", "/dashboard")).toBe("/dashboard");
+  });
+});
+
+describe("requestPathOf (#149)", () => {
+  it("keeps the path and the query of the requested page", () => {
+    expect(requestPathOf(new URL("https://agendfined.com.br/dashboard/agenda?data=2026-10-22"))).toBe(
+      "/dashboard/agenda?data=2026-10-22",
+    );
+  });
+
+  it("drops the RSC fetch parameter of client navigations", () => {
+    expect(requestPathOf(new URL("https://agendfined.com.br/dashboard/agenda?_rsc=abc"))).toBe("/dashboard/agenda");
+  });
+
+  it("sends the second-factor challenge back to the requested page", () => {
+    expect(mfaChallengePath(requestPathOf(new URL("https://agendfined.com.br/dashboard/agenda")))).toBe(
+      "/mfa?next=%2Fdashboard%2Fagenda",
+    );
   });
 });

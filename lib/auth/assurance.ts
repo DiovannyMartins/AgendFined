@@ -27,3 +27,18 @@ export function safeInternalPath(value: string | null | undefined, fallback = "/
 export function mfaChallengePath(next: string): string {
   return `/mfa?${new URLSearchParams({ next: safeInternalPath(next) }).toString()}`;
 }
+
+// The proxy forwards the requested path to server components, so a session
+// that still needs the second factor returns to /dashboard/agenda (not just
+// /dashboard) after the code (#149). Set by the proxy on every request, so a
+// value sent by the browser is always overwritten.
+export const REQUEST_PATH_HEADER = "x-request-path";
+
+export function requestPathOf(url: URL): string {
+  const params = new URLSearchParams(url.search);
+  // Client navigations fetch the RSC payload with ?_rsc=…; it is not part of
+  // the page address.
+  params.delete("_rsc");
+  const search = params.toString();
+  return `${url.pathname}${search ? `?${search}` : ""}`;
+}

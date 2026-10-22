@@ -5,8 +5,9 @@ type Filter = [op: string, column: string, value: unknown];
 const { state } = vi.hoisted(() => ({
   state: {
     business: { id: "business-1", timezone: "America/Sao_Paulo" } as { id: string; timezone: string } | null,
-    bookings: [] as { id: string; customer_name_snapshot: string; start_at: string; end_at: string }[],
+    bookings: [] as { id: string; customer_name_snapshot: string; status: string; start_at: string; end_at: string }[],
     bookingFilters: [] as Filter[],
+    bookingsError: null as { message: string } | null,
     inserts: [] as Record<string, unknown>[],
     faixas: [] as { id: string; start_time: string; end_time: string }[],
     faixaWrites: [] as Record<string, unknown>[],
@@ -48,14 +49,22 @@ vi.mock("@/lib/supabase/server", () => ({
         neq: (column: string, value: unknown) => (state.bookingFilters.push(["neq", column, value]), query),
         gt: (column: string, value: unknown) => (state.bookingFilters.push(["gt", column, value]), query),
         lt: (column: string, value: unknown) => (state.bookingFilters.push(["lt", column, value]), query),
-        then: (resolve: (value: { data: typeof state.bookings }) => unknown) => {
-          // Emulate Postgres half-open overlap using the instants the action sent.
-          const gt = state.bookingFilters.find(([op, c]) => op === "gt" && c === "end_at")?.[2] as string;
-          const lt = state.bookingFilters.find(([op, c]) => op === "lt" && c === "start_at")?.[2] as string;
-          const data = state.bookings.filter(
-            (b) => Date.parse(b.end_at) > Date.parse(gt) && Date.parse(b.start_at) < Date.parse(lt),
+        then: (resolve: (value: { data: typeof state.bookings | null; error: { message: string } | null }) => unknown) => {
+          if (state.bookingsError) return Promise.resolve({ data: null, error: state.bookingsError }).then(resolve);
+          // Emulate Postgres with the filters and instants the action sent; every
+          // fixture belongs to the current business.
+          const data = state.bookings.filter((b) =>
+            state.bookingFilters.every(([op, column, value]) => {
+              if (column === "business_id") return true;
+              const actual = b[column as keyof typeof b];
+              if (op === "eq") return actual === value;
+              if (op === "neq") return actual !== value;
+              if (op === "gt") return Date.parse(actual) > Date.parse(value as string);
+              if (op === "lt") return Date.parse(actual) < Date.parse(value as string);
+              throw new Error(`unexpected filter ${op}`);
+            }),
           );
-          return Promise.resolve({ data }).then(resolve);
+          return Promise.resolve({ data, error: null }).then(resolve);
         },
       };
       return query;
@@ -85,6 +94,7 @@ describe("createBlock", () => {
     state.business = { id: "business-1", timezone: "America/Sao_Paulo" };
     state.bookings = [];
     state.bookingFilters = [];
+    state.bookingsError = null;
     state.inserts = [];
   });
 
@@ -146,12 +156,67 @@ describe("createBlock", () => {
   it("rejects a block over an existing booking at the same local time", async () => {
     // 12:30–13:00 in Brasília, stored in UTC as the booking RPC does.
     state.bookings = [
-      { id: "booking-1", customer_name_snapshot: "Ana", start_at: "2026-10-19T15:30:00+00:00", end_at: "2026-10-19T16:00:00+00:00" },
+      { id: "booking-1", customer_name_snapshot: "Ana", status: "confirmed", start_at: "2026-10-19T15:30:00+00:00", end_at: "2026-10-19T16:00:00+00:00" },
     ];
 
     const result = await createBlock({ ok: true, data: undefined }, blockForm("2026-10-19T12:00", "2026-10-19T13:00"));
 
     expect(result).toMatchObject({ ok: false, code: "BOOKING_CONFLICT" });
+    expect(state.inserts).toEqual([]);
+  });
+
+  // #143: "fechei o resto do dia" às 09:00 (12:00Z) com o bloqueio 08:00–18:00.
+  it("accepts a block starting in the past over reservas that can no longer happen", async () => {
+    state.bookings = [
+      // 08:00–08:30, concluída.
+      { id: "booking-1", customer_name_snapshot: "Rita", status: "completed", start_at: "2026-10-17T11:00:00Z", end_at: "2026-10-17T11:30:00Z" },
+      // 08:30–09:00, ainda confirmada mas já terminou (o dono não marcou).
+      { id: "booking-2", customer_name_snapshot: "Bia", status: "confirmed", start_at: "2026-10-17T11:30:00Z", end_at: "2026-10-17T12:00:00Z" },
+      // 10:00–10:30, marcada como falta: estado terminal.
+      { id: "booking-3", customer_name_snapshot: "Caio", status: "no_show", start_at: "2026-10-17T13:00:00Z", end_at: "2026-10-17T13:30:00Z" },
+      { id: "booking-4", customer_name_snapshot: "Duda", status: "cancelled", start_at: "2026-10-17T14:00:00Z", end_at: "2026-10-17T14:30:00Z" },
+    ];
+
+    const result = await createBlock({ ok: true, data: undefined }, blockForm("2026-10-17T08:00", "2026-10-17T18:00"));
+
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(state.inserts).toHaveLength(1);
+  });
+
+  it("still rejects a block starting in the past over a confirmed reserva ahead, citing its date and time", async () => {
+    state.bookings = [
+      { id: "booking-1", customer_name_snapshot: "Rita", status: "completed", start_at: "2026-10-17T11:00:00Z", end_at: "2026-10-17T11:30:00Z" },
+      // 15:00–15:30 em Brasília.
+      { id: "booking-2", customer_name_snapshot: "Ana", status: "confirmed", start_at: "2026-10-17T18:00:00Z", end_at: "2026-10-17T18:30:00Z" },
+    ];
+
+    const result = await createBlock({ ok: true, data: undefined }, blockForm("2026-10-17T08:00", "2026-10-17T18:00"));
+
+    expect(result).toMatchObject({ ok: false, code: "BOOKING_CONFLICT" });
+    if (result.ok) throw new Error("expected a conflict");
+    expect(result.message).toContain("Ana (17/10/2026 às 15:00)");
+    expect(result.message).not.toContain("Rita");
+    expect(state.inserts).toEqual([]);
+  });
+
+  it("rejects a block over a confirmed reserva that is under way", async () => {
+    // 08:45–09:15 em Brasília; agora são 09:00.
+    state.bookings = [
+      { id: "booking-1", customer_name_snapshot: "Ana", status: "confirmed", start_at: "2026-10-17T11:45:00Z", end_at: "2026-10-17T12:15:00Z" },
+    ];
+
+    const result = await createBlock({ ok: true, data: undefined }, blockForm("2026-10-17T08:00", "2026-10-17T18:00"));
+
+    expect(result).toMatchObject({ ok: false, code: "BOOKING_CONFLICT" });
+    expect(state.inserts).toEqual([]);
+  });
+
+  it("fails closed when the conflict check cannot be read", async () => {
+    state.bookingsError = { message: "timeout" };
+
+    const result = await createBlock({ ok: true, data: undefined }, blockForm("2026-10-19T12:00", "2026-10-19T13:00"));
+
+    expect(result).toEqual({ ok: false, code: "DB_ERROR", message: "Não foi possível verificar conflitos. Tente novamente." });
     expect(state.inserts).toEqual([]);
   });
 

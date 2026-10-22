@@ -29,7 +29,7 @@ Intervalo contínuo de atendimento dentro de um dia (ex.: 08:00–12:00). Um dia
 _Avoid_: Janela, período, slot
 
 **Bloqueio**:
-Período específico em que o negócio não atende, sem alterar a regra recorrente. Usado para pausas, compromissos, férias e exceções.
+Período específico em que o negócio não atende, sem alterar a regra recorrente. Usado para pausas, compromissos, férias e exceções. Pode começar no passado, mas não pode se sobrepor a uma reserva confirmada que ainda não terminou.
 _Avoid_: Exceção, folga, indisponibilidade
 
 **Slot**:

@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { availabilitySchema, blockSchema, publicAvailabilitySchema } from "@/lib/validation/schemas";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { getCurrentBusiness } from "@/lib/business/queries";
+import { formatWhen } from "@/lib/format/when";
 import { getEffectiveBookingWindowDays } from "@/lib/plan/plan";
 import type { ActionResult } from "@/lib/business/actions";
 import { computeAvailableSlots, isWithinWindow, localDateTimeToUtc, localDayRangeUtc, overlaps, toUtcRange, weekdayOf } from "@/lib/booking/availability";
@@ -189,22 +190,31 @@ export async function createBlock(
 
   const supabase = await createClient();
 
-  // §9.4: cannot create a block overlapping a future active booking of the same
-  // business.
-  const { data: conflicting } = await supabase
+  // §9.4: cannot create a block overlapping a booking of the same business that
+  // can still happen (#143). A block may start in the past, so completed,
+  // no_show and already-ended confirmed bookings in that part do not conflict.
+  const now = new Date().toISOString();
+  const { data: conflicting, error: conflictError } = await supabase
     .from("bookings")
     .select("id, customer_name_snapshot, start_at, end_at")
     .eq("business_id", business.id)
-    .neq("status", "cancelled")
-    .gt("end_at", startAt)
+    .eq("status", "confirmed")
+    .gt("end_at", Date.parse(startAt) > Date.parse(now) ? startAt : now)
     .lt("start_at", endAt);
 
+  // Fail closed: without the check, the insert could hide a reserva behind a block.
+  if (conflictError) {
+    return { ok: false, code: "DB_ERROR", message: "Não foi possível verificar conflitos. Tente novamente." };
+  }
+
   if (conflicting && conflicting.length > 0) {
-    const names = conflicting.map((b) => b.customer_name_snapshot).join(", ");
+    const list = conflicting
+      .map((b) => `${b.customer_name_snapshot} (${formatWhen(b.start_at, timezone)})`)
+      .join(", ");
     return {
       ok: false,
       code: "BOOKING_CONFLICT",
-      message: `Bloqueio conflita com reserva(s) futura(s): ${names}. Cancele essas reservas ou escolha outro período.`,
+      message: `Bloqueio conflita com reserva(s) confirmada(s): ${list}. Cancele essas reservas ou escolha outro período.`,
     };
   }
 

@@ -52,14 +52,16 @@ export function classifyCancellationReason(
   const text = reason?.trim();
   if (!text) return null;
   const normalized = normalize(text);
-  const rules: Array<[CancellationReasonCategory, string[]]> = [
-    ["schedule_conflict", ["agenda", "horario", "trabalho", "viagem", "compromisso"]],
-    ["illness_or_emergency", ["doenca", "doente", "emergencia", "imprevisto", "saude", "mal"]],
-    ["price_or_budget", ["preco", "caro", "dinheiro", "orcamento", "valor"]],
-    ["service_issue", ["problema", "insatisfeito", "qualidade", "atraso", "atendimento"]],
-    ["found_alternative", ["outra opcao", "alternativa", "encontrei", "nao preciso", "desisti"]],
+  // Every keyword starts at a word boundary, and the short whole words also end
+  // at one, so "normal" or "animal" never reads as "mal", nor "valorizar" as "valor".
+  const rules: Array<[CancellationReasonCategory, RegExp]> = [
+    ["schedule_conflict", /\b(?:re)?agenda|\bhorario|\btrabalho|\bviagem|\bcompromisso/],
+    ["illness_or_emergency", /\bdoenca|\bdoente|\bemergencia|\bimprevisto|\bsaude|\bmal\b/],
+    ["price_or_budget", /\bpreco|\bcaros?\b|\bdinheiro|\borcamento|\bvalor(?:es)?\b/],
+    ["service_issue", /\bproblema|\binsatisfeito|\bqualidade|\batraso|\batendimento/],
+    ["found_alternative", /\boutra opcao|\balternativa|\bencontrei|\bnao preciso|\bdesisti/],
   ];
-  const match = rules.find(([, keywords]) => keywords.some((keyword) => normalized.includes(keyword)));
+  const match = rules.find(([, pattern]) => pattern.test(normalized));
   return { category: match?.[0] ?? "other", confidence: match ? 0.82 : 0.55 };
 }
 
@@ -67,13 +69,15 @@ export function classifyCustomerNote(note: string | null | undefined): CustomerN
   const text = note?.trim();
   if (!text) return null;
   const normalized = normalize(text);
-  const rules: Array<[CustomerNoteCategory, string[], boolean]> = [
-    ["accessibility", ["acessib", "cadeira", "deficien", "libras", "mobilidade", "surdo"], true],
-    ["preparation", ["preparar", "preparo", "antes do atendimento"], false],
-    ["operational_information", ["chegar", "atraso", "endereco", "estacion", "pagamento", "contato"], true],
-    ["special_request", ["pedido", "especial", "prefer", "gostaria", "alergia"], true],
+  // Keywords start at a word boundary ("impedido" is not a "pedido"); the
+  // open-ended ones stay prefixes so "acessibilidade" still matches "acessib".
+  const rules: Array<[CustomerNoteCategory, RegExp, boolean]> = [
+    ["accessibility", /\bacessib|\bcadeira|\bdeficien|\blibras\b|\bmobilidade|\bsurdo/, true],
+    ["preparation", /\bpreparar|\bpreparo|\bantes do atendimento/, false],
+    ["operational_information", /\bchegar|\batraso|\bendereco|\bestacion|\bpagamento|\bcontato/, true],
+    ["special_request", /\bpedido|\bespecial|\bprefer|\bgostaria|\balergia/, true],
   ];
-  const match = rules.find(([, keywords]) => keywords.some((keyword) => normalized.includes(keyword)));
+  const match = rules.find(([, pattern]) => pattern.test(normalized));
   return {
     category: match?.[0] ?? "general",
     categoryConfidence: match ? 0.82 : 0.55,

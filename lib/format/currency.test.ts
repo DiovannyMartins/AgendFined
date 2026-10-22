@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCurrencyBRL, formatPriceInput, parsePriceToCents } from "./currency";
+import { formatCurrencyBRL, formatPriceInput, formatServicePrice, parsePriceToCents } from "./currency";
 
 describe("formatCurrencyBRL", () => {
   it("formats cents as R$ with a comma decimal separator", () => {
@@ -43,5 +43,15 @@ describe("formatPriceInput", () => {
   it("prefills the price field in the Brazilian format", () => {
     expect(formatPriceInput(4990)).toBe("49,90");
     expect(formatPriceInput(5)).toBe("0,05");
+  });
+});
+
+describe("formatServicePrice", () => {
+  it("mostra Grátis para serviço sem custo (#149)", () => {
+    expect(formatServicePrice(0)).toBe("Grátis");
+  });
+
+  it("mostra o valor em reais para os demais", () => {
+    expect(formatServicePrice(4990)).toBe(formatCurrencyBRL(4990));
   });
 });

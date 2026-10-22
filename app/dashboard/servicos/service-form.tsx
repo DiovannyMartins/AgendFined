@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,13 @@ export function ServiceForm({ service }: { service?: ServiceRow }) {
   const serverErrors = state.ok ? undefined : state.fieldErrors;
   const nameError = errors.name?.message ?? serverErrors?.name?.[0];
   const priceError = errors.price?.message ?? serverErrors?.priceCents?.[0];
+  const durationError = errors.durationMinutes?.message ?? serverErrors?.durationMinutes?.[0];
+
+  // Each message is tied to its field so a screen reader announces it on focus
+  // (#149); the ids are unique because one page renders several forms.
+  const errorId = useId();
+  const describedBy = (field: string, error: string | undefined, hintId?: string) =>
+    [hintId, error ? `${errorId}-${field}` : undefined].filter(Boolean).join(" ") || undefined;
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -93,8 +100,13 @@ export function ServiceForm({ service }: { service?: ServiceRow }) {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           <div className="space-y-2">
             <Label htmlFor="name">Nome</Label>
-            <Input id="name" aria-invalid={nameError ? true : undefined} {...register("name")} />
-            {nameError && <p className="text-sm text-destructive">{nameError}</p>}
+            <Input
+              id="name"
+              aria-invalid={nameError ? true : undefined}
+              aria-describedby={describedBy("name", nameError)}
+              {...register("name")}
+            />
+            {nameError && <p id={`${errorId}-name`} className="text-sm text-destructive">{nameError}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="description">Descrição (opcional)</Label>
@@ -108,10 +120,12 @@ export function ServiceForm({ service }: { service?: ServiceRow }) {
                 type="number"
                 min={5}
                 max={480}
+                aria-invalid={durationError ? true : undefined}
+                aria-describedby={describedBy("durationMinutes", durationError)}
                 {...register("durationMinutes", { valueAsNumber: true })}
               />
-              {errors.durationMinutes && (
-                <p className="text-sm text-destructive">{errors.durationMinutes.message}</p>
+              {durationError && (
+                <p id={`${errorId}-durationMinutes`} className="text-sm text-destructive">{durationError}</p>
               )}
             </div>
             <div className="space-y-2">
@@ -121,14 +135,14 @@ export function ServiceForm({ service }: { service?: ServiceRow }) {
                 type="text"
                 inputMode="decimal"
                 placeholder="49,90"
-                aria-describedby="price-hint"
+                aria-describedby={describedBy("price", priceError, "price-hint")}
                 aria-invalid={priceError ? true : undefined}
                 {...register("price")}
               />
               <p id="price-hint" className="text-xs text-muted-foreground">
                 Use vírgula para os centavos, como 49,90 ou 1.234,56.
               </p>
-              {priceError && <p className="text-sm text-destructive">{priceError}</p>}
+              {priceError && <p id={`${errorId}-price`} className="text-sm text-destructive">{priceError}</p>}
             </div>
           </div>
           {!state.ok && !serverErrors && <p className="text-sm text-destructive">{state.message}</p>}

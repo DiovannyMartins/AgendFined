@@ -8,6 +8,12 @@ export function formatCurrencyBRL(cents: number): string {
   return BRL.format(cents / 100);
 }
 
+// A serviço's price as the cliente reads it: a free one says "Grátis" instead
+// of "R$ 0,00" (#149). Money totals (relatórios, planos) keep formatCurrencyBRL.
+export function formatServicePrice(cents: number): string {
+  return cents === 0 ? "Grátis" : formatCurrencyBRL(cents);
+}
+
 // Whole reais, optionally grouped by dots ("1.234"), with an optional decimal
 // part of one or two centavos digits. Ungrouped amounts take a comma or a dot
 // ("49,90", "49.90"); grouped ones take only a comma ("1.234,56"), so the

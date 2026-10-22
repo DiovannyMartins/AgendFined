@@ -200,6 +200,18 @@ describe("createBooking", () => {
       });
     });
 
+    it("accepts a horário that crosses the junção of faixas encostadas (#147)", async () => {
+      state.singles = { services: { id: validInput.serviceId, name: "Corte feminino", duration_minutes: 45 } };
+      state.lists.availability = [
+        { start_time: "09:00:00", end_time: "12:00:00" },
+        { start_time: "12:00:00", end_time: "17:00:00" },
+      ];
+
+      const result = await createBooking({ ...validInput, startTime: "11:30" });
+
+      expect(result).toMatchObject({ ok: true, publicCode: "65925DBB" });
+    });
+
     it("does not tell the dono when the reserva was not created", async () => {
       state.rpcResults.create_booking = { data: null, error: { message: "bookings_no_overlap" } };
 

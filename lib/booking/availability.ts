@@ -88,6 +88,23 @@ export function generateSlotStartTimes(
   return candidates;
 }
 
+// Joins faixas encostadas (end of A == start of B) so a slot may cross the
+// junção, as if the dono had saved one continuous faixa (#147). Only the read
+// side merges; saved faixas stay as they are. A gap between faixas is a pausa.
+export function mergeContiguousIntervals(intervals: SlotInterval[]): SlotInterval[] {
+  const sorted = intervals
+    .map((i) => ({ start: timeToMinutes(i.startTime), end: timeToMinutes(i.endTime) }))
+    .sort((a, b) => a.start - b.start);
+
+  const merged: { start: number; end: number }[] = [];
+  for (const range of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && range.start <= last.end) last.end = Math.max(last.end, range.end);
+    else merged.push({ ...range });
+  }
+  return merged.map((m) => ({ startTime: minutesToTime(m.start), endTime: minutesToTime(m.end) }));
+}
+
 export function toLocalDate(date: Date, timezone: string = APP_TIMEZONE): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
@@ -180,7 +197,7 @@ export function computeAvailableSlots(params: {
   if (!isWithinWindow(date, rules, now)) return [];
 
   const available: string[] = [];
-  for (const interval of intervals) {
+  for (const interval of mergeContiguousIntervals(intervals)) {
     const starts = generateSlotStartTimes(interval, rules.slotIntervalMinutes, durationMinutes);
     for (const start of starts) {
       // Build the candidate in UTC (local slot -> UTC), per §9.5/§10.3.

@@ -145,6 +145,45 @@ describe("computeAvailableSlots", () => {
     expect(slots).toContain("08:00");
   });
 
+  it("treats faixas encostadas as one continuous faixa (#147)", () => {
+    const slots = computeAvailableSlots({
+      intervals: [
+        { startTime: "09:00:00", endTime: "12:00:00" },
+        { startTime: "12:00", endTime: "17:00" },
+      ],
+      rules,
+      durationMinutes: 45,
+      date: "2026-09-10",
+      now,
+      blocks: [],
+      occupancies: [],
+    });
+    expect(slots).toContain("11:00");
+    expect(slots).toContain("11:30");
+    expect(slots).toContain("16:00");
+    expect(slots).not.toContain("16:30");
+    expect(slots).toEqual([...new Set(slots)]);
+  });
+
+  it("keeps a gap between faixas as a pausa (#147)", () => {
+    const slots = computeAvailableSlots({
+      intervals: [
+        { startTime: "09:00", endTime: "12:00" },
+        { startTime: "13:00", endTime: "17:00" },
+      ],
+      rules,
+      durationMinutes: 45,
+      date: "2026-09-10",
+      now,
+      blocks: [],
+      occupancies: [],
+    });
+    expect(slots).toContain("11:00");
+    expect(slots).not.toContain("11:30");
+    expect(slots).not.toContain("12:00");
+    expect(slots).toContain("13:00");
+  });
+
   it("returns an empty list when no intervals exist for the day", () => {
     const slots = computeAvailableSlots({
       intervals: [],

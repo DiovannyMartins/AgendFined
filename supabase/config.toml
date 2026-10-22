@@ -282,11 +282,13 @@ content_path = "./supabase/templates/invite.html"
 subject = "Seu código de verificação do AgendFined"
 content_path = "./supabase/templates/reauthentication.html"
 
-# Uncomment to customize notification email template
-# [auth.email.notification.password_changed]
-# enabled = true
-# subject = "Your password has been changed"
-# content_path = "./supabase/templates/password_changed_notification.html"
+# Tells the owner when the password changes, so a takeover does not go
+# unnoticed (#149). Production: enable it under Authentication → Emails →
+# Notifications with the same file.
+[auth.email.notification.password_changed]
+enabled = true
+subject = "Sua senha do AgendFined foi alterada"
+content_path = "./supabase/templates/password_changed_notification.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.

@@ -80,6 +80,7 @@ export async function updateBookingStatus(
       timezone: business.timezone,
       publicCode: booking.public_code,
       rebookUrl: buildPublicBookingUrl(resolveAppOrigin(), business.slug),
+      businessPhone: business.phone,
     });
     if (!emailResult.sent) {
       console.error("booking_cancellation_email_failed", { bookingId: id, reason: emailResult.reason });

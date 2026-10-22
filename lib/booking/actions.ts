@@ -227,6 +227,7 @@ export async function createBooking(input: {
         startAt: startAtIso,
         timezone: business.timezone,
         publicCode: data.public_code,
+        businessPhone: business.phone,
         confirmationUrl: buildPrivateConfirmationUrl(
           resolveAppOrigin(),
           input.slug,
@@ -440,7 +441,7 @@ async function notifyCancellation(
   try {
     const { data: business } = await supabase
       .from("businesses")
-      .select("name, slug, timezone, owner_id")
+      .select("name, slug, timezone, owner_id, phone")
       .eq("id", cancelled.business_id)
       .maybeSingle();
     if (!business) return logFailure("business_not_found");
@@ -457,6 +458,7 @@ async function notifyCancellation(
             timezone: business.timezone,
             publicCode: cancelled.public_code,
             rebookUrl: buildPublicBookingUrl(resolveAppOrigin(), business.slug),
+            businessPhone: business.phone,
           })
         : null,
       notifyOwner(supabase, "customer_cancelled", {
@@ -585,6 +587,7 @@ type ResolvedBusiness = {
   id: string;
   owner_id: string;
   name: string;
+  phone: string;
   plan: Plan | null;
   slot_interval_minutes: number;
   min_notice_minutes: number;

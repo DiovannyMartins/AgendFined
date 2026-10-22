@@ -1,5 +1,6 @@
 import { formatPublicCode } from "@/lib/bookings/public-code";
 import { escapeHtml, sendEmail, type SendResult } from "@/lib/email/resend";
+import { businessContactRowsHtml, businessContactTextLines } from "@/lib/email/business-contact";
 import { formatWhenWithTimezone } from "@/lib/format/when";
 
 // Sent when a reserva is cancelled, either by the negócio from the dashboard or
@@ -15,6 +16,7 @@ type BookingCancellation = {
   timezone: string;
   publicCode: string;
   rebookUrl: string;
+  businessPhone?: string | null;
 };
 
 // Only the wording changes with who cancelled; the reserva details are the same.
@@ -78,7 +80,7 @@ function buildBookingCancellationHtml(input: BookingCancellation, wording: Wordi
                   </tr>
                   <tr>
                     <td style="padding:0 20px 16px;color:#eeeeee;font-size:16px;font-weight:700;line-height:22px;">${businessName}</td>
-                  </tr>
+                  </tr>${businessContactRowsHtml(input.businessPhone)}
                   <tr>
                     <td style="padding:0 20px 8px;color:#b0b0b0;font-size:12px;line-height:18px;">SERVIÇO</td>
                   </tr>
@@ -129,6 +131,7 @@ async function sendCancellationEmail(input: BookingCancellation, wording: Wordin
     "",
     wording.intro(input.businessName),
     `Negócio: ${input.businessName}`,
+    ...businessContactTextLines(input.businessPhone),
     `Serviço: ${input.serviceName}`,
     `Data e horário: ${formattedWhen}`,
     `Código da reserva: ${formatPublicCode(input.publicCode)}`,

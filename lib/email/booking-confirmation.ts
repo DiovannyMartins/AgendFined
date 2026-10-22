@@ -1,5 +1,7 @@
 import { formatWhenWithTimezone } from "@/lib/format/when";
 import { escapeHtml, sendEmail, type SendResult } from "@/lib/email/resend";
+import { businessContactRowsHtml, businessContactTextLines } from "@/lib/email/business-contact";
+import { formatPublicCode } from "@/lib/bookings/public-code";
 
 type BookingConfirmation = {
   customerName: string;
@@ -10,13 +12,15 @@ type BookingConfirmation = {
   publicCode: string;
   confirmationUrl: string;
   timezone?: string;
+  businessPhone?: string | null;
 };
 
 function buildBookingConfirmationHtml(input: BookingConfirmation, formattedWhen: string): string {
   const customerName = escapeHtml(input.customerName);
   const businessName = escapeHtml(input.businessName);
   const serviceName = escapeHtml(input.serviceName);
-  const publicCode = escapeHtml(input.publicCode);
+  // Grouped like on screen and in the cancellation e-mail: 22AP-MB04 (#149).
+  const publicCode = escapeHtml(formatPublicCode(input.publicCode));
   const confirmationUrl = escapeHtml(input.confirmationUrl);
   const dateAndTime = escapeHtml(formattedWhen);
 
@@ -54,7 +58,7 @@ function buildBookingConfirmationHtml(input: BookingConfirmation, formattedWhen:
                   </tr>
                   <tr>
                     <td style="padding:0 20px 16px;color:#eeeeee;font-size:16px;font-weight:700;line-height:22px;">${businessName}</td>
-                  </tr>
+                  </tr>${businessContactRowsHtml(input.businessPhone)}
                   <tr>
                     <td style="padding:0 20px 8px;color:#b0b0b0;font-size:12px;line-height:18px;">SERVIÇO</td>
                   </tr>
@@ -105,9 +109,10 @@ export async function sendBookingConfirmationEmail(input: BookingConfirmation): 
     "",
     "Sua reserva está confirmada.",
     `Negócio: ${input.businessName}`,
+    ...businessContactTextLines(input.businessPhone),
     `Serviço: ${input.serviceName}`,
     `Data e horário: ${formattedWhen}`,
-    `Código da reserva: ${input.publicCode}`,
+    `Código da reserva: ${formatPublicCode(input.publicCode)}`,
     `Confirmação privada: ${input.confirmationUrl}`,
     "",
     "Guarde este e-mail. O link privado permite consultar e cancelar a reserva.",

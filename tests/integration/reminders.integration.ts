@@ -36,6 +36,8 @@ let dueClaimedRow: {
 } | null = null;
 // A due booking on a FREE business that must be excluded by the plan gate.
 let freeDueBookingId = "";
+// Made 3 h before it starts: the confirmation is its reminder (#144).
+let lateBookingId = "";
 
 async function insertBooking(opts: {
   businessId: string;
@@ -45,6 +47,9 @@ async function insertBooking(opts: {
   email: string | null;
   status?: "confirmed" | "cancelled";
   reminderSentAt?: string | null;
+  // Reservas default to being made days ahead, so each scenario only tests its
+  // own exclusion; see the late-booking case for the created_at rule.
+  createdAt?: string;
 }) {
   const { data: cust } = await admin
     .from("customers")
@@ -68,6 +73,7 @@ async function insertBooking(opts: {
       end_at: end,
       status: opts.status ?? "confirmed",
       reminder_sent_at: opts.reminderSentAt ?? null,
+      created_at: opts.createdAt ?? iso(-3 * 24 * 60),
     })
     .select("id")
     .single();
@@ -194,6 +200,15 @@ beforeAll(async () => {
     status: "cancelled", // not confirmed
   });
 
+  lateBookingId = await insertBooking({
+    businessId,
+    serviceId,
+    startAt: iso(360), // within lead, but created inside it
+    phone: "+5511980000006",
+    email: "late@example.com",
+    createdAt: new Date(now).toISOString(),
+  });
+
   // A due booking on the FREE business — must be filtered out by the plan gate.
   freeDueBookingId = await insertBooking({
     businessId: freeBusinessId,
@@ -226,6 +241,12 @@ describe("INC-2 lembretes: get_due_booking_reminders", () => {
     expect(dueClaimedRow.reminder_claim_token).toBeTruthy();
     // None of the filtered out bookings are present.
     expect(ids).toHaveLength(1);
+  });
+
+  it("skips a reserva created inside the reminder window, which already got the confirmation", async () => {
+    const { data, error } = await admin.rpc("get_due_booking_reminders", { p_lead_minutes: 1440 });
+    expect(error).toBeNull();
+    expect((data ?? []).map((b) => b.id)).not.toContain(lateBookingId);
   });
 
   it("excludes candidates from non-Pro businesses (plan gate)", async () => {

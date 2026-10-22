@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { updateBookingStatus } from "@/lib/bookings/actions";
 import { isTooEarlyFor } from "@/lib/bookings/transitions";
+import { submitWithoutReset } from "@/lib/forms/submit-without-reset";
 
 const INITIAL: { ok: boolean; message?: string } = { ok: true };
 export function StatusAction({ id, status, startAt }: { id: string; status: string; startAt: string }) {
@@ -169,7 +170,7 @@ function CancelDialog({ id }: { id: string }) {
             A reserva será cancelada e o horário voltará a ficar disponível.
           </DialogDescription>
         </DialogHeader>
-        <form action={formAction} className="space-y-4">
+        <form onSubmit={submitWithoutReset(formAction)} className="space-y-4">
           <input type="hidden" name="id" value={id} />
           <input type="hidden" name="status" value="cancelled" />
           <div className="space-y-2">

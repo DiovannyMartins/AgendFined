@@ -1,19 +1,27 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createBlock, deleteBlock, type ActionResult } from "@/lib/availability/actions";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
+import { submitWithoutReset } from "@/lib/forms/submit-without-reset";
 
 const INITIAL = { ok: true } as ActionResult;
 
 export function BlockForm({ timezone = APP_TIMEZONE }: { timezone?: string }) {
   const [state, formAction, pending] = useActionState(createBlock, INITIAL);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Cleared only once the bloqueio exists; on a conflict the fields keep what
+  // was sent (#148).
+  useEffect(() => {
+    if (state.ok && state !== INITIAL) formRef.current?.reset();
+  }, [state]);
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form ref={formRef} onSubmit={submitWithoutReset(formAction)} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="startAt">Início</Label>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,6 +26,7 @@ import {
   deleteAvailability,
   type ActionResult,
 } from "@/lib/availability/actions";
+import { submitWithoutReset } from "@/lib/forms/submit-without-reset";
 
 // value is the DB weekday (Sunday=1 .. Saturday=7); only the name is shown.
 export const WEEKDAYS: { value: number; name: string }[] = [
@@ -44,9 +45,16 @@ const WEEKDAY_ITEMS = Object.fromEntries(WEEKDAYS.map((d) => [String(d.value), d
 
 export function AvailabilityForm() {
   const [state, formAction, pending] = useActionState(setAvailability, INITIAL);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Back to the defaults only once the faixa was added; on error the fields
+  // keep what was sent (#148).
+  useEffect(() => {
+    if (state.ok && state !== INITIAL) formRef.current?.reset();
+  }, [state]);
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form ref={formRef} onSubmit={submitWithoutReset(formAction)} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="space-y-2">
           <Label htmlFor="weekday">Dia da semana</Label>
@@ -134,7 +142,7 @@ export function AvailabilityRow({
 
   return (
     <form
-      action={formAction}
+      onSubmit={submitWithoutReset(formAction)}
       className="space-y-3 rounded-lg border border-border px-3 py-3"
     >
       <div className="grid gap-3 sm:grid-cols-3">

@@ -12,6 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { cancelPublicBooking, type CancelState } from "@/lib/booking/actions";
+import { submitWithoutReset } from "@/lib/forms/submit-without-reset";
 
 const INITIAL: CancelState = { status: "idle" };
 
@@ -56,7 +57,7 @@ export function CancelBooking({
               Ao confirmar, esta reserva será cancelada e o horário voltará a ficar disponível.
             </DialogDescription>
           </DialogHeader>
-          <form action={formAction} className="space-y-4">
+          <form onSubmit={submitWithoutReset(formAction)} className="space-y-4">
             <input type="hidden" name="code" value={code} />
             <input type="hidden" name="token" value={token} />
             <div className="space-y-2">

@@ -7,35 +7,39 @@ import { CalendarClock } from "lucide-react";
 import { ConfirmationStatus } from "./confirmation-status";
 import { CurrentSlugRedirect } from "./current-slug-redirect";
 import { publicCodeSchema } from "@/lib/validation/schemas";
-import { enforceConsultRateLimit, getClientIp } from "@/lib/booking/rate-limit";
+import { enforceConfirmationRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { publicDocumentTitle } from "@/lib/bookings/public-status";
 import { formatPhoneBR } from "@/lib/format/phone";
+import { ConfirmationLookupError } from "./confirmation-errors";
 
 // Shared by generateMetadata and the page within one request, so the lookup
 // (and its rate-limit hit) runs once while the <title> follows the status.
+// Only an invalid or unknown code is "not_found"; a refused or failed lookup
+// says nothing about the booking and must not read as a 404 (#140).
 const loadConfirmation = cache(async (code: string) => {
   const parsedCode = publicCodeSchema.safeParse(code);
-  if (!parsedCode.success) return null;
+  if (!parsedCode.success) return { kind: "not_found" } as const;
 
   const supabase = createAdminClient();
   try {
-    const allowed = await enforceConsultRateLimit(supabase, await getClientIp());
-    if (!allowed) return null;
+    const allowed = await enforceConfirmationRateLimit(supabase, await getClientIp());
+    if (!allowed) return { kind: "rate_limited" } as const;
   } catch {
     // Public confirmation is a sensitive lookup; an unavailable limiter must
     // fail closed instead of becoming a brute-force oracle.
-    return null;
+    return { kind: "unavailable" } as const;
   }
 
   const { data, error } = await supabase.rpc("get_booking_by_public_code", { p_code: parsedCode.data });
+  if (error) return { kind: "unavailable" } as const;
 
   const booking = data?.[0];
-  if (error || !booking) return null;
-  return { code: parsedCode.data, booking };
+  if (!booking) return { kind: "not_found" } as const;
+  return { kind: "found", code: parsedCode.data, booking } as const;
 });
 
-type FoundConfirmation = NonNullable<Awaited<ReturnType<typeof loadConfirmation>>>;
+type FoundConfirmation = Extract<Awaited<ReturnType<typeof loadConfirmation>>, { kind: "found" }>;
 
 function ConfirmationContent({ found, slug }: { found: FoundConfirmation; slug: string }) {
   const { booking } = found;
@@ -97,7 +101,7 @@ type ConfirmationPageProps = {
 export async function generateMetadata({ searchParams }: ConfirmationPageProps): Promise<Metadata> {
   const { code } = await searchParams;
   const found = code ? await loadConfirmation(code) : null;
-  return { title: found ? publicDocumentTitle(found.booking.status) : "Reserva — AgendFined" };
+  return { title: found?.kind === "found" ? publicDocumentTitle(found.booking.status) : "Reserva — AgendFined" };
 }
 
 export default async function ConfirmationPage({ params, searchParams }: ConfirmationPageProps) {
@@ -107,9 +111,11 @@ export default async function ConfirmationPage({ params, searchParams }: Confirm
 
   // Resolve the code before rendering anything: a notFound() thrown inside a
   // Suspense boundary arrives after the 200 status is already streamed, which
-  // turns an unknown code into a soft 404.
+  // turns an unknown code into a soft 404. The same applies to the lookup
+  // failures below, which error.tsx renders with a 5xx status.
   const found = await loadConfirmation(code);
-  if (!found) notFound();
+  if (found.kind === "not_found") notFound();
+  if (found.kind !== "found") throw new ConfirmationLookupError(found.kind);
 
   return <ConfirmationContent found={found} slug={slug} />;
 }

@@ -2,10 +2,11 @@ import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const rpc = vi.fn();
+const enforceConfirmationRateLimit = vi.fn(async () => true);
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ rpc }) }));
 vi.mock("@/lib/booking/rate-limit", () => ({
-  enforceConsultRateLimit: async () => true,
+  enforceConfirmationRateLimit,
   getClientIp: async () => "1.2.3.4",
 }));
 
@@ -13,6 +14,9 @@ vi.mock("./current-slug-redirect", () => ({ CurrentSlugRedirect: () => null }));
 
 const { generateMetadata, default: ConfirmationPage } = await import("./page");
 const { CurrentSlugRedirect } = await import("./current-slug-redirect");
+const { CONFIRMATION_RATE_LIMITED, CONFIRMATION_UNAVAILABLE, ConfirmationLookupError } = await import(
+  "./confirmation-errors"
+);
 
 function bookingRow(status: string) {
   return {
@@ -99,5 +103,78 @@ describe("confirmation page after a slug change", () => {
     rpc.mockResolvedValue({ data: [], error: null });
 
     await expect(renderContent("65925DBB", "barbearia-antiga")).rejects.toThrow();
+  });
+});
+
+// Digest that Next maps to the 404 status, and the status it gives any other
+// error thrown before streaming starts.
+const NOT_FOUND_DIGEST = "NEXT_HTTP_ERROR_FALLBACK;404";
+
+async function pageFailure(code = "65925DBB") {
+  try {
+    await ConfirmationPage(props(code, "barbearia"));
+  } catch (error) {
+    return error as Error & { digest?: string };
+  }
+  throw new Error("expected the page to throw");
+}
+
+// #140: uma reserva gravada nunca pode virar "página não existe" só porque a
+// consulta foi limitada ou falhou.
+describe("confirmation page when the lookup cannot answer", () => {
+  beforeEach(() => {
+    rpc.mockReset();
+    enforceConfirmationRateLimit.mockReset();
+    enforceConfirmationRateLimit.mockResolvedValue(true);
+  });
+
+  it("answers 404 for an unknown code", async () => {
+    rpc.mockResolvedValue({ data: [], error: null });
+
+    const error = await pageFailure();
+
+    expect(error.digest).toBe(NOT_FOUND_DIGEST);
+  });
+
+  it("answers 404 for a malformed code without spending the limiter", async () => {
+    const error = await pageFailure("123");
+
+    expect(error.digest).toBe(NOT_FOUND_DIGEST);
+    expect(enforceConfirmationRateLimit).not.toHaveBeenCalled();
+  });
+
+  it("reports a rate limit instead of a 404", async () => {
+    enforceConfirmationRateLimit.mockResolvedValue(false);
+
+    const error = await pageFailure();
+
+    expect(error).toBeInstanceOf(ConfirmationLookupError);
+    expect(error.digest).toBe(CONFIRMATION_RATE_LIMITED);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("reports an unavailable limiter as a temporary failure (fail closed)", async () => {
+    enforceConfirmationRateLimit.mockRejectedValue(new Error("limiter down"));
+
+    const error = await pageFailure();
+
+    expect(error.digest).toBe(CONFIRMATION_UNAVAILABLE);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("reports a database error as a temporary failure", async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: "connection refused" } });
+
+    const error = await pageFailure();
+
+    expect(error.digest).toBe(CONFIRMATION_UNAVAILABLE);
+  });
+
+  it("keeps the neutral <title> when the lookup is limited", async () => {
+    enforceConfirmationRateLimit.mockResolvedValue(false);
+
+    const metadata = await generateMetadata(props("65925DBB"));
+
+    expect(metadata.title).toBe("Reserva — AgendFined");
   });
 });

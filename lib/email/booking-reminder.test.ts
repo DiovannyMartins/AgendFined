@@ -40,3 +40,46 @@ describe("buildReminderEmail", () => {
     expect(email.html).toContain("20/10/2026 às 10:00 (horário de Manaus, UTC−4)");
   });
 });
+
+// #149 item 25: o lembrete é quando o cliente mais cancela ou remarca.
+describe("buildReminderEmail com consulta e contato", () => {
+  const candidate = {
+    business_name: "Estúdio Beta",
+    customer_name_snapshot: "Ana",
+    customer_email_snapshot: "ana@example.com",
+    service_name_snapshot: "Corte",
+    start_at: "2026-10-22T14:00:00Z",
+    public_code: "22APMB04",
+    business_slug: "estudio-beta",
+    business_phone: "51998765432",
+  };
+
+  it("mostra o código agrupado como na tela", () => {
+    const email = buildReminderEmail(candidate, "https://agendfined.com.br");
+
+    expect(email.text).toContain("Código da reserva: 22AP-MB04");
+    expect(email.html).toContain("22AP-MB04");
+  });
+
+  it("leva à consulta da reserva no slug do negócio", () => {
+    const email = buildReminderEmail(candidate, "https://agendfined.com.br");
+
+    expect(email.text).toContain("Consultar reserva: https://agendfined.com.br/estudio-beta/consultar");
+    expect(email.html).toContain('href="https://agendfined.com.br/estudio-beta/consultar"');
+  });
+
+  it("traz o telefone e o WhatsApp do negócio", () => {
+    const email = buildReminderEmail(candidate, "https://agendfined.com.br");
+
+    expect(email.text).toContain("Telefone do negócio: (51) 99876-5432");
+    expect(email.html).toContain('href="tel:+5551998765432"');
+    expect(email.html).toContain('href="https://wa.me/5551998765432"');
+  });
+
+  it("omite o que não tem: sem telefone e sem origem, nada de link", () => {
+    const email = buildReminderEmail({ ...candidate, business_phone: null });
+
+    expect(email.html).not.toContain("TELEFONE DO NEGÓCIO");
+    expect(email.html).not.toContain("/consultar");
+  });
+});

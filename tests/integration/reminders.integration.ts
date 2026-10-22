@@ -28,6 +28,8 @@ function iso(offsetMinutes: number): string {
 let dueBookingId = "";
 let dueClaimedRow: {
   business_name: string;
+  business_phone: string;
+  business_slug: string;
   customer_email_snapshot: string;
   customer_name_snapshot: string;
   service_name_snapshot: string;
@@ -239,6 +241,9 @@ describe("INC-2 lembretes: get_due_booking_reminders", () => {
     expect(ids).toContain(dueBookingId);
     dueClaimedRow = data!.find((b) => b.id === dueBookingId)!;
     expect(dueClaimedRow.reminder_claim_token).toBeTruthy();
+    // #149: the e-mail shows the negócio's phone and links to its consulta.
+    expect(dueClaimedRow.business_phone).toBeTruthy();
+    expect(dueClaimedRow.business_slug).toBeTruthy();
     // None of the filtered out bookings are present.
     expect(ids).toHaveLength(1);
   });

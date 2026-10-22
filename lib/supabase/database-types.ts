@@ -896,6 +896,7 @@ export type Database = {
         Returns: {
           business_id: string
           business_name: string
+          business_phone: string
           business_slug: string
           business_timezone: string
           customer_email_snapshot: string

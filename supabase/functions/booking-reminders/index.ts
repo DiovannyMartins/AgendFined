@@ -28,6 +28,9 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const CRON_SECRET = Deno.env.get("REMINDER_CRON_SECRET") ?? "";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const RESEND_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") ?? "";
+// Public origin for the consulta link in the e-mail (#149). Optional secret;
+// without it the link points at production.
+const APP_URL = Deno.env.get("APP_URL") || "https://agendfined.com.br";
 
 const REMINDER_LEAD_MS = 24 * 60 * 60 * 1000;
 const REMINDER_BATCH_LIMIT = 50;
@@ -36,6 +39,8 @@ type Candidate = {
   id: string;
   business_name: string;
   business_timezone: string;
+  business_slug: string;
+  business_phone?: string | null;
   customer_name_snapshot: string;
   customer_email_snapshot: string | null;
   service_name_snapshot: string;
@@ -51,6 +56,10 @@ function isCandidate(value: unknown): value is Candidate {
     typeof candidate.id === "string" &&
       /^[0-9a-f-]{36}$/i.test(candidate.id) &&
       typeof candidate.business_name === "string" &&
+      typeof candidate.business_slug === "string" &&
+      // Absent before 20261022000000 is applied: the reminder still goes out,
+      // just without the phone.
+      (typeof candidate.business_phone === "string" || candidate.business_phone == null) &&
       typeof candidate.customer_name_snapshot === "string" &&
       (typeof candidate.customer_email_snapshot === "string" || candidate.customer_email_snapshot === null) &&
       typeof candidate.service_name_snapshot === "string" &&
@@ -101,7 +110,7 @@ Deno.serve(async (req) => {
     // E-mail not wired: leave the booking unmarked so nothing is lost until it is.
     if (!RESEND_API_KEY || !RESEND_FROM_EMAIL) continue;
 
-    const email = buildReminderEmail(candidate);
+    const email = buildReminderEmail(candidate, APP_URL);
     try {
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",

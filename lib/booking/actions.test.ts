@@ -4,14 +4,19 @@ type SendResult = { sent: true } | { sent: false; reason: "not_configured" | "pr
 type RpcResult = { data: unknown; error: { message: string } | null };
 type RecordedQuery = { table: string; filters: [string, unknown][]; update: Record<string, unknown> | null };
 
-const { state, sendCustomerCancelledEmail } = vi.hoisted(() => ({
+const { state, sendCustomerCancelledEmail, sendBookingConfirmationEmail, notifyOwner } = vi.hoisted(() => ({
   state: {
     business: null as Record<string, unknown> | null,
+    // Per-table overrides: the row `single` resolves to and the awaited list.
+    singles: {} as Record<string, unknown>,
+    lists: {} as Record<string, unknown[]>,
     rpcCalls: [] as { name: string; args: Record<string, unknown> }[],
     rpcResults: {} as Record<string, RpcResult>,
     queries: [] as RecordedQuery[],
   },
   sendCustomerCancelledEmail: vi.fn<(input: unknown) => Promise<SendResult>>(async () => ({ sent: true })),
+  sendBookingConfirmationEmail: vi.fn<(input: unknown) => Promise<SendResult>>(async () => ({ sent: true })),
+  notifyOwner: vi.fn<(admin: unknown, event: string, booking: unknown) => Promise<void>>(async () => {}),
 }));
 
 vi.mock("@/lib/booking/anti-bot", () => ({ verifyTurnstile: async () => ({ ok: true }) }));
@@ -27,6 +32,8 @@ vi.mock("@/lib/bookings/classification", () => ({
 }));
 vi.mock("@/lib/google-calendar/sync", () => ({ syncGoogleCalendarBooking: vi.fn() }));
 vi.mock("@/lib/email/booking-cancellation", () => ({ sendCustomerCancelledEmail }));
+vi.mock("@/lib/email/booking-confirmation", () => ({ sendBookingConfirmationEmail }));
+vi.mock("@/lib/bookings/owner-notification", () => ({ notifyOwner }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => {
     const from = (table: string) => {
@@ -36,10 +43,13 @@ vi.mock("@/lib/supabase/admin", () => ({
         select: () => query,
         eq: (column: string, value: unknown) => (recorded.filters.push([column, value]), query),
         update: (values: Record<string, unknown>) => ((recorded.update = values), query),
-        single: async () => ({ data: state.business, error: null }),
+        lt: () => query,
+        gt: () => query,
+        neq: () => query,
+        single: async () => ({ data: table in state.singles ? state.singles[table] : state.business, error: null }),
         maybeSingle: async () => ({ data: state.business, error: null }),
-        then: (resolve: (value: { data: null; error: null }) => unknown) =>
-          Promise.resolve({ data: null, error: null }).then(resolve),
+        then: (resolve: (value: { data: unknown[] | null; error: null }) => unknown) =>
+          Promise.resolve({ data: state.lists[table] ?? null, error: null }).then(resolve),
       };
       return query;
     };
@@ -142,6 +152,63 @@ describe("createBooking", () => {
       customerPhone: ["Informe um telefone válido com DDD, como (11) 98888-7777."],
     });
   });
+
+  describe("once the reserva is created", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-19T12:00:00Z"));
+      state.business = {
+        id: "business-1",
+        owner_id: "owner-1",
+        name: "Barbearia Demo",
+        plan: "free",
+        slot_interval_minutes: 30,
+        min_notice_minutes: 120,
+        booking_window_days: 30,
+        timezone: "America/Sao_Paulo",
+      };
+      state.singles = { services: { id: validInput.serviceId, name: "Corte", duration_minutes: 30 } };
+      state.lists = { availability: [{ start_time: "08:00:00", end_time: "18:00:00" }], availability_blocks: [], bookings: [] };
+      state.rpcResults = { create_booking: { data: { id: "booking-9", public_code: "65925DBB" }, error: null } };
+      notifyOwner.mockClear();
+      sendBookingConfirmationEmail.mockClear();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      state.singles = {};
+      state.lists = {};
+      state.rpcResults = {};
+    });
+
+    it("tells the dono about the reserva nova, alongside the cliente's confirmação", async () => {
+      const result = await createBooking(validInput);
+
+      expect(result).toMatchObject({ ok: true, publicCode: "65925DBB" });
+      expect(sendBookingConfirmationEmail).toHaveBeenCalledTimes(1);
+      expect(notifyOwner).toHaveBeenCalledTimes(1);
+      expect(notifyOwner).toHaveBeenCalledWith(expect.anything(), "new_booking", {
+        bookingId: "booking-9",
+        ownerId: "owner-1",
+        businessName: "Barbearia Demo",
+        customerName: "Maria Souza",
+        customerPhone: "11987654321",
+        serviceName: "Corte",
+        startAt: "2026-10-20T12:00:00.000Z",
+        timezone: "America/Sao_Paulo",
+        publicCode: "65925DBB",
+      });
+    });
+
+    it("does not tell the dono when the reserva was not created", async () => {
+      state.rpcResults.create_booking = { data: null, error: { message: "bookings_no_overlap" } };
+
+      const result = await createBooking(validInput);
+
+      expect(result).toMatchObject({ ok: false, code: "slot_taken" });
+      expect(notifyOwner).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("joinWaitlist", () => {
@@ -239,6 +306,7 @@ describe("cancelPublicBooking", () => {
     public_code: "65925DBB",
     customer_name_snapshot: "Maria Souza",
     customer_email_snapshot: "maria@example.com",
+    customer_phone_snapshot: "11987654321",
     service_name_snapshot: "Corte",
   };
 
@@ -254,8 +322,9 @@ describe("cancelPublicBooking", () => {
     vi.stubEnv("APP_URL", "https://agenda.example");
     state.rpcCalls = [];
     state.queries = [];
-    state.business = { name: "Barbearia Demo", slug: "barbearia-demo", timezone: "America/Fortaleza" };
+    state.business = { name: "Barbearia Demo", slug: "barbearia-demo", timezone: "America/Fortaleza", owner_id: "owner-1" };
     state.rpcResults = { cancel_booking_by_public_code: { data: cancelledBooking, error: null } };
+    notifyOwner.mockClear();
     sendCustomerCancelledEmail.mockClear();
     sendCustomerCancelledEmail.mockResolvedValue({ sent: true });
     vi.mocked(syncGoogleCalendarBooking).mockClear();
@@ -311,6 +380,40 @@ describe("cancelPublicBooking", () => {
 
     expect(result).toMatchObject({ status: "error", code: "INVALID_TOKEN" });
     expect(sendCustomerCancelledEmail).not.toHaveBeenCalled();
+    expect(notifyOwner).not.toHaveBeenCalled();
+  });
+
+  it("tells the dono the cliente cancelled, without the token or the cancel reason", async () => {
+    const result = await cancelPublicBooking({ status: "idle" }, cancelForm("Imprevisto no trabalho"));
+
+    expect(result).toEqual({ status: "done" });
+    expect(notifyOwner).toHaveBeenCalledTimes(1);
+    expect(notifyOwner).toHaveBeenCalledWith(expect.anything(), "customer_cancelled", {
+      bookingId: "booking-1",
+      ownerId: "owner-1",
+      businessName: "Barbearia Demo",
+      customerName: "Maria Souza",
+      customerPhone: "11987654321",
+      serviceName: "Corte",
+      startAt: "2026-10-20T12:00:00Z",
+      timezone: "America/Fortaleza",
+      publicCode: "65925DBB",
+    });
+    const ownerInput = JSON.stringify(notifyOwner.mock.calls[0][2]);
+    expect(ownerInput).not.toContain(token);
+    expect(ownerInput).not.toContain("Imprevisto");
+  });
+
+  it("tells the dono even when the reserva has no customer e-mail", async () => {
+    state.rpcResults.cancel_booking_by_public_code = {
+      data: { ...cancelledBooking, customer_email_snapshot: null },
+      error: null,
+    };
+
+    await cancelPublicBooking({ status: "idle" }, cancelForm());
+
+    expect(sendCustomerCancelledEmail).not.toHaveBeenCalled();
+    expect(notifyOwner).toHaveBeenCalledWith(expect.anything(), "customer_cancelled", expect.anything());
   });
 
   it("tells the cliente to talk to the negócio when the reserva has already started", async () => {

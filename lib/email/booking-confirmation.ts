@@ -1,4 +1,4 @@
-import { formatWhen } from "@/lib/format/when";
+import { formatWhenWithTimezone } from "@/lib/format/when";
 import { escapeHtml, sendEmail, type SendResult } from "@/lib/email/resend";
 
 type BookingConfirmation = {
@@ -99,7 +99,7 @@ function buildBookingConfirmationHtml(input: BookingConfirmation, formattedWhen:
 }
 
 export async function sendBookingConfirmationEmail(input: BookingConfirmation): Promise<SendResult> {
-  const formattedWhen = formatWhen(input.startAt, input.timezone);
+  const formattedWhen = formatWhenWithTimezone(input.startAt, input.timezone);
   const text = [
     `Olá, ${input.customerName}!`,
     "",

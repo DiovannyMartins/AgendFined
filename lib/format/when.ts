@@ -1,6 +1,40 @@
 // Shared appointment rendering: `start_at` is UTC and the business timezone is
 // supplied by the caller. The default preserves legacy callers.
-import { APP_TIMEZONE } from "@/lib/app-timezone";
+import { APP_TIMEZONE, TIMEZONE_OPTIONS } from "@/lib/app-timezone";
+
+// The fuso's UTC offset at `at`: "UTC−3", "UTC+1", or "UTC" itself.
+export function formatTimezoneOffset(timezone: string, at: Date | string = new Date()): string {
+  const offset =
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone, timeZoneName: "shortOffset" })
+      .formatToParts(new Date(at))
+      .find((p) => p.type === "timeZoneName")?.value ?? "GMT";
+  // ICU writes the zero offset as "GMT" or "GMT+0" depending on the fuso.
+  return offset.replace(/^GMT(?:[+-]0)?$/, "GMT").replace("GMT", "UTC").replace("-", "−");
+}
+
+// The city a cliente knows the fuso by ("Manaus"), or null for UTC itself. A
+// fuso outside the dashboard's list falls back to its IANA city.
+export function timezoneCity(timezone: string): string | null {
+  const option = TIMEZONE_OPTIONS.find((o) => o.value === timezone);
+  if (option) return option.city;
+  const city = timezone.split("/").pop();
+  return timezone.includes("/") && city ? city.replaceAll("_", " ") : null;
+}
+
+// "Manaus (UTC−4)", or "UTC".
+export function formatTimezone(timezone: string, at: Date | string = new Date()): string {
+  const city = timezoneCity(timezone);
+  const offset = formatTimezoneOffset(timezone, at);
+  return city ? `${city} (${offset})` : offset;
+}
+
+// formatWhen plus the fuso, for messages read away from the page (e-mails):
+// "20/10/2026 às 10:00 (horário de Manaus, UTC−4)".
+export function formatWhenWithTimezone(iso: string, timezone: string = APP_TIMEZONE): string {
+  const city = timezoneCity(timezone);
+  const offset = formatTimezoneOffset(timezone, iso);
+  return `${formatWhen(iso, timezone)} (${city ? `horário de ${city}, ${offset}` : offset})`;
+}
 
 export function formatWhen(iso: string, timezone: string = APP_TIMEZONE): string {
   const parts = new Intl.DateTimeFormat("pt-BR", {

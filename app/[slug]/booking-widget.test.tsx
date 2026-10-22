@@ -185,6 +185,37 @@ describe("BookingWidget", () => {
     );
   });
 
+  it("unlocks the button and explains the failure when the reserva action throws", async () => {
+    mockedCreateBooking.mockRejectedValue(new Error("network"));
+
+    await fillAndSubmit("Maria Souza");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Não foi possível concluir. Verifique sua conexão e tente novamente.",
+    );
+    expect(screen.getByRole("button", { name: "Confirmar reserva" })).toBeEnabled();
+    expect(screen.queryByText("Confirmando...")).not.toBeInTheDocument();
+  });
+
+  it("unlocks the waitlist button and explains the failure when the action throws", async () => {
+    mockedCreateBooking.mockResolvedValue({ ok: false, code: "slot_taken", message: "Esse horário acabou de ser reservado." });
+    mockedJoinWaitlist.mockRejectedValue(new Error("network"));
+
+    await fillAndSubmit("Maria Souza");
+    fireEvent.click(await screen.findByRole("button", { name: "Entrar na lista de espera" }));
+
+    expect(await screen.findByText("Não foi possível concluir. Verifique sua conexão e tente novamente.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Entrar na lista de espera" })).toBeEnabled();
+  });
+
+  it("says the serviço is no longer available when it was turned off with the page open", async () => {
+    mockedGetSlotsForDate.mockResolvedValue({ available: [], error: "service_not_found" });
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
+    fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-20" } });
+
+    expect(await screen.findByText("Este serviço não está mais disponível. Escolha outro.")).toBeInTheDocument();
+  });
+
   it("drops the chosen slot when the server says it no longer exists", async () => {
     mockedCreateBooking.mockResolvedValue({
       ok: false,

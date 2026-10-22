@@ -34,7 +34,7 @@ describe("sendBookingConfirmationEmail", () => {
     expect(request.text).toContain("Ana & João <cliente>");
     expect(request.text).toContain("Barbearia \"Demo\"");
     expect(request.text).toContain("Corte <premium>");
-    expect(request.text).toContain("10/05/2026 às 15:00");
+    expect(request.text).toContain("10/05/2026 às 15:00 (horário de Brasília, UTC−3)");
     expect(request.text).toContain("65925DBB");
     expect(request.text).toContain(input.confirmationUrl);
     expect(request.html).toContain("AgendFined");

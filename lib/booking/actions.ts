@@ -7,6 +7,7 @@ import {
   customerDetailsSchema,
   publicBookingSchema,
   publicCodeSchema,
+  publicSlotSchema,
   waitlistSchema,
 } from "@/lib/validation/schemas";
 import {
@@ -54,6 +55,14 @@ export type ActionResult = {
 
 type ServerClient = ReturnType<typeof createAdminClient>;
 
+// A malformed date/startTime (only a forged request sends one) is refused
+// before the anti-bot gate and before zonedTimeToUtc, which would throw on it.
+const INVALID_SLOT_RESULT: ActionResult = {
+  ok: false,
+  code: "validation",
+  message: "Não foi possível validar o serviço ou o horário. Escolha novamente.",
+};
+
 const waitlistCustomerSchema = waitlistSchema.pick({
   customerName: true,
   customerPhone: true,
@@ -91,6 +100,7 @@ export async function createBooking(input: {
       fieldErrors: z.flattenError(customer.error).fieldErrors,
     };
   }
+  if (!publicSlotSchema.safeParse(input).success) return INVALID_SLOT_RESULT;
 
   // Server-authoritative flow: the admin client reads blocks/bookings of any
   // business (anonymous RLS would block those reads) for revalidation.
@@ -478,6 +488,7 @@ export async function joinWaitlist(input: {
       fieldErrors: z.flattenError(customer.error).fieldErrors,
     };
   }
+  if (!publicSlotSchema.safeParse(input).success) return INVALID_SLOT_RESULT;
 
   // Same server-authoritative preamble as createBooking: this is an anonymous
   // write, so anti-bot, business resolution and the fail-closed reservation

@@ -117,6 +117,24 @@ describe("createBooking", () => {
     expect(result.fieldErrors).toEqual({ customerEmail: ["Informe seu e-mail."] });
   });
 
+  it.each([
+    { date: "2026-13-45" },
+    { date: "not-a-date" },
+    { startTime: "9h" },
+    { startTime: "25:00" },
+  ])("answers a malformed slot %j with validation instead of throwing", async (slot) => {
+    state.queries = [];
+
+    const result = await createBooking({ ...validInput, ...slot });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "validation",
+      message: "Não foi possível validar o serviço ou o horário. Escolha novamente.",
+    });
+    expect(state.queries).toEqual([]);
+  });
+
   it("rejects a phone made of letters", async () => {
     const result = await createBooking({ ...validInput, customerPhone: "abcdefgh" });
 
@@ -145,6 +163,16 @@ describe("joinWaitlist", () => {
       message: "Revise os campos destacados.",
       fieldErrors: { customerPhone: ["Informe um telefone com DDD."] },
     });
+  });
+
+  it("answers a malformed date with validation instead of throwing", async () => {
+    state.business = { id: "business-1", plan: "pro", timezone: "America/Sao_Paulo" };
+    state.rpcCalls = [];
+
+    const result = await joinWaitlist({ ...validInput, date: "2026-02-30" });
+
+    expect(result).toMatchObject({ ok: false, code: "validation" });
+    expect(state.rpcCalls).toEqual([]);
   });
 
   describe("plan gate", () => {

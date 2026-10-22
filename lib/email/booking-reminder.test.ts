@@ -24,4 +24,19 @@ describe("buildReminderEmail", () => {
     expect(email.html).toContain("Corte &quot;premium&quot;");
     expect(email.html).toContain("ABC-123");
   });
+
+  it("says which fuso the time is in, like the other e-mails", () => {
+    const email = buildReminderEmail({
+      business_name: "Barbearia",
+      customer_name_snapshot: "Ana",
+      customer_email_snapshot: "ana@example.com",
+      service_name_snapshot: "Corte",
+      start_at: "2026-10-20T14:00:00Z",
+      public_code: "ABC-123",
+      business_timezone: "America/Manaus",
+    });
+
+    expect(email.text).toContain("Data e horário: 20/10/2026 às 10:00 (horário de Manaus, UTC−4)");
+    expect(email.html).toContain("20/10/2026 às 10:00 (horário de Manaus, UTC−4)");
+  });
 });

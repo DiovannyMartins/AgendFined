@@ -89,6 +89,24 @@ describe("StatusAction", () => {
     expect(screen.getByLabelText("Motivo (opcional)")).toHaveValue("Cliente pediu");
   });
 
+  it("names the reserva and warns about the e-mail before cancelling (#149)", async () => {
+    vi.setSystemTime(new Date("2026-10-17T12:00:00.000Z"));
+    render(
+      <StatusAction
+        id="booking-1"
+        status="confirmed"
+        startAt={START_AT}
+        summary={{ customerName: "Ana Souza", serviceName: "Corte", when: "19/10/2026, 12:00" }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("A reserva de Ana Souza (Corte, 19/10/2026, 12:00) será cancelada");
+    expect(dialog).toHaveTextContent("O cliente recebe um e-mail avisando do cancelamento.");
+  });
+
   it("offers no action on a cancelled reserva", () => {
     vi.setSystemTime(new Date("2026-10-19T15:30:00.000Z"));
     const { container } = render(<StatusAction id="booking-1" status="cancelled" startAt={START_AT} />);

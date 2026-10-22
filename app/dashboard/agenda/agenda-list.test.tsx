@@ -61,4 +61,28 @@ describe("AgendaList", () => {
 
     expect(screen.queryByText(/Observação:/)).not.toBeInTheDocument();
   });
+
+  // #149: o aviso diz o que fazer e some quando a reserva já foi encerrada.
+  it("pede para ler a observação antes de um atendimento confirmado", () => {
+    render(
+      <AgendaList
+        bookings={[booking({ customer_note: "Gostaria de corte em camadas", customer_note_requires_follow_up: true })]}
+        timezone="America/Sao_Paulo"
+      />,
+    );
+
+    expect(screen.getByText("Leia a observação antes do atendimento.")).toBeInTheDocument();
+    expect(screen.queryByText(/acompanhamento manual/)).not.toBeInTheDocument();
+  });
+
+  it.each(["cancelled", "completed", "no_show"] as const)("não mostra o aviso da observação numa reserva %s", (status) => {
+    render(
+      <AgendaList
+        bookings={[booking({ status, customer_note: "Gostaria de corte em camadas", customer_note_requires_follow_up: true })]}
+        timezone="America/Sao_Paulo"
+      />,
+    );
+
+    expect(screen.queryByText("Leia a observação antes do atendimento.")).not.toBeInTheDocument();
+  });
 });

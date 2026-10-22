@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CalendarClock, CalendarDays, UserRound, Blocks, CalendarPlus, Settings, Sparkles, BarChart3, Hourglass, LogOut, Menu, X } from "lucide-react";
@@ -23,14 +23,24 @@ const links = [
 export function DashboardNav({ slug }: { slug: string | null }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+
+  // Esc closes the mobile menu from anywhere inside it and returns focus to the
+  // toggle, like the app's dialogs (#149).
+  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (event.key !== "Escape" || !mobileOpen) return;
+    setMobileOpen(false);
+    toggleRef.current?.focus();
+  }
 
   return (
-    <nav className="w-full border-b border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-6 lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col lg:border-b-0 lg:border-r lg:bg-background lg:px-5 lg:py-8 lg:backdrop-blur-none">
+    <nav onKeyDown={handleKeyDown} className="w-full border-b border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-6 lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col lg:border-b-0 lg:border-r lg:bg-background lg:px-5 lg:py-8 lg:backdrop-blur-none">
       <div className="mb-3 flex items-center justify-between lg:mb-10 lg:w-[216px]">
         <Link href="/dashboard" className="text-lg font-semibold tracking-tight">
           <BrandLogo />
         </Link>
         <button
+          ref={toggleRef}
           type="button"
           aria-expanded={mobileOpen}
           aria-controls="dashboard-menu"

@@ -68,6 +68,7 @@ type FakeBooking = {
   end_at: string;
   service_name_snapshot: string;
   customer_name_snapshot: string;
+  customer_phone_snapshot: string;
   customer_note: string | null;
 };
 
@@ -81,6 +82,7 @@ function booking(id: string, status: string, overrides: Partial<FakeBooking> = {
     end_at: new Date(Date.now() + 86_400_000 + 3_600_000).toISOString(),
     service_name_snapshot: "Corte",
     customer_name_snapshot: "Ana",
+    customer_phone_snapshot: "51998765432",
     customer_note: null,
     ...overrides,
   };
@@ -170,7 +172,7 @@ describe("Google Calendar sync of a booking", () => {
     expect(fakes.googleCalls[1].path).toBe("/calendar/v3/calendars/primary/events");
     expect(fakes.googleCalls[1].body).toMatchObject({
       summary: "Corte — Ana",
-      description: "Criado pelo AgendFined\nObservação: Primeira vez",
+      description: "Criado pelo AgendFined\nTelefone: (51) 99876-5432\nObservação: Primeira vez",
       start: { timeZone: "America/Sao_Paulo" },
       extendedProperties: { private: { agendfinedBookingId: "booking" } },
     });

@@ -25,7 +25,11 @@ const upcoming: GcalExportBooking = {
   start_at: "2026-09-02T10:00:00.000Z",
   end_at: "2026-09-02T10:30:00.000Z",
   service_name_snapshot: "Corte",
+  customer_name_snapshot: "Ana Souza",
+  customer_phone_snapshot: "11987654321",
+  customer_note: null,
 };
+const customer = { customer_name_snapshot: "Bia", customer_phone_snapshot: "11911112222", customer_note: null };
 
 describe("buildGcalExportResult (Pro gate, ADR 0008)", () => {
   it("returns no_business when there is no business", async () => {
@@ -70,6 +74,7 @@ describe("buildGcalExportResult (Pro gate, ADR 0008)", () => {
         start_at: "2026-08-01T10:00:00.000Z",
         end_at: "2026-08-01T10:30:00.000Z",
         service_name_snapshot: "Passado",
+        ...customer,
       },
       {
         id: "cancelled",
@@ -77,6 +82,7 @@ describe("buildGcalExportResult (Pro gate, ADR 0008)", () => {
         start_at: "2026-09-03T10:00:00.000Z",
         end_at: "2026-09-03T10:30:00.000Z",
         service_name_snapshot: "Cancelada",
+        ...customer,
       },
     ];
     const result = await buildGcalExportResult(proBusiness, async () => rows, now);
@@ -87,6 +93,24 @@ describe("buildGcalExportResult (Pro gate, ADR 0008)", () => {
       expect(result.icsFeed).not.toContain("SUMMARY:Passado");
       expect(result.icsFeed).not.toContain("SUMMARY:Cancelada");
     }
+  });
+
+  it("names the cliente and phone, and keys the event by the reserva id", async () => {
+    const withNote = { ...upcoming, customer_note: "Alergia a lâmina" };
+    const result = await buildGcalExportResult(proBusiness, async () => [withNote], now);
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      expect(result.icsFeed).toContain("SUMMARY:Corte — Ana Souza");
+      expect(result.icsFeed).toContain("DESCRIPTION:Cliente: Ana Souza\\nTelefone: (11) 98765-4321\\nObservação: Alergia a lâmina");
+      expect(result.icsFeed).toContain("UID:b1@agendfined");
+    }
+  });
+
+  it("keeps the UID when the serviço is renamed, so a reimport does not duplicate", async () => {
+    const before = await buildGcalExportResult(proBusiness, async () => [upcoming], now);
+    const after = await buildGcalExportResult(proBusiness, async () => [{ ...upcoming, service_name_snapshot: "Corte novo" }], now);
+    const uid = (r: typeof before) => (r.status === "ok" ? r.icsFeed.match(/^UID:.*$/m)?.[0] : null);
+    expect(uid(after)).toBe(uid(before));
   });
 
   it("returns error when the bookings fetch throws", async () => {

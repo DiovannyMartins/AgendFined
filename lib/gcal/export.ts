@@ -8,6 +8,7 @@
 import { buildIcsFeed, type GcalBooking } from "@/lib/gcal/gcal";
 import { runProGated, type GatedBusiness } from "@/lib/plan/gate";
 import type { BookingStatus } from "@/lib/bookings/transitions";
+import { formatPhoneBR } from "@/lib/format/phone";
 
 export type GcalExportBooking = {
   id: string;
@@ -15,6 +16,9 @@ export type GcalExportBooking = {
   start_at: string;
   end_at: string;
   service_name_snapshot: string;
+  customer_name_snapshot: string;
+  customer_phone_snapshot: string;
+  customer_note: string | null;
 };
 
 export type GcalExportBusiness = GatedBusiness & { timezone?: string };
@@ -38,16 +42,29 @@ export function isUpcomingConfirmed(
 }
 
 // The owner's upcoming confirmed bookings, mapped to calendar events for the
-// importable .ics feed. Past and non-confirmed bookings are excluded.
+// importable .ics feed. Past and non-confirmed bookings are excluded. Like the
+// Google Calendar sync, the event names the cliente, so the owner sees who is
+// coming, and its UID is the reserva id.
 export function toGcalBookings(rows: GcalExportBooking[], now: Date, timezone?: string): GcalBooking[] {
   return rows
     .filter((b) => isUpcomingConfirmed(b, now))
-    .map((b) => ({
-      summary: b.service_name_snapshot,
-      startAt: b.start_at,
-      endAt: b.end_at,
-      timezone,
-    }));
+    .map((b) => {
+      const note = b.customer_note?.trim();
+      return {
+        uid: b.id,
+        summary: `${b.service_name_snapshot} — ${b.customer_name_snapshot}`,
+        description: [
+          `Cliente: ${b.customer_name_snapshot}`,
+          `Telefone: ${formatPhoneBR(b.customer_phone_snapshot)}`,
+          note ? `Observação: ${note}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        startAt: b.start_at,
+        endAt: b.end_at,
+        timezone,
+      };
+    });
 }
 
 export async function buildGcalExportResult(

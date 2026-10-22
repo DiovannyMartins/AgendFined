@@ -23,7 +23,7 @@ const fetchOwnerBookings: FetchGcalBookings = async (businessId) => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("bookings")
-    .select("id, status, start_at, end_at, service_name_snapshot")
+    .select("id, status, start_at, end_at, service_name_snapshot, customer_name_snapshot, customer_phone_snapshot, customer_note")
     .eq("business_id", businessId);
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as GcalExportBooking[];

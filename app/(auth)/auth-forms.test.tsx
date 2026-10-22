@@ -10,6 +10,7 @@ vi.mock("@/lib/auth/actions", () => ({
   login: vi.fn(),
   signup: vi.fn(),
   requestPasswordReset: vi.fn(),
+  resendSignupConfirmation: vi.fn(),
   updatePassword: vi.fn(),
 }));
 vi.mock("@/components/turnstile-widget", () => ({ TurnstileWidget: () => null }));

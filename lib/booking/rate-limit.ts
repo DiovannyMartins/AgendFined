@@ -39,6 +39,7 @@ export const AUTH_RATE_LIMIT = {
   login: { perIp: 12, perEmail: 6, windowSeconds: 15 * 60 },
   signup: { perIp: 5, perEmail: 3, windowSeconds: 60 * 60 },
   passwordReset: { perIp: 5, perEmail: 3, windowSeconds: 60 * 60 },
+  confirmationResend: { perIp: 5, perEmail: 3, windowSeconds: 60 * 60 },
   mfaVerify: { perUser: 10, windowSeconds: 15 * 60 },
 } as const;
 
@@ -106,7 +107,7 @@ function hashIdentifier(value: string): string {
 export async function enforceAuthRateLimit(
   supabase: ServerClient,
   ip: string,
-  action: "login" | "signup" | "passwordReset",
+  action: "login" | "signup" | "passwordReset" | "confirmationResend",
   email: string,
 ): Promise<boolean> {
   const config = AUTH_RATE_LIMIT[action];

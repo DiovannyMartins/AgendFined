@@ -6,6 +6,7 @@ const auth = {
   signInWithPassword: vi.fn(),
   signUp: vi.fn(),
   resetPasswordForEmail: vi.fn(),
+  resend: vi.fn(),
   getUser: vi.fn(),
   updateUser: vi.fn(),
   mfa: { getAuthenticatorAssuranceLevel: vi.fn() },
@@ -13,8 +14,9 @@ const auth = {
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth }) }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
+const { enforceAuthRateLimit } = vi.hoisted(() => ({ enforceAuthRateLimit: vi.fn(async () => true) }));
 vi.mock("@/lib/booking/rate-limit", () => ({
-  enforceAuthRateLimit: async () => true,
+  enforceAuthRateLimit,
   enforceMfaRateLimit: async () => true,
   getClientIp: async () => "203.0.113.7",
 }));
@@ -26,7 +28,7 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const { login, requestPasswordReset, signup, updatePassword } = await import("./actions");
+const { login, requestPasswordReset, resendSignupConfirmation, signup, updatePassword } = await import("./actions");
 
 const INITIAL = { ok: true as const, data: undefined };
 
@@ -114,6 +116,107 @@ describe("login with a rejected CAPTCHA", () => {
     const result = await login(INITIAL, form({ email: "dono@agendfined.dev", password: "Senha-forte-1", cfTurnstileToken: "expired" }));
 
     expect(result).toMatchObject({ ok: false, code: "CAPTCHA_FAILED" });
+  });
+});
+
+// #139: com confirmação de e-mail ligada, a senha certa de uma conta ainda não
+// confirmada virava "E-mail ou senha incorretos.". O Supabase só devolve
+// email_not_confirmed quando a senha confere, então a mensagem não enumera contas.
+describe("login with an e-mail that was never confirmed", () => {
+  it("asks to confirm the e-mail instead of blaming the password", async () => {
+    auth.signInWithPassword.mockResolvedValue({
+      data: { user: null, session: null },
+      error: { code: "email_not_confirmed", message: "Email not confirmed" },
+    });
+
+    const result = await login(INITIAL, form({ email: "dono@agendfined.dev", password: "Senha-forte-1" }));
+
+    expect(result).toEqual({
+      ok: false,
+      code: "EMAIL_NOT_CONFIRMED",
+      message: "Confirme seu e-mail para entrar.",
+    });
+  });
+
+  it("still blames the credentials for any other rejection", async () => {
+    auth.signInWithPassword.mockResolvedValue({
+      data: { user: null, session: null },
+      error: { code: "invalid_credentials", message: "Invalid login credentials" },
+    });
+
+    const result = await login(INITIAL, form({ email: "dono@agendfined.dev", password: "senha-errada" }));
+
+    expect(result).toMatchObject({ ok: false, code: "INVALID_CREDENTIALS", message: "E-mail ou senha incorretos." });
+  });
+});
+
+describe("resendSignupConfirmation", () => {
+  const SENT = { ok: true, data: undefined };
+
+  it("asks Supabase Auth for a new signup link that lands on the dashboard", async () => {
+    vi.stubEnv("APP_URL", "https://agendfined.com.br");
+    auth.resend.mockResolvedValue({ data: {}, error: null });
+
+    const result = await resendSignupConfirmation(
+      INITIAL,
+      form({ email: " Dono@AgendFined.dev ", cfTurnstileToken: "tok-resend" }),
+    );
+
+    expect(result).toEqual(SENT);
+    expect(auth.resend).toHaveBeenCalledWith({
+      type: "signup",
+      email: "dono@agendfined.dev",
+      options: {
+        emailRedirectTo: "https://agendfined.com.br/auth/callback?next=/dashboard",
+        captchaToken: "tok-resend",
+      },
+    });
+    vi.unstubAllEnvs();
+  });
+
+  it("is limited per IP and per e-mail with its own AUTH_RATE_LIMIT entry", async () => {
+    enforceAuthRateLimit.mockResolvedValueOnce(false);
+
+    const result = await resendSignupConfirmation(INITIAL, form({ email: "dono@agendfined.dev" }));
+
+    expect(result).toMatchObject({ ok: false, code: "RATE_LIMITED" });
+    expect(enforceAuthRateLimit).toHaveBeenCalledWith(
+      expect.anything(),
+      "203.0.113.7",
+      "confirmationResend",
+      "dono@agendfined.dev",
+    );
+    expect(auth.resend).not.toHaveBeenCalled();
+  });
+
+  // Resposta uniforme: e-mail sem conta, conta já confirmada ou limite de envio
+  // do próprio Supabase (por usuário) não podem ser distinguidos pela resposta.
+  it.each([
+    ["an e-mail without a pending signup", null],
+    ["an already confirmed account", { code: "email_address_not_authorized", message: "x" }],
+    ["Supabase's own per-user send limit", { code: "over_email_send_rate_limit", message: "x" }],
+    ["an unexpected failure", { code: "unexpected_failure", message: "x" }],
+  ])("answers the same way for %s", async (_, error) => {
+    auth.resend.mockResolvedValue({ data: {}, error });
+
+    const result = await resendSignupConfirmation(INITIAL, form({ email: "alguem@agendfined.dev" }));
+
+    expect(result).toEqual(SENT);
+  });
+
+  it("asks for the human verification again when the CAPTCHA is rejected", async () => {
+    auth.resend.mockResolvedValue({ data: {}, error: { code: "captcha_failed", message: "captcha protection" } });
+
+    const result = await resendSignupConfirmation(INITIAL, form({ email: "dono@agendfined.dev", cfTurnstileToken: "old" }));
+
+    expect(result).toMatchObject({ ok: false, code: "CAPTCHA_FAILED" });
+  });
+
+  it("rejects an invalid e-mail without calling Supabase Auth", async () => {
+    const result = await resendSignupConfirmation(INITIAL, form({ email: "nao-e-email" }));
+
+    expect(result).toMatchObject({ ok: false, code: "VALIDATION" });
+    expect(auth.resend).not.toHaveBeenCalled();
   });
 });
 

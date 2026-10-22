@@ -10,11 +10,13 @@ import { Input } from "@/components/ui/input";
 import { login, type ActionResult } from "@/lib/auth/actions";
 import { useAuthTurnstile } from "@/components/auth-turnstile";
 import { loginSchema, type LoginInput } from "@/lib/validation/schemas";
+import { ResendConfirmation } from "../resend-confirmation";
 
 const INITIAL: ActionResult = { ok: true, data: undefined };
 
 export function LoginForm({ notice, next }: { notice?: string; next?: string }) {
   const [state, setState] = useState<ActionResult>(INITIAL);
+  const [submittedEmail, setSubmittedEmail] = useState("");
   const [pending, startTransition] = useTransition();
   const captcha = useAuthTurnstile();
   const {
@@ -25,6 +27,7 @@ export function LoginForm({ notice, next }: { notice?: string; next?: string }) 
 
   function onSubmit(values: LoginInput) {
     setState(INITIAL);
+    setSubmittedEmail(values.email);
     startTransition(async () => {
       const fd = new FormData();
       fd.set("email", values.email);
@@ -73,6 +76,9 @@ export function LoginForm({ notice, next }: { notice?: string; next?: string }) 
           </div>
           {captcha.widget}
           {error && <p className="text-sm text-destructive">{error}</p>}
+          {!state.ok && state.code === "EMAIL_NOT_CONFIRMED" && (
+            <ResendConfirmation email={submittedEmail} captcha={captcha} label="Reenviar confirmação" />
+          )}
           <Button type="submit" className="w-full" disabled={pending || !captcha.canSubmit}>
             {pending ? "Entrando..." : "Entrar"}
           </Button>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPhoneBR, matchesPhone } from "./phone";
+import { formatPhoneBR, matchesPhone, phoneTelHref, whatsappHref } from "./phone";
 
 describe("formatPhoneBR", () => {
   it.each([
@@ -26,5 +26,22 @@ describe("matchesPhone", () => {
   it("ignora buscas que não parecem telefone", () => {
     expect(matchesPhone("11987654321", "ana")).toBe(false);
     expect(matchesPhone("11987654321", "  ")).toBe(false);
+  });
+});
+
+describe("links de contato (#149)", () => {
+  it("liga para o telefone com o código do país", () => {
+    expect(phoneTelHref("(51) 99876-5432")).toBe("tel:+5551998765432");
+    expect(phoneTelHref("1133334444")).toBe("tel:+551133334444");
+  });
+
+  it("abre o WhatsApp só para celular", () => {
+    expect(whatsappHref("51998765432")).toBe("https://wa.me/5551998765432");
+    expect(whatsappHref("1133334444")).toBeNull();
+  });
+
+  it("não cria link para telefone inválido", () => {
+    expect(phoneTelHref("+1 415 555 0100")).toBeNull();
+    expect(whatsappHref("+1 415 555 0100")).toBeNull();
   });
 });

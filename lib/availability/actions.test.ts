@@ -9,7 +9,7 @@ const { state } = vi.hoisted(() => ({
     bookingFilters: [] as Filter[],
     bookingsError: null as { message: string } | null,
     inserts: [] as Record<string, unknown>[],
-    faixas: [] as { id: string; start_time: string; end_time: string }[],
+    faixas: [] as { id: string; weekday?: number; start_time: string; end_time: string }[],
     faixaWrites: [] as Record<string, unknown>[],
   },
 }));
@@ -34,11 +34,17 @@ vi.mock("@/lib/supabase/server", () => ({
         const query = {
           select: () => query,
           eq: () => query,
+          in: () => query,
           neq: (_column: string, value: unknown) => ((excludedId = value), query),
-          insert: async (row: Record<string, unknown>) => (state.faixaWrites.push(row), { error: null }),
+          insert: async (rows: Record<string, unknown> | Record<string, unknown>[]) => (
+            state.faixaWrites.push(...(Array.isArray(rows) ? rows : [rows])), { error: null }
+          ),
           update: (row: Record<string, unknown>) => (state.faixaWrites.push(row), query),
           then: (resolve: (value: { data: typeof state.faixas; error: null }) => unknown) =>
-            Promise.resolve({ data: state.faixas.filter((f) => f.id !== excludedId), error: null }).then(resolve),
+            Promise.resolve({
+              data: state.faixas.filter((f) => f.id !== excludedId).map((f) => ({ weekday: 2, ...f })),
+              error: null,
+            }).then(resolve),
         };
         return query;
       }
@@ -308,5 +314,44 @@ describe("availability faixa validation", () => {
     const result = await updateAvailability("faixa-1", { ok: true, data: undefined }, faixaForm("18:00", "08:00"));
 
     expect(result).toMatchObject({ ok: false, code: "VALIDATION", message: "O fim deve ser depois do início." });
+  });
+});
+
+describe("faixa em vários dias de uma vez (#149)", () => {
+  function multiDayForm(weekdays: number[], startTime = "08:00", endTime = "18:00") {
+    const formData = new FormData();
+    for (const weekday of weekdays) formData.append("weekday", String(weekday));
+    formData.set("startTime", startTime);
+    formData.set("endTime", endTime);
+    return formData;
+  }
+
+  beforeEach(() => {
+    state.business = { id: "business-1", timezone: "America/Sao_Paulo" };
+    state.faixas = [];
+    state.faixaWrites = [];
+  });
+
+  it("adiciona a mesma faixa de segunda a sexta num envio só", async () => {
+    const result = await setAvailability({ ok: true, data: undefined }, multiDayForm([2, 3, 4, 5, 6]));
+
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(state.faixaWrites.map((row) => row.weekday)).toEqual([2, 3, 4, 5, 6]);
+    expect(state.faixaWrites.every((row) => row.start_time === "08:00" && row.end_time === "18:00")).toBe(true);
+  });
+
+  it("não adiciona nada quando um dos dias já tem faixa sobreposta e diz qual", async () => {
+    state.faixas = [{ id: "quarta", weekday: 4, start_time: "09:00:00", end_time: "10:00:00" }];
+
+    const result = await setAvailability({ ok: true, data: undefined }, multiDayForm([2, 3, 4]));
+
+    expect(result).toMatchObject({ ok: false, code: "OVERLAP", message: expect.stringContaining("Quarta") });
+    expect(state.faixaWrites).toEqual([]);
+  });
+
+  it("pede pelo menos um dia", async () => {
+    const result = await setAvailability({ ok: true, data: undefined }, multiDayForm([]));
+
+    expect(result).toMatchObject({ ok: false, code: "VALIDATION", message: "Escolha pelo menos um dia da semana." });
   });
 });

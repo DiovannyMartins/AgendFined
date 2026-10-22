@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createBlock, deleteBlock, type ActionResult } from "@/lib/availability/actions";
-import { APP_TIMEZONE } from "@/lib/app-timezone";
+import { APP_TIMEZONE, timezoneLabel } from "@/lib/app-timezone";
 import { submitWithoutReset } from "@/lib/forms/submit-without-reset";
 
 const INITIAL = { ok: true } as ActionResult;
@@ -35,7 +35,7 @@ export function BlockForm({ timezone = APP_TIMEZONE }: { timezone?: string }) {
       <div className="space-y-2">
         <Label htmlFor="reason">Motivo (opcional)</Label>
         <Input id="reason" name="reason" maxLength={120} placeholder="Férias, pausa, compromisso..." />
-        <p className="text-xs text-muted-foreground">Os horários são interpretados em {timezone}.</p>
+        <p className="text-xs text-muted-foreground">Horários no fuso do negócio: {timezoneLabel(timezone)}.</p>
       </div>
       {!state.ok && <p className="text-sm text-destructive">{state.message}</p>}
       <Button type="submit" disabled={pending} size="sm">

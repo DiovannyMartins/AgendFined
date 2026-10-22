@@ -12,6 +12,7 @@ import type { ActionResult } from "@/lib/business/actions";
 import { computeAvailableSlots, isWithinWindow, localDateTimeToUtc, localDayRangeUtc, overlaps, toUtcRange, weekdayOf } from "@/lib/booking/availability";
 import type { UtcRange } from "@/lib/booking/availability";
 import { enforceAvailabilityRateLimit, getClientIp } from "@/lib/booking/rate-limit";
+import { weekdayName } from "@/lib/availability/weekdays";
 
 export type { ActionResult };
 
@@ -19,20 +20,29 @@ export async function setAvailability(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const weekday = Number(formData.get("weekday"));
+  // The same faixa can be added to several days at once (#149).
+  const weekdays = [...new Set(formData.getAll("weekday").map(Number))];
   const startTime = String(formData.get("startTime") ?? "");
   const endTime = String(formData.get("endTime") ?? "");
 
-  const parsed = availabilitySchema.safeParse({ weekday, startTime, endTime });
-  if (!parsed.success) {
-    return {
-      ok: false,
-      code: "VALIDATION",
-      // Every availabilitySchema message is pt-BR and names the problem (e.g. an
-      // inverted faixa), so it is shown as is instead of a generic hint.
-      message: parsed.error.issues[0]?.message ?? "Revise os campos de disponibilidade.",
-      fieldErrors: parsed.error.flatten().fieldErrors,
-    };
+  if (weekdays.length === 0) {
+    return { ok: false, code: "VALIDATION", message: "Escolha pelo menos um dia da semana." };
+  }
+
+  const faixas = [];
+  for (const weekday of weekdays) {
+    const parsed = availabilitySchema.safeParse({ weekday, startTime, endTime });
+    if (!parsed.success) {
+      return {
+        ok: false,
+        code: "VALIDATION",
+        // Every availabilitySchema message is pt-BR and names the problem (e.g. an
+        // inverted faixa), so it is shown as is instead of a generic hint.
+        message: parsed.error.issues[0]?.message ?? "Revise os campos de disponibilidade.",
+        fieldErrors: parsed.error.flatten().fieldErrors,
+      };
+    }
+    faixas.push(parsed.data);
   }
 
   const business = await getCurrentBusiness();
@@ -45,25 +55,34 @@ export async function setAvailability(
     .from("availability")
     .select("*")
     .eq("business_id", business.id)
-    .eq("weekday", parsed.data.weekday)
+    .in("weekday", weekdays)
     .eq("is_active", true);
 
-  for (const row of existing ?? []) {
-    if (overlaps({ start: row.start_time, end: row.end_time }, { start: startTime, end: endTime })) {
+  for (const faixa of faixas) {
+    const clash = (existing ?? []).find(
+      (row) => row.weekday === faixa.weekday && overlaps({ start: row.start_time, end: row.end_time }, { start: startTime, end: endTime }),
+    );
+    if (clash) {
       return {
         ok: false,
         code: "OVERLAP",
-        message: "Este intervalo se sobrepõe a um já existente neste dia.",
+        message:
+          faixas.length > 1
+            ? `${weekdayName(faixa.weekday)}: este intervalo se sobrepõe a um já existente. Nenhuma faixa foi adicionada.`
+            : "Este intervalo se sobrepõe a um já existente neste dia.",
       };
     }
   }
 
-  const { error } = await supabase.from("availability").insert({
-    business_id: business.id,
-    weekday: parsed.data.weekday,
-    start_time: parsed.data.startTime,
-    end_time: parsed.data.endTime,
-  });
+  // One insert for every day: either all faixas are added or none is.
+  const { error } = await supabase.from("availability").insert(
+    faixas.map((faixa) => ({
+      business_id: business.id,
+      weekday: faixa.weekday,
+      start_time: faixa.startTime,
+      end_time: faixa.endTime,
+    })),
+  );
 
   if (error) return { ok: false, code: "DB_ERROR", message: "Não foi possível salvar." };
 

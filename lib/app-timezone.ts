@@ -21,3 +21,9 @@ export const TIMEZONE_OPTIONS = [
   { value: "Europe/Lisbon", city: "Lisboa", label: "Lisboa (GMT+0; GMT+1 no verão)" },
   { value: "America/New_York", city: "Nova York", label: "Nova York (GMT−5; GMT−4 no verão)" },
 ] as const;
+
+// The owner sees the same label as in setup, not the IANA id (#149); a fuso
+// outside the list falls back to its id.
+export function timezoneLabel(timeZone: string): string {
+  return TIMEZONE_OPTIONS.find((option) => option.value === timeZone)?.label ?? timeZone;
+}

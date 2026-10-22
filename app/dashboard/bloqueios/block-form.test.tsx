@@ -22,6 +22,13 @@ beforeEach(() => {
 });
 
 describe("criação de bloqueio", () => {
+  it("mostra o fuso com o mesmo rótulo do setup, não o id IANA (#149)", () => {
+    render(<BlockForm timezone="America/Sao_Paulo" />);
+
+    expect(screen.getByText("Horários no fuso do negócio: Brasília / São Paulo (GMT−3).")).toBeInTheDocument();
+    expect(screen.queryByText(/America\/Sao_Paulo/)).not.toBeInTheDocument();
+  });
+
   it("mantém início, fim e motivo depois de um conflito (#148)", async () => {
     mockedCreate.mockResolvedValueOnce({
       ok: false,

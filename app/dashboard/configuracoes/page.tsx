@@ -46,16 +46,8 @@ export default async function ConfiguracoesPage({
         }}
       />
 
-      <PlanSection business={{ id: business.id, plan: business.plan }} />
-
-      <GoogleCalendarSection connection={googleCalendar} isPro={isProPlan(business.plan)} callbackStatus={calendar} />
-
-      <section className="space-y-2">
-        <h2 className="text-xl font-semibold">Segurança da conta</h2>
-        <p className="text-muted-foreground">Ative a autenticação em duas etapas com um aplicativo autenticador.</p>
-        <Link href="/mfa" className="inline-block text-sm underline">Configurar autenticação em duas etapas</Link>
-      </section>
-
+      {/* Para um negócio novo, a disponibilidade é o passo que libera as
+          reservas, então vem logo depois dos dados do negócio (#149). */}
       <section id="disponibilidade" className="scroll-mt-20">
         <h2 className="text-xl font-semibold">Disponibilidade recorrente</h2>
         <p className="mt-1 text-muted-foreground">
@@ -77,6 +69,16 @@ export default async function ConfiguracoesPage({
             ))}
           </div>
         )}
+      </section>
+
+      <PlanSection business={{ id: business.id, plan: business.plan }} />
+
+      <GoogleCalendarSection connection={googleCalendar} isPro={isProPlan(business.plan)} callbackStatus={calendar} />
+
+      <section className="space-y-2">
+        <h2 className="text-xl font-semibold">Segurança da conta</h2>
+        <p className="text-muted-foreground">Ative a autenticação em duas etapas com um aplicativo autenticador.</p>
+        <Link href="/mfa" className="inline-block text-sm underline">Configurar autenticação em duas etapas</Link>
       </section>
     </div>
   );

@@ -27,50 +27,63 @@ import {
   type ActionResult,
 } from "@/lib/availability/actions";
 import { submitWithoutReset } from "@/lib/forms/submit-without-reset";
-
-// value is the DB weekday (Sunday=1 .. Saturday=7); only the name is shown.
-export const WEEKDAYS: { value: number; name: string }[] = [
-  { value: 1, name: "Domingo" },
-  { value: 2, name: "Segunda" },
-  { value: 3, name: "Terça" },
-  { value: 4, name: "Quarta" },
-  { value: 5, name: "Quinta" },
-  { value: 6, name: "Sexta" },
-  { value: 7, name: "Sábado" },
-];
+import { WEEKDAYS } from "@/lib/availability/weekdays";
 
 const INITIAL = { ok: true } as ActionResult;
 
 const WEEKDAY_ITEMS = Object.fromEntries(WEEKDAYS.map((d) => [String(d.value), d.name]));
 
+const DEFAULT_DAYS = [2];
+const WEEKDAYS_MON_FRI = [2, 3, 4, 5, 6];
+
 export function AvailabilityForm() {
   const [state, formAction, pending] = useActionState(setAvailability, INITIAL);
   const formRef = useRef<HTMLFormElement>(null);
+  // Vários dias de uma vez: segunda a sexta, 08–18, é um envio só (#149).
+  const [days, setDays] = useState<number[]>(DEFAULT_DAYS);
 
   // Back to the defaults only once the faixa was added; on error the fields
   // keep what was sent (#148).
   useEffect(() => {
-    if (state.ok && state !== INITIAL) formRef.current?.reset();
+    if (!state.ok || state === INITIAL) return;
+    formRef.current?.reset();
+    const resetDaysAfterRender = window.setTimeout(() => setDays(DEFAULT_DAYS), 0);
+    return () => window.clearTimeout(resetDaysAfterRender);
   }, [state]);
+
+  const toggleDay = (value: number, checked: boolean) =>
+    setDays((current) =>
+      checked ? [...current.filter((d) => d !== value), value] : current.filter((d) => d !== value),
+    );
 
   return (
     <form ref={formRef} onSubmit={submitWithoutReset(formAction)} className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="space-y-2">
-          <Label htmlFor="weekday">Dia da semana</Label>
-          <Select name="weekday" defaultValue="2" items={WEEKDAY_ITEMS}>
-            <SelectTrigger id="weekday">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {WEEKDAYS.map((d) => (
-                <SelectItem key={d.value} value={String(d.value)}>
-                  {d.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">Dias da semana</legend>
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
+          {WEEKDAYS.map((d) => (
+            <label key={d.value} className="flex min-h-6 items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="weekday"
+                value={d.value}
+                checked={days.includes(d.value)}
+                onChange={(e) => toggleDay(d.value, e.target.checked)}
+                className="size-4 shrink-0"
+              />
+              {d.name}
+            </label>
+          ))}
         </div>
+        <button
+          type="button"
+          onClick={() => setDays(WEEKDAYS_MON_FRI)}
+          className="inline-flex min-h-6 items-center px-1 text-sm text-muted-foreground underline hover:text-foreground"
+        >
+          Marcar segunda a sexta
+        </button>
+      </fieldset>
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="startTime">Início</Label>
           <Input id="startTime" name="startTime" type="time" defaultValue="08:00" required className="[color-scheme:dark]" />
@@ -81,8 +94,8 @@ export function AvailabilityForm() {
         </div>
       </div>
       {!state.ok && <p className="text-sm text-destructive">{state.message}</p>}
-      <Button type="submit" disabled={pending} size="sm">
-        {pending ? "Adicionando..." : "Adicionar faixa"}
+      <Button type="submit" disabled={pending || days.length === 0} size="sm">
+        {pending ? "Adicionando..." : days.length > 1 ? `Adicionar faixa em ${days.length} dias` : "Adicionar faixa"}
       </Button>
     </form>
   );

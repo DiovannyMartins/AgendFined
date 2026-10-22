@@ -6,6 +6,14 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -21,6 +29,7 @@ import { getBookingWindowLimitDays, type Plan } from "@/lib/plan/plan";
 import { trackAnalyticsEvent } from "@/lib/analytics";
 import { formatPhoneBR } from "@/lib/format/phone";
 import { APP_TIMEZONE, TIMEZONE_OPTIONS } from "@/lib/app-timezone";
+import { suggestSlug } from "@/lib/business/slug";
 
 const INITIAL: ActionResultState = { ok: true, data: undefined };
 
@@ -60,6 +69,11 @@ export function BusinessForm({
   const [state, setState] = useState<ActionResultState>(INITIAL);
   const [submitted, setSubmitted] = useState(false);
   const [pending, startTransition] = useTransition();
+  // During setup the slug follows the name until the owner edits it (#149).
+  const [slugEdited, setSlugEdited] = useState(false);
+  // A new slug changes the link printed on QR Codes and shared around, so the
+  // save waits for an explicit confirmation (#149).
+  const [slugChangeToConfirm, setSlugChangeToConfirm] = useState<BusinessFormValues | null>(null);
   const slug = typeof initial?.slug === "string" ? initial.slug : "";
   const creating = !slug;
   const plan: Plan = initial?.plan === "pro" ? "pro" : "free";
@@ -73,6 +87,7 @@ export function BusinessForm({
     handleSubmit,
     control,
     setFocus,
+    setValue,
     formState: { errors },
   } = useForm<BusinessFormValues>({
     resolver: zodResolver(businessFormSchema),
@@ -95,6 +110,14 @@ export function BusinessForm({
   const slugChanged = !creating && nextSlug !== slug;
 
   function onSubmit(values: BusinessFormValues) {
+    if (!creating && values.slug !== slug) {
+      setSlugChangeToConfirm(values);
+      return;
+    }
+    save(values);
+  }
+
+  function save(values: BusinessFormValues) {
     startTransition(async () => {
       const fd = new FormData();
       fd.set("name", values.name);
@@ -108,6 +131,11 @@ export function BusinessForm({
       const result = await (creating ? createBusiness : updateBusiness)(INITIAL, fd);
       setState(result);
       setSubmitted(true);
+      // The server refused the new fuso (reservas futuras): the selector goes
+      // back to the saved one instead of showing a value that was not kept (#149).
+      if (!result.ok && result.fieldErrors?.timezone?.length && initial?.timezone) {
+        setValue("timezone", initial.timezone);
+      }
       if (!result.ok) {
         const firstInvalid = FIELD_ORDER.find((field) => result.fieldErrors?.[field]?.length);
         if (firstInvalid) setFocus(firstInvalid);
@@ -165,7 +193,15 @@ export function BusinessForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="name">Nome do negócio</Label>
-              <Input id="name" {...fieldErrorProps("name")} {...register("name")} />
+              <Input
+                id="name"
+                {...fieldErrorProps("name")}
+                {...register("name", {
+                  onChange: (event) => {
+                    if (creating && !slugEdited) setValue("slug", suggestSlug(event.target.value));
+                  },
+                })}
+              />
               {renderFieldError("name")}
             </div>
             <div className="space-y-2">
@@ -175,7 +211,7 @@ export function BusinessForm({
                 placeholder="minha-barbearia"
                 autoComplete="off"
                 {...fieldErrorProps("slug", "slug-hint")}
-                {...register("slug")}
+                {...register("slug", { onChange: () => setSlugEdited(true) })}
               />
               <p id="slug-hint" className="text-xs text-muted-foreground">
                 Apenas minúsculas, números e hífen. Seu link: agendfined.com.br/{nextSlug.toLowerCase() || "seu-slug"}
@@ -284,6 +320,37 @@ export function BusinessForm({
             {pending ? "Salvando..." : slug ? "Salvar alterações" : "Criar meu negócio"}
           </Button>
         </form>
+        <Dialog
+          open={slugChangeToConfirm !== null}
+          onOpenChange={(open) => {
+            if (!open) setSlugChangeToConfirm(null);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Trocar o endereço público?</DialogTitle>
+              <DialogDescription>
+                Seu link passa a ser agendfined.com.br/{slugChangeToConfirm?.slug}. O endereço antigo
+                (agendfined.com.br/{slug}) redireciona para o novo, mas QR Codes impressos e links
+                divulgados no WhatsApp ou no Instagram continuam mostrando o endereço antigo. Atualize-os
+                quando puder.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSlugChangeToConfirm(null)}>
+                Manter o endereço atual
+              </Button>
+              <Button
+                onClick={() => {
+                  if (slugChangeToConfirm) save(slugChangeToConfirm);
+                  setSlugChangeToConfirm(null);
+                }}
+              >
+                Trocar endereço
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

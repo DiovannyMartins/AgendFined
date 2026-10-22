@@ -56,4 +56,30 @@ describe("StatusAction", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "Confirmar no-show" })).not.toBeInTheDocument());
     expect(updateBookingStatus).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["no_show", "Marcar como concluída", "completed"],
+    ["completed", "Marcar como no-show", "no_show"],
+  ])("lets the owner correct a %s reserva after confirming (#145)", async (status, confirmLabel, nextStatus) => {
+    vi.setSystemTime(new Date("2026-10-19T15:30:00.000Z"));
+    render(<StatusAction id="booking-1" status={status} startAt={START_AT} />);
+
+    expect(screen.queryByRole("button", { name: "Cancelar" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Corrigir status" }));
+    expect(updateBookingStatus).not.toHaveBeenCalled();
+
+    fireEvent.click(await screen.findByRole("button", { name: confirmLabel }));
+
+    await waitFor(() => expect(updateBookingStatus).toHaveBeenCalledTimes(1));
+    const formData = (updateBookingStatus.mock.calls[0] as unknown[])[1] as FormData;
+    expect(formData.get("id")).toBe("booking-1");
+    expect(formData.get("status")).toBe(nextStatus);
+  });
+
+  it("offers no action on a cancelled reserva", () => {
+    vi.setSystemTime(new Date("2026-10-19T15:30:00.000Z"));
+    const { container } = render(<StatusAction id="booking-1" status="cancelled" startAt={START_AT} />);
+
+    expect(container).toBeEmptyDOMElement();
+  });
 });

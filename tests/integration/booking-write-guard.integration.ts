@@ -159,6 +159,28 @@ describe("owner writes to reservas outside the Server Actions", () => {
     const { data } = await owner.from("bookings").select("status").eq("id", id).single();
     expect(data?.status).toBe("cancelled");
   });
+
+  it("can correct completed and no_show into each other, but not reopen them (#145)", async () => {
+    const owner = await anonClientForUser(EMAIL, PASSWORD);
+    const id = await createReserva();
+    const noShow = await owner.from("bookings").update({ status: "no_show" }).eq("id", id);
+    expect(noShow.error).toBeNull();
+
+    const completed = await owner.from("bookings").update({ status: "completed" }).eq("id", id).select("status");
+    expect(completed.error).toBeNull();
+    expect(completed.data).toEqual([{ status: "completed" }]);
+
+    const backToNoShow = await owner.from("bookings").update({ status: "no_show" }).eq("id", id).select("status");
+    expect(backToNoShow.error).toBeNull();
+    expect(backToNoShow.data).toEqual([{ status: "no_show" }]);
+
+    for (const status of ["confirmed", "cancelled"] as const) {
+      const { error } = await owner.from("bookings").update({ status }).eq("id", id);
+      expect(error).not.toBeNull();
+    }
+    const { data } = await owner.from("bookings").select("status").eq("id", id).single();
+    expect(data?.status).toBe("no_show");
+  });
 });
 
 describe("owner changes to the negócio outside the Server Actions", () => {

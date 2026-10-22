@@ -117,10 +117,24 @@ describe("updateBookingStatus", () => {
     vi.setSystemTime(new Date(START_AT));
     state.booking = { ...state.booking!, status: "completed" };
 
-    const result = await updateBookingStatus({ ok: true }, statusForm("no_show"));
+    const result = await updateBookingStatus({ ok: true }, statusForm("cancelled"));
 
-    expect(result).toEqual({ ok: false, message: 'Não é possível mudar de "Concluída" para "No-show".' });
+    expect(result).toEqual({ ok: false, message: 'Não é possível mudar de "Concluída" para "Cancelada".' });
     expect(state.updates).toEqual([]);
+  });
+
+  it.each([
+    ["no_show", "completed"],
+    ["completed", "no_show"],
+  ])("corrects %s to %s without emailing the cliente (#145)", async (from, to) => {
+    vi.setSystemTime(new Date("2026-10-19T15:20:00.000Z"));
+    state.booking = { ...state.booking!, status: from };
+
+    const result = await updateBookingStatus({ ok: true }, statusForm(to));
+
+    expect(result).toEqual({ ok: true });
+    expect(state.updates).toEqual([{ status: to }]);
+    expect(sendBusinessCancelledEmail).not.toHaveBeenCalled();
   });
 
   it("refuses a cancellation reason longer than the 250 characters the database accepts", async () => {

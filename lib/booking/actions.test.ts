@@ -230,6 +230,7 @@ describe("cancelPublicBooking", () => {
     state.rpcResults = { cancel_booking_by_public_code: { data: cancelledBooking, error: null } };
     sendCustomerCancelledEmail.mockClear();
     sendCustomerCancelledEmail.mockResolvedValue({ sent: true });
+    vi.mocked(syncGoogleCalendarBooking).mockClear();
   });
 
   afterEach(() => {
@@ -282,6 +283,20 @@ describe("cancelPublicBooking", () => {
 
     expect(result).toMatchObject({ status: "error", code: "INVALID_TOKEN" });
     expect(sendCustomerCancelledEmail).not.toHaveBeenCalled();
+  });
+
+  it("tells the cliente to talk to the negócio when the reserva has already started", async () => {
+    state.rpcResults.cancel_booking_by_public_code = { data: null, error: { message: "BOOKING_ALREADY_STARTED" } };
+
+    const result = await cancelPublicBooking({ status: "idle" }, cancelForm());
+
+    expect(result).toEqual({
+      status: "error",
+      code: "ALREADY_STARTED",
+      message: "Este horário já passou. Fale com o negócio.",
+    });
+    expect(sendCustomerCancelledEmail).not.toHaveBeenCalled();
+    expect(syncGoogleCalendarBooking).not.toHaveBeenCalled();
   });
 
   it("keeps the cancellation when the e-mail fails and logs it without the token", async () => {

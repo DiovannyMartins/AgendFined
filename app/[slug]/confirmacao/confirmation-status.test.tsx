@@ -31,6 +31,20 @@ describe("ConfirmationStatus", () => {
     expect(screen.getByText("Código da reserva")).toBeInTheDocument();
   });
 
+  // #141: cancelling after the start would erase a no-show.
+  it("does not offer cancellation for a confirmed booking that already started", () => {
+    render(
+      <ConfirmationStatus code="65925DBB" initialStatus="confirmed" started>
+        <p>detalhes</p>
+      </ConfirmationStatus>,
+    );
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Este horário já passou");
+    expect(screen.getByText(/fale com o negócio/i)).toBeInTheDocument();
+    expect(screen.queryByText("Reserva confirmada!")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "simular cancelamento" })).not.toBeInTheDocument();
+    expect(screen.getByText("Código da reserva")).toBeInTheDocument();
+  });
+
   it("does not offer cancellation for a booking that is no longer confirmed", () => {
     render(
       <ConfirmationStatus code="65925DBB" initialStatus="cancelled">

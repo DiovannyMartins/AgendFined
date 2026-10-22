@@ -1,7 +1,6 @@
 import type { Ref } from "react";
 import { CalendarCheck, CalendarX, CheckCircle2, XCircle, type LucideIcon } from "lucide-react";
-import { PUBLIC_STATUS_COPY, type PublicStatusTone } from "@/lib/bookings/public-status";
-import type { BookingStatus } from "@/lib/bookings/transitions";
+import { PUBLIC_STATUS_COPY, type PublicStatusTone, type PublicStatusView } from "@/lib/bookings/public-status";
 
 const TONE: Record<PublicStatusTone, { icon: LucideIcon; className: string }> = {
   success: { icon: CheckCircle2, className: "bg-green-100 text-green-700" },
@@ -16,7 +15,7 @@ export function PublicBookingStatus({
   status,
   headingRef,
 }: {
-  status: BookingStatus;
+  status: PublicStatusView;
   headingRef?: Ref<HTMLHeadingElement>;
 }) {
   const copy = PUBLIC_STATUS_COPY[status];

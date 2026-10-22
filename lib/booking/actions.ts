@@ -40,6 +40,7 @@ import {
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
 import { buildPrivateConfirmationUrl } from "@/lib/bookings/private-confirmation";
 import { buildPublicBookingUrl } from "@/lib/bookings/public-booking-url";
+import { BOOKING_ALREADY_STARTED_MESSAGE } from "@/lib/bookings/public-status";
 import { resolveAppOrigin } from "@/lib/app-origin";
 
 export type ActionResult = {
@@ -329,7 +330,11 @@ export async function consultBooking(
 export type CancelState =
   | { status: "idle" }
   | { status: "done" }
-  | { status: "error"; code: "INVALID_TOKEN" | "NOT_FOUND" | "NOT_CONFIRMED" | "DB_ERROR" | "RATE_LIMITED"; message: string };
+  | {
+      status: "error";
+      code: "INVALID_TOKEN" | "NOT_FOUND" | "NOT_CONFIRMED" | "DB_ERROR" | "RATE_LIMITED" | "ALREADY_STARTED";
+      message: string;
+    };
 
 export async function cancelPublicBooking(
   _prev: CancelState,
@@ -365,6 +370,10 @@ export async function cancelPublicBooking(
     p_cancel_reason: reason,
   });
 
+  // Only reached with a valid capability, so it reveals nothing new (#141).
+  if (error?.message.includes("BOOKING_ALREADY_STARTED")) {
+    return { status: "error", code: "ALREADY_STARTED", message: BOOKING_ALREADY_STARTED_MESSAGE };
+  }
   if (error) return cancellationRejected();
 
   // The RPC returns the row it just cancelled; it is the source of truth for

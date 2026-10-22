@@ -143,6 +143,44 @@ describe("cancel_booking_by_public_code (INC-3)", () => {
     expect(row?.status).toBe("confirmed");
   });
 
+  // A cliente who missed the visit must not erase the no-show by cancelling
+  // afterwards (#141). Only the token holder learns the reserva has started.
+  it("rejects cancelling a booking that has already started, keeping it confirmed", async () => {
+    const booking = await createBookingAt(futureSlot(0, 17), "+5511980000005");
+    const startAt = new Date(Date.now() - 60 * 60_000);
+    const { error: moveError } = await admin
+      .from("bookings")
+      .update({ start_at: startAt.toISOString(), end_at: new Date(startAt.getTime() + 30 * 60_000).toISOString() })
+      .eq("id", booking.id);
+    expect(moveError).toBeNull();
+
+    const { error } = await admin.rpc("cancel_booking_by_public_code", {
+      p_code: booking.public_code,
+      p_cancel_token_hash: CANCEL_TOKEN_HASH,
+      p_cancel_reason: "Esqueci",
+    });
+    expect(error).not.toBeNull();
+    expect(String(error?.message)).toContain("BOOKING_ALREADY_STARTED");
+
+    const { data: row } = await admin.from("bookings").select("status, cancel_reason").eq("id", booking.id).single();
+    expect(row).toEqual({ status: "confirmed", cancel_reason: null });
+  });
+
+  it("still answers a started booking with the generic rejection when the capability is wrong", async () => {
+    const booking = await createBookingAt(futureSlot(0, 17, 30), "+5511980000006");
+    const startAt = new Date(Date.now() - 60 * 60_000);
+    await admin
+      .from("bookings")
+      .update({ start_at: startAt.toISOString(), end_at: new Date(startAt.getTime() + 30 * 60_000).toISOString() })
+      .eq("id", booking.id);
+
+    const { error } = await admin.rpc("cancel_booking_by_public_code", {
+      p_code: booking.public_code,
+      p_cancel_token_hash: "0".repeat(64),
+    });
+    expect(String(error?.message)).toContain("CANCELLATION_REJECTED");
+  });
+
   it("anon CANNOT execute the cancel RPC directly", async () => {
     const anon = anonClient();
     const { error } = await anon.rpc("cancel_booking_by_public_code", {

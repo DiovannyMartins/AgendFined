@@ -9,7 +9,7 @@ import { CurrentSlugRedirect } from "./current-slug-redirect";
 import { publicCodeSchema } from "@/lib/validation/schemas";
 import { enforceConfirmationRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
-import { publicDocumentTitle } from "@/lib/bookings/public-status";
+import { publicDocumentTitle, publicStatusView } from "@/lib/bookings/public-status";
 import { formatPhoneBR } from "@/lib/format/phone";
 import { ConfirmationLookupError } from "./confirmation-errors";
 
@@ -36,7 +36,9 @@ const loadConfirmation = cache(async (code: string) => {
 
   const booking = data?.[0];
   if (!booking) return { kind: "not_found" } as const;
-  return { kind: "found", code: parsedCode.data, booking } as const;
+  // Evaluated per request; the cancel RPC enforces the same rule (#141).
+  const started = Date.parse(booking.start_at) <= Date.now();
+  return { kind: "found", code: parsedCode.data, booking, started } as const;
 });
 
 type FoundConfirmation = Extract<Awaited<ReturnType<typeof loadConfirmation>>, { kind: "found" }>;
@@ -63,7 +65,7 @@ function ConfirmationContent({ found, slug }: { found: FoundConfirmation; slug: 
   return (
     <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-lg items-center justify-center px-4 py-12">
       <div className="w-full rounded-2xl border border-border bg-background p-8 text-center shadow-sm">
-        <ConfirmationStatus code={found.code} initialStatus={booking.status}>
+        <ConfirmationStatus code={found.code} initialStatus={booking.status} started={found.started}>
           <div className="mt-6 space-y-3 rounded-xl bg-muted/40 p-5 text-left">
             <div className="flex items-center gap-2 font-medium">
               <CalendarClock className="size-5 text-primary" />
@@ -101,7 +103,12 @@ type ConfirmationPageProps = {
 export async function generateMetadata({ searchParams }: ConfirmationPageProps): Promise<Metadata> {
   const { code } = await searchParams;
   const found = code ? await loadConfirmation(code) : null;
-  return { title: found?.kind === "found" ? publicDocumentTitle(found.booking.status) : "Reserva — AgendFined" };
+  return {
+    title:
+      found?.kind === "found"
+        ? publicDocumentTitle(publicStatusView(found.booking.status, found.started))
+        : "Reserva — AgendFined",
+  };
 }
 
 export default async function ConfirmationPage({ params, searchParams }: ConfirmationPageProps) {

@@ -18,11 +18,14 @@ const { CONFIRMATION_RATE_LIMITED, CONFIRMATION_UNAVAILABLE, ConfirmationLookupE
   "./confirmation-errors"
 );
 
-function bookingRow(status: string) {
+const FUTURE_START = new Date(Date.now() + 7 * 24 * 60 * 60_000);
+const PAST_START = new Date(Date.now() - 60 * 60_000);
+
+function bookingRow(status: string, startAt = FUTURE_START) {
   return {
     service_name: "Corte",
-    start_at: "2026-09-01T20:00:00.000Z",
-    end_at: "2026-09-01T20:30:00.000Z",
+    start_at: startAt.toISOString(),
+    end_at: new Date(startAt.getTime() + 30 * 60_000).toISOString(),
     business_name: "Barbearia Demo",
     business_slug: "barbearia",
     business_phone: "+5511987654321",
@@ -50,6 +53,15 @@ describe("confirmation page <title>", () => {
     const metadata = await generateMetadata(props("65925DBB"));
 
     expect(metadata.title).toBe(title);
+  });
+
+  // #141: a confirmed reserva that already started is no longer a guaranteed slot.
+  it("says the horário has passed for a confirmed booking that already started", async () => {
+    rpc.mockResolvedValue({ data: [bookingRow("confirmed", PAST_START)], error: null });
+
+    const metadata = await generateMetadata(props("65925DBB"));
+
+    expect(metadata.title).toBe("Este horário já passou — AgendFined");
   });
 
   it("never claims a confirmed booking when the code resolves to nothing", async () => {

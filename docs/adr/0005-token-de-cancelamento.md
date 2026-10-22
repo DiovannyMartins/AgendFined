@@ -4,7 +4,7 @@
 
 O cancelamento self-service usa uma capability própria: na criação da reserva, a Server Action gera 32 bytes aleatórios (base64url), calcula o SHA-256 e passa só o digest para a RPC de criação, que o grava em `bookings.cancel_token_hash`. O token bruto é devolvido uma única vez ao navegador e vai no link do e-mail de confirmação. A conversão da lista de espera em reserva segue o mesmo contrato.
 
-A RPC de cancelamento, restrita à service role, exige o digest e o compara na mesma transação com lock que muda o status. Todas as falhas têm a mesma resposta genérica.
+A RPC de cancelamento, restrita à service role, exige o digest e o compara na mesma transação com lock que muda o status. Todas as falhas têm a mesma resposta genérica. A única exceção vem depois de o digest bater: uma reserva confirmada cujo `start_at` já passou é recusada com `BOOKING_ALREADY_STARTED` (#141), que só revela algo a quem já detém o token, e preserva o no-show para o negócio registrar.
 
 ## Alternativas consideradas
 

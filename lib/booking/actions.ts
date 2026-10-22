@@ -33,6 +33,7 @@ import { assertProPlan, getEffectiveBookingWindowDays } from "@/lib/plan/plan";
 import type { Plan } from "@/lib/plan/plan";
 import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
 import { sendCustomerCancelledEmail } from "@/lib/email/booking-cancellation";
+import { notifyOwner } from "@/lib/bookings/owner-notification";
 import {
   classifyCancellationReason,
   classifyCustomerNote,
@@ -215,21 +216,36 @@ export async function createBooking(input: {
   }
 
   if (data?.id && data.public_code) {
-    const emailResult = await sendBookingConfirmationEmail({
-      customerName: parsed.data.customerName,
-      customerEmail: parsed.data.customerEmail,
-      businessName: business.name,
-      serviceName: service.name,
-      startAt: startAtIso,
-      timezone: business.timezone,
-      publicCode: data.public_code,
-      confirmationUrl: buildPrivateConfirmationUrl(
-        resolveAppOrigin(),
-        input.slug,
-        data.public_code,
-        cancelToken,
-      ),
-    });
+    // The dono hears about the reserva in parallel with the cliente's
+    // confirmação; notifyOwner never throws (#146).
+    const [emailResult] = await Promise.all([
+      sendBookingConfirmationEmail({
+        customerName: parsed.data.customerName,
+        customerEmail: parsed.data.customerEmail,
+        businessName: business.name,
+        serviceName: service.name,
+        startAt: startAtIso,
+        timezone: business.timezone,
+        publicCode: data.public_code,
+        confirmationUrl: buildPrivateConfirmationUrl(
+          resolveAppOrigin(),
+          input.slug,
+          data.public_code,
+          cancelToken,
+        ),
+      }),
+      notifyOwner(admin, "new_booking", {
+        bookingId: data.id,
+        ownerId: business.owner_id,
+        businessName: business.name,
+        customerName: parsed.data.customerName,
+        customerPhone: parsed.data.customerPhone,
+        serviceName: service.name,
+        startAt: startAtIso,
+        timezone: business.timezone,
+        publicCode: data.public_code,
+      }),
+    ]);
     if (!emailResult.sent) {
       console.error("booking_confirmation_email_failed", {
         bookingId: data.id,
@@ -394,7 +410,7 @@ export async function cancelPublicBooking(
     console.error("google_calendar_booking_sync_failed", { bookingId: cancelled.id, reason: syncError instanceof Error ? syncError.message : "unknown" });
   }
 
-  await notifyCustomerCancelled(supabase, cancelled);
+  await notifyCancellation(supabase, cancelled);
 
   if (reason) {
     const judgment = await classifyCancellationReason(reason);
@@ -409,38 +425,53 @@ export async function cancelPublicBooking(
   return { status: "done" };
 }
 
-// Only called for a cancellation that really happened. Best effort, like the
-// confirmação: no failure here (missing negócio, provider error or an
-// exception) ever undoes the cancellation; it is only logged. The e-mail never
+// Only called for a cancellation that really happened: e-mails the cliente
+// (when the reserva has an e-mail) and tells the dono (#146). Best effort, like
+// the confirmação: no failure here (missing negócio, provider error or an
+// exception) ever undoes the cancellation; it is only logged. Neither e-mail
 // carries the token, the private link or the cancel reason.
-async function notifyCustomerCancelled(
+async function notifyCancellation(
   supabase: ServerClient,
   cancelled: Database["public"]["Functions"]["cancel_booking_by_public_code"]["Returns"],
 ): Promise<void> {
-  if (!cancelled.customer_email_snapshot) return;
-
   const logFailure = (reason: string) =>
     console.error("booking_cancellation_email_failed", { bookingId: cancelled.id, reason });
 
   try {
     const { data: business } = await supabase
       .from("businesses")
-      .select("name, slug, timezone")
+      .select("name, slug, timezone, owner_id")
       .eq("id", cancelled.business_id)
       .maybeSingle();
     if (!business) return logFailure("business_not_found");
 
-    const emailResult = await sendCustomerCancelledEmail({
-      customerName: cancelled.customer_name_snapshot,
-      customerEmail: cancelled.customer_email_snapshot,
-      businessName: business.name,
-      serviceName: cancelled.service_name_snapshot,
-      startAt: cancelled.start_at,
-      timezone: business.timezone,
-      publicCode: cancelled.public_code,
-      rebookUrl: buildPublicBookingUrl(resolveAppOrigin(), business.slug),
-    });
-    if (!emailResult.sent) logFailure(emailResult.reason);
+    const customerEmail = cancelled.customer_email_snapshot;
+    const [emailResult] = await Promise.all([
+      customerEmail
+        ? sendCustomerCancelledEmail({
+            customerName: cancelled.customer_name_snapshot,
+            customerEmail,
+            businessName: business.name,
+            serviceName: cancelled.service_name_snapshot,
+            startAt: cancelled.start_at,
+            timezone: business.timezone,
+            publicCode: cancelled.public_code,
+            rebookUrl: buildPublicBookingUrl(resolveAppOrigin(), business.slug),
+          })
+        : null,
+      notifyOwner(supabase, "customer_cancelled", {
+        bookingId: cancelled.id,
+        ownerId: business.owner_id,
+        businessName: business.name,
+        customerName: cancelled.customer_name_snapshot,
+        customerPhone: cancelled.customer_phone_snapshot,
+        serviceName: cancelled.service_name_snapshot,
+        startAt: cancelled.start_at,
+        timezone: business.timezone,
+        publicCode: cancelled.public_code,
+      }),
+    ]);
+    if (emailResult && !emailResult.sent) logFailure(emailResult.reason);
   } catch {
     logFailure("unexpected_error");
   }
@@ -552,6 +583,7 @@ export async function joinWaitlist(input: {
 // admin client and the resolved business, or an `ActionResult` error to surface.
 type ResolvedBusiness = {
   id: string;
+  owner_id: string;
   name: string;
   plan: Plan | null;
   slot_interval_minutes: number;

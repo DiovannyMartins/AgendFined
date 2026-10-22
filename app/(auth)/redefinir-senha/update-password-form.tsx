@@ -70,7 +70,7 @@ export function UpdatePasswordForm() {
             <p className="text-muted-foreground">Redirecionando para o painel...</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+          <form method="post" onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
             <div className="space-y-2">
               <label htmlFor="password" className="text-sm font-medium">
                 Nova senha

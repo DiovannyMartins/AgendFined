@@ -113,6 +113,31 @@ describe("updateBookingStatus", () => {
     expect(state.booking?.status).toBe(status);
   });
 
+  it("names both statuses in pt-BR when the transition is not allowed", async () => {
+    vi.setSystemTime(new Date(START_AT));
+    state.booking = { ...state.booking!, status: "completed" };
+
+    const result = await updateBookingStatus({ ok: true }, statusForm("no_show"));
+
+    expect(result).toEqual({ ok: false, message: 'Não é possível mudar de "Concluída" para "No-show".' });
+    expect(state.updates).toEqual([]);
+  });
+
+  it("refuses a cancellation reason longer than the 250 characters the database accepts", async () => {
+    vi.setSystemTime(new Date("2026-10-17T12:00:00.000Z"));
+    const overLimit = statusForm("cancelled");
+    overLimit.set("cancelReason", "a".repeat(251));
+    const atLimit = statusForm("cancelled");
+    atLimit.set("cancelReason", "a".repeat(250));
+
+    expect(await updateBookingStatus({ ok: true }, overLimit)).toEqual({
+      ok: false,
+      message: "O motivo do cancelamento é muito longo.",
+    });
+    expect(state.updates).toEqual([]);
+    expect(await updateBookingStatus({ ok: true }, atLimit)).toEqual({ ok: true });
+  });
+
   it("still cancels a reserva that has not started", async () => {
     vi.setSystemTime(new Date("2026-10-17T12:00:00.000Z"));
 

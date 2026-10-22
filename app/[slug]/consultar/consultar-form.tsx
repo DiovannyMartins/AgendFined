@@ -14,6 +14,7 @@ import { consultBooking } from "@/lib/booking/actions";
 import type { ConsultState } from "@/lib/bookings/lookup";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { formatPhoneBR } from "@/lib/format/phone";
+import { TimezoneNotice } from "@/components/timezone-notice";
 
 const INITIAL: ConsultState = { status: "idle" };
 
@@ -69,6 +70,7 @@ function ConsultarFormInner({ slug, timezone, onReset }: { slug: string; timezon
           <p className="text-sm text-muted-foreground">
             {dateStr} · às {timeStr}
           </p>
+          <TimezoneNotice timezone={bookingTimezone} at={booking.startAt} />
           <div className="border-t border-border pt-3">
             <p className="text-sm font-medium">{booking.businessName}</p>
             <p className="text-sm text-muted-foreground">

@@ -6,13 +6,15 @@
 // marking each one sent afterwards so a scheduling tick never re-sends.
 //
 // Lead rule (per product decision): ONE reminder, sent when the appointment is
-// within 24 hours of now (and still in the future). `start_at` is stored in UTC;
+// within 24 hours of now (and still in the future). A reserva created inside
+// that window is never reminded: the RPC skips it, since its confirmação por
+// e-mail went out moments ago (#144). `start_at` is stored in UTC;
 // comparisons use UTC `now`, and the rendered date/time is shown in
 // the app timezone.
 
 export const REMINDER_LEAD_MINUTES = 24 * 60;
 
-import { formatWhen } from "@/lib/format/when";
+import { formatWhenWithTimezone } from "@/lib/format/when";
 
 export type ReminderCandidateRow = {
   id: string;
@@ -56,7 +58,7 @@ export function prepareReminderEmails(
 
 export function buildReminderEmail(row: ReminderCandidateRow): ReminderEmail {
   const to = row.customer_email_snapshot!;
-  const when = formatWhen(row.start_at, row.business_timezone);
+  const when = formatWhenWithTimezone(row.start_at, row.business_timezone);
   return {
     bookingId: row.id,
     to,

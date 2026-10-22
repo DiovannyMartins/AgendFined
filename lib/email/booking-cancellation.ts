@@ -1,6 +1,6 @@
 import { formatPublicCode } from "@/lib/bookings/public-code";
 import { escapeHtml, sendEmail, type SendResult } from "@/lib/email/resend";
-import { formatWhen } from "@/lib/format/when";
+import { formatWhenWithTimezone } from "@/lib/format/when";
 
 // Sent when a reserva is cancelled, either by the negócio from the dashboard or
 // by the cliente through the private cancellation link. It deliberately carries
@@ -123,7 +123,7 @@ function buildBookingCancellationHtml(input: BookingCancellation, wording: Wordi
 }
 
 async function sendCancellationEmail(input: BookingCancellation, wording: Wording): Promise<SendResult> {
-  const formattedWhen = formatWhen(input.startAt, input.timezone);
+  const formattedWhen = formatWhenWithTimezone(input.startAt, input.timezone);
   const text = [
     `Olá, ${input.customerName}!`,
     "",

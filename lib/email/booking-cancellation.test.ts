@@ -35,7 +35,7 @@ describe("sendBusinessCancelledEmail", () => {
     expect(request.text).toContain("Ana & João <cliente>");
     expect(request.text).toContain("Barbearia \"Demo\" cancelou a sua reserva");
     expect(request.text).toContain("Corte <premium>");
-    expect(request.text).toContain("10/05/2026 às 15:00");
+    expect(request.text).toContain("10/05/2026 às 15:00 (horário de Brasília, UTC−3)");
     expect(request.text).toContain("6592-5DBB");
     expect(request.text).toContain(input.rebookUrl);
     expect(request.html).toContain("CANCELAMENTO DE RESERVA");

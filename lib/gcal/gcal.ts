@@ -7,6 +7,9 @@
 // grow alongside without changing these exports.
 
 export type GcalBooking = {
+  // The reserva id: a stable UID, so renaming the serviço and importing again
+  // updates the event instead of duplicating it.
+  uid?: string;
   summary: string;
   startAt: string; // ISO-8601 UTC instant
   endAt: string; // ISO-8601 UTC instant
@@ -17,7 +20,8 @@ export type GcalBooking = {
 
 // A multi-event VCALENDAR feed (e.g. the business's active upcoming bookings),
 // for the owner to import into their own calendar. Each event carries a
-// deterministic UID so importing the same reservations twice does not duplicate.
+// deterministic UID (the reserva id when given) so importing the same
+// reservations twice does not duplicate.
 export function buildIcsFeed(bookings: GcalBooking[]): string {
   const events = bookings.flatMap(buildSingleEvent);
   return [...calendarHeader(), ...events, "END:VCALENDAR"].join("\r\n");
@@ -26,7 +30,7 @@ export function buildIcsFeed(bookings: GcalBooking[]): string {
 function buildSingleEvent(b: GcalBooking): string[] {
   return [
     "BEGIN:VEVENT",
-    `UID:agendfined-${toGcalUtc(b.startAt)}-${escapeText(b.summary)}`,
+    `UID:${b.uid ? `${escapeText(b.uid)}@agendfined` : `agendfined-${toGcalUtc(b.startAt)}-${escapeText(b.summary)}`}`,
     `DTSTAMP:${toGcalUtc(new Date().toISOString())}`,
     `DTSTART:${toGcalUtc(b.startAt)}`,
     `DTEND:${toGcalUtc(b.endAt)}`,

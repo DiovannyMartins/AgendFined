@@ -149,7 +149,7 @@ describe("INC-3 exportação de agenda: gate de plano (free negado, pro liberado
       fetchBookings: async (businessId) => {
         const { data, error } = await proOwner
           .from("bookings")
-          .select("id, status, start_at, end_at, service_name_snapshot")
+          .select("id, status, start_at, end_at, service_name_snapshot, customer_name_snapshot, customer_phone_snapshot, customer_note")
           .eq("business_id", businessId);
         if (error) throw new Error(error.message);
         return (data ?? []) as unknown as GcalExportBooking[];
@@ -160,7 +160,8 @@ describe("INC-3 exportação de agenda: gate de plano (free negado, pro liberado
       expect(result.count).toBe(1);
       expect(result.icsFeed).toContain("BEGIN:VCALENDAR");
       expect(result.icsFeed).toContain("END:VCALENDAR");
-      expect(result.icsFeed).toContain("SUMMARY:Corte Pro");
+      expect(result.icsFeed).toContain("SUMMARY:Corte Pro — Cliente");
+      expect(result.icsFeed).toContain("Telefone: (11) 99000-0001");
     }
   });
 });

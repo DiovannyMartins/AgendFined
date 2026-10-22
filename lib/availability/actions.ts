@@ -272,8 +272,9 @@ export async function getSlotsForDate(
     .from("businesses")
     .select("id, is_active, slot_interval_minutes, min_notice_minutes, booking_window_days, plan, timezone")
     .eq("id", businessId)
-    .single();
+    .maybeSingle();
 
+  // maybeSingle: a missing row is "not found", only a real failure is db_error.
   if (businessError) return { available: [], error: "db_error" };
   if (!business || !business.is_active) return { available: [], error: "not_found" };
 
@@ -283,7 +284,7 @@ export async function getSlotsForDate(
     .eq("id", serviceId)
     .eq("business_id", businessId)
     .eq("is_active", true)
-    .single();
+    .maybeSingle();
 
   if (serviceError) return { available: [], error: "db_error" };
   if (!service) return { available: [], error: "service_not_found" };

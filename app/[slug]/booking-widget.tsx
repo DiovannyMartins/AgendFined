@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { TurnstileWidget } from "@/components/turnstile-widget";
+import { TimezoneNotice } from "@/components/timezone-notice";
 import { createBooking, joinWaitlist } from "@/lib/booking/actions";
 import { getSlotsForDate } from "@/lib/availability/actions";
 import { lastBookableDate, toLocalDate } from "@/lib/booking/availability";
@@ -24,6 +25,8 @@ type FieldErrors = Partial<Record<CustomerField, string>>;
 // it so the customer can fix the form and retry. `slot_taken` has its own branch.
 const SLOT_GONE_CODES = new Set(["no_availability", "booking_window", "service_not_found"]);
 const SLOT_TAKEN_MESSAGE = "Esse horário acabou de ser reservado. Escolha outro.";
+const SERVICE_GONE_MESSAGE = "Este serviço não está mais disponível. Escolha outro.";
+const CONNECTION_ERROR_MESSAGE ="Não foi possível concluir. Verifique sua conexão e tente novamente.";
 
 type ServiceOption = {
   id: string;
@@ -161,6 +164,8 @@ export function BookingWidget({
               ? "Esta data está fora da janela de reservas do negócio. Escolha outra."
             : res.error === "validation"
               ? "Não foi possível consultar esta data. Confira a data escolhida e tente novamente."
+            : res.error === "service_not_found"
+              ? SERVICE_GONE_MESSAGE
             : res.error
               ? "Não foi possível encontrar este serviço ou negócio."
               : null,
@@ -190,18 +195,27 @@ export function BookingWidget({
     setSubmitting(true);
     setError(null);
     setFieldErrors({});
-    const result = await createBooking({
-      slug,
-      serviceId,
-      date,
-      startTime: slot,
-      customerName,
-      customerPhone,
-      customerEmail: customerEmail || undefined,
-      customerNote: customerNote || undefined,
-      cfTurnstileToken: turnstileToken || undefined,
-    });
-    setSubmitting(false);
+    let result: Awaited<ReturnType<typeof createBooking>>;
+    try {
+      result = await createBooking({
+        slug,
+        serviceId,
+        date,
+        startTime: slot,
+        customerName,
+        customerPhone,
+        customerEmail: customerEmail || undefined,
+        customerNote: customerNote || undefined,
+        cfTurnstileToken: turnstileToken || undefined,
+      });
+    } catch {
+      // The action threw (network drop, 500): the token may already be spent.
+      setError(CONNECTION_ERROR_MESSAGE);
+      resetTurnstile();
+      return;
+    } finally {
+      setSubmitting(false);
+    }
     if (result.ok && result.publicCode && result.cancelToken) {
       trackAnalyticsEvent("booking_complete", { method: "public_form" });
       router.push(buildPrivateConfirmationPath(slug, result.publicCode, result.cancelToken));
@@ -239,17 +253,25 @@ export function BookingWidget({
     setWaitlistBusy(true);
     setError(null);
     setFieldErrors({});
-    const res = await joinWaitlist({
-      slug,
-      serviceId,
-      date: lastAttempt.date,
-      startTime: lastAttempt.startTime,
-      customerName,
-      customerPhone,
-      customerEmail: customerEmail || undefined,
-      cfTurnstileToken: turnstileToken || undefined,
-    });
-    setWaitlistBusy(false);
+    let res: Awaited<ReturnType<typeof joinWaitlist>>;
+    try {
+      res = await joinWaitlist({
+        slug,
+        serviceId,
+        date: lastAttempt.date,
+        startTime: lastAttempt.startTime,
+        customerName,
+        customerPhone,
+        customerEmail: customerEmail || undefined,
+        cfTurnstileToken: turnstileToken || undefined,
+      });
+    } catch {
+      setError(CONNECTION_ERROR_MESSAGE);
+      resetTurnstile();
+      return;
+    } finally {
+      setWaitlistBusy(false);
+    }
     if (res.ok) {
       setWaitlistOffered(false);
       setWaitlistSubmitted(res.message ?? "Você entrou na lista de espera deste horário.");
@@ -315,6 +337,7 @@ export function BookingWidget({
 
         <fieldset className="space-y-2">
           <legend className="mb-2 text-sm leading-none font-medium">Horários disponíveis</legend>
+          <TimezoneNotice timezone={timezone} />
           {/* One live region announces every change of the slot list; each
               message shows once (the slot count is for screen readers only). */}
           <div aria-live="polite" aria-atomic="true" className="text-sm">

@@ -224,17 +224,27 @@ export const publicBookingSchema = bookingSchema.extend({
 });
 export type PublicBookingInput = z.infer<typeof publicBookingSchema>;
 
+// A real calendar date "YYYY-MM-DD" (2026-02-30 is rejected).
+const calendarDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida.")
+  .refine((value) => {
+    const [year, month, day] = value.split("-").map(Number);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+  }, "Data inválida.");
+
 export const publicAvailabilitySchema = z.object({
   businessId: z.string().uuid(),
   serviceId: z.string().uuid(),
-  date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida.")
-    .refine((value) => {
-      const [year, month, day] = value.split("-").map(Number);
-      const parsed = new Date(Date.UTC(year, month - 1, day));
-      return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
-    }, "Data inválida."),
+  date: calendarDateSchema,
+});
+
+// The business-local date + start time the public page sends. Checked before
+// it is converted to a UTC instant, which would throw on a malformed value.
+export const publicSlotSchema = z.object({
+  date: calendarDateSchema,
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Horário inválido."),
 });
 
 export const bookingStatusSchema = z.enum(["confirmed", "completed", "cancelled", "no_show"]);

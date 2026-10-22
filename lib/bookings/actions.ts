@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { canTransition, isTooEarlyFor, type BookingStatus } from "@/lib/bookings/transitions";
 import { bookingStatusSchema } from "@/lib/validation/schemas";
 import { classifyCancellationReason } from "@/lib/bookings/classification";
+import { statusLabel } from "@/lib/bookings/status";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
 import { sendBusinessCancelledEmail } from "@/lib/email/booking-cancellation";
 import { buildPublicBookingUrl } from "@/lib/bookings/public-booking-url";
@@ -26,7 +27,8 @@ export async function updateBookingStatus(
   if (!nextStatus) {
     return { ok: false, message: "Status inválido." };
   }
-  if (cancelReasonValue.length > 500) return { ok: false, message: "O motivo do cancelamento é muito longo." };
+  // Same limit as bookings.cancel_reason and the agenda input.
+  if (cancelReasonValue.length > 250) return { ok: false, message: "O motivo do cancelamento é muito longo." };
 
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, message: "Configure seu negócio primeiro." };
@@ -44,7 +46,7 @@ export async function updateBookingStatus(
 
   const current = booking.status as BookingStatus;
   if (!canTransition(current, nextStatus)) {
-    return { ok: false, message: `Não é possível mudar de "${current}" para "${nextStatus}".` };
+    return { ok: false, message: `Não é possível mudar de "${statusLabel(current).label}" para "${statusLabel(nextStatus).label}".` };
   }
   if (isTooEarlyFor(nextStatus, booking.start_at, new Date())) {
     return { ok: false, message: "Só é possível marcar após o início do atendimento." };

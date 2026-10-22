@@ -11,6 +11,7 @@ import { enforceConfirmationRateLimit, getClientIp } from "@/lib/booking/rate-li
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { publicDocumentTitle, publicStatusView } from "@/lib/bookings/public-status";
 import { formatPhoneBR } from "@/lib/format/phone";
+import { TimezoneNotice } from "@/components/timezone-notice";
 import { ConfirmationLookupError } from "./confirmation-errors";
 
 // Shared by generateMetadata and the page within one request, so the lookup
@@ -74,6 +75,7 @@ function ConfirmationContent({ found, slug }: { found: FoundConfirmation; slug: 
             <p className="text-sm text-muted-foreground">
               {dateStr} · às {timeStr}
             </p>
+            <TimezoneNotice timezone={booking.business_timezone ?? APP_TIMEZONE} at={booking.start_at} />
             <div className="border-t border-border pt-3">
               <p className="text-sm font-medium">{booking.business_name}</p>
               <p className="text-sm text-muted-foreground">

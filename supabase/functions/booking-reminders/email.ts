@@ -41,8 +41,35 @@ function formatWhen(iso: string, timezone = "America/Sao_Paulo"): string {
   return `${value("day")}/${value("month")}/${value("year")} às ${value("hour")}:${value("minute")}`;
 }
 
+// Deno twin of formatWhenWithTimezone (lib/format/when.ts), which this function
+// cannot import: "20/10/2026 às 10:00 (horário de Manaus, UTC−4)".
+const TIMEZONE_CITY: Record<string, string | null> = {
+  "America/Sao_Paulo": "Brasília",
+  "America/Cuiaba": "Cuiabá",
+  "America/Manaus": "Manaus",
+  "America/Rio_Branco": "Rio Branco",
+  "America/Noronha": "Fernando de Noronha",
+  UTC: null,
+  "Europe/Lisbon": "Lisboa",
+  "America/New_York": "Nova York",
+};
+
+function formatWhenWithTimezone(iso: string, timezone = "America/Sao_Paulo"): string {
+  const offset = (
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone, timeZoneName: "shortOffset" })
+      .formatToParts(new Date(iso))
+      .find((part) => part.type === "timeZoneName")?.value ?? "GMT"
+  )
+    .replace(/^GMT(?:[+-]0)?$/, "GMT")
+    .replace("GMT", "UTC")
+    .replace("-", "−");
+  const fallbackCity = timezone.includes("/") ? (timezone.split("/").pop() ?? "").replaceAll("_", " ") : null;
+  const city = timezone in TIMEZONE_CITY ? TIMEZONE_CITY[timezone] : fallbackCity || null;
+  return `${formatWhen(iso, timezone)} (${city ? `horário de ${city}, ${offset}` : offset})`;
+}
+
 export function buildReminderEmail(candidate: ReminderCandidate): ReminderEmail {
-  const when = formatWhen(candidate.start_at, candidate.business_timezone);
+  const when = formatWhenWithTimezone(candidate.start_at, candidate.business_timezone);
   const customerName = escapeHtml(candidate.customer_name_snapshot);
   const businessName = escapeHtml(candidate.business_name);
   const serviceName = escapeHtml(candidate.service_name_snapshot);

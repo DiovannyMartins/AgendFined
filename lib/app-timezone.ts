@@ -10,13 +10,14 @@ export function isValidTimeZone(timeZone: string): boolean {
   }
 }
 
+// `city` names the fuso for the cliente: "Horários no fuso de Manaus (UTC−4)".
 export const TIMEZONE_OPTIONS = [
-  { value: "America/Sao_Paulo", label: "Brasília / São Paulo (GMT−3)" },
-  { value: "America/Cuiaba", label: "Cuiabá (GMT−4)" },
-  { value: "America/Manaus", label: "Manaus (GMT−4)" },
-  { value: "America/Rio_Branco", label: "Rio Branco (GMT−5)" },
-  { value: "America/Noronha", label: "Fernando de Noronha (GMT−2)" },
-  { value: "UTC", label: "UTC" },
-  { value: "Europe/Lisbon", label: "Lisboa (GMT+0; GMT+1 no verão)" },
-  { value: "America/New_York", label: "Nova York (GMT−5; GMT−4 no verão)" },
+  { value: "America/Sao_Paulo", city: "Brasília", label: "Brasília / São Paulo (GMT−3)" },
+  { value: "America/Cuiaba", city: "Cuiabá", label: "Cuiabá (GMT−4)" },
+  { value: "America/Manaus", city: "Manaus", label: "Manaus (GMT−4)" },
+  { value: "America/Rio_Branco", city: "Rio Branco", label: "Rio Branco (GMT−5)" },
+  { value: "America/Noronha", city: "Fernando de Noronha", label: "Fernando de Noronha (GMT−2)" },
+  { value: "UTC", city: null, label: "UTC" },
+  { value: "Europe/Lisbon", city: "Lisboa", label: "Lisboa (GMT+0; GMT+1 no verão)" },
+  { value: "America/New_York", city: "Nova York", label: "Nova York (GMT−5; GMT−4 no verão)" },
 ] as const;

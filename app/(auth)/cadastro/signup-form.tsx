@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -10,12 +11,14 @@ import { signup, type ActionResult } from "@/lib/auth/actions";
 import { useAuthTurnstile } from "@/components/auth-turnstile";
 import { signupSchema, type SignupInput } from "@/lib/validation/schemas";
 import { trackAnalyticsEvent } from "@/lib/analytics";
+import { ResendConfirmation } from "../resend-confirmation";
 
 const INITIAL: ActionResult = { ok: true, data: undefined };
 
 export function SignupForm() {
   const [state, setState] = useState<ActionResult>(INITIAL);
   const [submitted, setSubmitted] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState("");
   const [pending, startTransition] = useTransition();
   const captcha = useAuthTurnstile();
   const {
@@ -26,6 +29,7 @@ export function SignupForm() {
   } = useForm<SignupInput>({ resolver: zodResolver(signupSchema) });
 
   function onSubmit(values: SignupInput) {
+    setSubmittedEmail(values.email);
     startTransition(async () => {
       const fd = new FormData();
       fd.set("displayName", values.displayName);
@@ -58,6 +62,22 @@ export function SignupForm() {
             <p className="text-muted-foreground">
               Verifique seu e-mail para confirmar o cadastro e depois faça login.
             </p>
+            {/* With confirmations on, Supabase answers an existing e-mail with
+                the same success and sends nothing, so point those owners to
+                login and recovery instead. */}
+            <p className="text-muted-foreground">
+              Já tinha conta com esse e-mail?{" "}
+              <Link href="/login" className="underline underline-offset-4">
+                Entre
+              </Link>{" "}
+              ou{" "}
+              <Link href="/recuperar-senha" className="underline underline-offset-4">
+                recupere a senha
+              </Link>
+              .
+            </p>
+            {captcha.widget}
+            <ResendConfirmation email={submittedEmail} captcha={captcha} label="Não recebeu o e-mail? Reenviar" />
           </div>
         ) : (
           <form method="post" onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>

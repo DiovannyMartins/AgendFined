@@ -8,6 +8,7 @@ type SecurityEvent =
   | "auth.login_failed"
   | "auth.logout"
   | "auth.password_reset_requested"
+  | "auth.confirmation_resend_requested"
   | "auth.password_changed"
   | "auth.mfa_enrollment_started"
   | "auth.mfa_verified"

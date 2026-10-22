@@ -55,7 +55,10 @@ function authCallbackUrl(next: string): string | undefined {
   }
 }
 
-async function authRateLimit(action: "login" | "signup" | "passwordReset", email: string) {
+async function authRateLimit(
+  action: "login" | "signup" | "passwordReset" | "confirmationResend",
+  email: string,
+) {
   try {
     const admin = createAdminClient();
     return await enforceAuthRateLimit(admin, await getClientIp(), action, email);
@@ -133,6 +136,11 @@ export async function login(_prev: ActionResult, formData: FormData): Promise<Ac
     if (error.code === "captcha_failed") {
       return { ok: false, code: "CAPTCHA_FAILED", message: "Verificação humana falhou. Tente novamente." };
     }
+    // Supabase only reports email_not_confirmed after the password matched, so
+    // telling it apart from wrong credentials does not enumerate accounts.
+    if (error.code === "email_not_confirmed") {
+      return { ok: false, code: "EMAIL_NOT_CONFIRMED", message: "Confirme seu e-mail para entrar." };
+    }
     return {
       ok: false,
       code: "INVALID_CREDENTIALS",
@@ -197,6 +205,37 @@ export async function requestPasswordReset(_prev: ActionResult, formData: FormDa
   }
 
   auditSecurityEvent("auth.password_reset_requested");
+  return { ok: true, data: undefined };
+}
+
+// Answers the same way whether the e-mail has a pending signup, an already
+// confirmed account or no account at all; only a rejected CAPTCHA, which is
+// about the request and not the address, gets its own answer.
+export async function resendSignupConfirmation(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const parsedEmail = emailSchema.safeParse(String(formData.get("email") ?? "").trim().toLowerCase());
+  if (!parsedEmail.success) {
+    return { ok: false, code: "VALIDATION", message: "Informe um e-mail válido.", fieldErrors: {} };
+  }
+
+  const allowed = await authRateLimit("confirmationResend", parsedEmail.data);
+  if (allowed !== true) {
+    return { ok: false, code: allowed === false ? "RATE_LIMITED" : "RATE_LIMIT_UNAVAILABLE", message: "Muitas tentativas. Tente novamente mais tarde." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: parsedEmail.data,
+    options: {
+      emailRedirectTo: authCallbackUrl("/dashboard"),
+      captchaToken: captchaToken(formData),
+    },
+  });
+  if (error?.code === "captcha_failed") {
+    return { ok: false, code: "CAPTCHA_FAILED", message: "Verificação humana falhou. Tente novamente." };
+  }
+
+  auditSecurityEvent("auth.confirmation_resend_requested");
   return { ok: true, data: undefined };
 }
 

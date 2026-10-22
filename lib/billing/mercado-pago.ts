@@ -174,9 +174,9 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
         id?: string;
         status?: string;
         external_reference?: string | null;
+        next_payment_date?: string | null;
         auto_recurring?: {
           start_date?: string | null;
-          end_date?: string | null;
           transaction_amount?: number | null;
           currency_id?: string | null;
           frequency?: number | null;
@@ -197,7 +197,10 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
         status,
         externalReference: body.external_reference ?? null,
         currentPeriodStart: body.auto_recurring?.start_date ?? null,
-        currentPeriodEnd: body.auto_recurring?.end_date ?? null,
+        // The paid period ends on the next charge. `auto_recurring.end_date` is
+        // the end of the whole assinatura and is absent when it has no final
+        // date, which is how the PROFISSIONAL is sold (issue #142).
+        currentPeriodEnd: body.next_payment_date ?? null,
         transactionAmount:
           typeof body.auto_recurring?.transaction_amount === "number" ? body.auto_recurring.transaction_amount : null,
         currencyId: body.auto_recurring?.currency_id ?? null,

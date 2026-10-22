@@ -117,6 +117,59 @@ describe("handleWebhook (issue #24) lifecycle", () => {
     }));
   });
 
+  it("cancelled keeps the PROFISSIONAL until the end of the paid month (issue #142)", async () => {
+    const deps = makeDeps({
+      findSubscription: vi.fn(async () => authorizedSubscription),
+      getPreapproval: vi.fn(async () => makePreapproval("cancelled", { currentPeriodEnd: "2026-10-07T12:00:00.000Z" })),
+    });
+    const result = await handleWebhook(deps);
+
+    expect(result).toEqual({ ok: true, applied: "grace" });
+    expect(deps.applySnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      status: "cancelled",
+      gracePeriodEnd: "2026-10-07T12:00:00.000Z",
+    }));
+  });
+
+  it("cancelled keeps at least the 7-day grace when the paid period ends sooner", async () => {
+    const deps = makeDeps({
+      findSubscription: vi.fn(async () => authorizedSubscription),
+      getPreapproval: vi.fn(async () => makePreapproval("cancelled", { currentPeriodEnd: "2026-09-09T12:00:00.000Z" })),
+    });
+    await handleWebhook(deps);
+
+    expect(deps.applySnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      status: "cancelled",
+      gracePeriodEnd: "2026-09-14T12:00:00.000Z",
+    }));
+  });
+
+  it("paused keeps the 7-day grace even with a next charge date ahead", async () => {
+    const deps = makeDeps({
+      findSubscription: vi.fn(async () => authorizedSubscription),
+      getPreapproval: vi.fn(async () => makePreapproval("paused", { currentPeriodEnd: "2026-10-07T12:00:00.000Z" })),
+    });
+    await handleWebhook(deps);
+
+    expect(deps.applySnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      status: "paused",
+      gracePeriodEnd: "2026-09-14T12:00:00.000Z",
+    }));
+  });
+
+  it("cancelled after a failed payment does not grant the unpaid period", async () => {
+    const deps = makeDeps({
+      findSubscription: vi.fn(async () => ({ ...authorizedSubscription, status: "paused" as const })),
+      getPreapproval: vi.fn(async () => makePreapproval("cancelled", { currentPeriodEnd: "2026-10-07T12:00:00.000Z" })),
+    });
+    await handleWebhook(deps);
+
+    expect(deps.applySnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      status: "cancelled",
+      gracePeriodEnd: "2026-09-14T12:00:00.000Z",
+    }));
+  });
+
   it("pending only updates the subscription status, never the plan", async () => {
     const deps = makeDeps({ getPreapproval: vi.fn(async () => makePreapproval("pending")) });
     const result = await handleWebhook(deps);

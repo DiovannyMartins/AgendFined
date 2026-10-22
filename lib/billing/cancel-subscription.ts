@@ -2,6 +2,8 @@
 // is the pure decision core: it cancels the active preapproval at the provider
 // (so the owner stops being charged) and records the `cancelled` status with a
 // grace period, mirroring the webhook lifecycle for a `cancelled` preapproval.
+// The grace keeps the month already paid (the preapproval's next charge date,
+// read before cancelling) and never less than 7 days (issue #142).
 // The business stays Pro during the grace; the `downgrade_expired_subscriptions`
 // cron drops it to Free once the grace passes (data preserved). The provider and
 // persistence are injectable so this seam is unit-testable without Mercado Pago
@@ -9,9 +11,7 @@
 import type { BillingPlan, SubscriptionStatus } from "./types";
 import type { BillingProvider } from "./provider";
 import type { FetchSubscription } from "./get-subscription";
-
-const DEFAULT_GRACE_DAYS = 7;
-const MS_PER_DAY = 86_400_000;
+import { graceEnd } from "./grace";
 
 export type CancelSubscriptionResult = { ok: true } | { ok: false; code: string; message: string };
 
@@ -37,7 +37,12 @@ export async function cancelSubscription(deps: CancelSubscriptionDeps): Promise<
     };
   }
 
+  // The local `current_period_end` is not trusted for this: rows written before
+  // the provider mapped `next_payment_date` have it null. Read the paid period
+  // first, so a failed read leaves the assinatura untouched and safe to retry.
+  let paidPeriodEnd: string | null;
   try {
+    paidPeriodEnd = (await deps.provider.getPreapproval(subscription.mpPreapprovalId)).currentPeriodEnd;
     await deps.provider.cancelPreapproval(subscription.mpPreapprovalId);
   } catch {
     return {
@@ -51,9 +56,7 @@ export async function cancelSubscription(deps: CancelSubscriptionDeps): Promise<
   try {
     await deps.updateSubscription(subscription.mpPreapprovalId, {
       status: "cancelled",
-      gracePeriodEnd: new Date(
-        now.getTime() + (deps.graceDays ?? DEFAULT_GRACE_DAYS) * MS_PER_DAY,
-      ).toISOString(),
+      gracePeriodEnd: graceEnd({ now, graceDays: deps.graceDays, paidPeriodEnd }),
     });
   } catch {
     // The provider cancellation already succeeded. Surface the persistence

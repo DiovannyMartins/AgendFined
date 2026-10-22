@@ -21,3 +21,4 @@ Os ADRs 0001 a 0006 foram registrados retroativamente em 17/10/2026, a partir do
 - [0005 — Token de cancelamento independente, armazenado só como digest](0005-token-de-cancelamento.md)
 - [0006 — Leituras e escritas públicas por RPCs com allowlist](0006-rpcs-publicas-com-allowlist.md)
 - [0007 — Slug antigo reservado ao negócio e redirecionado ao atual](0007-slug-antigo-reservado-e-redirecionado.md)
+- [0008 — Carência do cancelamento mantém o mês já pago](0008-carencia-mantem-o-mes-pago.md)

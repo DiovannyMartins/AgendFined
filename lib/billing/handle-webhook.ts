@@ -99,6 +99,10 @@ export interface HandleWebhookDeps {
   // A checkout whose currency or frequency is not what the PROFISSIONAL plan
   // sells (BRL, monthly) is refused the same way.
   reportUnexpectedTermsCharge: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
+  // Tells the dono that a failed charge opened the carência (issue #151). Best
+  // effort: it runs once, on the move from authorized to paused, and a failure
+  // never turns the notification into a retry.
+  notifyPaymentFailed?: (input: { businessId: string; gracePeriodEnd: string }) => void | Promise<void>;
   graceDays?: number;
   now?: () => Date;
 }
@@ -185,6 +189,7 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
 
   let superseded: SubscriptionForWebhook[] = [];
   let duplicate = false;
+  let appliedSnapshot: AppliedSubscriptionSnapshot;
   try {
     // The payer paid a checkout that a retry had replaced. While the current
     // one is still unpaid, the paid checkout becomes the current assinatura;
@@ -208,6 +213,7 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
       gracePeriodEnd,
       ...(makeCurrent ? { makeCurrent } : {}),
     });
+    appliedSnapshot = applied;
 
     if (duplicate) {
       superseded = [sub];
@@ -220,6 +226,24 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
       code: "DATABASE_ERROR",
       message: err instanceof Error ? err.message : "Não foi possível aplicar o estado da assinatura.",
     };
+  }
+
+  // Only the first `paused` of a paid, current assinatura is news to the dono:
+  // a repeated notification finds the row already paused.
+  const noticeGraceEnd = appliedSnapshot.effectiveGracePeriodEnd ?? gracePeriodEnd;
+  if (
+    preapproval.status === "paused" &&
+    sub.status === "authorized" &&
+    noticeGraceEnd &&
+    appliedSnapshot.isCurrent &&
+    appliedSnapshot.effectivePlan === "pro" &&
+    deps.notifyPaymentFailed
+  ) {
+    try {
+      await deps.notifyPaymentFailed({ businessId, gracePeriodEnd: noticeGraceEnd });
+    } catch {
+      // Best effort; the carência is already recorded.
+    }
   }
 
   // Reported before cancelling so a refund is never lost to a failed cancel; a

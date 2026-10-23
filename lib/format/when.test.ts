@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { formatTimezone, formatTimezoneOffset, formatWhenWithTimezone, timezoneCity } from "./when";
+import { formatDate, formatTimezone, formatTimezoneOffset, formatWhenWithTimezone, timezoneCity } from "./when";
+
+describe("formatDate", () => {
+  it("gives the calendar date in the business fuso", () => {
+    expect(formatDate("2026-10-27T02:00:00Z", "America/Sao_Paulo")).toBe("26/10/2026");
+    expect(formatDate("2026-10-27T02:00:00Z", "UTC")).toBe("27/10/2026");
+  });
+});
 
 describe("fuso labels", () => {
   it("names the fuso by its city and UTC offset", () => {

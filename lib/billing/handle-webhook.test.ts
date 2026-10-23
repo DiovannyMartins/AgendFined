@@ -333,6 +333,73 @@ describe("handleWebhook (issue #24) lifecycle", () => {
   });
 });
 
+// The real RPC answers with the negócio's plan, still PROFISSIONAL in the carência.
+const applyKeepingPro: HandleWebhookDeps["applySnapshot"] = async (input) => ({
+  subscriptionId: input.subscriptionId,
+  businessId: input.businessId,
+  subscriptionStatus: input.status,
+  isCurrent: true,
+  effectivePlan: "pro",
+  effectiveGracePeriodEnd: input.gracePeriodEnd,
+});
+
+describe("handleWebhook failed payment e-mail (issue #151)", () => {
+  it("tells the dono once, when a paid assinatura is paused, with the end of the carência", async () => {
+    const notifyPaymentFailed = vi.fn();
+    const deps = makeDeps({
+      findSubscription: vi.fn(async () => authorizedSubscription),
+      getPreapproval: vi.fn(async () => makePreapproval("paused")),
+      applySnapshot: vi.fn(applyKeepingPro),
+      notifyPaymentFailed,
+    });
+
+    await expect(handleWebhook(deps)).resolves.toEqual({ ok: true, applied: "grace" });
+    expect(notifyPaymentFailed).toHaveBeenCalledWith({ businessId: "biz_1", gracePeriodEnd: "2026-09-14T12:00:00.000Z" });
+  });
+
+  it("does not repeat the e-mail on a repeated paused notification", async () => {
+    const notifyPaymentFailed = vi.fn();
+    const deps = makeDeps({
+      findSubscription: vi.fn(async () => ({ ...authorizedSubscription, status: "paused" as const, gracePeriodEnd: "2026-09-14T12:00:00.000Z" })),
+      getPreapproval: vi.fn(async () => makePreapproval("paused")),
+      applySnapshot: vi.fn(applyKeepingPro),
+      notifyPaymentFailed,
+    });
+
+    await handleWebhook(deps);
+    expect(notifyPaymentFailed).not.toHaveBeenCalled();
+  });
+
+  it("sends nothing for a cancellation or for a checkout that was never paid", async () => {
+    const notifyPaymentFailed = vi.fn();
+    await handleWebhook(makeDeps({
+      findSubscription: vi.fn(async () => authorizedSubscription),
+      getPreapproval: vi.fn(async () => makePreapproval("cancelled")),
+      applySnapshot: vi.fn(applyKeepingPro),
+      notifyPaymentFailed,
+    }));
+    await handleWebhook(makeDeps({
+      getPreapproval: vi.fn(async () => makePreapproval("paused")),
+      notifyPaymentFailed,
+    }));
+
+    expect(notifyPaymentFailed).not.toHaveBeenCalled();
+  });
+
+  it("keeps the carência when the e-mail fails", async () => {
+    const deps = makeDeps({
+      findSubscription: vi.fn(async () => authorizedSubscription),
+      getPreapproval: vi.fn(async () => makePreapproval("paused")),
+      applySnapshot: vi.fn(applyKeepingPro),
+      notifyPaymentFailed: vi.fn(async () => {
+        throw new Error("resend down");
+      }),
+    });
+
+    await expect(handleWebhook(deps)).resolves.toEqual({ ok: true, applied: "grace" });
+  });
+});
+
 describe("handleWebhook superseded checkouts", () => {
   it("cancels the negócio's other pending checkouts once the current assinatura is authorized", async () => {
     const deps = makeDeps({

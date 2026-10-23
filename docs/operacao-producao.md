@@ -44,7 +44,8 @@ npx supabase db push --linked
 
 4. Confirme que o cron/pg_net chama a Edge Function `booking-reminders` com `REMINDER_CRON_SECRET` e que a função possui `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY` e `RESEND_FROM_EMAIL`.
 5. Para a reconciliação, confirme no Vault os nomes `agendfined_reconciliation_cron_url` e `agendfined_reconciliation_cron_secret`, e no `cron.job` o schedule `*/30 * * * *` com `active = true`.
-6. Não altere RLS, RPCs, cron ou secrets diretamente como parte de um deploy de frontend. Faça mudanças de banco em migration, revise-as e valide com os testes de integração usando Node 22+.
+6. Confirme no `cron.job` que `subscription-grace-downgrade` (rebaixa para o Grátis quem passou da carência), `booking-reminders` e `billing-reconciliation` existem com `*/30 * * * *` e `active = true`. O teste `tests/sql/cron-jobs.sql` faz essa checagem no Supabase local e roda no CI.
+7. Não altere RLS, RPCs, cron ou secrets diretamente como parte de um deploy de frontend. Faça mudanças de banco em migration, revise-as e valide com os testes de integração usando Node 22+.
 
 ### Diagnóstico do scheduler
 

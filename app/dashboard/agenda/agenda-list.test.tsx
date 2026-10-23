@@ -85,4 +85,15 @@ describe("AgendaList", () => {
 
     expect(screen.queryByText("Leia a observação antes do atendimento.")).not.toBeInTheDocument();
   });
+  // #149 item 16: a agenda diz quem cancelou.
+  it.each([
+    ["customer", "Cancelada pelo cliente"],
+    ["business", "Cancelada por você"],
+    [null, "Cancelada"],
+  ])("mostra quem cancelou (%s)", (cancelledBy, label) => {
+    render(<AgendaList bookings={[booking({ status: "cancelled", cancelled_by: cancelledBy })]} timezone="America/Sao_Paulo" />);
+
+    expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
 });

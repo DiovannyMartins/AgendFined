@@ -18,6 +18,7 @@ export interface AgendaBooking {
   public_code?: string;
   cancel_reason?: string | null;
   cancel_reason_category?: string | null;
+  cancelled_by?: string | null;
   customer_note?: string | null;
   customer_note_category?: string | null;
   customer_note_requires_follow_up?: boolean;

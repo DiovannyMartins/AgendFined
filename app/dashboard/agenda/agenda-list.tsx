@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { StatusAction } from "./status-action";
 import type { AgendaBooking } from "@/lib/agenda/view";
-import { statusLabel } from "@/lib/bookings/status";
+import { bookingStatusLabel } from "@/lib/bookings/status";
 import { formatPhoneBR, matchesPhone } from "@/lib/format/phone";
 import { formatPublicCode, matchesPublicCode } from "@/lib/bookings/public-code";
 import { CANCELLATION_REASON_CATEGORY_LABELS, type CancellationReasonCategory } from "@/lib/bookings/classification";
@@ -96,7 +96,7 @@ export function AgendaList({
       ) : (
         <div className="space-y-3">
           {filtered.map((booking) => {
-            const status = statusLabel(booking.status);
+            const status = bookingStatusLabel(booking.status, booking.cancelled_by);
             const note = booking.customer_note?.trim();
             return (
               <div

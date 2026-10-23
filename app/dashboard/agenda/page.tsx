@@ -26,7 +26,7 @@ export default async function AgendaPage({
   const supabase = await createClient();
   const { data: bookings } = await supabase
       .from("bookings")
-      .select("id, start_at, end_at, status, service_name_snapshot, duration_minutes_snapshot, customer_name_snapshot, customer_phone_snapshot, public_code, cancel_reason, cancel_reason_category, customer_note, customer_note_requires_follow_up")
+      .select("id, start_at, end_at, status, service_name_snapshot, duration_minutes_snapshot, customer_name_snapshot, customer_phone_snapshot, public_code, cancel_reason, cancel_reason_category, cancelled_by, customer_note, customer_note_requires_follow_up")
       .eq("business_id", business.id)
       .order("start_at", { ascending: true });
 

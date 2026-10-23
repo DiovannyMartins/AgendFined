@@ -15,3 +15,16 @@ export const STATUS_LABEL: Record<BookingStatus, { label: string; variant: Statu
 export function statusLabel(status: BookingStatus | string): { label: string; variant: StatusVariant } {
   return STATUS_LABEL[status as BookingStatus] ?? STATUS_LABEL.confirmed;
 }
+
+// A cancelled reserva says who cancelled it (#149). cancelled_by is null for
+// reservas cancelled before the column existed; those keep "Cancelada".
+export function bookingStatusLabel(
+  status: BookingStatus | string,
+  cancelledBy?: string | null,
+): { label: string; variant: StatusVariant } {
+  const base = statusLabel(status);
+  if (status !== "cancelled") return base;
+  if (cancelledBy === "customer") return { ...base, label: "Cancelada pelo cliente" };
+  if (cancelledBy === "business") return { ...base, label: "Cancelada por você" };
+  return base;
+}

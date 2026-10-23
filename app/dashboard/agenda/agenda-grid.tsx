@@ -12,7 +12,7 @@ import {
   type AgendaBooking,
   type AvailabilityRow,
 } from "@/lib/agenda/view";
-import { statusLabel } from "@/lib/bookings/status";
+import { bookingStatusLabel } from "@/lib/bookings/status";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 
 function dayHeading(dateKey: string, timezone = APP_TIMEZONE): string {
@@ -135,7 +135,7 @@ function DayGrid({
 }
 
 function BookingCell({ booking }: { booking: AgendaBooking }) {
-  const status = statusLabel(booking.status);
+  const status = bookingStatusLabel(booking.status, booking.cancelled_by);
   return (
     <div className="rounded-lg border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs">
       <p className="font-medium">{booking.service_name_snapshot}</p>
@@ -256,7 +256,7 @@ function WeekCell({
 }
 
 function WeekBooking({ booking }: { booking: AgendaBooking }) {
-  const status = statusLabel(booking.status);
+  const status = bookingStatusLabel(booking.status, booking.cancelled_by);
   return (
     <div className="rounded border border-primary/20 bg-primary/5 px-1.5 py-1 text-xs">
       <p className="font-medium">{booking.service_name_snapshot}</p>

@@ -97,6 +97,8 @@ describe("cancel_booking_by_public_code (INC-3)", () => {
     expect(error).toBeNull();
     expect(data?.status).toBe("cancelled");
     expect(data?.cancel_reason).toBe("Não vou mais poder ir");
+    // #149: the agenda tells a cancellation by the cliente apart.
+    expect(data?.cancelled_by).toBe("customer");
     // The freed slot can now be booked again at the same instant.
     const second = await createBookingAt(SLOT, "+5511980000002");
     expect(second.status).toBe("confirmed");

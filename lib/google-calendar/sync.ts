@@ -9,6 +9,7 @@ import {
 } from "./oauth";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { isProPlan } from "@/lib/plan/plan";
+import { formatPhoneBR } from "@/lib/format/phone";
 
 const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 const REFRESH_MARGIN_MS = 60_000;
@@ -21,6 +22,7 @@ type BookingForCalendar = {
   status: string;
   service_name_snapshot: string;
   customer_name_snapshot: string;
+  customer_phone_snapshot: string;
   customer_note: string | null;
 };
 
@@ -42,10 +44,18 @@ function googleEventId(bookingId: string): string {
 
 function calendarEvent(booking: BookingForCalendar, timezone: string) {
   const note = booking.customer_note?.trim();
+  // The phone lets the dono call the cliente straight from the event (#149).
+  const phone = booking.customer_phone_snapshot?.trim();
   return {
     id: googleEventId(booking.id),
     summary: `${booking.service_name_snapshot} — ${booking.customer_name_snapshot}`,
-    description: ["Criado pelo AgendFined", note ? `Observação: ${note}` : ""].filter(Boolean).join("\n"),
+    description: [
+      "Criado pelo AgendFined",
+      phone ? `Telefone: ${formatPhoneBR(phone)}` : "",
+      note ? `Observação: ${note}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
     start: { dateTime: booking.start_at, timeZone: timezone },
     end: { dateTime: booking.end_at, timeZone: timezone },
     extendedProperties: {
@@ -167,7 +177,7 @@ export async function syncGoogleCalendarBooking(businessId: string, bookingId: s
   try {
     const { data: booking, error } = await admin
       .from("bookings")
-      .select("id,start_at,end_at,status,service_name_snapshot,customer_name_snapshot,customer_note")
+      .select("id,start_at,end_at,status,service_name_snapshot,customer_name_snapshot,customer_phone_snapshot,customer_note")
       .eq("id", bookingId)
       .eq("business_id", businessId)
       .maybeSingle();
@@ -203,7 +213,7 @@ export async function syncGoogleCalendarForBusiness(businessId: string): Promise
       connection.calendar_timezone = calendarTimezone;
     }
     const [{ data: upcoming, error: upcomingError }, { data: cancelled, error: cancelledError }] = await Promise.all([
-      admin.from("bookings").select("id,start_at,end_at,status,service_name_snapshot,customer_name_snapshot,customer_note")
+      admin.from("bookings").select("id,start_at,end_at,status,service_name_snapshot,customer_name_snapshot,customer_phone_snapshot,customer_note")
         .eq("business_id", businessId).eq("status", "confirmed").gte("end_at", new Date(Date.now() - SYNC_LOOKBACK_MS).toISOString()).order("start_at").limit(250),
       admin.from("bookings").select("id,status,end_at").eq("business_id", businessId).eq("status", "cancelled").gte("end_at", new Date(Date.now() - SYNC_LOOKBACK_MS).toISOString()).limit(250),
     ]);

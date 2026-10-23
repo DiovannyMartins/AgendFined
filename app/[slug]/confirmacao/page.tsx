@@ -10,7 +10,7 @@ import { publicCodeSchema } from "@/lib/validation/schemas";
 import { enforceConfirmationRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { publicDocumentTitle, publicStatusView } from "@/lib/bookings/public-status";
-import { formatPhoneBR } from "@/lib/format/phone";
+import { BusinessPhone } from "@/components/business-contact";
 import { TimezoneNotice } from "@/components/timezone-notice";
 import { ConfirmationLookupError } from "./confirmation-errors";
 
@@ -78,9 +78,7 @@ function ConfirmationContent({ found, slug }: { found: FoundConfirmation; slug: 
             <TimezoneNotice timezone={booking.business_timezone ?? APP_TIMEZONE} at={booking.start_at} />
             <div className="border-t border-border pt-3">
               <p className="text-sm font-medium">{booking.business_name}</p>
-              <p className="text-sm text-muted-foreground">
-                {formatPhoneBR(booking.business_phone)}
-              </p>
+              <BusinessPhone phone={booking.business_phone} />
             </div>
           </div>
         </ConfirmationStatus>

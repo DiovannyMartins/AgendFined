@@ -18,7 +18,22 @@ import { isTooEarlyFor } from "@/lib/bookings/transitions";
 import { submitWithoutReset } from "@/lib/forms/submit-without-reset";
 
 const INITIAL: { ok: boolean; message?: string } = { ok: true };
-export function StatusAction({ id, status, startAt }: { id: string; status: string; startAt: string }) {
+
+// Which reserva a dialog acts on, so the owner never cancels the wrong one when
+// several are on screen (#149).
+export type BookingSummary = { customerName: string; serviceName: string; when: string };
+
+export function StatusAction({
+  id,
+  status,
+  startAt,
+  summary,
+}: {
+  id: string;
+  status: string;
+  startAt: string;
+  summary?: BookingSummary;
+}) {
   // Keyed by status so the dialog closes once the correction lands.
   if (status === "completed" || status === "no_show") return <CorrectionDialog key={status} id={id} status={status} />;
   if (status !== "confirmed") return null;
@@ -49,7 +64,7 @@ export function StatusAction({ id, status, startAt }: { id: string; status: stri
         description="A reserva será marcada como no-show (o cliente não compareceu). Se for engano, use Corrigir status para trocar por concluída."
         confirmLabel="Confirmar no-show"
       />
-      <CancelDialog id={id} />
+      <CancelDialog id={id} summary={summary} />
     </div>
   );
 }
@@ -153,7 +168,7 @@ function CorrectionDialog({ id, status }: { id: string; status: keyof typeof COR
   );
 }
 
-function CancelDialog({ id }: { id: string }) {
+function CancelDialog({ id, summary }: { id: string; summary?: BookingSummary }) {
   const [state, formAction, pending] = useActionState(updateBookingStatus, INITIAL);
 
   return (
@@ -167,7 +182,10 @@ function CancelDialog({ id }: { id: string }) {
         <DialogHeader>
           <DialogTitle>Cancelar reserva</DialogTitle>
           <DialogDescription>
-            A reserva será cancelada e o horário voltará a ficar disponível.
+            {summary
+              ? `A reserva de ${summary.customerName} (${summary.serviceName}, ${summary.when}) será cancelada e o horário voltará a ficar disponível.`
+              : "A reserva será cancelada e o horário voltará a ficar disponível."}{" "}
+            O cliente recebe um e-mail avisando do cancelamento.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submitWithoutReset(formAction)} className="space-y-4">

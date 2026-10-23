@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { StatusAction } from "./status-action";
 import type { AgendaBooking } from "@/lib/agenda/view";
-import { statusLabel } from "@/lib/bookings/status";
+import { bookingStatusLabel } from "@/lib/bookings/status";
 import { formatPhoneBR, matchesPhone } from "@/lib/format/phone";
 import { formatPublicCode, matchesPublicCode } from "@/lib/bookings/public-code";
 import { CANCELLATION_REASON_CATEGORY_LABELS, type CancellationReasonCategory } from "@/lib/bookings/classification";
@@ -96,7 +96,7 @@ export function AgendaList({
       ) : (
         <div className="space-y-3">
           {filtered.map((booking) => {
-            const status = statusLabel(booking.status);
+            const status = bookingStatusLabel(booking.status, booking.cancelled_by);
             const note = booking.customer_note?.trim();
             return (
               <div
@@ -131,13 +131,24 @@ export function AgendaList({
                       <p className="mt-0.5 whitespace-pre-line break-words">{note}</p>
                     </div>
                   )}
-                  {booking.customer_note_requires_follow_up && (
+                  {/* Only an atendimento still to happen needs preparing; the
+                      text says what to do (#149). */}
+                  {booking.customer_note_requires_follow_up && booking.status === "confirmed" && (
                     <p className="mt-1 text-xs font-medium text-amber-700">
-                      Observação requer acompanhamento manual
+                      Leia a observação antes do atendimento.
                     </p>
                   )}
                 </div>
-                <StatusAction id={booking.id} status={booking.status} startAt={booking.start_at} />
+                <StatusAction
+                  id={booking.id}
+                  status={booking.status}
+                  startAt={booking.start_at}
+                  summary={{
+                    customerName: booking.customer_name_snapshot,
+                    serviceName: booking.service_name_snapshot,
+                    when: formatBookingTime(booking.start_at, timezone),
+                  }}
+                />
               </div>
             );
           })}

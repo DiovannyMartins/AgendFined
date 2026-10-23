@@ -138,6 +138,8 @@ export type Database = {
           cancel_reason: string | null
           cancel_reason_category: string | null
           cancel_token_hash: string | null
+
+          cancelled_by: string | null
           created_at: string
           customer_email_snapshot: string | null
           customer_id: string
@@ -165,6 +167,8 @@ export type Database = {
           cancel_reason?: string | null
           cancel_reason_category?: string | null
           cancel_token_hash?: string | null
+
+          cancelled_by?: string | null
           created_at?: string
           customer_email_snapshot?: string | null
           customer_id: string
@@ -192,6 +196,8 @@ export type Database = {
           cancel_reason?: string | null
           cancel_reason_category?: string | null
           cancel_token_hash?: string | null
+
+          cancelled_by?: string | null
           created_at?: string
           customer_email_snapshot?: string | null
           customer_id?: string
@@ -654,6 +660,8 @@ export type Database = {
           business_id: string
           cancel_reason: string | null
           cancel_reason_category: string | null
+
+          cancelled_by: string | null
           created_at: string
           customer_email_snapshot: string | null
           customer_id: string
@@ -691,6 +699,8 @@ export type Database = {
           business_id: string
           cancel_reason: string | null
           cancel_reason_category: string | null
+
+          cancelled_by: string | null
           created_at: string
           customer_email_snapshot: string | null
           customer_id: string
@@ -733,6 +743,8 @@ export type Database = {
           business_id: string
           cancel_reason: string | null
           cancel_reason_category: string | null
+
+          cancelled_by: string | null
           created_at: string
           customer_email_snapshot: string | null
           customer_id: string
@@ -896,6 +908,7 @@ export type Database = {
         Returns: {
           business_id: string
           business_name: string
+          business_phone: string
           business_slug: string
           business_timezone: string
           customer_email_snapshot: string

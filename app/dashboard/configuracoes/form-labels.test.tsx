@@ -19,10 +19,11 @@ describe("rótulos acessíveis das configurações", () => {
     expect(slug).toHaveAccessibleDescription(/Apenas minúsculas, números e hífen/);
   });
 
-  it("dá nome ao seletor de dia da semana da nova faixa", () => {
+  it("agrupa os dias da nova faixa sob um rótulo", () => {
     render(<AvailabilityForm />);
 
-    expect(screen.getByRole("combobox", { name: "Dia da semana" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Dias da semana" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Segunda" })).toBeChecked();
   });
 
   it("dá nome ao seletor de dia da semana ao editar uma faixa", () => {

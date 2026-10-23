@@ -134,3 +134,31 @@ describe("sendCustomerCancelledEmail", () => {
     await expect(sendCustomerCancelledEmail(input)).resolves.toEqual({ sent: false, reason: "provider_error" });
   });
 });
+
+describe("contato do negócio no cancelamento (#149)", () => {
+  it("traz o telefone do negócio junto do \"fale diretamente\"", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "AgendFined <reservas@example.com>");
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await sendBusinessCancelledEmail({ ...input, businessPhone: "1133334444" });
+
+    const request = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(request.html).toContain('href="tel:+551133334444"');
+    expect(request.html).not.toContain("wa.me");
+    expect(request.text).toContain("Telefone do negócio: (11) 3333-4444");
+  });
+
+  it("omite o contato quando o negócio não tem telefone", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "AgendFined <reservas@example.com>");
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await sendCustomerCancelledEmail(input);
+
+    const request = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(request.html).not.toContain("TELEFONE DO NEGÓCIO");
+  });
+});

@@ -147,6 +147,24 @@ describe("owner writes to reservas outside the Server Actions", () => {
     expect(data).toEqual([{ status: "cancelled", cancel_reason: "Cliente pediu" }]);
   });
 
+  // #149: the dashboard cancellation is stamped as the negócio's, and the owner
+  // cannot pass it off as the cliente's.
+  it("stamps a dashboard cancellation as the negócio's and cannot forge cancelled_by", async () => {
+    const owner = await anonClientForUser(EMAIL, PASSWORD);
+    const id = await createReserva();
+
+    const forged = await owner.from("bookings").update({ status: "cancelled", cancelled_by: "customer" }).eq("id", id);
+    expect(forged.error).not.toBeNull();
+
+    const { data, error } = await owner
+      .from("bookings")
+      .update({ status: "cancelled" })
+      .eq("id", id)
+      .select("status, cancelled_by");
+    expect(error).toBeNull();
+    expect(data).toEqual([{ status: "cancelled", cancelled_by: "business" }]);
+  });
+
   it("cannot reopen a cancelled reserva", async () => {
     const owner = await anonClientForUser(EMAIL, PASSWORD);
     const id = await createReserva();

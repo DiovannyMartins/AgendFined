@@ -26,18 +26,20 @@ export default async function AgendaPage({
   const supabase = await createClient();
   const { data: bookings } = await supabase
       .from("bookings")
-      .select("id, start_at, end_at, status, service_name_snapshot, duration_minutes_snapshot, customer_name_snapshot, customer_phone_snapshot, public_code, cancel_reason, cancel_reason_category, customer_note, customer_note_requires_follow_up")
+      .select("id, start_at, end_at, status, service_name_snapshot, duration_minutes_snapshot, customer_name_snapshot, customer_phone_snapshot, public_code, cancel_reason, cancel_reason_category, cancelled_by, customer_note, customer_note_requires_follow_up")
       .eq("business_id", business.id)
       .order("start_at", { ascending: true });
 
   const list = bookings ?? [];
   const now = new Date();
 
+  // Only what is still ahead today: a concluída, no-show or past reserva is
+  // not an atendimento to prepare for (#149).
   const todayKey = toLocalDate(now, business.timezone);
   const todayBookings = filterAgenda(list, {
     tz: business.timezone,
     filters: { dateKey: todayKey },
-  }).filter((b) => b.status !== "cancelled");
+  }).filter((b) => isUpcomingConfirmed(b, now));
 
   const upcoming = list.filter((b) => isUpcomingConfirmed(b, now));
 
@@ -81,7 +83,11 @@ export default async function AgendaPage({
           <CardContent>
             <p className="text-3xl font-semibold">{todayBookings.length}</p>
             <p className="text-sm text-muted-foreground">
-              {todayBookings.length === 0 ? "Nenhuma para hoje" : "atendimento(s) agendado(s)"}
+              {todayBookings.length === 0
+                ? "Nenhum atendimento por vir hoje"
+                : todayBookings.length === 1
+                  ? "atendimento por vir hoje"
+                  : "atendimentos por vir hoje"}
             </p>
           </CardContent>
         </Card>

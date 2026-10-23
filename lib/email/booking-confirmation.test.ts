@@ -35,7 +35,7 @@ describe("sendBookingConfirmationEmail", () => {
     expect(request.text).toContain("Barbearia \"Demo\"");
     expect(request.text).toContain("Corte <premium>");
     expect(request.text).toContain("10/05/2026 às 15:00 (horário de Brasília, UTC−3)");
-    expect(request.text).toContain("65925DBB");
+    expect(request.text).toContain("Código da reserva: 6592-5DBB");
     expect(request.text).toContain(input.confirmationUrl);
     expect(request.html).toContain("AgendFined");
     expect(request.html).toContain("#141414");
@@ -70,5 +70,23 @@ describe("sendBookingConfirmationEmail", () => {
       sent: false,
       reason: "provider_error",
     });
+  });
+
+  // #149: o código vem agrupado como na tela, e o e-mail traz como falar com o negócio.
+  it("agrupa o código e traz o telefone e o WhatsApp do negócio", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "AgendFined <reservas@example.com>");
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await sendBookingConfirmationEmail({ ...input, businessPhone: "51998765432" });
+
+    const request = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(request.html).toContain("6592-5DBB");
+    expect(request.html).not.toContain(">65925DBB<");
+    expect(request.html).toContain('href="tel:+5551998765432"');
+    expect(request.html).toContain('href="https://wa.me/5551998765432"');
+    expect(request.text).toContain("Telefone do negócio: (51) 99876-5432");
+    expect(request.text).toContain("WhatsApp: https://wa.me/5551998765432");
   });
 });

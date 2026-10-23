@@ -12,7 +12,7 @@ import { TimezoneNotice } from "@/components/timezone-notice";
 import { createBooking, joinWaitlist } from "@/lib/booking/actions";
 import { getSlotsForDate } from "@/lib/availability/actions";
 import { lastBookableDate, toLocalDate } from "@/lib/booking/availability";
-import { formatCurrencyBRL } from "@/lib/format/currency";
+import { formatServicePrice } from "@/lib/format/currency";
 import { formatSlotWhen } from "@/lib/format/when";
 import { cn } from "@/lib/utils";
 import { trackAnalyticsEvent } from "@/lib/analytics";
@@ -316,7 +316,7 @@ export function BookingWidget({
           >
             {services.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name} · {s.durationMinutes} min · {formatCurrencyBRL(s.priceCents)}
+                {s.name} · {s.durationMinutes} min · {formatServicePrice(s.priceCents)}
               </option>
             ))}
           </select>

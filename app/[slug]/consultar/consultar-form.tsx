@@ -13,7 +13,7 @@ import { publicCodeHint, publicDocumentTitle } from "@/lib/bookings/public-statu
 import { consultBooking } from "@/lib/booking/actions";
 import type { ConsultState } from "@/lib/bookings/lookup";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
-import { formatPhoneBR } from "@/lib/format/phone";
+import { BusinessPhone } from "@/components/business-contact";
 import { TimezoneNotice } from "@/components/timezone-notice";
 
 const INITIAL: ConsultState = { status: "idle" };
@@ -73,9 +73,7 @@ function ConsultarFormInner({ slug, timezone, onReset }: { slug: string; timezon
           <TimezoneNotice timezone={bookingTimezone} at={booking.startAt} />
           <div className="border-t border-border pt-3">
             <p className="text-sm font-medium">{booking.businessName}</p>
-            <p className="text-sm text-muted-foreground">
-              {formatPhoneBR(booking.businessPhone)}
-            </p>
+            <BusinessPhone phone={booking.businessPhone} />
           </div>
         </div>
         <div className="mt-4 flex flex-col items-center gap-1.5">

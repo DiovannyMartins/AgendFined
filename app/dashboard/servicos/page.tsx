@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBusiness } from "@/lib/business/queries";
-import { formatCurrencyBRL } from "@/lib/format/currency";
+import { formatServicePrice } from "@/lib/format/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles } from "lucide-react";
@@ -75,7 +75,7 @@ export default async function ServicosPage() {
                 </div>
                 <p className="mt-0.5 truncate text-sm text-muted-foreground">
                   {service.description || "Sem descrição"} · {service.duration_minutes} min ·{" "}
-                  {formatCurrencyBRL(service.price_cents)}
+                  {formatServicePrice(service.price_cents)}
                 </p>
               </div>
               <div className="flex items-center gap-3">

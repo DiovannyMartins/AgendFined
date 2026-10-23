@@ -157,3 +157,75 @@ describe("BusinessForm", () => {
     expect(updateBusiness).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("polimento pós-beta (#149)", () => {
+  beforeEach(() => vi.mocked(updateBusiness).mockReset());
+
+  it("sugere o slug a partir do nome no setup", () => {
+    render(<BusinessForm initial={null} />);
+
+    fireEvent.change(screen.getByLabelText("Nome do negócio"), { target: { value: "Estúdio Beta Teste" } });
+
+    expect(screen.getByLabelText("Endereço público (slug)")).toHaveValue("estudio-beta-teste");
+  });
+
+  it("para de sugerir depois que o dono edita o slug", () => {
+    render(<BusinessForm initial={null} />);
+
+    fireEvent.change(screen.getByLabelText("Endereço público (slug)"), { target: { value: "meu-estudio" } });
+    fireEvent.change(screen.getByLabelText("Nome do negócio"), { target: { value: "Estúdio Beta Teste" } });
+
+    expect(screen.getByLabelText("Endereço público (slug)")).toHaveValue("meu-estudio");
+  });
+
+  it("não troca o slug de um negócio existente ao renomear", () => {
+    render(<BusinessForm initial={initial} />);
+
+    fireEvent.change(screen.getByLabelText("Nome do negócio"), { target: { value: "Outro Nome" } });
+
+    expect(screen.getByLabelText("Endereço público (slug)")).toHaveValue("barbearia-demo");
+  });
+
+  it("pede confirmação antes de salvar um slug novo", async () => {
+    vi.mocked(updateBusiness).mockResolvedValue({ ok: true, data: undefined });
+    render(<BusinessForm initial={initial} />);
+
+    fireEvent.change(screen.getByLabelText("Endereço público (slug)"), { target: { value: "barbearia-nova" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent(/QR Codes impressos/);
+    expect(updateBusiness).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Trocar endereço" }));
+
+    await waitFor(() => expect(updateBusiness).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(updateBusiness).mock.calls[0][1].get("slug")).toBe("barbearia-nova");
+  });
+
+  it("não salva quando o dono mantém o endereço atual", async () => {
+    render(<BusinessForm initial={initial} />);
+
+    fireEvent.change(screen.getByLabelText("Endereço público (slug)"), { target: { value: "barbearia-nova" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Manter o endereço atual" }));
+
+    expect(updateBusiness).not.toHaveBeenCalled();
+  });
+
+  it("volta o fuso para o salvo quando o servidor recusa a troca", async () => {
+    vi.mocked(updateBusiness).mockResolvedValue({
+      ok: false,
+      code: "TIMEZONE_HAS_BOOKINGS",
+      message: "O fuso horário não pode ser alterado enquanto houver reservas futuras.",
+      fieldErrors: { timezone: ["Há reservas futuras neste negócio."] },
+    });
+    render(<BusinessForm initial={initial} />);
+
+    fireEvent.change(screen.getByLabelText("Fuso horário do negócio"), { target: { value: "America/Manaus" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+
+    expect(await screen.findByText("Há reservas futuras neste negócio.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Fuso horário do negócio")).toHaveValue("America/Sao_Paulo");
+  });
+});

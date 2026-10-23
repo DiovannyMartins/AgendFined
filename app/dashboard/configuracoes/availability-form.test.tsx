@@ -104,6 +104,27 @@ describe("faixa com erro mantém o que foi digitado", () => {
     await vi.waitFor(() => expect(mockedSet).toHaveBeenCalledTimes(1));
     await vi.waitFor(() => expect(screen.getByLabelText("Início")).toHaveValue("08:00"));
   });
+});
+
+describe("faixa em vários dias (#149)", () => {
+  it("envia segunda a sexta de uma vez com o atalho", async () => {
+    mockedSet.mockResolvedValueOnce({ ok: true, data: undefined });
+    render(<AvailabilityForm />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Marcar segunda a sexta" }));
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar faixa em 5 dias" }));
+
+    await vi.waitFor(() => expect(mockedSet).toHaveBeenCalledTimes(1));
+    expect(mockedSet.mock.calls[0][1].getAll("weekday")).toEqual(["2", "3", "4", "5", "6"]);
+  });
+
+  it("desabilita o envio sem nenhum dia marcado", () => {
+    render(<AvailabilityForm />);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Segunda" }));
+
+    expect(screen.getByRole("button", { name: "Adicionar faixa" })).toBeDisabled();
+  });
 
   it("edição mantém os novos horários depois de um erro", async () => {
     mockedUpdate.mockResolvedValueOnce(OVERLAP);

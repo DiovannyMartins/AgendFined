@@ -2,6 +2,7 @@ import { type NextFetchEvent, type NextRequest, NextResponse } from "next/server
 import { updateSession } from "@/lib/supabase/proxy";
 import { sendSecurityLog } from "@/lib/security/betterstack";
 import { buildContentSecurityPolicy } from "@/lib/security/content-security-policy";
+import { REQUEST_PATH_HEADER, requestPathOf } from "@/lib/auth/assurance";
 
 const PROTECTED_PREFIXES = ["/dashboard"];
 // /redefinir-senha is deliberately NOT in AUTH_ROUTES: it must remain reachable
@@ -20,6 +21,7 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
   requestHeaders.set("x-nonce", nonce);
   // Next.js reads the incoming CSP to apply this nonce to its framework scripts.
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicy);
+  requestHeaders.set(REQUEST_PATH_HEADER, requestPathOf(request.nextUrl));
   let response: NextResponse;
   if (
     /^\/(?:\.git|\.env|\.next|node_modules)(?:\/|$)/i.test(pathname) ||

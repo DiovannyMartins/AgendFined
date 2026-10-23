@@ -4,6 +4,7 @@ import { isAnalyticsAllowedPath, sanitizedPageLocation } from "./google-analytic
 describe("Google Analytics privacy boundary", () => {
   it("does not run on confirmation or authentication routes", () => {
     expect(isAnalyticsAllowedPath("/barbearia/confirmacao")).toBe(false);
+    expect(isAnalyticsAllowedPath("/barbearia/lista-de-espera/sair")).toBe(false);
     expect(isAnalyticsAllowedPath("/mfa")).toBe(false);
     expect(isAnalyticsAllowedPath("/redefinir-senha")).toBe(false);
     expect(isAnalyticsAllowedPath("/auth/callback")).toBe(false);

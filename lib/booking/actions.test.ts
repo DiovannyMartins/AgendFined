@@ -4,7 +4,7 @@ type SendResult = { sent: true } | { sent: false; reason: "not_configured" | "pr
 type RpcResult = { data: unknown; error: { message: string } | null };
 type RecordedQuery = { table: string; filters: [string, unknown][]; update: Record<string, unknown> | null };
 
-const { state, sendCustomerCancelledEmail, sendBookingConfirmationEmail, notifyOwner } = vi.hoisted(() => ({
+const { state, sendCustomerCancelledEmail, sendBookingConfirmationEmail, sendWaitlistJoinedEmail, notifyOwner } = vi.hoisted(() => ({
   state: {
     business: null as Record<string, unknown> | null,
     // Per-table overrides: the row `single` resolves to and the awaited list.
@@ -16,6 +16,7 @@ const { state, sendCustomerCancelledEmail, sendBookingConfirmationEmail, notifyO
   },
   sendCustomerCancelledEmail: vi.fn<(input: unknown) => Promise<SendResult>>(async () => ({ sent: true })),
   sendBookingConfirmationEmail: vi.fn<(input: unknown) => Promise<SendResult>>(async () => ({ sent: true })),
+  sendWaitlistJoinedEmail: vi.fn<(input: unknown) => Promise<SendResult>>(async () => ({ sent: true })),
   notifyOwner: vi.fn<(admin: unknown, event: string, booking: unknown) => Promise<void>>(async () => {}),
 }));
 
@@ -23,7 +24,7 @@ vi.mock("@/lib/booking/anti-bot", () => ({ verifyTurnstile: async () => ({ ok: t
 vi.mock("@/lib/booking/rate-limit", () => ({
   getClientIp: async () => "203.0.113.7",
   enforceRateLimit: async () => true,
-  enforceConsultRateLimit: async () => true,
+  enforceConsultRateLimit: vi.fn(async () => true),
 }));
 vi.mock("@/lib/bookings/classification", () => ({
   classifyCancellationReason: vi.fn(async () => null),
@@ -33,6 +34,7 @@ vi.mock("@/lib/bookings/classification", () => ({
 vi.mock("@/lib/google-calendar/sync", () => ({ syncGoogleCalendarBooking: vi.fn() }));
 vi.mock("@/lib/email/booking-cancellation", () => ({ sendCustomerCancelledEmail }));
 vi.mock("@/lib/email/booking-confirmation", () => ({ sendBookingConfirmationEmail }));
+vi.mock("@/lib/email/waitlist-joined", () => ({ sendWaitlistJoinedEmail }));
 vi.mock("@/lib/bookings/owner-notification", () => ({ notifyOwner }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => {
@@ -63,7 +65,9 @@ vi.mock("@/lib/supabase/admin", () => ({
   },
 }));
 
-import { cancelPublicBooking, consultBooking, createBooking, joinWaitlist } from "@/lib/booking/actions";
+import { createHash } from "node:crypto";
+import { cancelPublicBooking, consultBooking, createBooking, joinWaitlist, leaveWaitlist } from "@/lib/booking/actions";
+import { enforceConsultRateLimit } from "@/lib/booking/rate-limit";
 import { classifyCancellationReason } from "@/lib/bookings/classification";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
 
@@ -305,6 +309,161 @@ describe("joinWaitlist", () => {
         },
       ]);
     });
+  });
+
+  // #152: the cliente who gave an e-mail hears that the entrada exists and gets
+  // the private link to leave the list (ADR 0005 capability).
+  describe("e-mail de entrada", () => {
+    const futureInput = { ...validInput, date: "2030-01-15", customerEmail: "maria@example.com" };
+
+    beforeEach(() => {
+      vi.stubEnv("APP_URL", "https://agenda.example");
+      state.rpcCalls = [];
+      state.business = {
+        id: "business-1",
+        name: "Barbearia",
+        phone: "11987654321",
+        plan: "pro",
+        slot_interval_minutes: 30,
+        min_notice_minutes: 0,
+        booking_window_days: 365,
+        timezone: "America/Sao_Paulo",
+      };
+      state.singles = { services: { name: "Corte" } };
+      state.rpcResults = { join_waitlist: { data: { id: "entry-1" }, error: null } };
+      sendWaitlistJoinedEmail.mockReset();
+      sendWaitlistJoinedEmail.mockResolvedValue({ sent: true });
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.restoreAllMocks();
+      state.singles = {};
+      state.rpcResults = {};
+    });
+
+    it("stores only the digest and e-mails the raw token in the private leave link", async () => {
+      const result = await joinWaitlist(futureInput);
+
+      expect(result).toEqual({ ok: true, message: "Você entrou na lista de espera deste horário." });
+      const hash = state.rpcCalls[0].args.p_cancel_token_hash as string;
+      expect(hash).toMatch(/^[0-9a-f]{64}$/);
+      expect(sendWaitlistJoinedEmail).toHaveBeenCalledWith({
+        customerName: "Maria Souza",
+        customerEmail: "maria@example.com",
+        businessName: "Barbearia",
+        serviceName: "Corte",
+        startAt: "2030-01-15T12:00:00.000Z",
+        timezone: "America/Sao_Paulo",
+        businessPhone: "11987654321",
+        leaveUrl: expect.stringMatching(/^https:\/\/agenda\.example\/barbearia\/lista-de-espera\/sair#token=[A-Za-z0-9_-]{43}$/),
+      });
+      const { leaveUrl } = sendWaitlistJoinedEmail.mock.calls[0][0] as { leaveUrl: string };
+      const token = new URL(leaveUrl).hash.slice("#token=".length);
+      expect(createHash("sha256").update(token).digest("hex")).toBe(hash);
+    });
+
+    it("sends nothing when the cliente gave no e-mail", async () => {
+      const result = await joinWaitlist({ ...futureInput, customerEmail: "" });
+
+      expect(result.ok).toBe(true);
+      expect(state.rpcCalls[0].args.p_cancel_token_hash).toMatch(/^[0-9a-f]{64}$/);
+      expect(sendWaitlistJoinedEmail).not.toHaveBeenCalled();
+    });
+
+    it("sends nothing when the entrada was not written", async () => {
+      state.rpcResults = { join_waitlist: { data: null, error: { message: "WAITLIST_SLOT_NOT_OCCUPIED" } } };
+
+      const result = await joinWaitlist(futureInput);
+
+      expect(result).toMatchObject({ ok: false, code: "slot_free" });
+      expect(sendWaitlistJoinedEmail).not.toHaveBeenCalled();
+    });
+
+    it("keeps the entrada when the e-mail fails, logging without the token", async () => {
+      sendWaitlistJoinedEmail.mockResolvedValue({ sent: false, reason: "provider_error" });
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const result = await joinWaitlist(futureInput);
+
+      expect(result.ok).toBe(true);
+      expect(consoleError).toHaveBeenCalledWith("waitlist_joined_email_failed", {
+        entryId: "entry-1",
+        reason: "provider_error",
+      });
+    });
+
+    it("keeps the entrada when sending the e-mail throws", async () => {
+      sendWaitlistJoinedEmail.mockRejectedValue(new RangeError("Invalid time zone specified"));
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const result = await joinWaitlist(futureInput);
+
+      expect(result.ok).toBe(true);
+      expect(consoleError).toHaveBeenCalledWith("waitlist_joined_email_failed", {
+        entryId: "entry-1",
+        reason: "unexpected_error",
+      });
+    });
+  });
+});
+
+describe("leaveWaitlist", () => {
+  const token = "A".repeat(43);
+
+  function leaveForm(value = token): FormData {
+    const formData = new FormData();
+    formData.set("token", value);
+    return formData;
+  }
+
+  beforeEach(() => {
+    state.rpcCalls = [];
+    state.rpcResults = { cancel_waitlist_entry_by_token: { data: { id: "entry-1", status: "cancelled" }, error: null } };
+  });
+
+  afterEach(() => {
+    state.rpcResults = {};
+  });
+
+  it("sends only the token digest and leaves the list", async () => {
+    const result = await leaveWaitlist({ status: "idle" }, leaveForm());
+
+    expect(result).toEqual({ status: "done" });
+    expect(state.rpcCalls).toEqual([
+      {
+        name: "cancel_waitlist_entry_by_token",
+        args: { p_cancel_token_hash: createHash("sha256").update(token).digest("hex") },
+      },
+    ]);
+  });
+
+  it("refuses a malformed token without calling the database", async () => {
+    const result = await leaveWaitlist({ status: "idle" }, leaveForm("curto"));
+
+    expect(result).toMatchObject({ status: "error", code: "INVALID_TOKEN" });
+    expect(state.rpcCalls).toEqual([]);
+  });
+
+  it("answers every database rejection with the same generic message", async () => {
+    state.rpcResults = {
+      cancel_waitlist_entry_by_token: { data: null, error: { message: "WAITLIST_CANCELLATION_REJECTED" } },
+    };
+
+    const result = await leaveWaitlist({ status: "idle" }, leaveForm());
+
+    expect(result).toEqual(await leaveWaitlist({ status: "idle" }, leaveForm("curto")));
+    expect(result).toMatchObject({ status: "error", code: "INVALID_TOKEN" });
+  });
+
+  it("fails closed when rate limited or when the limiter is unavailable", async () => {
+    vi.mocked(enforceConsultRateLimit).mockResolvedValueOnce(false);
+    await expect(leaveWaitlist({ status: "idle" }, leaveForm())).resolves.toMatchObject({ code: "RATE_LIMITED" });
+
+    vi.mocked(enforceConsultRateLimit).mockRejectedValueOnce(new Error("limiter down"));
+    await expect(leaveWaitlist({ status: "idle" }, leaveForm())).resolves.toMatchObject({ code: "RATE_LIMITED" });
+
+    expect(state.rpcCalls).toEqual([]);
   });
 });
 

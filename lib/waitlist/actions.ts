@@ -6,13 +6,24 @@ import { createClient } from "@/lib/supabase/server";
 import { assertProPlan } from "@/lib/plan/plan";
 import { classifyOperationalError } from "@/lib/bookings/classification";
 import { generateCancelToken, hashCancelToken } from "@/lib/bookings/cancel";
-import { buildPrivateConfirmationPath } from "@/lib/bookings/private-confirmation";
+import { buildPrivateConfirmationPath, buildPrivateConfirmationUrl } from "@/lib/bookings/private-confirmation";
+import { buildPublicBookingUrl } from "@/lib/bookings/public-booking-url";
+import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
+import { sendWaitlistSlotFreedEmail } from "@/lib/email/waitlist-slot-freed";
+import { resolveAppOrigin } from "@/lib/app-origin";
 
 // Server actions for the waitlist management dashboard (issue #22, ADR 0008).
 // Managing the waitlist is a PROFISSIONAL feature, so both actions gate on the
 // business plan first (fail-closed) and only then hand off to the owner-scoped
 // RPCs. The public join (`joinWaitlist` in lib/booking/actions.ts) is untouched
 // and stays free.
+//
+// Once the RPC succeeds, both actions reach the cliente by e-mail (#152):
+// notifying sends "o horário ficou livre" with the public page link, and
+// converting sends the same confirmação as a public reserva, carrying the only
+// copy of the private cancellation link (ADR 0005). Delivery is best effort: a
+// cliente without e-mail, or a failed send, never undoes the transition; the
+// message tells the dono to reach the cliente another way.
 
 export type WaitlistActionResult = {
   ok: boolean;
@@ -21,8 +32,10 @@ export type WaitlistActionResult = {
   cancellationUrl?: string;
 };
 
+type ProBusiness = NonNullable<Awaited<ReturnType<typeof getCurrentBusiness>>>;
+
 async function requireProBusiness(): Promise<
-  { ok: true; slug: string } | { ok: false; message: string }
+  { ok: true; business: ProBusiness } | { ok: false; message: string }
 > {
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, message: "Configure seu negócio primeiro." };
@@ -30,7 +43,7 @@ async function requireProBusiness(): Promise<
   if (!gate.ok) {
     return { ok: false, message: "A gestão da lista de espera é exclusiva do plano PROFISSIONAL." };
   }
-  return { ok: true, slug: business.slug };
+  return { ok: true, business };
 }
 
 export async function notifyWaitlistEntry(
@@ -44,7 +57,7 @@ export async function notifyWaitlistEntry(
   if (!gate.ok) return gate;
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("notify_waitlist_entry", { p_entry_id: id });
+  const { data: entry, error } = await supabase.rpc("notify_waitlist_entry", { p_entry_id: id });
   if (error) {
     const msg = String(error.message ?? "");
     if (/WAITLIST_PRO_REQUIRED/i.test(msg)) {
@@ -67,7 +80,34 @@ export async function notifyWaitlistEntry(
   }
 
   revalidatePath("/dashboard/lista-de-espera");
-  return { ok: true };
+
+  if (!entry.customer_email) {
+    return { ok: true, message: "Sem e-mail cadastrado. Avise o cliente pelo telefone ou WhatsApp." };
+  }
+
+  const { business } = gate;
+  // The owner's own catálogo, read under RLS like the dashboard list.
+  const { data: service } = await supabase
+    .from("services")
+    .select("name")
+    .eq("id", entry.service_id)
+    .eq("business_id", business.id)
+    .maybeSingle();
+  const emailResult = await sendWaitlistSlotFreedEmail({
+    customerName: entry.customer_name,
+    customerEmail: entry.customer_email,
+    businessName: business.name,
+    businessPhone: business.phone,
+    serviceName: service?.name ?? "Serviço",
+    startAt: entry.start_at,
+    timezone: business.timezone,
+    bookingUrl: buildPublicBookingUrl(resolveAppOrigin(), business.slug),
+  });
+  if (!emailResult.sent) {
+    console.error("waitlist_slot_freed_email_failed", { entryId: id, reason: emailResult.reason });
+    return { ok: true, message: "Não foi possível enviar o e-mail. Avise o cliente pelo telefone ou WhatsApp." };
+  }
+  return { ok: true, message: `Aviso enviado por e-mail para ${entry.customer_email}.` };
 }
 
 export async function convertWaitlistEntry(
@@ -118,9 +158,32 @@ export async function convertWaitlistEntry(
 
   revalidatePath("/dashboard/lista-de-espera");
   revalidatePath("/dashboard/agenda");
-  return {
+
+  const { business } = gate;
+  const converted = {
     ok: true,
-    publicCode: data!.public_code,
-    cancellationUrl: buildPrivateConfirmationPath(gate.slug, data!.public_code, cancelToken),
+    publicCode: data.public_code,
+    cancellationUrl: buildPrivateConfirmationPath(business.slug, data.public_code, cancelToken),
   };
+
+  if (!data.customer_email_snapshot) {
+    return { ...converted, message: "Sem e-mail cadastrado. Envie ao cliente o link da confirmação privada." };
+  }
+
+  const emailResult = await sendBookingConfirmationEmail({
+    customerName: data.customer_name_snapshot,
+    customerEmail: data.customer_email_snapshot,
+    businessName: business.name,
+    serviceName: data.service_name_snapshot,
+    startAt: data.start_at,
+    timezone: business.timezone,
+    publicCode: data.public_code,
+    businessPhone: business.phone,
+    confirmationUrl: buildPrivateConfirmationUrl(resolveAppOrigin(), business.slug, data.public_code, cancelToken),
+  });
+  if (!emailResult.sent) {
+    console.error("booking_confirmation_email_failed", { bookingId: data.id, reason: emailResult.reason });
+    return { ...converted, message: "Não foi possível enviar o e-mail. Envie ao cliente o link da confirmação privada." };
+  }
+  return { ...converted, message: `Confirmação enviada por e-mail para ${data.customer_email_snapshot}.` };
 }

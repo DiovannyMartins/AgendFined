@@ -1,4 +1,5 @@
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
+import { randomBytes } from "node:crypto";
 import { adminClient, anonClient, anonClientForUser, retryOnFk } from "./index";
 import { futureSlot } from "./future-slot";
 
@@ -26,6 +27,8 @@ const SLOT_2 = futureSlot(0, 15);
 // occupied slot — a free slot should just be booked).
 const SLOT_WAIT = futureSlot(0, 16);
 const CANCEL_TOKEN_HASH = "f".repeat(64);
+// Each lista de espera entrada needs its own digest (unique index).
+const waitlistTokenHash = () => randomBytes(32).toString("hex");
 
 async function createBookingAt(startAt: string, phone: string) {
   const { data, error } = await admin.rpc("create_booking", {
@@ -201,6 +204,7 @@ describe("join_waitlist (INC-3)", () => {
       p_start_at: SLOT_WAIT,
       p_customer_name: "Maria",
       p_customer_phone: "+5511980000010",
+      p_cancel_token_hash: waitlistTokenHash(),
     };
     const first = await admin.rpc("join_waitlist", { ...args, p_customer_email: "a@b.com" });
     expect(first.error).toBeNull();
@@ -214,6 +218,7 @@ describe("join_waitlist (INC-3)", () => {
     const other = await admin.rpc("join_waitlist", {
       ...args,
       p_customer_phone: "+5511980000011",
+      p_cancel_token_hash: waitlistTokenHash(),
     });
     expect(other.data!.id).not.toBe(first.data!.id);
   });
@@ -225,6 +230,7 @@ describe("join_waitlist (INC-3)", () => {
       p_start_at: SLOT_2,
       p_customer_name: "Maria",
       p_customer_phone: "+5511980000012",
+      p_cancel_token_hash: waitlistTokenHash(),
     });
     expect(error).not.toBeNull();
     expect(String(error?.message).toLowerCase()).toMatch(/not_occupied|occupied|free/i);
@@ -237,6 +243,7 @@ describe("join_waitlist (INC-3)", () => {
       p_start_at: "2020-01-01T00:00:00.000Z",
       p_customer_name: "Maria",
       p_customer_phone: "+5511980000013",
+      p_cancel_token_hash: waitlistTokenHash(),
     });
     expect(error).not.toBeNull();
     expect(String(error?.message).toLowerCase()).toMatch(/past|waitlist/i);
@@ -250,6 +257,7 @@ describe("join_waitlist (INC-3)", () => {
       p_start_at: SLOT_WAIT,
       p_customer_name: "Maria",
       p_customer_phone: "+5511980000014",
+      p_cancel_token_hash: waitlistTokenHash(),
     });
     expect(error).not.toBeNull();
   });

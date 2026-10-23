@@ -17,6 +17,7 @@ export default function robots(): MetadataRoute.Robots {
         "/mfa",
         "/*/consultar",
         "/*/confirmacao",
+        "/*/lista-de-espera/",
       ],
     },
     sitemap: `${siteUrl}/sitemap.xml`,

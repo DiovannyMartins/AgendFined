@@ -601,6 +601,7 @@ export type Database = {
       waitlist_entries: {
         Row: {
           business_id: string
+          cancel_token_hash: string | null
           created_at: string
           customer_email: string | null
           customer_name: string
@@ -612,6 +613,7 @@ export type Database = {
         }
         Insert: {
           business_id: string
+          cancel_token_hash?: string | null
           created_at?: string
           customer_email?: string | null
           customer_name: string
@@ -623,6 +625,7 @@ export type Database = {
         }
         Update: {
           business_id?: string
+          cancel_token_hash?: string | null
           created_at?: string
           customer_email?: string | null
           customer_name?: string
@@ -937,6 +940,7 @@ export type Database = {
       join_waitlist: {
         Args: {
           p_business_id: string
+          p_cancel_token_hash?: string
           p_customer_email?: string
           p_customer_name: string
           p_customer_phone: string
@@ -945,6 +949,7 @@ export type Database = {
         }
         Returns: {
           business_id: string
+          cancel_token_hash: string | null
           created_at: string
           customer_email: string | null
           customer_name: string
@@ -965,6 +970,28 @@ export type Database = {
         Args: { p_entry_id: string }
         Returns: {
           business_id: string
+          cancel_token_hash: string | null
+          created_at: string
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string
+          id: string
+          service_id: string
+          start_at: string
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "waitlist_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      cancel_waitlist_entry_by_token: {
+        Args: { p_cancel_token_hash: string }
+        Returns: {
+          business_id: string
+          cancel_token_hash: string | null
           created_at: string
           customer_email: string | null
           customer_name: string

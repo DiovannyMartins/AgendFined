@@ -61,7 +61,7 @@ Capability aleatória de 256 bits, independente do public_code, entregue uma ún
 _Avoid_: Token de sessão, código de cancelamento, hash
 
 **Lista de espera**:
-Fila de clientes que desejam um horário específico (serviço + início) quando ele está ocupado; deduplicada por (negócio, serviço, início, telefone). Não cria reserva automaticamente.
+Fila de clientes que desejam um horário específico (serviço + início) quando ele está ocupado; deduplicada por (negócio, serviço, início, telefone). Não cria reserva automaticamente. O cliente que informa e-mail recebe um link privado para sair da lista, no mesmo contrato do token de cancelamento (ADR 0005).
 _Avoid_: Fila, agendamento pendente, banco de espera
 
 **No-show**:

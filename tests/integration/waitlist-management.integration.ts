@@ -1,4 +1,5 @@
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
+import { randomBytes } from "node:crypto";
 import { adminClient, anonClientForUser, retryOnFk } from "./index";
 import { futureSlot } from "./future-slot";
 import {
@@ -81,6 +82,7 @@ async function joinWaitlist(businessId: string, serviceId: string, startAt: stri
     p_start_at: startAt,
     p_customer_name: name,
     p_customer_phone: phone,
+    p_cancel_token_hash: randomBytes(32).toString("hex"),
     p_customer_email: `cli.${stamp}@agendfined.dev`,
   });
   expect(error).toBeNull();

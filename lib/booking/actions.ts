@@ -33,6 +33,8 @@ import { assertProPlan, getEffectiveBookingWindowDays } from "@/lib/plan/plan";
 import type { Plan } from "@/lib/plan/plan";
 import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
 import { sendCustomerCancelledEmail } from "@/lib/email/booking-cancellation";
+import { sendWaitlistJoinedEmail } from "@/lib/email/waitlist-joined";
+import { buildWaitlistLeaveUrl } from "@/lib/waitlist/leave-link";
 import { notifyOwner } from "@/lib/bookings/owner-notification";
 import {
   classifyCancellationReason,
@@ -558,6 +560,9 @@ export async function joinWaitlist(input: {
     return { ok: false, code: "no_future", message: "Esse horário já passou e não pode entrar na lista de espera." };
   }
 
+  // Same capability contract as the reserva (ADR 0005): only the digest is
+  // stored; the raw token goes once in the e-mail's private link to leave.
+  const cancelToken = generateCancelToken();
   const supabase = createAdminClient();
   const { data, error } = await supabase.rpc("join_waitlist", {
     p_business_id: business.id,
@@ -566,6 +571,7 @@ export async function joinWaitlist(input: {
     p_customer_name: parsed.data.customerName,
     p_customer_phone: parsed.data.customerPhone,
     p_customer_email: parsed.data.customerEmail || undefined,
+    p_cancel_token_hash: hashCancelToken(cancelToken),
   });
 
   if (error || !data) {
@@ -576,7 +582,112 @@ export async function joinWaitlist(input: {
     return { ok: false, code: "db_error", message: "Não foi possível entrar na lista de espera. Tente novamente." };
   }
 
+  const customerEmail = parsed.data.customerEmail;
+  if (customerEmail) {
+    await notifyWaitlistJoined(supabase, {
+      entryId: data.id,
+      customerName: parsed.data.customerName,
+      customerEmail,
+      serviceId: parsed.data.serviceId,
+      startAt: parsed.data.startAt,
+      business,
+      leaveUrl: buildWaitlistLeaveUrl(resolveAppOrigin(), input.slug, cancelToken),
+    });
+  }
+
   return { ok: true, message: "Você entrou na lista de espera deste horário." };
+}
+
+// Best effort, like the reserva's confirmação: a missing serviço or a provider
+// error never undoes the entrada; it is only logged, without the token.
+async function notifyWaitlistJoined(
+  supabase: ServerClient,
+  entry: {
+    entryId: string;
+    customerName: string;
+    customerEmail: string;
+    serviceId: string;
+    startAt: string;
+    business: ResolvedBusiness;
+    leaveUrl: string;
+  },
+): Promise<void> {
+  const logFailure = (reason: string) =>
+    console.error("waitlist_joined_email_failed", { entryId: entry.entryId, reason });
+
+  try {
+    const { data: service } = await supabase
+      .from("services")
+      .select("name")
+      .eq("id", entry.serviceId)
+      .eq("business_id", entry.business.id)
+      .single();
+    if (!service) return logFailure("service_not_found");
+
+    const result = await sendWaitlistJoinedEmail({
+      customerName: entry.customerName,
+      customerEmail: entry.customerEmail,
+      businessName: entry.business.name,
+      serviceName: service.name,
+      startAt: entry.startAt,
+      timezone: entry.business.timezone,
+      leaveUrl: entry.leaveUrl,
+      businessPhone: entry.business.phone,
+    });
+    if (!result.sent) logFailure(result.reason);
+  } catch {
+    logFailure("unexpected_error");
+  }
+}
+
+// Self-service exit from the lista de espera (#152). The token comes from the
+// private link in the "você está na lista de espera" e-mail; the RPC compares
+// its digest and moves pending/notified -> cancelled atomically. Every failure
+// gets the same answer (ADR 0005/0006).
+export type LeaveWaitlistState =
+  | { status: "idle" }
+  | { status: "done" }
+  | { status: "error"; code: "INVALID_TOKEN" | "RATE_LIMITED"; message: string };
+
+export async function leaveWaitlist(
+  _prev: LeaveWaitlistState,
+  formData: FormData,
+): Promise<LeaveWaitlistState> {
+  const token = String(formData.get("token") ?? "").trim();
+  if (!isValidCancelToken(token)) return leaveWaitlistRejected();
+
+  const supabase = createAdminClient();
+
+  const ip = await getClientIp();
+  let allowed: boolean;
+  try {
+    allowed = await enforceConsultRateLimit(supabase, ip);
+  } catch {
+    allowed = false;
+  }
+  if (!allowed) {
+    return {
+      status: "error",
+      code: "RATE_LIMITED",
+      message: "Muitas tentativas. Aguarde alguns minutos e tente novamente.",
+    };
+  }
+
+  const { error } = await supabase.rpc("cancel_waitlist_entry_by_token", {
+    p_cancel_token_hash: hashCancelToken(token),
+  });
+  if (error) return leaveWaitlistRejected();
+
+  return { status: "done" };
+}
+
+function leaveWaitlistRejected(): LeaveWaitlistState {
+  return {
+    status: "error",
+    code: "INVALID_TOKEN",
+    message:
+      "Não foi possível sair da lista de espera por este link. Talvez você já tenha saído ou o horário já tenha sido reservado para você.",
+  };
 }
 
 // Shared preamble for the anonymous public writes (createBooking, joinWaitlist):

@@ -11,7 +11,8 @@ export function isAnalyticsAllowedPath(pathname: string): boolean {
   if (SENSITIVE_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
     return false;
   }
-  return !/^\/[^/]+\/confirmacao\/?$/.test(pathname);
+  // Both pages receive a private capability in the URL fragment (ADR 0005).
+  return !/^\/[^/]+\/(confirmacao|lista-de-espera\/sair)\/?$/.test(pathname);
 }
 
 export function sanitizedPageLocation(origin: string, pathname: string): string {

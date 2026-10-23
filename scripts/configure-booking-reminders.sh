@@ -200,6 +200,10 @@ cli_path() {
   fi
 }
 
+# strip_cr VALUE drops the CR a CRLF .env file leaves on every value (#154: a
+# "\r" inside the cron URL silently broke every reminder dispatch).
+strip_cr() { printf '%s' "${1//$'\r'/}"; }
+
 TEMP_ENV_FILE=""
 TEMP_CRON_SQL=""
 cleanup() {
@@ -221,7 +225,7 @@ if [[ -z "$RESEND_API_KEY" || -z "$RESEND_FROM_EMAIL" ]]; then
   warn "A API key e o remetente são obrigatórios."
   exit 1
 fi
-REMINDER_CRON_SECRET="$(_existing REMINDER_CRON_SECRET || true)"
+REMINDER_CRON_SECRET="$(strip_cr "$(_existing REMINDER_CRON_SECRET || true)")"
 if [[ -n "$REMINDER_CRON_SECRET" ]]; then
   note "Reutilizando o segredo do cron já salvo; ele não será exibido."
 elif command -v openssl >/dev/null 2>&1; then
@@ -250,9 +254,14 @@ fi
 if [[ -z "$SUPABASE_URL" ]]; then
   ask SUPABASE_URL "URL do projeto Supabase:"
 fi
+SUPABASE_URL="$(strip_cr "$SUPABASE_URL")"
 SUPABASE_URL="${SUPABASE_URL%/}"
 if [[ -z "$SUPABASE_URL" ]]; then
   warn "A URL do projeto Supabase é obrigatória."
+  exit 1
+fi
+if [[ ! "$SUPABASE_URL" =~ ^https://[^[:space:][:cntrl:]\']+$ ]]; then
+  warn "A URL do projeto Supabase deve ser https:// sem espaços, aspas ou caracteres de controle."
   exit 1
 fi
 TEMP_CRON_SQL="$(mktemp .reminder-cron.XXXXXX)"
@@ -276,7 +285,8 @@ stage "Verificação"
 step "Confirmando que os secrets existem sem imprimir seus valores."
 npx supabase secrets list
 step "Confirmando o job do pg_cron sem mostrar o comando que contém o segredo."
-npx supabase db query --linked "select jobname, schedule, active from cron.job where jobname = 'booking-reminders';"
+npx supabase db query --linked "select public.get_booking_reminders_health();"
+note "Espere dispatch_configured e url_valid = true."
 note "A verificação não dispara e-mails imediatamente; os próximos ticks processarão reservas elegíveis."
 
 finish

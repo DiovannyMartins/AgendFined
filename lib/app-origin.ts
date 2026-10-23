@@ -12,3 +12,17 @@ export function resolveAppOrigin(): URL {
     return new URL(FALLBACK_ORIGIN);
   }
 }
+
+// Origin for redirects back into the app (auth callback, checkout return).
+// Reads APP_URL, then NEXT_PUBLIC_APP_URL, so the redirect never depends on
+// the request's Host; without a valid configured value it keeps the request's
+// own origin.
+export function trustedAppOrigin(requestOrigin: string): string {
+  const configured = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+  if (!configured) return requestOrigin;
+  try {
+    return new URL(configured).origin;
+  } catch {
+    return requestOrigin;
+  }
+}

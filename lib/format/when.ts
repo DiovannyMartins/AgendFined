@@ -51,6 +51,16 @@ export function formatWhen(iso: string, timezone: string = APP_TIMEZONE): string
   return `${value("day")}/${value("month")}/${value("year")} às ${value("hour")}:${value("minute")}`;
 }
 
+// The calendar date of an instant in the business timezone: "27/10/2026".
+export function formatDate(iso: string, timezone: string = APP_TIMEZONE): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: timezone,
+  }).format(new Date(iso));
+}
+
 // A slot is already a calendar date and time in the business timezone
 // (`YYYY-MM-DD` + `HH:mm`), so it is formatted as is, with no UTC conversion:
 // "terça-feira, 20/10/2026 às 09:00".

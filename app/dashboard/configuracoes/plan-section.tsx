@@ -2,9 +2,12 @@ import { Check, Crown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { isProPlan } from "@/lib/plan/plan";
 import { getSubscription } from "@/lib/billing/get-subscription";
+import { graceEnd } from "@/lib/billing/grace";
+import { graceNotice, type GraceNotice } from "@/lib/billing/grace-notice";
 import { PLAN_INFO } from "@/lib/billing/plans";
-import { isSubscriptionInGrace, type BillingPlan, type SubscriptionStatus } from "@/lib/billing/types";
-import { GraceCountdown } from "./grace-countdown";
+import type { BillingPlan, SubscriptionStatus } from "@/lib/billing/types";
+import { APP_TIMEZONE } from "@/lib/app-timezone";
+import { formatDate } from "@/lib/format/when";
 import { RetryUpgradeButton } from "./retry-upgrade-button";
 import { UpgradeButton } from "./upgrade-button";
 import { CancelSubscriptionButton } from "./cancel-subscription-button";
@@ -12,24 +15,44 @@ import { CancelSubscriptionButton } from "./cancel-subscription-button";
 const STATUS_LABEL: Record<SubscriptionStatus, string> = {
   pending: "Checkout não concluído",
   authorized: "Assinatura ativa",
-  paused: "Assinatura pausada",
+  paused: "Cobrança recusada",
   cancelled: "Assinatura cancelada",
 };
 
 const STATUS_BADGE: Record<SubscriptionStatus, { label: string; variant: "default" | "secondary" | "destructive" }> = {
   pending: { label: "Pendente", variant: "secondary" },
   authorized: { label: "Ativo", variant: "default" },
-  paused: { label: "Pausado", variant: "secondary" },
+  paused: { label: "Cobrança recusada", variant: "destructive" },
   cancelled: { label: "Cancelado", variant: "destructive" },
 };
 
-export async function PlanSection({ business }: { business: { id: string; plan: BillingPlan } }) {
-  const { plan, subscription, graceSubscription } = await getSubscription(business);
+// What the carência means for the dono, with the date the PROFISSIONAL ends
+// (issue #151). A failed payment asks for a new payment method; it is not a
+// cancellation.
+function graceMessage(notice: GraceNotice, activeUntil: string): string {
+  if (notice.checkoutInProgress) {
+    return `Novo pagamento em andamento. Seu PROFISSIONAL fica ativo até ${activeUntil}; se o pagamento não for concluído, o plano volta para Grátis.`;
+  }
+  if (notice.reason === "payment_failed") {
+    return `Não conseguimos cobrar a sua assinatura. Atualize a forma de pagamento até ${activeUntil} para manter o PROFISSIONAL.`;
+  }
+  return `Seu PROFISSIONAL fica ativo até ${activeUntil}. Depois, o negócio volta ao Grátis, sem perder dados.`;
+}
+
+export async function PlanSection({
+  business,
+}: {
+  business: { id: string; plan: BillingPlan; timezone?: string };
+}) {
+  const result = await getSubscription(business);
+  const { plan, subscription } = result;
+  const timezone = business.timezone ?? APP_TIMEZONE;
+  const now = new Date();
   const info = PLAN_INFO[plan];
   const proInfo = PLAN_INFO.pro;
   const isPro = isProPlan(plan);
   const status = subscription?.status ?? null;
-  const pendingGrace = status === "pending" ? graceSubscription : null;
+  const pendingGrace = status === "pending" ? result.graceSubscription : null;
   // Re-subscribe during the grace window: the latest row is `pending` (new
   // checkout) while an older `paused`/`cancelled` row still grants Pro. Show
   // the grace — not the pending checkout — as the subscription status, so a
@@ -37,14 +60,26 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
   const pendingDuringGrace = pendingGrace !== null;
   const displayStatus = pendingGrace ? pendingGrace.status : status;
   const showSubscriptionStatus = isPro || status !== "pending";
-  // Live countdown target: the pending checkout hides the grace row, so use
-  // the older grace row; otherwise use the current row's own grace.
-  const graceEnd =
-    pendingGrace?.gracePeriodEnd
-      ? pendingGrace.gracePeriodEnd
-      : isSubscriptionInGrace(status) && subscription?.gracePeriodEnd
-        ? subscription.gracePeriodEnd
-        : null;
+  const notice = graceNotice(result, now);
+  const nextCharge =
+    subscription?.status === "authorized" && subscription.currentPeriodEnd
+      ? formatDate(subscription.currentPeriodEnd, timezone)
+      : null;
+  // Preview for the cancel dialog. The action reads the paid period from the
+  // Mercado Pago before cancelling (ADR 0008); without a local next charge
+  // date, only the 7-day minimum is known here.
+  const paidPeriodKnown =
+    !!subscription?.currentPeriodEnd && Date.parse(subscription.currentPeriodEnd) > now.getTime();
+  const cancelActiveUntil =
+    subscription?.status === "authorized"
+      ? {
+          date: formatDate(
+            graceEnd({ now, paidPeriodEnd: paidPeriodKnown ? subscription.currentPeriodEnd : null }),
+            timezone,
+          ),
+          atLeast: !paidPeriodKnown,
+        }
+      : null;
 
   const badge = isPro
     ? displayStatus
@@ -100,22 +135,14 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
                   {displayStatus ? STATUS_LABEL[displayStatus] : "Sem assinatura"}
                 </span>
               </p>
-              {pendingDuringGrace && (
+              {notice && (
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Novo pagamento em andamento. Você mantém o PROFISSIONAL até o fim da carência
-                  {graceEnd && (
-                    <>
-                      {" ("}
-                      <GraceCountdown gracePeriodEnd={graceEnd} />
-                      {")"}
-                    </>
-                  )}
-                  ; se o pagamento não for concluído, o plano volta para Grátis.
+                  {graceMessage(notice, formatDate(notice.activeUntil, timezone))}
                 </p>
               )}
-              {!pendingDuringGrace && graceEnd && (
+              {nextCharge && (
                 <p className="mt-1 text-sm text-muted-foreground">
-                  <GraceCountdown gracePeriodEnd={graceEnd} />
+                  Próxima cobrança em <span className="font-medium text-foreground">{nextCharge}</span>.
                 </p>
               )}
 
@@ -132,7 +159,16 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
             </div>
           )}
 
-          {isPro && isSubscriptionInGrace(subscription?.status) && (
+          {isPro && subscription?.status === "paused" && (
+            <div className="border-t border-border pt-4">
+              <p className="text-sm text-muted-foreground">
+                Você vai abrir um novo checkout no Mercado Pago para cadastrar outro cartão.
+              </p>
+              <UpgradeButton label="Atualizar forma de pagamento" />
+            </div>
+          )}
+
+          {isPro && subscription?.status === "cancelled" && (
             <div className="border-t border-border pt-4">
               <p className="text-sm text-muted-foreground">
                 Mudou de ideia? Reative a assinatura para continuar no plano PROFISSIONAL.
@@ -141,12 +177,12 @@ export async function PlanSection({ business }: { business: { id: string; plan: 
             </div>
           )}
 
-          {subscription?.status === "authorized" && (
+          {cancelActiveUntil && (
             <div className="border-t border-border pt-4">
               <p className="text-sm text-muted-foreground">
                 A assinatura é recorrente mensal. Ao cancelar, novas cobranças são interrompidas conforme o processamento do Mercado Pago; os recursos PROFISSIONAL permanecem disponíveis até o fim do mês já pago, e por no mínimo 7 dias, e depois o negócio volta ao Grátis.
               </p>
-              <CancelSubscriptionButton />
+              <CancelSubscriptionButton activeUntil={cancelActiveUntil} />
             </div>
           )}
         </div>

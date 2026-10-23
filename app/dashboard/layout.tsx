@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { DashboardNav } from "./nav";
+import { GraceBanner } from "./grace-banner";
 import { REQUEST_PATH_HEADER, mfaChallengePath, requiresMfaChallenge } from "@/lib/auth/assurance";
 
 export const metadata: Metadata = {
@@ -31,7 +32,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <div className="flex w-full flex-col lg:flex-row">
         <DashboardNav slug={business?.slug ?? null} />
         <main id="main-content" className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-10 lg:py-10">
-          <div className="mx-auto max-w-6xl">{children}</div>
+          <div className="mx-auto max-w-6xl">
+            {business && (
+              <GraceBanner business={{ id: business.id, plan: business.plan, timezone: business.timezone }} />
+            )}
+            {children}
+          </div>
         </main>
       </div>
     </div>

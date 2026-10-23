@@ -10,6 +10,7 @@ import type { Database } from "@/lib/supabase/database-types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getProPriceCents } from "@/lib/plan/catalog";
 import { createMercadoPagoProvider } from "./mercado-pago";
+import { notifyPaymentFailed } from "./payment-failed-notification";
 import {
   handleWebhook,
   type AppliedSubscriptionSnapshot,
@@ -129,6 +130,7 @@ export async function runMercadoPagoWebhook(
     reportDoubleCharge: (input) =>
       console.error(JSON.stringify({ event: "billing_double_charge", ...input })),
     ...createCheckoutTermsReporting(),
+    notifyPaymentFailed: (input) => notifyPaymentFailed(createAdminClient(), input),
     graceDays: config.graceDays,
   });
 }

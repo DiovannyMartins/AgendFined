@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getSubscription } from "@/lib/billing/get-subscription";
+import type { BillingSubscription } from "@/lib/billing/types";
 import { PlanSection } from "./plan-section";
 
 vi.mock("@/lib/billing/get-subscription", () => ({
@@ -18,7 +19,11 @@ vi.mock("./upgrade-button", () => ({
 }));
 
 vi.mock("./cancel-subscription-button", () => ({
-  CancelSubscriptionButton: () => <button type="button">Cancelar assinatura</button>,
+  CancelSubscriptionButton: ({ activeUntil }: { activeUntil: { date: string; atLeast: boolean } }) => (
+    <button type="button" data-active-until={activeUntil.date} data-at-least={String(activeUntil.atLeast)}>
+      Cancelar assinatura
+    </button>
+  ),
 }));
 
 vi.mock("./retry-upgrade-button", () => ({
@@ -27,8 +32,28 @@ vi.mock("./retry-upgrade-button", () => ({
   ),
 }));
 
+const NOW = new Date("2026-10-20T15:00:00.000Z");
+
+function subscription(overrides: Partial<BillingSubscription>): BillingSubscription {
+  return {
+    mpPreapprovalId: "mp_1",
+    status: "authorized",
+    plan: "pro",
+    currentPeriodStart: null,
+    currentPeriodEnd: null,
+    gracePeriodEnd: null,
+    ...overrides,
+  };
+}
+
 describe("PlanSection", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
     vi.mocked(getSubscription).mockResolvedValue({
       plan: "free",
       subscription: null,
@@ -97,5 +122,89 @@ describe("PlanSection", () => {
     expect(screen.getByText(/R\$ 19,90/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Fazer upgrade" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Assinar PROFISSIONAL" })).not.toBeInTheDocument();
+  });
+
+  it("tells a failed payment apart from a cancellation and asks for a new payment method", async () => {
+    vi.mocked(getSubscription).mockResolvedValue({
+      plan: "pro",
+      subscription: subscription({ status: "paused", gracePeriodEnd: "2026-10-27T15:00:00.000Z" }),
+      graceSubscription: null,
+    });
+
+    render(await PlanSection({ business: { id: "biz_1", plan: "pro", timezone: "America/Sao_Paulo" } }));
+
+    expect(
+      screen.getByText(
+        "Não conseguimos cobrar a sua assinatura. Atualize a forma de pagamento até 27/10/2026 para manter o PROFISSIONAL.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Atualizar forma de pagamento" })).toBeInTheDocument();
+    expect(screen.queryByText(/Mudou de ideia/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Termina em/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancelar assinatura" })).not.toBeInTheDocument();
+  });
+
+  it("says until when a cancelled assinatura keeps the PROFISSIONAL, as a date", async () => {
+    vi.mocked(getSubscription).mockResolvedValue({
+      plan: "pro",
+      subscription: subscription({ status: "cancelled", gracePeriodEnd: "2026-11-21T15:00:00.000Z" }),
+      graceSubscription: null,
+    });
+
+    render(await PlanSection({ business: { id: "biz_1", plan: "pro", timezone: "America/Sao_Paulo" } }));
+
+    expect(
+      screen.getByText("Seu PROFISSIONAL fica ativo até 21/11/2026. Depois, o negócio volta ao Grátis, sem perder dados."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Assinar novamente" })).toBeInTheDocument();
+    expect(screen.queryByText(/Termina em/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the grace date while a new checkout is still unpaid", async () => {
+    vi.mocked(getSubscription).mockResolvedValue({
+      plan: "pro",
+      subscription: subscription({ mpPreapprovalId: "mp_new", status: "pending" }),
+      graceSubscription: subscription({ status: "paused", gracePeriodEnd: "2026-10-27T15:00:00.000Z" }),
+    });
+
+    render(await PlanSection({ business: { id: "biz_1", plan: "pro", timezone: "America/Sao_Paulo" } }));
+
+    expect(
+      screen.getByText(
+        "Novo pagamento em andamento. Seu PROFISSIONAL fica ativo até 27/10/2026; se o pagamento não for concluído, o plano volta para Grátis.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Concluir pagamento" })).toBeInTheDocument();
+  });
+
+  it("shows the next charge of an active assinatura and previews it in the cancel dialog", async () => {
+    vi.mocked(getSubscription).mockResolvedValue({
+      plan: "pro",
+      subscription: subscription({ currentPeriodEnd: "2026-11-21T15:00:00.000Z" }),
+      graceSubscription: null,
+    });
+
+    render(await PlanSection({ business: { id: "biz_1", plan: "pro", timezone: "America/Sao_Paulo" } }));
+
+    expect(screen.getByText("21/11/2026")).toBeInTheDocument();
+    expect(screen.getByText(/Próxima cobrança em/)).toBeInTheDocument();
+    const cancel = screen.getByRole("button", { name: "Cancelar assinatura" });
+    expect(cancel).toHaveAttribute("data-active-until", "21/11/2026");
+    expect(cancel).toHaveAttribute("data-at-least", "false");
+  });
+
+  it("promises only the 7-day minimum in the cancel dialog without a known next charge", async () => {
+    vi.mocked(getSubscription).mockResolvedValue({
+      plan: "pro",
+      subscription: subscription({}),
+      graceSubscription: null,
+    });
+
+    render(await PlanSection({ business: { id: "biz_1", plan: "pro", timezone: "America/Sao_Paulo" } }));
+
+    expect(screen.queryByText(/Próxima cobrança em/)).not.toBeInTheDocument();
+    const cancel = screen.getByRole("button", { name: "Cancelar assinatura" });
+    expect(cancel).toHaveAttribute("data-active-until", "27/10/2026");
+    expect(cancel).toHaveAttribute("data-at-least", "true");
   });
 });

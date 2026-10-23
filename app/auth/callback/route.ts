@@ -1,16 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { type NextRequest } from "next/server";
-
-function trustedOrigin(requestOrigin: string): string {
-  const configured = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
-  if (!configured) return requestOrigin;
-  try {
-    return new URL(configured).origin;
-  } catch {
-    return requestOrigin;
-  }
-}
+import { trustedAppOrigin } from "@/lib/app-origin";
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -35,8 +26,8 @@ export async function GET(request: NextRequest) {
   }
 
   if (!error) {
-    return NextResponse.redirect(`${trustedOrigin(origin)}${next}`);
+    return NextResponse.redirect(`${trustedAppOrigin(origin)}${next}`);
   }
 
-  return NextResponse.redirect(`${trustedOrigin(origin)}/login?error=auth`);
+  return NextResponse.redirect(`${trustedAppOrigin(origin)}/login?error=auth`);
 }

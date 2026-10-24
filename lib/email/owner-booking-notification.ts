@@ -17,8 +17,14 @@ type OwnerBookingNotification = {
   startAt: string;
   timezone: string;
   publicCode: string;
+  // What the cliente wrote when booking (alergia, acessibilidade, preferência)
+  // and whether it needs reading before the atendimento, as the agenda shows (#179).
+  customerNote?: string | null;
+  customerNoteRequiresFollowUp?: boolean;
   agendaUrl: string;
 };
+
+const NOTE_ATTENTION = "Leia a observação antes do atendimento.";
 
 type Wording = {
   label: string;
@@ -56,6 +62,15 @@ function detailRows(rows: [label: string, value: string, style?: string][]): str
                   </tr>`,
     )
     .join("\n");
+}
+
+function noteRow(input: OwnerBookingNotification): [label: string, value: string, style?: string][] {
+  const note = input.customerNote?.trim();
+  if (!note) return [];
+  const attention = input.customerNoteRequiresFollowUp
+    ? `<span style="display:block;margin-bottom:6px;color:#f5b041;font-size:13px;font-weight:700;">${NOTE_ATTENTION}</span>`
+    : "";
+  return [["OBSERVAÇÃO", `${attention}${escapeHtml(note).replace(/\r?\n/g, "<br>")}`, "font-weight:400;"]];
 }
 
 function buildOwnerNotificationHtml(
@@ -102,6 +117,7 @@ ${detailRows([
   ["SERVIÇO", escapeHtml(input.serviceName)],
   ["DATA E HORÁRIO", escapeHtml(formattedWhen), wording.strikeWhen ? "text-decoration:line-through;" : ""],
   ["CÓDIGO DA RESERVA", escapeHtml(formatPublicCode(input.publicCode)), "color:#ffffff;font-size:17px;letter-spacing:1.4px;"],
+  ...noteRow(input),
 ])}
                 </table>
 
@@ -129,6 +145,7 @@ ${detailRows([
 
 async function sendOwnerNotification(input: OwnerBookingNotification, wording: Wording): Promise<SendResult> {
   const formattedWhen = formatWhenWithTimezone(input.startAt, input.timezone);
+  const note = input.customerNote?.trim();
   const text = [
     wording.heading,
     "",
@@ -138,6 +155,7 @@ async function sendOwnerNotification(input: OwnerBookingNotification, wording: W
     `Serviço: ${input.serviceName}`,
     `Data e horário: ${formattedWhen}`,
     `Código da reserva: ${formatPublicCode(input.publicCode)}`,
+    ...(note ? [`Observação: ${note}`, ...(input.customerNoteRequiresFollowUp ? [NOTE_ATTENTION] : [])] : []),
     "",
     `Abrir agenda: ${input.agendaUrl}`,
   ].join("\n");

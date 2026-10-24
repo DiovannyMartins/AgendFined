@@ -68,7 +68,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 import { createHash } from "node:crypto";
 import { cancelPublicBooking, consultBooking, createBooking, joinWaitlist, leaveWaitlist } from "@/lib/booking/actions";
 import { enforceConsultRateLimit } from "@/lib/booking/rate-limit";
-import { classifyCancellationReason } from "@/lib/bookings/classification";
+import { classifyCancellationReason, classifyCustomerNote } from "@/lib/bookings/classification";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
 
 describe("consultBooking", () => {
@@ -201,7 +201,26 @@ describe("createBooking", () => {
         startAt: "2026-10-20T12:00:00.000Z",
         timezone: "America/Sao_Paulo",
         publicCode: "65925DBB",
+        customerNote: null,
+        customerNoteRequiresFollowUp: false,
       });
+    });
+
+    // #179: o e-mail do dono traz a observação e o mesmo destaque da agenda.
+    it("passes the observação and its follow-up flag to the dono's e-mail", async () => {
+      vi.mocked(classifyCustomerNote).mockReturnValueOnce({
+        category: "accessibility",
+        categoryConfidence: 0.82,
+        requiresManualFollowUp: true,
+      });
+
+      await createBooking({ ...validInput, customerNote: "Uso cadeira de rodas" });
+
+      expect(notifyOwner).toHaveBeenCalledWith(
+        expect.anything(),
+        "new_booking",
+        expect.objectContaining({ customerNote: "Uso cadeira de rodas", customerNoteRequiresFollowUp: true }),
+      );
     });
 
     it("accepts a horário that crosses the junção of faixas encostadas (#147)", async () => {

@@ -60,6 +60,42 @@ describe("sendOwnerNewBookingEmail", () => {
     expect(body.html).not.toContain("<cliente>");
   });
 
+  // #179: a observação (alergia, acessibilidade, preferência) é o que o dono
+  // precisa ler antes do atendimento.
+  it("includes the cliente's observação, escaped, when there is one", async () => {
+    const request = stubResend();
+
+    await sendOwnerNewBookingEmail({ ...input, customerNote: "Alergia a <amônia> & tintas\nchego cedo" });
+
+    const body = request();
+    expect(body.text).toContain("Observação: Alergia a <amônia> & tintas\nchego cedo");
+    expect(body.html).toContain("OBSERVAÇÃO");
+    expect(body.html).toContain("Alergia a &lt;amônia&gt; &amp; tintas<br>chego cedo");
+    expect(body.html).not.toContain("<amônia>");
+    expect(body.text).not.toContain("Leia a observação antes do atendimento.");
+  });
+
+  it("highlights an observação that needs attention before the atendimento", async () => {
+    const request = stubResend();
+
+    await sendOwnerNewBookingEmail({ ...input, customerNote: "Uso cadeira de rodas", customerNoteRequiresFollowUp: true });
+
+    const body = request();
+    expect(body.text).toContain("Leia a observação antes do atendimento.");
+    expect(body.html).toContain("Leia a observação antes do atendimento.");
+  });
+
+  it("leaves the observação out when the cliente wrote none", async () => {
+    const request = stubResend();
+
+    await sendOwnerNewBookingEmail({ ...input, customerNote: "   ", customerNoteRequiresFollowUp: true });
+
+    const body = request();
+    expect(body.text).not.toContain("Observação");
+    expect(body.html).not.toContain("OBSERVAÇÃO");
+    expect(body.html).not.toContain("Leia a observação");
+  });
+
   it("reports a missing provider configuration instead of throwing", async () => {
     await expect(sendOwnerNewBookingEmail(input)).resolves.toEqual({ sent: false, reason: "not_configured" });
   });

@@ -15,7 +15,9 @@ export const metadata: Metadata = {
   title: "AgendFined — Agendamentos online para profissionais",
   description:
     "Receba agendamentos online, organize seus horários e ofereça uma experiência mais profissional aos seus clientes.",
-  alternates: { canonical: "/" },
+  // No canonical here: every page inherits it, and a canonical pointing at the
+  // home tells search engines /privacidade and /termos are copies of it. Each
+  // indexable page declares its own; noindex pages need none.
   openGraph: {
     type: "website",
     locale: "pt_BR",

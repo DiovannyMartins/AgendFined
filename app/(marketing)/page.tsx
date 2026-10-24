@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -19,6 +20,9 @@ import { Reveal } from "@/components/reveal";
 import { Faq } from "./faq";
 import { Plans } from "./plans";
 import { Hero } from "@/components/marketing/hero";
+
+// Title, description and social cards come from the root layout.
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 const benefits = [
   {

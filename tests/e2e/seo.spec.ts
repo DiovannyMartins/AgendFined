@@ -29,4 +29,14 @@ test("public SEO endpoints are available", async ({ page, request }) => {
 test("private auth route is marked noindex", async ({ page }) => {
   await page.goto("/login");
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+  // A noindex page does not borrow the home's canonical.
+  await expect(page.locator('link[rel="canonical"]')).toHaveCount(0);
+});
+
+test("legal pages declare their own canonical", async ({ page }) => {
+  await page.goto("/privacidade");
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    "href",
+    "https://agendfined.com.br/privacidade",
+  );
 });

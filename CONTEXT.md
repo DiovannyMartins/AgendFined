@@ -8,6 +8,10 @@ O AgendFined é uma plataforma SaaS de agendamento online para profissionais e p
 A organização profissional que oferece serviços e recebe reservas. É o dono da agenda. No MVP, cada usuário autenticado possui exatamente um negócio.
 _Avoid_: Empresa, comerciante, prestador, estabelecimento
 
+**Negócio fora da busca**:
+Negócio ativo cuja página pública funciona e recebe reservas, mas que fica fora do sitemap e é marcada `noindex` (`businesses.search_indexing_enabled = false`). Usado para os negócios de teste em produção. Um negócio inativo (`is_active = false`) não tem página pública.
+_Avoid_: Negócio oculto, negócio privado
+
 **Cliente**:
 Pessoa que reserva um serviço. Não possui conta; os dados são coletados no fluxo de reserva.
 _Avoid_: Usuário, consumidor, lead, paciente

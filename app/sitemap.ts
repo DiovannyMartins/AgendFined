@@ -28,7 +28,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const { data, error } = await supabase
       .from("businesses")
       .select("slug, updated_at")
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .eq("search_indexing_enabled", true);
 
     if (error) return staticRoutes;
 

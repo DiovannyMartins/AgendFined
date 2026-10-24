@@ -3,6 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  GOOGLE_CALENDAR_REAUTH_REQUIRED,
   decryptGoogleToken,
   encryptGoogleToken,
   refreshGoogleAccessToken,
@@ -243,9 +244,12 @@ export async function syncGoogleCalendarForBusiness(businessId: string): Promise
 
 export async function runGoogleCalendarSyncBatch(): Promise<{ connections: number; synced: number; deleted: number; failed: number }> {
   const admin = createAdminClient();
+  // A connection waiting for the owner to reconnect would fail every run;
+  // reconnecting clears last_error and brings it back into the batch.
   const { data: connections, error } = await admin.from("google_calendar_connections")
     .select("business_id,businesses!inner(plan)")
     .eq("businesses.plan", "pro")
+    .or(`last_error.is.null,last_error.neq.${GOOGLE_CALENDAR_REAUTH_REQUIRED}`)
     .order("updated_at", { ascending: true }).limit(25);
   if (error) throw new Error("GOOGLE_CALENDAR_CONNECTIONS_LOAD_FAILED");
   let synced = 0;

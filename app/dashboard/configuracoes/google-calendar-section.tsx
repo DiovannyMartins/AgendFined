@@ -57,7 +57,11 @@ export function GoogleCalendarSection({ connection, isPro, callbackStatus }: { c
                 </div>
               )}
               {connection.lastSyncAt && <p className="mt-1 text-muted-foreground">Última sincronização: {new Date(connection.lastSyncAt).toLocaleString("pt-BR")}</p>}
-              {connection.lastError && <p className="mt-2 text-sm text-destructive">A última sincronização falhou. Tente sincronizar novamente ou reconecte a conta.</p>}
+              {connection.needsReconnect ? (
+                <p className="mt-2 text-sm text-destructive">O Google não autoriza mais o acesso à sua agenda, então as reservas pararam de ir para o Google Calendar. Desconecte e conecte o Google Calendar de novo.</p>
+              ) : (
+                connection.lastError && <p className="mt-2 text-sm text-destructive">A última sincronização falhou. Tente sincronizar novamente ou reconecte a conta.</p>
+              )}
               <p className="mt-2 text-xs text-muted-foreground">Desconectar interrompe novas sincronizações; eventos já criados permanecem no Google Calendar.</p>
             </div>
             <div className="flex flex-wrap gap-2">

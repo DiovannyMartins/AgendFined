@@ -33,6 +33,40 @@ describe("GoogleCalendarSection callback notice", () => {
   });
 });
 
+describe("GoogleCalendarSection sync failure", () => {
+  const connection = {
+    googleEmail: "dono@example.com",
+    calendarId: "primary",
+    calendarTimezone: "America/Sao_Paulo",
+    businessTimezone: "America/Sao_Paulo",
+    timezoneMismatch: false,
+    lastSyncAt: null,
+    lastError: "GOOGLE_CALENDAR_TOKEN_REFRESH_FAILED",
+    needsReconnect: false,
+  };
+
+  it("suggests syncing again after a passing failure", () => {
+    render(<GoogleCalendarSection connection={connection} isPro />);
+
+    expect(screen.getByText(/A última sincronização falhou/)).toBeInTheDocument();
+  });
+
+  // Sincronizar de novo nunca resolve uma autorização revogada.
+  it("asks only to reconnect when Google no longer authorizes the calendar", () => {
+    render(
+      <GoogleCalendarSection
+        connection={{ ...connection, lastError: "GOOGLE_CALENDAR_REAUTH_REQUIRED", needsReconnect: true }}
+        isPro
+      />,
+    );
+
+    expect(screen.getByText(/O Google não autoriza mais o acesso à sua agenda/)).toHaveTextContent(
+      "Desconecte e conecte o Google Calendar de novo",
+    );
+    expect(screen.queryByText(/Tente sincronizar novamente/)).not.toBeInTheDocument();
+  });
+});
+
 describe("GoogleCalendarSection connect link", () => {
   // #136: um <a type="button"> confunde o leitor de tela e dispara o aviso do Base UI.
   it("renders the connect action as a plain link", () => {

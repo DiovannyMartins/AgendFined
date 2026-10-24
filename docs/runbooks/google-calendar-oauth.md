@@ -59,3 +59,68 @@ Depois de configurar as variáveis, faça um novo deploy e teste com uma conta d
 3. Crie uma reserva confirmada e verifique o evento no calendário principal.
 4. Cancele a reserva e verifique a remoção do evento.
 5. Use Sincronizar agora para validar a reconciliação manual.
+
+## Verificação do app pelo Google
+
+O escopo `calendar.events` é **sensível**. Enquanto o Google não verificar o uso dele:
+
+- todo dono que conecta vê "O Google não verificou este app" e só segue por **Avançado → Acessar AgendFined (não seguro)**;
+- na tela seguinte, a caixa "Ver e editar eventos em todas as suas agendas" vem desmarcada, e sem ela a conexão não tem acesso à agenda;
+- o app aceita no máximo 100 usuários.
+
+Em 24 de outubro de 2026, o projeto `agendfined` estava **Em produção**, com a marca (nome e logo) já verificada e o escopo sensível ainda não verificado. Uma autorização dada enquanto o app estava em **Teste** expira em 7 dias. Foi o que derrubou a sincronização do negócio de teste em 19/10.
+
+### Pré-requisitos
+
+1. **Verificação em duas etapas** na conta Google que administra o projeto. Desde 23 de outubro de 2026 o Google Cloud bloqueia as páginas de branding e de verificação sem ela.
+2. **Domínio verificado no Google Search Console** (`agendfined.com.br`), na mesma conta que é proprietária ou editora do projeto.
+3. Em **Google Auth Platform → Branding**:
+   - página inicial `https://agendfined.com.br`;
+   - política de privacidade `https://agendfined.com.br/privacidade`;
+   - termos `https://agendfined.com.br/termos`;
+   - domínio autorizado `agendfined.com.br`.
+4. **Política de privacidade:** a seção 4 explica o acesso ao Google Calendar e declara a adesão ao Uso Limitado. O Google exige isso; não remova.
+5. Em **Data Access**, só os escopos que o app pede: `openid`, `.../auth/userinfo.email` (não sensíveis) e `https://www.googleapis.com/auth/calendar.events` (sensível).
+
+### Justificativa do escopo (colar em inglês no formulário)
+
+```text
+AgendFined is an online booking platform for small service businesses in Brazil.
+When a business owner on the paid plan clicks "Conectar Google Calendar" in
+Settings and grants access, AgendFined creates one event in the owner's primary
+Google Calendar for each confirmed booking (service, date and time, customer
+name, phone and note), updates it when the booking changes and deletes it when
+the booking is cancelled. This lets the owner see their AgendFined schedule
+next to their personal calendar.
+
+We need https://www.googleapis.com/auth/calendar.events because the feature
+creates, updates and deletes events. Each event has a deterministic id derived
+from the booking id, and the app only ever touches the events it created; it
+never lists, reads or changes any other event. Read-only scopes cannot write
+events, and the full calendar scope would grant more than we need.
+
+Tokens are encrypted at rest (AES-256-GCM). Disconnecting in Settings revokes
+the token with Google and deletes it. Google user data is not sold, not used
+for advertising and not shared with third parties, as described in
+https://agendfined.com.br/privacidade (section 4), which also states our
+compliance with the Google API Services User Data Policy, including the
+Limited Use requirements.
+```
+
+### Roteiro do vídeo de demonstração
+
+Grave a tela, publique no YouTube como **Não listado** e cole o link no formulário. Os revisores do Google costumam pedir o vídeo em inglês; deixe o idioma da conta Google em inglês durante a gravação (ou acrescente `hl=en` à URL de consentimento).
+
+1. Mostre `https://agendfined.com.br` e o link da política de privacidade.
+2. Entre no painel com uma conta do plano PROFISSIONAL e abra **Configurações → Google Calendar**.
+3. Clique em **Conectar Google Calendar**. Na tela do Google, mostre a **barra de endereço com o `client_id`**, o nome do app e a permissão "View and edit events on all your calendars". Marque a permissão e continue.
+4. Volte ao AgendFined e mostre "Google Calendar conectado" com o e-mail da conta.
+5. Faça uma reserva na página pública do negócio e mostre o evento aparecendo no Google Calendar.
+6. Cancele a reserva e mostre o evento sumindo do Google Calendar.
+7. Clique em **Desconectar** e mostre, em `myaccount.google.com/permissions`, que o AgendFined não tem mais acesso.
+
+### Envio e acompanhamento
+
+1. Em **Google Auth Platform → Verification Center**, clique em **Prepare for verification** e preencha com o texto e o vídeo acima.
+2. O Google responde nos e-mails de contato do desenvolvedor (`agendfined@outlook.com` e `diovannydev@gmail.com`), às vezes pedindo ajustes. Responda pela mesma thread.
+3. Até a aprovação, o aviso continua aparecendo. Depois dela, confira o fluxo de conexão de novo: o aviso some e a permissão já vem marcada.

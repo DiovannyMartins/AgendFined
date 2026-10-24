@@ -123,7 +123,10 @@ describe("MfaPanel — códigos de recuperação (#169)", () => {
     await confirm();
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível gerar os códigos de recuperação.");
-    fireEvent.click(screen.getByRole("button", { name: "Gerar códigos de recuperação" }));
+    // O erro é gravado dentro da transição de verify: o alerta pode aparecer um
+    // render antes de `pending` voltar a falso, e o botão só existe sem pending.
+    // Sob CPU ocupada (suíte completa) os dois renders se separam.
+    fireEvent.click(await screen.findByRole("button", { name: "Gerar códigos de recuperação" }));
 
     expect(await screen.findByRole("list", { name: "Códigos de recuperação" })).toBeInTheDocument();
   });

@@ -281,7 +281,14 @@ describe("anon data exposure (§36)", () => {
     const { data: active, error: activeError } = await anon.rpc("get_public_business", { p_slug: `biz-a-${stamp}` });
     expect(activeError).toBeNull();
     expect(active?.[0]?.id).toBe(businessA);
-    expect(Object.keys(active?.[0] ?? {}).sort()).toEqual(["description", "id", "name", "slug", "timezone"]);
+    expect(Object.keys(active?.[0] ?? {}).sort()).toEqual([
+      "description",
+      "id",
+      "name",
+      "search_indexing_enabled",
+      "slug",
+      "timezone",
+    ]);
     const { data: inactive, error: inactiveError } = await anon.rpc("get_public_business", { p_slug: `biz-c-${stamp}` });
     expect(inactiveError).toBeNull();
     expect(inactive?.length ?? 0).toBe(0);

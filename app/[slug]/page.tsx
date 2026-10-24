@@ -28,6 +28,9 @@ export async function generateMetadata({
     return {
       title: `${business.name} — AgendFined`,
       description,
+      // A business kept out of search (e.g. a test business in production)
+      // stays bookable but out of the index; the sitemap leaves it out too.
+      ...(business.search_indexing_enabled ? {} : { robots: { index: false, follow: false } }),
       alternates: { canonical: `/${encodeURIComponent(slug)}` },
       openGraph: {
         type: "website",

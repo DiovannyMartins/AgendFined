@@ -1,7 +1,14 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const barbearia = { id: "biz-1", name: "Barbearia", slug: "barbearia", description: null, timezone: "America/Sao_Paulo" };
+const barbearia = {
+  id: "biz-1",
+  name: "Barbearia",
+  slug: "barbearia",
+  description: null,
+  timezone: "America/Sao_Paulo",
+  search_indexing_enabled: true,
+};
 
 const { state, navigation } = vi.hoisted(() => ({
   state: {
@@ -45,7 +52,7 @@ vi.mock("@/lib/business/readiness", () => ({
 }));
 vi.mock("./booking-widget", () => ({ BookingWidget: () => <form aria-label="Formulário de reserva" /> }));
 
-import PublicPage from "./page";
+import PublicPage, { generateMetadata } from "./page";
 
 const corte = { id: "svc-1", name: "Corte", description: null, duration_minutes: 30, price_cents: 5000 };
 
@@ -129,5 +136,32 @@ describe("página pública do negócio", () => {
     state.previousSlugError = { message: "Could not find the function" };
 
     await expect(renderPage("nao-existe")).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+});
+
+describe("metadados da página pública do negócio", () => {
+  beforeEach(() => {
+    state.businesses = [barbearia];
+  });
+
+  async function metadataFor(slug = "barbearia") {
+    return generateMetadata({ params: Promise.resolve({ slug }) });
+  }
+
+  it("deixa buscadores indexarem um negócio liberado", async () => {
+    const metadata = await metadataFor();
+
+    expect(metadata.title).toBe("Barbearia — AgendFined");
+    expect(metadata.robots).toBeUndefined();
+  });
+
+  // Negócio de teste em produção: a página funciona, mas fica fora do Google.
+  it("pede aos buscadores para não indexar um negócio fora da busca", async () => {
+    state.businesses = [{ ...barbearia, search_indexing_enabled: false }];
+
+    const metadata = await metadataFor();
+
+    expect(metadata.title).toBe("Barbearia — AgendFined");
+    expect(metadata.robots).toEqual({ index: false, follow: false });
   });
 });

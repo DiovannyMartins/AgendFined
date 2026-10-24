@@ -258,6 +258,7 @@ export type Database = {
           owner_id: string
           phone: string
           plan: Database["public"]["Enums"]["business_plan"]
+          search_indexing_enabled: boolean
           slot_interval_minutes: number
           slug: string
           updated_at: string
@@ -275,6 +276,7 @@ export type Database = {
           owner_id: string
           phone: string
           plan?: Database["public"]["Enums"]["business_plan"]
+          search_indexing_enabled?: boolean
           slot_interval_minutes?: number
           slug: string
           updated_at?: string
@@ -292,6 +294,7 @@ export type Database = {
           owner_id?: string
           phone?: string
           plan?: Database["public"]["Enums"]["business_plan"]
+          search_indexing_enabled?: boolean
           slot_interval_minutes?: number
           slug?: string
           updated_at?: string
@@ -903,6 +906,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          search_indexing_enabled: boolean
           slug: string
           timezone: string
         }[]

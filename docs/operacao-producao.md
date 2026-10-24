@@ -101,10 +101,20 @@ A função devolve quantos telefones foram normalizados, quantas linhas foram ju
 
 - Landing: título, descrição, CTA de cadastro, links de navegação, suporte e rodapé.
 - Auth: cadastro, confirmação de e-mail, login, MFA quando habilitado e logout.
-- Público: abrir slug, carregar serviços/horários, reservar, consultar e cancelar.
+- Público: abrir slug, carregar serviços/horários, reservar, consultar e cancelar. Use o negócio de teste `teste-oauth-calendar` (veja "Negócios de teste em produção").
 - Operação: confirmação e lembrete recebidos; webhook de assinatura respondendo sem erro.
-- Indexação: `robots.txt`, `sitemap.xml`, canonical da home e `noindex` em login, dashboard, consulta e confirmação.
+- Indexação: `robots.txt`, `sitemap.xml`, canonical da home e `noindex` em login, dashboard, consulta e confirmação. O `sitemap.xml` não lista nenhum negócio de teste.
 - Desktop e mobile: sem overflow horizontal, foco visível, labels associados e mensagens de erro legíveis.
+
+## Negócios de teste em produção
+
+O smoke test precisa de um negócio ativo, mas negócio de teste não pode aparecer no Google. Não desative o negócio de teste para tirá-lo da busca: sem página pública, ele acaba reativado para o próximo teste e volta ao sitemap (aconteceu entre 6 e 13 de outubro de 2026). Deixe-o ativo e fora da busca:
+
+```sql
+update public.businesses set search_indexing_enabled = false where slug = 'teste-oauth-calendar';
+```
+
+Com `search_indexing_enabled = false` o negócio sai do `sitemap.xml` (cache de até 1 hora) e a página pública responde com `noindex, nofollow`; reservas, e-mails e Google Calendar funcionam normalmente. Para conferir: `curl -s https://agendfined.com.br/sitemap.xml` não traz o slug, e `curl -s https://agendfined.com.br/teste-oauth-calendar | grep -o '<meta name="robots"[^>]*>'` mostra `noindex, nofollow`. Negócios de teste sem uso ficam desativados (`is_active = false`), como o `barbearia-teste`.
 
 ## Rollback
 

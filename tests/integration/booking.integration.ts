@@ -230,7 +230,14 @@ describe("RLS (§13.2)", () => {
     expect(businessError).toBeNull();
     const biz = businesses?.[0];
     expect(biz?.id).toBe(businessId);
-    expect(Object.keys(biz ?? {}).sort()).toEqual(["description", "id", "name", "slug", "timezone"]);
+    expect(Object.keys(biz ?? {}).sort()).toEqual([
+      "description",
+      "id",
+      "name",
+      "search_indexing_enabled",
+      "slug",
+      "timezone",
+    ]);
     // But the outsider cannot read the owner's bookings (private data).
     const { data: rows } = await outsider.from("bookings").select("*").eq("business_id", businessId);
     expect(rows?.length ?? 0).toBe(0);

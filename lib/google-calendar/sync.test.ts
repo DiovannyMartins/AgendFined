@@ -267,7 +267,7 @@ describe("Google Calendar access token", () => {
   it("records a renewal failure in last_error without calling the Calendar API", async () => {
     const fakes = installGoogleCalendarFakes({
       tokenExpiresAt: new Date(Date.now() - 1_000).toISOString(),
-      tokenEndpoint: () => Response.json({ error: "invalid_grant" }, { status: 400 }),
+      tokenEndpoint: () => Response.json({ error: "internal_failure" }, { status: 503 }),
     });
 
     await expect(syncGoogleCalendarForBusiness("business")).rejects.toThrow("GOOGLE_CALENDAR_TOKEN_REFRESH_FAILED");
@@ -280,13 +280,72 @@ describe("Google Calendar access token", () => {
     const fakes = installGoogleCalendarFakes({
       bookings: [booking("booking", "confirmed")],
       tokenExpiresAt: new Date(Date.now() - 1_000).toISOString(),
-      tokenEndpoint: () => Response.json({ error: "invalid_grant" }, { status: 400 }),
+      tokenEndpoint: () => Response.json({ error: "internal_failure" }, { status: 503 }),
     });
 
     await expect(syncGoogleCalendarBooking("business", "booking")).rejects.toThrow("GOOGLE_CALENDAR_TOKEN_REFRESH_FAILED");
 
     expect(fakes.googleCalls).toEqual([]);
     expect(fakes.connectionUpdates).toEqual([{ last_error: "GOOGLE_CALENDAR_TOKEN_REFRESH_FAILED" }]);
+  });
+
+  // Uma autorização revogada ou expirada (app em modo Teste: 7 dias) nunca
+  // volta sozinha; só reconectar resolve.
+  it("asks for reconnection when Google revoked the authorization", async () => {
+    const fakes = installGoogleCalendarFakes({
+      tokenExpiresAt: new Date(Date.now() - 1_000).toISOString(),
+      tokenEndpoint: () => Response.json({ error: "invalid_grant", error_description: "Token has been expired or revoked." }, { status: 400 }),
+    });
+
+    await expect(syncGoogleCalendarForBusiness("business")).rejects.toThrow("GOOGLE_CALENDAR_REAUTH_REQUIRED");
+
+    expect(fakes.googleCalls).toEqual([]);
+    expect(fakes.connectionUpdates).toEqual([{ last_error: "GOOGLE_CALENDAR_REAUTH_REQUIRED" }]);
+  });
+});
+
+describe("Google Calendar batch sync", () => {
+  let renewals: number;
+
+  beforeEach(() => {
+    renewals = 0;
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://database.example");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-only-key");
+    vi.stubEnv("GOOGLE_CALENDAR_CLIENT_ID", "client-id");
+    vi.stubEnv("GOOGLE_CALENDAR_CLIENT_SECRET", "client-secret");
+    vi.stubEnv("GOOGLE_CALENDAR_REDIRECT_URI", "https://agenda.example/api/google-calendar/callback");
+    vi.stubEnv("GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY", Buffer.alloc(32, 1).toString("base64"));
+    const connections = [{ business_id: "business", last_error: "GOOGLE_CALENDAR_REAUTH_REQUIRED" }];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+      if (url.hostname === "oauth2.googleapis.com") {
+        renewals += 1;
+        return Response.json({ error: "invalid_grant" }, { status: 400 });
+      }
+      if (url.pathname.endsWith("/google_calendar_connections") && url.searchParams.has("order")) {
+        // PostgREST applies the batch filter; a connection waiting for the
+        // owner to reconnect only comes back when the batch does not exclude it.
+        const excludesReauth = url.searchParams.get("or") === "(last_error.is.null,last_error.neq.GOOGLE_CALENDAR_REAUTH_REQUIRED)";
+        return Response.json(excludesReauth ? connections.filter((row) => row.last_error !== "GOOGLE_CALENDAR_REAUTH_REQUIRED") : connections);
+      }
+      if (url.pathname.endsWith("/google_calendar_connections")) {
+        return Response.json({
+          id: "connection", business_id: "business", calendar_id: "primary",
+          access_token_ciphertext: encryptGoogleToken("stored-access-token"),
+          refresh_token_ciphertext: encryptGoogleToken("stored-refresh-token"),
+          token_expires_at: new Date(Date.now() - 1_000).toISOString(),
+        });
+      }
+      if (url.pathname.endsWith("/businesses")) return Response.json({ plan: "pro", timezone: "America/Sao_Paulo" });
+      throw new Error(`Unexpected request: ${url.pathname}`);
+    }));
+  });
+
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  it("skips a connection waiting for the owner to reconnect instead of failing every run", async () => {
+    expect(await runGoogleCalendarSyncBatch()).toEqual({ connections: 0, synced: 0, deleted: 0, failed: 0 });
+    expect(renewals).toBe(0);
   });
 });
 

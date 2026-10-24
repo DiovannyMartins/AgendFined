@@ -40,6 +40,8 @@ export async function runPendingCheckoutRepricing(
     updatePreapprovalAmount: (id, amountCents) => provider.updatePreapprovalAmount(id, amountCents),
     cancelPreapproval: (id) => provider.cancelPreapproval(id),
     currentPriceCents: options.currentPriceCents ?? getProPriceCents(),
+    // The reason is the Mercado Pago status and message, never the token.
+    reportFailure: (input) => console.error(JSON.stringify({ event: "checkout_repricing_item_failed", ...input })),
   });
 
   // Rewriting the unchanged status fires `set_updated_at`, sending these rows

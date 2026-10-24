@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { GOOGLE_CALENDAR_REAUTH_REQUIRED } from "./oauth";
 
 export type GoogleCalendarConnectionStatus = {
   googleEmail: string;
@@ -10,6 +11,8 @@ export type GoogleCalendarConnectionStatus = {
   timezoneMismatch: boolean;
   lastSyncAt: string | null;
   lastError: string | null;
+  // Google no longer authorizes the calendar; only reconnecting fixes it.
+  needsReconnect: boolean;
 } | null;
 
 export async function getGoogleCalendarConnectionStatus(businessId: string, businessTimezone: string): Promise<GoogleCalendarConnectionStatus> {
@@ -29,5 +32,6 @@ export async function getGoogleCalendarConnectionStatus(businessId: string, busi
     timezoneMismatch: Boolean(data.calendar_timezone && data.calendar_timezone !== businessTimezone),
     lastSyncAt: data.last_sync_at,
     lastError: data.last_error,
+    needsReconnect: data.last_error === GOOGLE_CALENDAR_REAUTH_REQUIRED,
   };
 }

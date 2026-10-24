@@ -99,4 +99,26 @@ describe("repricePendingCheckouts", () => {
     expect(deps.updatePreapprovalAmount).toHaveBeenCalledWith("mp_old", 1990);
     expect(result).toEqual({ checked: 2, repriced: 1, cancelled: 0, failed: 1 });
   });
+
+  // Em produção, 5 a 9 de 16 checkouts falhavam a cada execução sem deixar
+  // rastro; o motivo precisa chegar aos logs.
+  it("reports why each checkout failed", async () => {
+    const reportFailure = vi.fn();
+    const deps = makeDeps({
+      listPendingCheckouts: vi.fn(async () => ["mp_down", "mp_old"]),
+      getPreapproval: vi.fn(async (id: string) => {
+        if (id === "mp_down") throw new Error("Mercado Pago preapproval fetch failed (429): Too many requests");
+        return snapshot(id);
+      }),
+      reportFailure,
+    });
+
+    await repricePendingCheckouts(deps);
+
+    expect(reportFailure).toHaveBeenCalledTimes(1);
+    expect(reportFailure).toHaveBeenCalledWith({
+      mpPreapprovalId: "mp_down",
+      reason: "Mercado Pago preapproval fetch failed (429): Too many requests",
+    });
+  });
 });

@@ -48,6 +48,11 @@ export function buildGoogleCalendarAuthorizationUrl(state: string): string {
   return `${GOOGLE_AUTH_URL}?${params.toString()}`;
 }
 
+// The connection's last_error when Google no longer accepts the refresh token
+// (revoked by the owner, or expired: a Testing-mode app's grants last 7 days).
+// Retrying never helps; only reconnecting does, which clears last_error.
+export const GOOGLE_CALENDAR_REAUTH_REQUIRED = "GOOGLE_CALENDAR_REAUTH_REQUIRED";
+
 async function parseGoogleResponse<T>(response: Response, operation: string): Promise<T> {
   const body = await response.text();
   let parsed: unknown = null;
@@ -57,7 +62,10 @@ async function parseGoogleResponse<T>(response: Response, operation: string): Pr
     parsed = null;
   }
   if (!response.ok) {
-    console.error("google_calendar_api_error", { operation, status: response.status });
+    // Google's OAuth error code (e.g. invalid_grant) carries no token.
+    const code = typeof (parsed as { error?: unknown } | null)?.error === "string" ? (parsed as { error: string }).error : undefined;
+    console.error("google_calendar_api_error", { operation, status: response.status, code });
+    if (operation === "token_refresh" && code === "invalid_grant") throw new Error(GOOGLE_CALENDAR_REAUTH_REQUIRED);
     throw new Error(`GOOGLE_CALENDAR_${operation.toUpperCase()}_FAILED`);
   }
   return parsed as T;

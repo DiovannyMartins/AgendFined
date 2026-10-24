@@ -13,6 +13,9 @@ export interface RepriceCheckoutsDeps {
   updatePreapprovalAmount: (id: string, amountCents: number) => Promise<void>;
   cancelPreapproval: (id: string) => Promise<void>;
   currentPriceCents: number;
+  // A failed checkout is retried by the next run, so without this the reason
+  // never surfaces anywhere.
+  reportFailure?: (input: { mpPreapprovalId: string; reason: string }) => void;
 }
 
 export interface RepriceCheckoutsResult {
@@ -29,9 +32,10 @@ export async function repricePendingCheckouts(deps: RepriceCheckoutsDeps): Promi
     try {
       const outcome = await repriceCheckout(id, deps);
       if (outcome) result[outcome] += 1;
-    } catch {
+    } catch (error) {
       // Left for the next run; the webhook still refuses a stale-price payment.
       result.failed += 1;
+      deps.reportFailure?.({ mpPreapprovalId: id, reason: error instanceof Error ? error.message : "unknown" });
     }
   }
   return result;

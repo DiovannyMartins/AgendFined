@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   CONFIRMATION_RATE_LIMIT,
   CONSULT_RATE_LIMIT,
@@ -13,33 +13,56 @@ import {
   enforceBillingCheckoutRateLimit,
   getClientIpFromHeaders,
   enforceRateLimit,
+  recordPublicWrite,
 } from "@/lib/booking/rate-limit";
 import type { Database } from "@/lib/supabase/database-types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-function fakeClient(perWindow: boolean[]) {
-  let i = 0;
-  const rpc = vi.fn(async (_name: string, { p_key }: { p_key: string }) => {
-    // Business aggregate window is the second in buildRateKeys.
-    const idx = p_key.startsWith("business:") ? 1 : 0;
-    const allowed = perWindow[Math.min(i++, idx)];
-    return { data: allowed, error: null };
-  });
-  return { rpc } as unknown as SupabaseClient<Database>;
+function fakeClient({ perIp, perBusiness }: { perIp: boolean; perBusiness: boolean }) {
+  const rpc = vi.fn(async (name: string) => ({
+    data: name === "peek_booking_rate_limit" ? perBusiness : perIp,
+    error: null,
+  }));
+  return { client: { rpc } as unknown as SupabaseClient<Database>, rpc };
 }
+
+// Same counting as the two RPCs inside one window: check_booking_rate_limit
+// adds one and allows up to the limit; peek_booking_rate_limit only reads and
+// allows while the count is below the limit.
+function windowClient() {
+  const counts = new Map<string, number>();
+  const rpc = vi.fn(async (name: string, { p_key, p_limit }: { p_key: string; p_limit: number }) => {
+    const count = counts.get(p_key) ?? 0;
+    if (name === "peek_booking_rate_limit") return { data: count < p_limit, error: null };
+    counts.set(p_key, count + 1);
+    return { data: count + 1 <= p_limit, error: null };
+  });
+  return { client: { rpc } as unknown as SupabaseClient<Database>, counts };
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("buildRateKeys (§16)", () => {
   it("keys on IP+business and on a business-wide aggregate, never on phone", () => {
-    const keys = buildRateKeys("1.2.3.4", "biz-1");
-    expect(keys).toEqual([
-      { key: "ip:1.2.3.4|business:biz-1", limit: 8, windowSeconds: 900 },
-      { key: "business:biz-1", limit: 60, windowSeconds: 900 },
-    ]);
+    expect(buildRateKeys("1.2.3.4", "biz-1", "booking")).toEqual({
+      perIp: { key: "ip:1.2.3.4|business:biz-1", limit: 8, windowSeconds: 900 },
+      perBusiness: { key: "business:biz-1", limit: 60, windowSeconds: 900 },
+    });
+  });
+
+  it("counts the lista de espera apart from the reservas", () => {
+    expect(buildRateKeys("1.2.3.4", "biz-1", "waitlist")).toEqual({
+      perIp: { key: "ip:1.2.3.4|business:biz-1", limit: 8, windowSeconds: 900 },
+      perBusiness: { key: "business:biz-1|waitlist", limit: 60, windowSeconds: 900 },
+    });
   });
 
   it("uses the documented default limits", () => {
     expect(RATE_LIMIT.perIpPerBusiness.limit).toBe(8);
     expect(RATE_LIMIT.perBusiness.limit).toBe(60);
+    expect(RATE_LIMIT.perBusinessWaitlist.limit).toBe(60);
   });
 });
 
@@ -98,24 +121,91 @@ describe("public read rate-limit keys", () => {
 });
 
 describe("enforceRateLimit", () => {
-  it("allows when both windows are within limits", async () => {
-    const allowed = await enforceRateLimit(fakeClient([true, true]), "1.2.3.4", "biz-1");
-    expect(allowed).toBe(true);
+  it("spends the per-IP window and only reads the business aggregate", async () => {
+    const { client, rpc } = fakeClient({ perIp: true, perBusiness: true });
+
+    await expect(enforceRateLimit(client, "1.2.3.4", "biz-1", "booking")).resolves.toBe(true);
+
+    expect(rpc.mock.calls).toEqual([
+      ["check_booking_rate_limit", { p_key: "ip:1.2.3.4|business:biz-1", p_limit: 8, p_window_seconds: 900 }],
+      ["peek_booking_rate_limit", { p_key: "business:biz-1", p_limit: 60, p_window_seconds: 900 }],
+    ]);
   });
 
-  it("blocks when the per-IP window is exceeded", async () => {
-    const allowed = await enforceRateLimit(fakeClient([false, true]), "1.2.3.4", "biz-1");
-    expect(allowed).toBe(false);
+  it("blocks when the per-IP window is exceeded, without reading the business aggregate", async () => {
+    const { client, rpc } = fakeClient({ perIp: false, perBusiness: true });
+
+    await expect(enforceRateLimit(client, "1.2.3.4", "biz-1", "booking")).resolves.toBe(false);
+    expect(rpc).toHaveBeenCalledTimes(1);
   });
 
-  it("blocks when the business aggregate window is exceeded", async () => {
-    const allowed = await enforceRateLimit(fakeClient([true, false]), "1.2.3.4", "biz-1");
-    expect(allowed).toBe(false);
+  it("blocks and logs the negócio when the business aggregate is exhausted", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { client } = fakeClient({ perIp: true, perBusiness: false });
+
+    await expect(enforceRateLimit(client, "1.2.3.4", "biz-1", "waitlist")).resolves.toBe(false);
+    expect(warn).toHaveBeenCalledWith("public_write_business_rate_limited", { businessId: "biz-1", kind: "waitlist" });
   });
 
   it("propagates an RPC error", async () => {
     const client = { rpc: vi.fn(async () => ({ data: null, error: new Error("boom") })) } as unknown as SupabaseClient<Database>;
-    await expect(enforceRateLimit(client, "1.2.3.4", "biz-1")).rejects.toThrow("boom");
+    await expect(enforceRateLimit(client, "1.2.3.4", "biz-1", "booking")).rejects.toThrow("boom");
+  });
+
+  // #188, cenário 1: the negócio opens a new agenda and a crowd hits horários
+  // already taken. None of those attempts writes anything.
+  it("keeps taking reservas after a crowd of refused attempts", async () => {
+    const { client } = windowClient();
+
+    for (let attempt = 0; attempt < 200; attempt++) {
+      await expect(enforceRateLimit(client, `198.51.100.${attempt % 40}`, "biz-1", "booking")).resolves.toBe(true);
+    }
+
+    await expect(enforceRateLimit(client, "203.0.113.9", "biz-1", "booking")).resolves.toBe(true);
+  });
+
+  it("stops the negócio once the limit of reservas written is reached", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { client } = windowClient();
+
+    for (let booking = 0; booking < RATE_LIMIT.perBusiness.limit; booking++) {
+      await expect(enforceRateLimit(client, `198.51.100.${booking}`, "biz-1", "booking")).resolves.toBe(true);
+      await recordPublicWrite(client, "biz-1", "booking");
+    }
+
+    await expect(enforceRateLimit(client, "203.0.113.9", "biz-1", "booking")).resolves.toBe(false);
+    // The lista de espera has its own counter, and so does every other negócio.
+    await expect(enforceRateLimit(client, "203.0.113.9", "biz-1", "waitlist")).resolves.toBe(true);
+    await expect(enforceRateLimit(client, "203.0.113.9", "biz-2", "booking")).resolves.toBe(true);
+  });
+});
+
+describe("recordPublicWrite", () => {
+  it("spends the business aggregate of the kind written", async () => {
+    const { client, rpc } = fakeClient({ perIp: true, perBusiness: true });
+
+    await recordPublicWrite(client, "biz-1", "waitlist");
+
+    expect(rpc).toHaveBeenCalledWith("check_booking_rate_limit", {
+      p_key: "business:biz-1|waitlist",
+      p_limit: 60,
+      p_window_seconds: 900,
+    });
+  });
+
+  it.each([
+    ["returns an error", async () => ({ data: null, error: { message: "boom" } })],
+    ["throws", async () => { throw new Error("boom"); }],
+  ])("logs instead of failing the write when the RPC %s", async (_case, rpc) => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const client = { rpc: vi.fn(rpc) } as unknown as SupabaseClient<Database>;
+
+    await expect(recordPublicWrite(client, "biz-1", "booking")).resolves.toBeUndefined();
+    expect(error).toHaveBeenCalledWith("public_write_rate_limit_record_failed", {
+      businessId: "biz-1",
+      kind: "booking",
+      reason: "boom",
+    });
   });
 });
 

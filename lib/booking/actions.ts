@@ -27,7 +27,13 @@ import {
   type SlotInterval,
   type UtcRange,
 } from "@/lib/booking/availability";
-import { enforceRateLimit, enforceConsultRateLimit, getClientIp } from "@/lib/booking/rate-limit";
+import {
+  enforceRateLimit,
+  enforceConsultRateLimit,
+  getClientIp,
+  recordPublicWrite,
+  type PublicWriteKind,
+} from "@/lib/booking/rate-limit";
 import { verifyTurnstile } from "@/lib/booking/anti-bot";
 import { assertProPlan, getEffectiveBookingWindowDays } from "@/lib/plan/plan";
 import type { Plan } from "@/lib/plan/plan";
@@ -110,7 +116,7 @@ export async function createBooking(input: {
 
   // Server-authoritative flow: the admin client reads blocks/bookings of any
   // business (anonymous RLS would block those reads) for revalidation.
-  const preamble = await resolvePublicBusinessAndRateLimit(input.slug, input.cfTurnstileToken);
+  const preamble = await resolvePublicBusinessAndRateLimit(input.slug, input.cfTurnstileToken, "booking");
   if (!preamble.ok) return preamble.result;
   const { supabase, business } = preamble;
 
@@ -219,6 +225,9 @@ export async function createBooking(input: {
     }
     return { ok: false, code: "db_error", message: "Não foi possível concluir a reserva. Tente novamente." };
   }
+
+  // Only a reserva created spends the business-wide limit (#188).
+  if (data?.id) await recordPublicWrite(admin, business.id, "booking");
 
   // Judged before the e-mails so the dono's one highlights a note that needs
   // reading before the atendimento, like the agenda does (#179).
@@ -537,7 +546,7 @@ export async function joinWaitlist(input: {
   // Same server-authoritative preamble as createBooking: this is an anonymous
   // write, so anti-bot, business resolution and the fail-closed reservation
   // limiter apply identically.
-  const preamble = await resolvePublicBusinessAndRateLimit(input.slug, input.cfTurnstileToken);
+  const preamble = await resolvePublicBusinessAndRateLimit(input.slug, input.cfTurnstileToken, "waitlist");
   if (!preamble.ok) return preamble.result;
   const { business } = preamble;
 
@@ -590,6 +599,8 @@ export async function joinWaitlist(input: {
     }
     return { ok: false, code: "db_error", message: "Não foi possível entrar na lista de espera. Tente novamente." };
   }
+
+  await recordPublicWrite(supabase, business.id, "waitlist");
 
   const customerEmail = parsed.data.customerEmail;
   if (customerEmail) {
@@ -717,7 +728,8 @@ type ResolvedBusiness = {
 
 async function resolvePublicBusinessAndRateLimit(
   slug: string,
-  cfTurnstileToken?: string,
+  cfTurnstileToken: string | undefined,
+  kind: PublicWriteKind,
 ): Promise<{ ok: true; supabase: ServerClient; business: ResolvedBusiness } | { ok: false; result: ActionResult }> {
   const supabase = createAdminClient();
 
@@ -742,8 +754,9 @@ async function resolvePublicBusinessAndRateLimit(
   }
 
   // Rate limit before expensive work, keyed on IP+business and a business-wide
-  // aggregate (never only on the customer phone).
-  const allowed = await enforceRateLimit(supabase, ip, business.id);
+  // aggregate (never only on the customer phone). The aggregate is only read
+  // here; the caller spends it once the write is done (#188).
+  const allowed = await enforceRateLimit(supabase, ip, business.id, kind);
   if (!allowed) {
     return {
       ok: false,

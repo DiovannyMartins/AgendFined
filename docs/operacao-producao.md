@@ -75,6 +75,10 @@ select private.normalize_customer_phones();
 
 A função devolve quantos telefones foram normalizados, quantas linhas foram juntadas e quantos telefones não normalizam (esses ficam como estão). O teste `tests/sql/normalize-customer-phones.sql` roda só no Supabase local, dentro de uma transação revertida.
 
+### Limite de reservas por negócio
+
+Desde o #188, o limite por negócio das escritas públicas conta só reservas criadas e entradas na lista de espera gravadas, cada uma no seu contador (60 a cada 15 min). Antes de gravar, o servidor só lê o contador com `peek_booking_rate_limit`. Aplique a migration `20261024010000_peek_booking_rate_limit.sql` **antes** do deploy do código: sem a função, toda reserva e entrada na lista de espera é recusada. Quando um negócio atinge o limite, o log mostra `public_write_business_rate_limited` com o `businessId` e o tipo (`booking` ou `waitlist`).
+
 ## Mercado Pago
 
 1. Use o Access Token de produção (`APP_USR-*`) em `MERCADO_PAGO_ACCESS_TOKEN`; não use token `TEST-*` no lançamento.

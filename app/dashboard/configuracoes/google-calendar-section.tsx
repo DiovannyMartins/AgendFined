@@ -47,7 +47,7 @@ export function GoogleCalendarSection({ connection, isPro, callbackStatus }: { c
               <p className="mt-1 text-muted-foreground">Fuso do negócio: {connection.businessTimezone}</p>
               {connection.calendarTimezone && <p className="mt-1 text-muted-foreground">Fuso do Google Calendar: {connection.calendarTimezone}</p>}
               {connection.timezoneMismatch && (
-                <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-amber-800 dark:text-amber-200">
+                <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
                   <p>Os fusos são diferentes. O horário real está correto, mas o Google Calendar pode exibir outra hora para você.</p>
                   {connection.calendarTimezone && isBrazilianTimeZone(connection.calendarTimezone) ? (
                     <>

@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { deleteAvailability, setAvailability, updateAvailability } from "@/lib/availability/actions";
-import { AvailabilityForm, AvailabilityRow } from "./availability-form";
+import { AvailabilityChangeNotice, AvailabilityChangeProvider, AvailabilityForm, AvailabilityRow } from "./availability-form";
 
 vi.mock("@/lib/availability/actions", () => ({
   setAvailability: vi.fn(),
@@ -136,5 +137,60 @@ describe("faixa em vários dias (#149)", () => {
 
     expect(await screen.findByText(OVERLAP.message)).toBeInTheDocument();
     expect(screen.getByLabelText("Início")).toHaveValue("07:00");
+  });
+});
+
+// #192: a mudança é salva, mas o dono fica sabendo das reservas que ficaram de fora.
+describe("aviso de reservas fora do novo horário", () => {
+  const WARNING = {
+    warning: "Você ainda tem 1 reserva fora do novo horário: Ana (26/10/2026 às 10:00). Ela continua valendo; se precisar, cancele ou remarque pela agenda.",
+    agendaDate: "2026-10-26",
+  };
+
+  function withNotice(row: ReactNode) {
+    return (
+      <AvailabilityChangeProvider>
+        <AvailabilityChangeNotice />
+        {row}
+      </AvailabilityChangeProvider>
+    );
+  }
+
+  it("mostra o aviso depois de remover a faixa, mesmo quando a linha some", async () => {
+    mockedDelete.mockResolvedValueOnce({ ok: true, data: WARNING });
+    const { rerender } = render(withNotice(<AvailabilityRow id="faixa-1" weekday={2} startTime="08:00:00" endTime="12:00:00" />));
+
+    fireEvent.click(screen.getByRole("button", { name: "Remover" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remover faixa" }));
+    await vi.waitFor(() => expect(mockedDelete).toHaveBeenCalledTimes(1));
+    // revalidatePath tira a linha removida da lista.
+    rerender(withNotice(null));
+
+    expect(await screen.findByText(WARNING.warning)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ver na agenda" })).toHaveAttribute(
+      "href",
+      "/dashboard/agenda?data=2026-10-26&status=confirmed",
+    );
+  });
+
+  it("mostra o aviso depois de editar a faixa", async () => {
+    mockedUpdate.mockResolvedValueOnce({ ok: true, data: WARNING });
+    render(withNotice(<AvailabilityRow id="faixa-1" weekday={2} startTime="08:00:00" endTime="12:00:00" />));
+
+    fireEvent.click(screen.getByRole("button", { name: "Editar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+
+    expect(await screen.findByText(WARNING.warning)).toBeInTheDocument();
+  });
+
+  it("não mostra aviso quando nenhuma reserva ficou de fora", async () => {
+    mockedDelete.mockResolvedValueOnce({ ok: true, data: undefined });
+    render(withNotice(<AvailabilityRow id="faixa-1" weekday={2} startTime="08:00:00" endTime="12:00:00" />));
+
+    fireEvent.click(screen.getByRole("button", { name: "Remover" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remover faixa" }));
+    await vi.waitFor(() => expect(mockedDelete).toHaveBeenCalledTimes(1));
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

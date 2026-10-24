@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { BusinessForm } from "./business-form";
-import { AvailabilityForm, AvailabilityRow } from "./availability-form";
+import { AvailabilityChangeNotice, AvailabilityChangeProvider, AvailabilityForm, AvailabilityRow } from "./availability-form";
 import { PlanSection } from "./plan-section";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { createClient } from "@/lib/supabase/server";
@@ -53,22 +53,25 @@ export default async function ConfiguracoesPage({
         <p className="mt-1 text-muted-foreground">
           Defina as faixas de atendimento por dia da semana, em hora local do negócio.
         </p>
-        <div className="mt-4 rounded-xl border border-border p-4">
-          <AvailabilityForm />
-        </div>
-        {availability && availability.length > 0 && (
-          <div className="mt-4 space-y-2">
-            {availability.map((row) => (
-              <AvailabilityRow
-                key={row.id}
-                id={row.id}
-                weekday={row.weekday}
-                startTime={row.start_time}
-                endTime={row.end_time}
-              />
-            ))}
+        <AvailabilityChangeProvider>
+          <div className="mt-4 rounded-xl border border-border p-4">
+            <AvailabilityForm />
           </div>
-        )}
+          <AvailabilityChangeNotice />
+          {availability && availability.length > 0 && (
+            <div className="mt-4 space-y-2">
+              {availability.map((row) => (
+                <AvailabilityRow
+                  key={row.id}
+                  id={row.id}
+                  weekday={row.weekday}
+                  startTime={row.start_time}
+                  endTime={row.end_time}
+                />
+              ))}
+            </div>
+          )}
+        </AvailabilityChangeProvider>
       </section>
 
       <PlanSection business={{ id: business.id, plan: business.plan, timezone: business.timezone }} />

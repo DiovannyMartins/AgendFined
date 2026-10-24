@@ -229,7 +229,7 @@ export function BusinessForm({
                 Apenas minúsculas, números e hífen. Seu link: agendfined.com.br/{nextSlug.toLowerCase() || "seu-slug"}
               </p>
               {slugChanged && (
-                <p role="status" className="text-sm text-amber-700 dark:text-amber-400">
+                <p role="status" className="text-sm text-amber-400">
                   Ao salvar, o link agendfined.com.br/{slug} passa a redirecionar para
                   agendfined.com.br/{nextSlug || "seu-slug"} e continua reservado para o seu negócio. Os links de
                   confirmação já enviados aos clientes continuam funcionando. Se quiser, atualize o link onde ele

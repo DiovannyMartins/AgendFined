@@ -31,20 +31,41 @@ vi.mock("@/lib/supabase/server", () => ({
       if (table === "availability") {
         // Postgres returns time columns as "HH:MM:SS", unlike the form's "HH:MM".
         let excludedId: unknown;
+        let rowId: unknown;
+        let pendingUpdate: Record<string, unknown> | null = null;
+        let deleting = false;
+        const withWeekday = (f: (typeof state.faixas)[number]) => ({ weekday: 2, ...f });
         const query = {
           select: () => query,
-          eq: () => query,
+          eq: (column: string, value: unknown) => (column === "id" && (rowId = value), query),
           in: () => query,
           neq: (_column: string, value: unknown) => ((excludedId = value), query),
           insert: async (rows: Record<string, unknown> | Record<string, unknown>[]) => (
             state.faixaWrites.push(...(Array.isArray(rows) ? rows : [rows])), { error: null }
           ),
-          update: (row: Record<string, unknown>) => (state.faixaWrites.push(row), query),
-          then: (resolve: (value: { data: typeof state.faixas; error: null }) => unknown) =>
-            Promise.resolve({
-              data: state.faixas.filter((f) => f.id !== excludedId).map((f) => ({ weekday: 2, ...f })),
+          update: (row: Record<string, unknown>) => (state.faixaWrites.push(row), (pendingUpdate = row), query),
+          delete: () => ((deleting = true), query),
+          maybeSingle: async () => {
+            const row = state.faixas.find((f) => f.id === rowId);
+            return { data: row ? withWeekday(row) : null, error: null };
+          },
+          then: (resolve: (value: { data: typeof state.faixas | null; error: null }) => unknown) => {
+            // Writes land in state.faixas so the action's re-read sees the new rule.
+            if (pendingUpdate) {
+              const update = pendingUpdate;
+              state.faixas = state.faixas.map((f) => (f.id === rowId ? ({ ...f, ...update } as typeof f) : f));
+              return Promise.resolve({ data: null, error: null }).then(resolve);
+            }
+            if (deleting) {
+              const removed = state.faixas.filter((f) => f.id === rowId).map(withWeekday);
+              state.faixas = state.faixas.filter((f) => f.id !== rowId);
+              return Promise.resolve({ data: removed, error: null }).then(resolve);
+            }
+            return Promise.resolve({
+              data: state.faixas.filter((f) => f.id !== excludedId).map(withWeekday),
               error: null,
-            }).then(resolve),
+            }).then(resolve);
+          },
         };
         return query;
       }
@@ -78,7 +99,7 @@ vi.mock("@/lib/supabase/server", () => ({
   }),
 }));
 
-import { createBlock, setAvailability, updateAvailability } from "./actions";
+import { createBlock, deleteAvailability, setAvailability, updateAvailability } from "./actions";
 import { computeAvailableSlots, toUtcRange } from "@/lib/booking/availability";
 
 function blockForm(startAt: string, endAt: string, reason = "") {
@@ -270,6 +291,9 @@ describe("availability faixa validation", () => {
     state.business = { id: "business-1", timezone: "America/Sao_Paulo" };
     state.faixas = [];
     state.faixaWrites = [];
+    state.bookings = [];
+    state.bookingFilters = [];
+    state.bookingsError = null;
   });
 
   const morningAndAfternoon = [
@@ -353,5 +377,109 @@ describe("faixa em vários dias de uma vez (#149)", () => {
     const result = await setAvailability({ ok: true, data: undefined }, multiDayForm([]));
 
     expect(result).toMatchObject({ ok: false, code: "VALIDATION", message: "Escolha pelo menos um dia da semana." });
+  });
+});
+
+describe("aviso de reservas fora da nova disponibilidade (#192)", () => {
+  function faixaForm(weekday: number, startTime: string, endTime: string) {
+    const formData = new FormData();
+    formData.set("weekday", String(weekday));
+    formData.set("startTime", startTime);
+    formData.set("endTime", endTime);
+    return formData;
+  }
+
+  // Segunda, 26/10/2026, 10:00–10:30 em Brasília.
+  const ana = { id: "booking-1", customer_name_snapshot: "Ana", status: "confirmed", start_at: "2026-10-26T13:00:00Z", end_at: "2026-10-26T13:30:00Z" };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-24T12:00:00Z"));
+    state.business = { id: "business-1", timezone: "America/Sao_Paulo" };
+    state.faixas = [{ id: "segunda", weekday: 2, start_time: "08:00:00", end_time: "12:00:00" }];
+    state.faixaWrites = [];
+    state.bookings = [];
+    state.bookingFilters = [];
+    state.bookingsError = null;
+  });
+
+  it("remover a faixa de um dia com reserva futura avisa com data, hora e cliente", async () => {
+    state.bookings = [ana];
+
+    const result = await deleteAvailability("segunda");
+
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        warning:
+          "Você ainda tem 1 reserva fora do novo horário: Ana (26/10/2026 às 10:00). Ela continua valendo; se precisar, cancele ou remarque pela agenda.",
+        agendaDate: "2026-10-26",
+      },
+    });
+    // A mudança não é bloqueada e a reserva não é tocada.
+    expect(state.faixas).toEqual([]);
+    expect(state.bookings).toEqual([ana]);
+  });
+
+  it("só olha reservas confirmadas e futuras", async () => {
+    state.bookings = [ana];
+
+    await deleteAvailability("segunda");
+
+    expect(state.bookingFilters).toContainEqual(["eq", "status", "confirmed"]);
+    expect(state.bookingFilters).toContainEqual(["gt", "start_at", "2026-10-24T12:00:00.000Z"]);
+  });
+
+  it("encurtar a faixa avisa sobre a reserva que ficou de fora", async () => {
+    state.bookings = [ana];
+
+    const result = await updateAvailability("segunda", { ok: true, data: undefined }, faixaForm(2, "08:00", "10:00"));
+
+    expect(result).toMatchObject({ ok: true, data: { warning: expect.stringContaining("Ana (26/10/2026 às 10:00)") } });
+  });
+
+  it("mudar a faixa de dia avisa sobre as reservas do dia antigo", async () => {
+    state.bookings = [ana];
+
+    const result = await updateAvailability("segunda", { ok: true, data: undefined }, faixaForm(3, "08:00", "12:00"));
+
+    expect(result).toMatchObject({ ok: true, data: { agendaDate: "2026-10-26" } });
+  });
+
+  it("mudança sem reservas afetadas mantém o resultado de sempre", async () => {
+    state.bookings = [ana];
+
+    const result = await updateAvailability("segunda", { ok: true, data: undefined }, faixaForm(2, "09:00", "11:00"));
+
+    expect(result).toEqual({ ok: true, data: undefined });
+  });
+
+  it("ignora reservas de outros dias que a mudança não tocou", async () => {
+    // Terça, 27/10, sem faixa: não é efeito desta mudança.
+    state.bookings = [{ ...ana, start_at: "2026-10-27T13:00:00Z", end_at: "2026-10-27T13:30:00Z" }];
+
+    const result = await deleteAvailability("segunda");
+
+    expect(result).toEqual({ ok: true, data: undefined });
+  });
+
+  it("adicionar uma faixa nunca deixa reserva de fora e não consulta reservas", async () => {
+    const result = await setAvailability({ ok: true, data: undefined }, faixaForm(2, "14:00", "18:00"));
+
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(state.bookingFilters).toEqual([]);
+  });
+
+  it("salva mesmo quando não consegue conferir as reservas e diz isso", async () => {
+    state.bookingsError = { message: "timeout" };
+
+    const result = await deleteAvailability("segunda");
+
+    expect(result).toMatchObject({ ok: true, data: { warning: expect.stringContaining("não foi possível conferir"), agendaDate: null } });
+    expect(state.faixas).toEqual([]);
   });
 });

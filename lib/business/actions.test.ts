@@ -5,6 +5,7 @@ const { state } = vi.hoisted(() => ({
     existing: null as { id: string; plan: string } | null,
     writes: [] as string[],
     insertError: null as { code?: string; message: string } | null,
+    currentTimezone: "America/Sao_Paulo",
   },
 }));
 
@@ -19,7 +20,7 @@ vi.mock("@/lib/supabase/server", () => ({
         eq: () => chain,
         gt: () => Promise.resolve({ count: 0 }),
         maybeSingle: async () => ({ data: state.existing }),
-        single: async () => ({ data: { timezone: "America/Sao_Paulo" } }),
+        single: async () => ({ data: { timezone: state.currentTimezone } }),
         update: () => {
           state.writes.push(`update:${table}`);
           return { eq: () => ({ eq: async () => ({ error: null }) }) };
@@ -43,7 +44,7 @@ import { createBusiness, updateBusiness } from "./actions";
 const INITIAL = { ok: true as const, data: undefined };
 const EXISTING = { id: "business-1", plan: "free" };
 
-function form(slug: string) {
+function form(slug: string, timezone = "America/Sao_Paulo") {
   const fd = new FormData();
   fd.set("name", "Barbearia Demo");
   fd.set("slug", slug);
@@ -51,7 +52,7 @@ function form(slug: string) {
   fd.set("slotIntervalMinutes", "30");
   fd.set("minNoticeMinutes", "120");
   fd.set("bookingWindowDays", "30");
-  fd.set("timezone", "America/Sao_Paulo");
+  fd.set("timezone", timezone);
   return fd;
 }
 
@@ -59,6 +60,38 @@ beforeEach(() => {
   state.existing = null;
   state.writes = [];
   state.insertError = null;
+  state.currentTimezone = "America/Sao_Paulo";
+});
+
+// #189: phones are always Brazilian, so a fuso abroad would leave the negócio
+// unable to save and its clientes unable to book.
+describe("fuso outside Brazil", () => {
+  it.each([
+    ["creating (onboarding)", createBusiness, null],
+    ["editing (configurações)", updateBusiness, EXISTING],
+  ])("rejects Europe/Lisbon when %s", async (_label, action, existing) => {
+    state.existing = existing;
+    const result = await action(INITIAL, form("barbearia-demo", "Europe/Lisbon"));
+    expect(result).toMatchObject({
+      ok: false,
+      code: "VALIDATION",
+      fieldErrors: { timezone: ["Escolha um fuso horário do Brasil."] },
+    });
+    expect(state.writes).toEqual([]);
+  });
+
+  it("accepts a Brazilian fuso outside the dashboard's list", async () => {
+    const result = await createBusiness(INITIAL, form("barbearia-demo", "America/Fortaleza"));
+    expect(result).toEqual({ ok: true, data: undefined });
+  });
+
+  it("keeps saving a negócio whose fuso was set abroad before the restriction", async () => {
+    state.existing = EXISTING;
+    state.currentTimezone = "America/New_York";
+    const result = await updateBusiness(INITIAL, form("barbearia-demo", "America/New_York"));
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(state.writes).toEqual(["update:businesses"]);
+  });
 });
 
 describe("reserved slugs", () => {

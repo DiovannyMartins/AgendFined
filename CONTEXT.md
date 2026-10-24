@@ -77,7 +77,7 @@ Reserva em que o cliente não compareceu. Permanece no histórico; se marcado po
 _Avoid_: Falta, ausência, não comparecimento
 
 **Fuso do negócio**:
-Fuso IANA configurado por negócio (`businesses.timezone`, padrão America/Sao_Paulo). Datas são armazenadas em UTC; disponibilidade, bloqueios digitados no dashboard e slots são interpretados e exibidos no fuso do negócio. Não pode ser alterado enquanto houver reservas agendadas.
+Fuso IANA configurado por negócio (`businesses.timezone`, padrão America/Sao_Paulo). Datas são armazenadas em UTC; disponibilidade, bloqueios digitados no dashboard e slots são interpretados e exibidos no fuso do negócio. Não pode ser alterado enquanto houver reservas agendadas. Só fusos brasileiros são aceitos, porque o telefone do negócio e do cliente é sempre brasileiro.
 _Avoid_: Fuso da aplicação, fuso único, região, hora local
 
 ## Planos

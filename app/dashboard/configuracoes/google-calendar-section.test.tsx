@@ -77,3 +77,31 @@ describe("GoogleCalendarSection connect link", () => {
     expect(link).not.toHaveAttribute("type");
   });
 });
+
+// #189: the negócio's fuso can only be Brazilian, so the button never offers a
+// fuso abroad.
+describe("GoogleCalendarSection fuso mismatch", () => {
+  const connection = {
+    googleEmail: "dono@example.com",
+    calendarId: "primary",
+    calendarTimezone: "America/Fortaleza",
+    businessTimezone: "America/Sao_Paulo",
+    timezoneMismatch: true,
+    lastSyncAt: null,
+    lastError: null,
+    needsReconnect: false,
+  };
+
+  it("offers to adopt a Brazilian Google Calendar fuso", () => {
+    render(<GoogleCalendarSection connection={connection} isPro />);
+
+    expect(screen.getByRole("button", { name: "Usar o fuso do Google Calendar" })).toBeInTheDocument();
+  });
+
+  it("explains instead of offering a Google Calendar fuso abroad", () => {
+    render(<GoogleCalendarSection connection={{ ...connection, calendarTimezone: "Europe/Lisbon" }} isPro />);
+
+    expect(screen.queryByRole("button", { name: "Usar o fuso do Google Calendar" })).not.toBeInTheDocument();
+    expect(screen.getByText(/fora do Brasil/)).toHaveTextContent("ajuste o fuso no Google Calendar");
+  });
+});

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { businessSchema } from "@/lib/validation/schemas";
 import { getBookingWindowLimitDays, type Plan } from "@/lib/plan/plan";
 import { RESERVED_SLUG_MESSAGE, isReservedSlug } from "@/lib/business/reserved-slugs";
+import { BRAZILIAN_TIMEZONE_MESSAGE, isBrazilianTimeZone } from "@/lib/app-timezone";
 
 export type ActionResult<T = undefined, E = undefined> =
   | { ok: true; data: T }
@@ -60,6 +61,9 @@ export async function createBusiness(
     .eq("owner_id", user.id)
     .maybeSingle();
   if (existing.data?.id) return BUSINESS_EXISTS;
+
+  const timezoneError = checkTimezone(parsed.data.timezone, null);
+  if (timezoneError) return timezoneError;
 
   const limitError = checkBookingWindowLimit(parsed.data, undefined);
   if (limitError) return limitError;
@@ -125,6 +129,8 @@ export async function updateBusiness(
     .eq("status", "confirmed")
     .gt("start_at", new Date().toISOString());
   const current = await supabase.from("businesses").select("timezone").eq("id", existing.data.id).single();
+  const timezoneError = checkTimezone(parsed.data.timezone, current.data?.timezone ?? null);
+  if (timezoneError) return timezoneError;
   if (current.data?.timezone !== parsed.data.timezone && (futureBookings ?? 0) > 0) {
     return {
       ok: false,
@@ -194,6 +200,19 @@ function parseBusinessForm(
   }
 
   return { ok: true, data: parsed.data };
+}
+
+// Only Brazilian fusos (#189). A negócio whose fuso was set abroad before this
+// rule keeps it while it saves the other fields, but cannot move to another
+// fuso abroad.
+function checkTimezone(timezone: string, currentTimezone: string | null): ActionResultState | null {
+  if (isBrazilianTimeZone(timezone) || timezone === currentTimezone) return null;
+  return {
+    ok: false,
+    code: "VALIDATION",
+    message: "Revise os campos destacados.",
+    fieldErrors: { timezone: [BRAZILIAN_TIMEZONE_MESSAGE] },
+  };
 }
 
 function checkBookingWindowLimit(

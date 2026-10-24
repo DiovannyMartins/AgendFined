@@ -131,16 +131,38 @@ export function isWithinWindow(date: string, rules: BusinessRules, now: Date): b
   return target >= today && target <= windowEnd;
 }
 
-export function zonedTimeToUtcMs(date: string, time: string, timezone: string = APP_TIMEZONE): number {
+const DAY_MS = 24 * 60 * 60_000;
+
+// Every UTC instant whose wall-clock reading in `timezone` is date+time, in
+// order: none in the gap where horário de verão starts, two in the hour
+// repeated where it ends (#190). The offsets a day before and after cover both
+// sides of a transition near that time.
+function zonedTimeInstants(date: string, time: string, timezone: string): { instants: number[]; fallback: number } {
   const [y, m, d] = date.split("-").map(Number);
   const [hh, mm] = time.split(":").map(Number);
-  // UTC instant whose local wall-clock reading in `timezone` equals date+time.
-  // Iterate to converge on DST-aware offsets.
   const naive = Date.UTC(y, m - 1, d, hh, mm);
-  let guess = naive - tzOffsetMinutes(timezone, naive) * 60_000;
-  guess = naive - tzOffsetMinutes(timezone, guess) * 60_000;
-  guess = naive - tzOffsetMinutes(timezone, guess) * 60_000;
-  return guess;
+  const offsetBefore = tzOffsetMinutes(timezone, naive - DAY_MS);
+  const offsetAfter = tzOffsetMinutes(timezone, naive + DAY_MS);
+  const instants = [...new Set([offsetBefore, offsetAfter])]
+    .map((offset) => naive - offset * 60_000)
+    .filter((ms) => ms + tzOffsetMinutes(timezone, ms) * 60_000 === naive)
+    .sort((a, b) => a - b);
+  // A time in the gap read with the offset before it lands on the first
+  // instant after the gap (02:30 EST = 03:30 EDT).
+  return { instants, fallback: naive - offsetBefore * 60_000 };
+}
+
+export function localTimeExists(date: string, time: string, timezone: string = APP_TIMEZONE): boolean {
+  return zonedTimeInstants(date, time, timezone).instants.length > 0;
+}
+
+// UTC instant whose wall-clock reading in `timezone` equals date+time. A
+// repeated time resolves to its first occurrence; a time that does not exist
+// shifts forward past the gap, so a day starting in the gap starts when the
+// day really begins. Slots skip those times via localTimeExists.
+export function zonedTimeToUtcMs(date: string, time: string, timezone: string = APP_TIMEZONE): number {
+  const { instants, fallback } = zonedTimeInstants(date, time, timezone);
+  return instants[0] ?? fallback;
 }
 
 export function zonedTimeToUtc(date: string, time: string, timezone: string = APP_TIMEZONE): string {
@@ -200,6 +222,9 @@ export function computeAvailableSlots(params: {
   for (const interval of mergeContiguousIntervals(intervals)) {
     const starts = generateSlotStartTimes(interval, rules.slotIntervalMinutes, durationMinutes);
     for (const start of starts) {
+      // A wall-clock time inside the horário de verão gap would be booked at
+      // another instant than the one shown (#190).
+      if (!localTimeExists(date, start, rules.timezone)) continue;
       // Build the candidate in UTC (local slot -> UTC), per §9.5/§10.3.
       const startMs = zonedTimeToUtcMs(date, start, rules.timezone);
       const candidateUtc: UtcRange = {

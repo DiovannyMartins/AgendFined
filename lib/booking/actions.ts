@@ -21,6 +21,7 @@ import {
   computeAvailableSlots,
   isWithinWindow,
   localDayRangeUtc,
+  localTimeExists,
   toUtcRange,
   weekdayOf,
   zonedTimeToUtc,
@@ -561,6 +562,9 @@ export async function joinWaitlist(input: {
     };
   }
 
+  // A horário inside the horário de verão gap would be stored as another
+  // instant than the one the cliente chose (#190).
+  if (!localTimeExists(input.date, input.startTime, business.timezone)) return INVALID_SLOT_RESULT;
   const startAt = zonedTimeToUtc(input.date, input.startTime, business.timezone);
 
   const parsed = parseWaitlistInput({

@@ -53,7 +53,7 @@ export function AvailabilityChangeNotice() {
   const { change, report } = useContext(ChangeContext);
   if (!change) return null;
   return (
-    <div role="status" className="mt-4 space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-200">
+    <div role="status" className="mt-4 space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
       <p>{change.warning}</p>
       <div className="flex items-center gap-4">
         <Link

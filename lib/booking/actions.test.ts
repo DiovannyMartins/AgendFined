@@ -238,6 +238,19 @@ describe("createBooking", () => {
       );
     });
 
+    // #190: 02:00 não existe em Nova York no dia em que o relógio adianta.
+    it("refuses a horário that does not exist in the business's fuso", async () => {
+      vi.setSystemTime(new Date("2027-03-01T12:00:00Z"));
+      state.business = { ...state.business, min_notice_minutes: 0, timezone: "America/New_York" };
+      state.lists.availability = [{ start_time: "00:00:00", end_time: "04:00:00" }];
+      state.rpcCalls = [];
+
+      const result = await createBooking({ ...validInput, date: "2027-03-14", startTime: "02:00" });
+
+      expect(result).toMatchObject({ ok: false, code: "slot_taken" });
+      expect(state.rpcCalls).toEqual([]);
+    });
+
     it("accepts a horário that crosses the junção of faixas encostadas (#147)", async () => {
       state.singles = { services: { id: validInput.serviceId, name: "Corte feminino", duration_minutes: 45 } };
       state.lists.availability = [
@@ -419,6 +432,17 @@ describe("joinWaitlist", () => {
       expect(result).toMatchObject({ ok: false, code: "slot_free" });
       expect(recordPublicWrite).not.toHaveBeenCalled();
       state.rpcResults = {};
+    });
+
+    // #190: 02:00 would become 03:00 EDT, another horário than the one shown.
+    it("refuses a horário that does not exist in the business's fuso", async () => {
+      state.business = { ...business, plan: "pro", timezone: "America/New_York" };
+
+      const result = await joinWaitlist({ ...validInput, date: "2030-03-10", startTime: "02:00" });
+
+      expect(result).toMatchObject({ ok: false, code: "validation" });
+      expect(state.rpcCalls).toEqual([]);
+      expect(recordPublicWrite).not.toHaveBeenCalled();
     });
   });
 

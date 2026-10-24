@@ -6,6 +6,7 @@ import {
   lastBookableDate,
   isValidSlot,
   localDayRangeUtc,
+  localTimeExists,
   overlaps,
   zonedTimeToUtc,
   zonedTimeToUtcMs,
@@ -246,5 +247,85 @@ describe("isValidSlot min_notice (§10.2 step 8)", () => {
     expect(isValidSlot("2026-09-10", "12:00", now, rules)).toBe(true);
     // Local 09:00 = UTC 12:00, right at now -> too soon.
     expect(isValidSlot("2026-09-10", "09:00", now, rules)).toBe(false);
+  });
+});
+
+// #190: fusos com horário de verão. No dia em que o relógio adianta, os
+// horários do "buraco" não existem; no dia em que atrasa, a hora se repete.
+describe("horário de verão (#190)", () => {
+  const rules = (timezone: string): BusinessRules => ({
+    slotIntervalMinutes: 30,
+    minNoticeMinutes: 0,
+    bookingWindowDays: 60,
+    timezone,
+  });
+  const madrugada = (timezone: string, date: string, now: Date) =>
+    computeAvailableSlots({
+      intervals: [{ startTime: "00:00", endTime: "04:00" }],
+      rules: rules(timezone),
+      durationMinutes: 60,
+      date,
+      now,
+      blocks: [],
+      occupancies: [],
+    });
+
+  it("não oferece 02:00 e 02:30 em Nova York no dia em que o relógio adianta", () => {
+    const slots = madrugada("America/New_York", "2027-03-14", new Date("2027-03-01T12:00:00Z"));
+
+    expect(slots).toEqual(["00:00", "00:30", "01:00", "01:30", "03:00"]);
+  });
+
+  it("não oferece 01:00 e 01:30 em Lisboa no dia em que o relógio adianta", () => {
+    const slots = madrugada("Europe/Lisbon", "2027-03-28", new Date("2027-03-15T12:00:00Z"));
+
+    expect(slots).toEqual(["00:00", "00:30", "02:00", "02:30", "03:00"]);
+  });
+
+  it("sabe quais horários locais não existem", () => {
+    expect(localTimeExists("2027-03-14", "02:00", "America/New_York")).toBe(false);
+    expect(localTimeExists("2027-03-14", "02:30", "America/New_York")).toBe(false);
+    expect(localTimeExists("2027-03-14", "03:00", "America/New_York")).toBe(true);
+    expect(localTimeExists("2027-03-28", "01:00", "Europe/Lisbon")).toBe(false);
+    expect(localTimeExists("2027-03-28", "01:30", "Europe/Lisbon")).toBe(false);
+    expect(localTimeExists("2027-03-28", "02:00", "Europe/Lisbon")).toBe(true);
+  });
+
+  it("converte os horários que sobram para o instante certo", () => {
+    expect(zonedTimeToUtc("2027-03-14", "01:30", "America/New_York")).toBe("2027-03-14T06:30:00.000Z");
+    expect(zonedTimeToUtc("2027-03-14", "03:00", "America/New_York")).toBe("2027-03-14T07:00:00.000Z");
+    expect(zonedTimeToUtc("2027-03-28", "00:30", "Europe/Lisbon")).toBe("2027-03-28T00:30:00.000Z");
+    expect(zonedTimeToUtc("2027-03-28", "02:00", "Europe/Lisbon")).toBe("2027-03-28T01:00:00.000Z");
+  });
+
+  // A hora repetida existe duas vezes; o slot fica na primeira ocorrência
+  // (ainda no horário de verão), nos dois fusos.
+  it("usa a primeira ocorrência da hora repetida no dia em que o relógio atrasa", () => {
+    expect(localTimeExists("2027-11-07", "01:30", "America/New_York")).toBe(true);
+    expect(zonedTimeToUtc("2027-11-07", "01:30", "America/New_York")).toBe("2027-11-07T05:30:00.000Z");
+    expect(localTimeExists("2027-10-31", "01:30", "Europe/Lisbon")).toBe(true);
+    expect(zonedTimeToUtc("2027-10-31", "01:30", "Europe/Lisbon")).toBe("2027-10-31T00:30:00.000Z");
+
+    const slots = madrugada("America/New_York", "2027-11-07", new Date("2027-11-01T12:00:00Z"));
+    expect(slots).toEqual(["00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00"]);
+  });
+
+  it("não muda nada nos fusos brasileiros", () => {
+    for (const timezone of ["America/Sao_Paulo", "America/Cuiaba", "America/Manaus", "America/Noronha"]) {
+      const slots = madrugada(timezone, "2027-03-14", new Date("2027-03-01T12:00:00Z"));
+      expect(slots).toEqual(["00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00"]);
+    }
+    expect(zonedTimeToUtc("2027-03-14", "02:00", "America/Sao_Paulo")).toBe("2027-03-14T05:00:00.000Z");
+    expect(zonedTimeToUtc("2027-10-31", "01:30", "America/Noronha")).toBe("2027-10-31T03:30:00.000Z");
+  });
+
+  // O antigo horário de verão brasileiro começava à meia-noite: o dia local
+  // começa no primeiro instante que existe, 01:00 (03:00Z).
+  it("começa o dia no primeiro instante que existe quando a meia-noite não existe", () => {
+    expect(localTimeExists("2018-11-04", "00:00", "America/Sao_Paulo")).toBe(false);
+    expect(localDayRangeUtc("2018-11-04", "America/Sao_Paulo")).toEqual({
+      start: "2018-11-04T03:00:00.000Z",
+      end: "2018-11-05T02:00:00.000Z",
+    });
   });
 });

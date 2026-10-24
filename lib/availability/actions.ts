@@ -13,8 +13,58 @@ import { computeAvailableSlots, isWithinWindow, localDateTimeToUtc, localDayRang
 import type { UtcRange } from "@/lib/booking/availability";
 import { enforceAvailabilityRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 import { weekdayName } from "@/lib/availability/weekdays";
+import {
+  bookingLocalDate,
+  bookingsOutsideAvailability,
+  bookingWeekday,
+  outsideBookingsMessage,
+} from "@/lib/availability/outside-bookings";
 
 export type { ActionResult };
+
+// What an edit or removal left behind: reservas confirmadas e futuras that no
+// faixa covers anymore (#192). `agendaDate` opens the agenda on the first one.
+export type AvailabilityChange = { warning: string; agendaDate: string | null } | undefined;
+
+// The disponibilidade is the rule for new reservas, so a change is never
+// blocked and nothing is cancelled: the owner is only told what was left out.
+// Only the weekday that lost coverage is checked, so reservas of other days
+// are not blamed on this change.
+async function outsideBookingsNotice(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  business: { id: string; timezone: string | null },
+  weekday: number,
+): Promise<AvailabilityChange> {
+  const timezone = business.timezone || APP_TIMEZONE;
+  const [{ data: faixas, error: faixasError }, { data: bookings, error: bookingsError }] = await Promise.all([
+    supabase
+      .from("availability")
+      .select("weekday, start_time, end_time")
+      .eq("business_id", business.id)
+      .eq("is_active", true),
+    supabase
+      .from("bookings")
+      .select("customer_name_snapshot, start_at, end_at")
+      .eq("business_id", business.id)
+      .eq("status", "confirmed")
+      .gt("start_at", new Date().toISOString()),
+  ]);
+
+  // The change is already saved; say the check is missing instead of failing it.
+  if (faixasError || bookingsError) {
+    return {
+      warning: "Horário salvo, mas não foi possível conferir as reservas já marcadas. Confira a agenda.",
+      agendaDate: null,
+    };
+  }
+
+  const sameDay = (bookings ?? []).filter((b) => bookingWeekday(b, timezone) === weekday);
+  const outside = bookingsOutsideAvailability(sameDay, faixas ?? [], timezone).sort(
+    (a, b) => Date.parse(a.start_at) - Date.parse(b.start_at),
+  );
+  if (outside.length === 0) return undefined;
+  return { warning: outsideBookingsMessage(outside, timezone), agendaDate: bookingLocalDate(outside[0], timezone) };
+}
 
 export async function setAvailability(
   _prev: ActionResult,
@@ -86,6 +136,8 @@ export async function setAvailability(
 
   if (error) return { ok: false, code: "DB_ERROR", message: "Não foi possível salvar." };
 
+  // Adding a faixa only widens the disponibilidade, so no reserva is left out
+  // and there is nothing to check (#192).
   revalidatePath("/dashboard/bloqueios");
   revalidatePath("/dashboard/configuracoes");
   return { ok: true, data: undefined };
@@ -93,9 +145,9 @@ export async function setAvailability(
 
 export async function updateAvailability(
   id: string,
-  _prev: ActionResult,
+  _prev: ActionResult<AvailabilityChange>,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<ActionResult<AvailabilityChange>> {
   const weekday = Number(formData.get("weekday"));
   const startTime = String(formData.get("startTime") ?? "");
   const endTime = String(formData.get("endTime") ?? "");
@@ -116,6 +168,16 @@ export async function updateAvailability(
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
 
   const supabase = await createClient();
+
+  // The weekday before the edit is the one that may lose coverage (#192).
+  const { data: current, error: currentError } = await supabase
+    .from("availability")
+    .select("weekday")
+    .eq("id", id)
+    .eq("business_id", business.id)
+    .maybeSingle();
+  if (currentError) return { ok: false, code: "DB_ERROR", message: "Não foi possível salvar." };
+  if (!current) return { ok: false, code: "NOT_FOUND", message: "Horário não encontrado." };
 
   // §9.3: same business + day ranges must not overlap (agenda is per business).
   // Exclude the row being edited so saving without changes always succeeds.
@@ -151,10 +213,10 @@ export async function updateAvailability(
 
   revalidatePath("/dashboard/bloqueios");
   revalidatePath("/dashboard/configuracoes");
-  return { ok: true, data: undefined };
+  return { ok: true, data: await outsideBookingsNotice(supabase, business, current.weekday) };
 }
 
-export async function deleteAvailability(id: string): Promise<ActionResult> {
+export async function deleteAvailability(id: string): Promise<ActionResult<AvailabilityChange>> {
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
   const supabase = await createClient();
@@ -163,12 +225,12 @@ export async function deleteAvailability(id: string): Promise<ActionResult> {
     .delete()
     .eq("id", id)
     .eq("business_id", business.id)
-    .select("id");
+    .select("id, weekday");
   if (error) return { ok: false, code: "DB_ERROR", message: "Não foi possível excluir o horário." };
   if (!data?.length) return { ok: false, code: "NOT_FOUND", message: "Horário não encontrado." };
   revalidatePath("/dashboard/bloqueios");
   revalidatePath("/dashboard/configuracoes");
-  return { ok: true, data: undefined };
+  return { ok: true, data: await outsideBookingsNotice(supabase, business, data[0].weekday) };
 }
 
 export async function createBlock(

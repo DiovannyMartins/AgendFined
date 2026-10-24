@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { createContext, useActionState, useContext, useEffect, useRef, useState, useTransition } from "react";
+import type { ReactNode } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,11 +27,52 @@ import {
   updateAvailability,
   deleteAvailability,
   type ActionResult,
+  type AvailabilityChange,
 } from "@/lib/availability/actions";
 import { submitWithoutReset } from "@/lib/forms/submit-without-reset";
 import { WEEKDAYS } from "@/lib/availability/weekdays";
+import { agendaSearchString } from "@/lib/agenda/view";
 
 const INITIAL = { ok: true } as ActionResult;
+const INITIAL_CHANGE = { ok: true } as ActionResult<AvailabilityChange>;
+
+// Reservas left outside the disponibilidade by the last change (#192). The
+// notice lives above the list because a removed faixa's row unmounts as soon
+// as the page revalidates.
+const ChangeContext = createContext<{
+  change: AvailabilityChange;
+  report: (change: AvailabilityChange) => void;
+}>({ change: undefined, report: () => {} });
+
+export function AvailabilityChangeProvider({ children }: { children: ReactNode }) {
+  const [change, report] = useState<AvailabilityChange>(undefined);
+  return <ChangeContext.Provider value={{ change, report }}>{children}</ChangeContext.Provider>;
+}
+
+export function AvailabilityChangeNotice() {
+  const { change, report } = useContext(ChangeContext);
+  if (!change) return null;
+  return (
+    <div role="status" className="mt-4 space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-200">
+      <p>{change.warning}</p>
+      <div className="flex items-center gap-4">
+        <Link
+          href={`/dashboard/agenda${agendaSearchString({ dateKey: change.agendaDate, status: "confirmed" })}`}
+          className="inline-flex min-h-6 items-center underline"
+        >
+          Ver na agenda
+        </Link>
+        <button
+          type="button"
+          onClick={() => report(undefined)}
+          className="inline-flex min-h-6 items-center px-1 text-muted-foreground hover:text-foreground"
+        >
+          Fechar aviso
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const WEEKDAY_ITEMS = Object.fromEntries(WEEKDAYS.map((d) => [String(d.value), d.name]));
 
@@ -41,15 +84,18 @@ export function AvailabilityForm() {
   const formRef = useRef<HTMLFormElement>(null);
   // Vários dias de uma vez: segunda a sexta, 08–18, é um envio só (#149).
   const [days, setDays] = useState<number[]>(DEFAULT_DAYS);
+  const { report } = useContext(ChangeContext);
 
   // Back to the defaults only once the faixa was added; on error the fields
   // keep what was sent (#148).
   useEffect(() => {
     if (!state.ok || state === INITIAL) return;
     formRef.current?.reset();
+    // A new faixa may cover what the last notice listed, so it is cleared.
+    report(undefined);
     const resetDaysAfterRender = window.setTimeout(() => setDays(DEFAULT_DAYS), 0);
     return () => window.clearTimeout(resetDaysAfterRender);
-  }, [state]);
+  }, [state, report]);
 
   const toggleDay = (value: number, checked: boolean) =>
     setDays((current) =>
@@ -115,20 +161,22 @@ export function AvailabilityRow({
   const [editing, setEditing] = useState(false);
   const [state, formAction, pending] = useActionState(
     updateAvailability.bind(null, id),
-    INITIAL,
+    INITIAL_CHANGE,
   );
+  const { report } = useContext(ChangeContext);
 
   const short = (t: string) => t.slice(0, 5);
   const day = WEEKDAYS.find((d) => d.value === weekday);
   const label = day?.name ?? String(weekday);
 
   useEffect(() => {
-    if (!state.ok || state === INITIAL) return;
+    if (!state.ok || state === INITIAL_CHANGE) return;
+    report(state.data);
     const closeAfterRender = window.setTimeout(() => setEditing(false), 0);
     return () => {
       window.clearTimeout(closeAfterRender);
     };
-  }, [state]);
+  }, [state, report]);
 
   if (!editing) {
     return (
@@ -222,7 +270,8 @@ export function AvailabilityRow({
 // confirmação como as outras ações destrutivas do painel.
 function AvailabilityDelete({ id, range }: { id: string; range: string }) {
   const [open, setOpen] = useState(false);
-  const [state, setState] = useState<ActionResult>(INITIAL);
+  const [state, setState] = useState<ActionResult<AvailabilityChange>>(INITIAL_CHANGE);
+  const { report } = useContext(ChangeContext);
   const [pending, startTransition] = useTransition();
 
   return (
@@ -230,7 +279,7 @@ function AvailabilityDelete({ id, range }: { id: string; range: string }) {
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) setState(INITIAL);
+        if (next) setState(INITIAL_CHANGE);
       }}
     >
       <DialogTrigger
@@ -261,7 +310,7 @@ function AvailabilityDelete({ id, range }: { id: string; range: string }) {
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                let result: ActionResult;
+                let result: ActionResult<AvailabilityChange>;
                 try {
                   result = await deleteAvailability(id);
                 } catch {
@@ -272,7 +321,9 @@ function AvailabilityDelete({ id, range }: { id: string; range: string }) {
                   };
                 }
                 setState(result);
-                if (result.ok) setOpen(false);
+                if (!result.ok) return;
+                report(result.data);
+                setOpen(false);
               })
             }
           >

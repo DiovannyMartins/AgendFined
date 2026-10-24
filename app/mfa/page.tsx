@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { MfaPanel } from "./mfa-panel";
 import { requiresMfaChallenge, safeInternalPath } from "@/lib/auth/assurance";
 import { logout } from "@/lib/auth/actions";
+import { countRecoveryCodes } from "@/lib/auth/recovery-codes";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
   title: "Autenticação em duas etapas — AgendFined",
@@ -26,7 +28,23 @@ export default async function MfaPage({
   if (error) throw error;
   const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if (assuranceError) throw assuranceError;
-  if (next && assurance.currentLevel === "aal2") redirect(returnTo);
+
+  const factorId = data.totp.find((factor) => factor.status === "verified")?.id ?? null;
+  const verified = assurance.currentLevel === "aal2";
+  // Only the confirmed session sees how many códigos de recuperação are left (#169).
+  let recoveryCodesLeft: number | null | undefined;
+  if (factorId && verified) {
+    try {
+      recoveryCodesLeft = await countRecoveryCodes(createAdminClient(), user.id);
+    } catch {
+      recoveryCodesLeft = null;
+    }
+  }
+  // A confirmed session goes back to where it was headed, unless it has no
+  // códigos de recuperação yet: confirming a new authenticator sets the aal2
+  // cookie and re-renders this page, and the dono must stay to save the codes
+  // that the panel generates next (#169).
+  if (next && verified && recoveryCodesLeft !== 0) redirect(returnTo);
 
   return (
     <main className="container mx-auto flex min-h-[calc(100vh-4rem)] max-w-lg flex-col items-center justify-center px-4 py-12">
@@ -35,8 +53,9 @@ export default async function MfaPage({
       </Link>
       <div className="w-full">
         <MfaPanel
-          factorId={data.totp.find((factor) => factor.status === "verified")?.id ?? null}
-          verified={assurance.currentLevel === "aal2"}
+          factorId={factorId}
+          verified={verified}
+          recoveryCodesLeft={recoveryCodesLeft}
           returnTo={returnTo}
         />
       </div>

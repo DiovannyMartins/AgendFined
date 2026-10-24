@@ -652,6 +652,24 @@ export type Database = {
           },
         ]
       }
+      mfa_recovery_codes: {
+        Row: {
+          code_hash: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          code_hash: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          code_hash?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1035,6 +1053,22 @@ export type Database = {
           p_subject_id: string
         }
         Returns: undefined
+      }
+      replace_mfa_recovery_codes: {
+        Args: { p_code_hashes: string[]; p_user_id: string }
+        Returns: undefined
+      }
+      consume_mfa_recovery_code: {
+        Args: { p_code_hash: string; p_user_id: string }
+        Returns: boolean
+      }
+      clear_mfa_recovery_codes: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      count_mfa_recovery_codes: {
+        Args: { p_user_id: string }
+        Returns: number
       }
     }
     Enums: {

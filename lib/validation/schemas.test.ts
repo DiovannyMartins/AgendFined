@@ -6,6 +6,7 @@ import {
   bookingSchema,
   businessFormSchema,
   businessSchema,
+  businessSchemaFor,
   loginSchema,
   publicAvailabilitySchema,
   publicBookingSchema,
@@ -47,13 +48,22 @@ describe("businessSchema", () => {
     expect(businessSchema.safeParse({ ...valid, slug: "a--b" }).success).toBe(false);
   });
 
-  it("accepts a custom slot interval", () => {
-    expect(businessSchema.safeParse({ ...valid, slotIntervalMinutes: 45 }).success).toBe(true);
+  // #191: a 1-minute interval meant hundreds of buttons on the public page.
+  it.each([5, 10, 15, 20, 30, 45, 60, 90, 120])("accepts the %i-minute interval from the list", (minutes) => {
+    expect(businessSchema.safeParse({ ...valid, slotIntervalMinutes: minutes }).success).toBe(true);
   });
 
-  it("rejects zero and intervals longer than one day", () => {
-    expect(businessSchema.safeParse({ ...valid, slotIntervalMinutes: 0 }).success).toBe(false);
-    expect(businessSchema.safeParse({ ...valid, slotIntervalMinutes: 1441 }).success).toBe(false);
+  it.each([0, 1, 7, 13, 25, 180, 1440])("rejects the %i-minute interval outside the list", (minutes) => {
+    const result = businessSchema.safeParse({ ...valid, slotIntervalMinutes: minutes });
+    expect(result.success).toBe(false);
+    expect(result.error?.flatten().fieldErrors.slotIntervalMinutes).toEqual(["Escolha um dos intervalos da lista."]);
+  });
+
+  it("keeps the interval a negócio saved before the list, and only that one", () => {
+    const legacy = businessSchemaFor(25);
+    expect(legacy.safeParse({ ...valid, slotIntervalMinutes: 25 }).success).toBe(true);
+    expect(legacy.safeParse({ ...valid, slotIntervalMinutes: 30 }).success).toBe(true);
+    expect(legacy.safeParse({ ...valid, slotIntervalMinutes: 7 }).success).toBe(false);
   });
 });
 

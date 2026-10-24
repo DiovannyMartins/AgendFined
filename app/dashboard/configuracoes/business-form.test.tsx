@@ -242,3 +242,30 @@ describe("polimento pós-beta (#149)", () => {
     expect(screen.getByLabelText("Fuso horário do negócio")).toHaveValue("America/Sao_Paulo");
   });
 });
+
+describe("intervalo entre horários (#191)", () => {
+  beforeEach(() => vi.mocked(updateBusiness).mockReset());
+
+  it("oferece só os intervalos da lista", () => {
+    render(<BusinessForm initial={null} />);
+    const select = screen.getByLabelText("Intervalo entre horários");
+
+    const values = Array.from(select.querySelectorAll("option"), (option) => option.value);
+    expect(values).toEqual(["5", "10", "15", "20", "30", "45", "60", "90", "120"]);
+    expect(select).toHaveValue("30");
+  });
+
+  it("mostra o intervalo antigo do negócio como opção até o dono trocar", async () => {
+    vi.mocked(updateBusiness).mockResolvedValue({ ok: true, data: undefined });
+    render(<BusinessForm initial={{ ...initial, slotIntervalMinutes: 25 }} />);
+    const select = screen.getByLabelText("Intervalo entre horários");
+
+    expect(select).toHaveValue("25");
+    expect(screen.getByRole("option", { name: "25 min (atual)" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+
+    await waitFor(() => expect(updateBusiness).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(updateBusiness).mock.calls[0][1].get("slotIntervalMinutes")).toBe("25");
+  });
+});

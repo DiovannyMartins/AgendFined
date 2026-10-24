@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PrivateCancellation } from "./private-cancellation";
 
 vi.mock("./cancel-booking", () => ({
-  CancelBooking: ({ code, token }: { code: string; token: string }) => (
-    <div data-testid="private-cancellation">{`${code}:${token}`}</div>
+  CancelBooking: ({ code, token, confirmationEmailSent = true }: { code: string; token: string; confirmationEmailSent?: boolean }) => (
+    <div data-testid="private-cancellation">{`${code}:${token}:${confirmationEmailSent ? "email" : "sem-email"}`}</div>
   ),
 }));
 
@@ -19,10 +19,19 @@ describe("PrivateCancellation", () => {
     render(<PrivateCancellation code="65925DBB" canCancel onCancelled={() => {}} />);
 
     expect(await screen.findByTestId("private-cancellation")).toHaveTextContent(
-      `65925DBB:${TOKEN}`,
+      `65925DBB:${TOKEN}:email`,
     );
     await waitFor(() => expect(window.location.hash).toBe(""));
     expect(window.location.search).toBe("?code=65925DBB");
+  });
+
+  it("tells the cancel control when the confirmação e-mail was not sent, and scrubs that too", async () => {
+    window.history.replaceState(null, "", `/barbearia/confirmacao?code=65925DBB#cancel=${TOKEN}&email=falhou`);
+
+    render(<PrivateCancellation code="65925DBB" canCancel onCancelled={() => {}} />);
+
+    expect(await screen.findByTestId("private-cancellation")).toHaveTextContent(`65925DBB:${TOKEN}:sem-email`);
+    await waitFor(() => expect(window.location.hash).toBe(""));
   });
 
   it("consumes and scrubs capabilities from links issued by older versions", async () => {

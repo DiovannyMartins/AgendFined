@@ -235,6 +235,28 @@ describe("createBooking", () => {
       expect(result).toMatchObject({ ok: true, publicCode: "65925DBB" });
     });
 
+    it("tells the page the confirmação e-mail went out", async () => {
+      const result = await createBooking(validInput);
+
+      expect(result).toMatchObject({ ok: true, confirmationEmailSent: true });
+    });
+
+    // #187: the e-mail is the only other way to cancel, so the page must know.
+    it("still confirms the reserva but tells the page when the confirmação e-mail failed", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      sendBookingConfirmationEmail.mockResolvedValueOnce({ sent: false, reason: "provider_error" });
+
+      const result = await createBooking(validInput);
+
+      expect(result).toMatchObject({ ok: true, publicCode: "65925DBB", confirmationEmailSent: false });
+      expect(consoleError).toHaveBeenCalledWith("booking_confirmation_email_failed", {
+        bookingId: "booking-9",
+        reason: "provider_error",
+      });
+      expect(JSON.stringify(consoleError.mock.calls)).not.toContain(result.cancelToken);
+      consoleError.mockRestore();
+    });
+
     it("does not tell the dono when the reserva was not created", async () => {
       state.rpcResults.create_booking = { data: null, error: { message: "bookings_no_overlap" } };
 

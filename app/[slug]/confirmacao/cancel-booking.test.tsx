@@ -6,6 +6,24 @@ import { CancelBooking } from "./cancel-booking";
 vi.mock("@/lib/booking/actions", () => ({ cancelPublicBooking: vi.fn() }));
 
 describe("CancelBooking", () => {
+  it("points to the link in the confirmação e-mail for a later cancellation", () => {
+    render(<CancelBooking code="65925DBB" token={"A".repeat(43)} />);
+
+    expect(screen.getByText(/use o link do e-mail de confirmação/)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  // #187: without the e-mail, this button is the cliente's only self-service way out.
+  it("asks to cancel now or talk to the negócio when the confirmação e-mail was not sent", () => {
+    render(<CancelBooking code="65925DBB" token={"A".repeat(43)} confirmationEmailSent={false} />);
+
+    const warning = screen.getByRole("alert");
+    expect(warning).toHaveTextContent("Não conseguimos enviar o e-mail de confirmação");
+    expect(warning).toHaveTextContent("cancele agora");
+    expect(warning).toHaveTextContent("fale com o negócio");
+    expect(screen.queryByText(/use o link do e-mail/)).not.toBeInTheDocument();
+  });
+
   it("keeps the typed reason when the cancellation fails (#148)", async () => {
     vi.mocked(cancelPublicBooking).mockResolvedValueOnce({ status: "error", code: "DB_ERROR", message: "Não foi possível cancelar." });
     render(<CancelBooking code="65925DBB" token={"A".repeat(43)} />);

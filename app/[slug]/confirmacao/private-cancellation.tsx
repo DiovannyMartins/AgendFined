@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { readPrivateCancelCapability } from "@/lib/bookings/private-confirmation";
+import {
+  readConfirmationEmailFailed,
+  readPrivateCancelCapability,
+} from "@/lib/bookings/private-confirmation";
 import { CancelBooking } from "./cancel-booking";
 
 // The capability is always captured and scrubbed from the URL, but the cancel
@@ -16,6 +19,7 @@ export function PrivateCancellation({
   onCancelled: () => void;
 }) {
   const [token, setToken] = useState<string | null>(null);
+  const [emailFailed, setEmailFailed] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -25,7 +29,10 @@ export function PrivateCancellation({
         window.location.hash,
         window.location.search,
       );
-      if (cancelToken) setToken(cancelToken);
+      if (cancelToken) {
+        setToken(cancelToken);
+        setEmailFailed(readConfirmationEmailFailed(window.location.hash));
+      }
 
       // The fragment is not sent in HTTP requests. Remove it from the visible URL
       // as soon as the client captures the capability so copies and screenshots do
@@ -46,5 +53,12 @@ export function PrivateCancellation({
     };
   }, []);
 
-  return token && canCancel ? <CancelBooking code={code} token={token} onCancelled={onCancelled} /> : null;
+  return token && canCancel ? (
+    <CancelBooking
+      code={code}
+      token={token}
+      confirmationEmailSent={!emailFailed}
+      onCancelled={onCancelled}
+    />
+  ) : null;
 }

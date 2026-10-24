@@ -3,8 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingWidget } from "./booking-widget";
 import { createBooking, joinWaitlist } from "@/lib/booking/actions";
 import { getSlotsForDate } from "@/lib/availability/actions";
+import { readConfirmationEmailFailed } from "@/lib/bookings/private-confirmation";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+const { push } = vi.hoisted(() => ({ push: vi.fn() }));
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("@/components/turnstile-widget", () => ({ TurnstileWidget: () => null }));
 vi.mock("@/lib/booking/actions", () => ({ createBooking: vi.fn(), joinWaitlist: vi.fn() }));
 vi.mock("@/lib/availability/actions", () => ({
@@ -58,6 +61,27 @@ describe("BookingWidget", () => {
     expect(nameInput).toHaveAccessibleDescription("Informe seu nome completo.");
     expect(screen.getByLabelText("Telefone / WhatsApp")).not.toHaveAttribute("aria-invalid");
     expect(screen.getByRole("button", { name: "09:00" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  // #187: the confirmation page only learns the e-mail failed from this navigation.
+  it.each([
+    [true, false],
+    [false, true],
+  ])("goes to the private confirmation saying whether the e-mail went out (sent: %s)", async (sent, warns) => {
+    push.mockClear();
+    mockedCreateBooking.mockResolvedValue({
+      ok: true,
+      publicCode: "65925DBB",
+      cancelToken: "A".repeat(43),
+      confirmationEmailSent: sent,
+    });
+
+    await fillAndSubmit("Maria Souza");
+
+    await waitFor(() => expect(push).toHaveBeenCalledTimes(1));
+    const url = new URL(push.mock.calls[0][0], "https://agenda.example");
+    expect(url.pathname).toBe("/barbearia/confirmacao");
+    expect(readConfirmationEmailFailed(url.hash)).toBe(warns);
   });
 
   it("limits the date picker to the janela futura", () => {

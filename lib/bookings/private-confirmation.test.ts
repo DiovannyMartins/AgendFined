@@ -4,6 +4,7 @@ import {
   buildPrivateConfirmationUrl,
   moveConfirmationToSlug,
   readCancelTokenFromHash,
+  readConfirmationEmailFailed,
   readPrivateCancelCapability,
 } from "./private-confirmation";
 
@@ -28,6 +29,23 @@ describe("private confirmation navigation", () => {
     expect(url.origin).toBe("https://agenda.example");
     expect(url.searchParams.has("cancel")).toBe(false);
     expect(readCancelTokenFromHash(url.hash)).toBe(TOKEN);
+  });
+
+  // #187: only the navigation right after a failed e-mail carries the warning;
+  // the link inside the e-mail never does.
+  it("marks in the fragment that the confirmação e-mail was not sent", () => {
+    const path = buildPrivateConfirmationPath("barbearia", "65925DBB", TOKEN, { confirmationEmailFailed: true });
+    const url = new URL(path, "https://agenda.example");
+
+    expect(readCancelTokenFromHash(url.hash)).toBe(TOKEN);
+    expect(readConfirmationEmailFailed(url.hash)).toBe(true);
+    expect(url.searchParams.toString()).toBe("code=65925DBB");
+    expect(readConfirmationEmailFailed(new URL(buildPrivateConfirmationPath("barbearia", "65925DBB", TOKEN), "https://agenda.example").hash)).toBe(false);
+    expect(
+      readConfirmationEmailFailed(
+        new URL(buildPrivateConfirmationUrl(new URL("https://agenda.example"), "barbearia", "65925DBB", TOKEN)).hash,
+      ),
+    ).toBe(false);
   });
 
   it("rejects malformed capabilities from the fragment", () => {

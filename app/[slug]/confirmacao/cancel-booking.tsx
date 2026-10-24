@@ -21,10 +21,12 @@ const INITIAL: CancelState = { status: "idle" };
 export function CancelBooking({
   code,
   token,
+  confirmationEmailSent = true,
   onCancelled,
 }: {
   code: string;
   token: string;
+  confirmationEmailSent?: boolean;
   onCancelled?: () => void;
 }) {
   const [state, formAction, pending] = useActionState(async (prev: CancelState, formData: FormData) => {
@@ -46,6 +48,18 @@ export function CancelBooking({
 
   return (
     <div className="mt-6 border-t border-border pt-4">
+      {/* #187: without the e-mail there is no later link, so the cliente is
+          told up front that this button is the last self-service chance. */}
+      {!confirmationEmailSent && (
+        <div role="alert" className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-left text-sm font-normal">
+          <p className="font-medium">Não conseguimos enviar o e-mail de confirmação.</p>
+          <p className="mt-1 text-muted-foreground">
+            Sua reserva está confirmada, mas você não vai receber o link para cancelar depois. Se precisar,
+            cancele agora por este botão. Depois de sair desta página, para cancelar, fale com o
+            negócio.
+          </p>
+        </div>
+      )}
       <Dialog>
         <DialogTrigger render={<Button type="button" variant="ghost" className="text-destructive" />}>
           Cancelar reserva
@@ -75,10 +89,12 @@ export function CancelBooking({
       </Dialog>
       {/* ADR 0005: the token is delivered once and scrubbed from the URL, so
           the button does not come back after leaving or reloading the page. */}
-      <p className="mt-2 text-xs text-muted-foreground">
-        Este botão não aparece de novo se você sair ou recarregar a página. Para cancelar depois,
-        use o link do e-mail de confirmação.
-      </p>
+      {confirmationEmailSent && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Este botão não aparece de novo se você sair ou recarregar a página. Para cancelar depois,
+          use o link do e-mail de confirmação.
+        </p>
+      )}
     </div>
   );
 }

@@ -54,6 +54,9 @@ export type ActionResult = {
   fieldErrors?: Record<string, string[]>;
   publicCode?: string;
   cancelToken?: string;
+  // Set by createBooking: false means the cliente did not get the e-mail with
+  // the private link, so the confirmation page must say so (#187).
+  confirmationEmailSent?: boolean;
 };
 
 type ServerClient = ReturnType<typeof createAdminClient>;
@@ -222,6 +225,7 @@ export async function createBooking(input: {
   const noteJudgment = parsed.data.customerNote ? classifyCustomerNote(parsed.data.customerNote) : null;
   const trustedNoteJudgment = noteJudgment && noteJudgment.categoryConfidence >= 0.7 ? noteJudgment : null;
 
+  let confirmationEmailSent = false;
   if (data?.id && data.public_code) {
     // The dono hears about the reserva in parallel with the cliente's
     // confirmação; notifyOwner never throws (#146).
@@ -256,6 +260,7 @@ export async function createBooking(input: {
         customerNoteRequiresFollowUp: trustedNoteJudgment?.requiresManualFollowUp ?? false,
       }),
     ]);
+    confirmationEmailSent = emailResult.sent;
     if (!emailResult.sent) {
       console.error("booking_confirmation_email_failed", {
         bookingId: data.id,
@@ -286,7 +291,7 @@ export async function createBooking(input: {
   }
 
   return data?.public_code
-    ? { ok: true, publicCode: data.public_code, cancelToken }
+    ? { ok: true, publicCode: data.public_code, cancelToken, confirmationEmailSent }
     : { ok: false, code: "db_error", message: "Não foi possível concluir a reserva. Tente novamente." };
 }
 

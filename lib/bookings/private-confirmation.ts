@@ -1,13 +1,24 @@
 import { isValidCancelToken } from "./cancel-token";
 
+const EMAIL_FAILED = "falhou";
+
+// `confirmationEmailFailed` is only for the navigation right after the reserva
+// (#187): it rides in the fragment with the capability, so it is scrubbed with
+// it and never reaches the server, a reload or the e-mail link itself.
 export function buildPrivateConfirmationPath(
   slug: string,
   publicCode: string,
   cancelToken: string,
+  options: { confirmationEmailFailed?: boolean } = {},
 ): string {
   const query = new URLSearchParams({ code: publicCode });
   const fragment = new URLSearchParams({ cancel: cancelToken });
+  if (options.confirmationEmailFailed) fragment.set("email", EMAIL_FAILED);
   return `/${encodeURIComponent(slug)}/confirmacao?${query.toString()}#${fragment.toString()}`;
+}
+
+export function readConfirmationEmailFailed(hash: string): boolean {
+  return new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash).get("email") === EMAIL_FAILED;
 }
 
 export function buildPrivateConfirmationUrl(

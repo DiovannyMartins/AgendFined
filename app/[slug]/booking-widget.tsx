@@ -218,7 +218,11 @@ export function BookingWidget({
     }
     if (result.ok && result.publicCode && result.cancelToken) {
       trackAnalyticsEvent("booking_complete", { method: "public_form" });
-      router.push(buildPrivateConfirmationPath(slug, result.publicCode, result.cancelToken));
+      router.push(
+        buildPrivateConfirmationPath(slug, result.publicCode, result.cancelToken, {
+          confirmationEmailFailed: result.confirmationEmailSent === false,
+        }),
+      );
     } else if (result.code === "slot_taken" && offersWaitlist) {
       // INC-3: the slot was lost to another reservation — offer the waitlist.
       setError(result.message ?? "Esse horário não está mais disponível.");

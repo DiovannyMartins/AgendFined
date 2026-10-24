@@ -97,17 +97,34 @@ const businessFields = {
   description: descriptionField,
 };
 
-const SLOT_INTERVAL_MESSAGE = "Use um intervalo entre 1 e 1440 minutos.";
+// Intervals between horários on the public page (#191): a free number let a
+// negócio offer 08:00, 08:01, 08:02… or odd starts such as 08:07.
+export const SLOT_INTERVAL_OPTIONS = [5, 10, 15, 20, 30, 45, 60, 90, 120] as const;
 
-export const businessSchema = z.object({
-  ...businessFields,
-  slotIntervalMinutes: wholeNumber(1, 1440, SLOT_INTERVAL_MESSAGE),
-  timezone: z
-    .string()
-    .trim()
-    .min(1, "Escolha um fuso horário.")
-    .refine(isValidTimeZone, "Informe um fuso horário IANA válido."),
-});
+const SLOT_INTERVAL_MESSAGE = "Escolha um dos intervalos da lista.";
+
+export function isSlotIntervalOption(minutes: number): boolean {
+  return (SLOT_INTERVAL_OPTIONS as readonly number[]).includes(minutes);
+}
+
+// A negócio saved with another interval before the list keeps it while it
+// saves the other fields (`currentSlotInterval`), but cannot move to another
+// value outside the list.
+export function businessSchemaFor(currentSlotInterval?: number | null) {
+  return z.object({
+    ...businessFields,
+    slotIntervalMinutes: z
+      .number({ error: SLOT_INTERVAL_MESSAGE })
+      .refine((minutes) => isSlotIntervalOption(minutes) || minutes === currentSlotInterval, SLOT_INTERVAL_MESSAGE),
+    timezone: z
+      .string()
+      .trim()
+      .min(1, "Escolha um fuso horário.")
+      .refine(isValidTimeZone, "Informe um fuso horário IANA válido."),
+  });
+}
+
+export const businessSchema = businessSchemaFor();
 export type BusinessInput = z.infer<typeof businessSchema>;
 
 // Client-side form schema for the business setup form (React Hook Form).
@@ -116,10 +133,9 @@ export const businessFormSchema = z.object({
   ...businessFields,
   // Same rule createBusiness and updateBusiness enforce server-side, shown inline before submit.
   slug: businessFields.slug.refine((slug) => !isReservedSlug(slug), RESERVED_SLUG_MESSAGE),
-  slotIntervalMinutes: z
-    .string()
-    .regex(/^\d+$/, "Informe um número inteiro de minutos.")
-    .refine((value) => Number(value) >= 1 && Number(value) <= 1440, SLOT_INTERVAL_MESSAGE),
+  // The select offers only the list (plus the negócio's current interval, which
+  // the client cannot tell apart), so the server checks the value.
+  slotIntervalMinutes: z.string().regex(/^\d+$/, SLOT_INTERVAL_MESSAGE),
   timezone: z.string().trim().min(1, "Escolha um fuso horário."),
 });
 export type BusinessFormValues = z.infer<typeof businessFormSchema>;

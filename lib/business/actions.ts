@@ -1,9 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { businessSchema } from "@/lib/validation/schemas";
+import { businessSchemaFor, type BusinessInput } from "@/lib/validation/schemas";
 import { getBookingWindowLimitDays, type Plan } from "@/lib/plan/plan";
 import { RESERVED_SLUG_MESSAGE, isReservedSlug } from "@/lib/business/reserved-slugs";
 import { BRAZILIAN_TIMEZONE_MESSAGE, isBrazilianTimeZone } from "@/lib/app-timezone";
@@ -30,7 +29,7 @@ type BusinessPayload = {
   description?: string | null;
 };
 
-type ParsedBusiness = z.infer<typeof businessSchema>;
+type ParsedBusiness = BusinessInput;
 
 export type ActionResultState = ActionResult<undefined>;
 
@@ -101,9 +100,6 @@ export async function updateBusiness(
   _prev: ActionResultState,
   formData: FormData,
 ): Promise<ActionResultState> {
-  const parsed = parseBusinessForm(formData);
-  if (!parsed.ok) return parsed.error;
-
   const supabase = await createClient();
   const {
     data: { user },
@@ -112,12 +108,16 @@ export async function updateBusiness(
 
   const existing = await supabase
     .from("businesses")
-    .select("id, plan")
+    .select("id, plan, slot_interval_minutes")
     .eq("owner_id", user.id)
     .maybeSingle();
   if (!existing.data?.id) {
     return { ok: false, code: "BUSINESS_NOT_FOUND", message: "Configure seu negócio antes de editá-lo." };
   }
+
+  // Parsed after the read so an interval saved before the list (#191) still validates.
+  const parsed = parseBusinessForm(formData, existing.data.slot_interval_minutes);
+  if (!parsed.ok) return parsed.error;
 
   const limitError = checkBookingWindowLimit(parsed.data, existing.data.plan);
   if (limitError) return limitError;
@@ -162,6 +162,7 @@ export async function updateBusiness(
 
 function parseBusinessForm(
   formData: FormData,
+  currentSlotInterval?: number | null,
 ): { ok: true; data: ParsedBusiness } | { ok: false; error: ActionResultState } {
   const payload: BusinessPayload = {
     name: String(formData.get("name") ?? ""),
@@ -174,7 +175,7 @@ function parseBusinessForm(
     description: String(formData.get("description") ?? "") || null,
   };
 
-  const parsed = businessSchema.safeParse(payload);
+  const parsed = businessSchemaFor(currentSlotInterval).safeParse(payload);
   if (!parsed.success) {
     return {
       ok: false,

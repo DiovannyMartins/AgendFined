@@ -24,7 +24,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createBusiness, updateBusiness, type ActionResultState } from "@/lib/business/actions";
-import { businessFormSchema, type BusinessFormValues } from "@/lib/validation/schemas";
+import {
+  SLOT_INTERVAL_OPTIONS,
+  businessFormSchema,
+  isSlotIntervalOption,
+  type BusinessFormValues,
+} from "@/lib/validation/schemas";
 import { getBookingWindowLimitDays, type Plan } from "@/lib/plan/plan";
 import { trackAnalyticsEvent } from "@/lib/analytics";
 import { formatPhoneBR } from "@/lib/format/phone";
@@ -32,6 +37,8 @@ import { APP_TIMEZONE, TIMEZONE_OPTIONS } from "@/lib/app-timezone";
 import { suggestSlug } from "@/lib/business/slug";
 
 const INITIAL: ActionResultState = { ok: true, data: undefined };
+
+const SLOT_INTERVAL_SELECT_OPTIONS = SLOT_INTERVAL_OPTIONS.map((minutes) => ({ value: minutes, label: `${minutes} min` }));
 
 type BusinessField = keyof BusinessFormValues;
 
@@ -81,6 +88,11 @@ export function BusinessForm({
   const timezoneOptions = initial?.timezone && !TIMEZONE_OPTIONS.some((option) => option.value === initial.timezone)
     ? [{ value: initial.timezone, label: initial.timezone }, ...TIMEZONE_OPTIONS]
     : TIMEZONE_OPTIONS;
+  // An interval saved before the fixed list (#191) stays selected until the owner picks another.
+  const currentSlotInterval = initial?.slotIntervalMinutes;
+  const slotIntervalOptions = currentSlotInterval !== undefined && !isSlotIntervalOption(currentSlotInterval)
+    ? [{ value: currentSlotInterval, label: `${currentSlotInterval} min (atual)` }, ...SLOT_INTERVAL_SELECT_OPTIONS]
+    : SLOT_INTERVAL_SELECT_OPTIONS;
 
   const {
     register,
@@ -244,17 +256,18 @@ export function BusinessForm({
 
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="slotIntervalMinutes">Intervalo (min)</Label>
-              <Input
+              <Label htmlFor="slotIntervalMinutes">Intervalo entre horários</Label>
+              <select
                 id="slotIntervalMinutes"
-                type="number"
-                min={1}
-                max={1440}
-                step={1}
+                className="flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3"
                 {...fieldErrorProps("slotIntervalMinutes", "slotIntervalMinutes-hint")}
                 {...register("slotIntervalMinutes")}
-              />
-              <p id="slotIntervalMinutes-hint" className="text-xs text-muted-foreground">Informe qualquer valor inteiro entre 1 e 1440 minutos.</p>
+              >
+                {slotIntervalOptions.map((option) => (
+                  <option key={option.value} value={String(option.value)}>{option.label}</option>
+                ))}
+              </select>
+              <p id="slotIntervalMinutes-hint" className="text-xs text-muted-foreground">De quanto em quanto tempo os horários aparecem na sua página pública.</p>
               {renderFieldError("slotIntervalMinutes")}
             </div>
             <div className="space-y-2">

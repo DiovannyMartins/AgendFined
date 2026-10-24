@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { state } = vi.hoisted(() => ({
   state: {
-    existing: null as { id: string; plan: string } | null,
+    existing: null as { id: string; plan: string; slot_interval_minutes?: number } | null,
     writes: [] as string[],
     insertError: null as { code?: string; message: string } | null,
     currentTimezone: "America/Sao_Paulo",
@@ -44,12 +44,12 @@ import { createBusiness, updateBusiness } from "./actions";
 const INITIAL = { ok: true as const, data: undefined };
 const EXISTING = { id: "business-1", plan: "free" };
 
-function form(slug: string, timezone = "America/Sao_Paulo") {
+function form(slug: string, timezone = "America/Sao_Paulo", slotIntervalMinutes = "30") {
   const fd = new FormData();
   fd.set("name", "Barbearia Demo");
   fd.set("slug", slug);
   fd.set("phone", "+5511999999999");
-  fd.set("slotIntervalMinutes", "30");
+  fd.set("slotIntervalMinutes", slotIntervalMinutes);
   fd.set("minNoticeMinutes", "120");
   fd.set("bookingWindowDays", "30");
   fd.set("timezone", timezone);
@@ -91,6 +91,37 @@ describe("fuso outside Brazil", () => {
     const result = await updateBusiness(INITIAL, form("barbearia-demo", "America/New_York"));
     expect(result).toEqual({ ok: true, data: undefined });
     expect(state.writes).toEqual(["update:businesses"]);
+  });
+});
+
+// #191: intervals outside the fixed list made the public page list hundreds of horários.
+describe("slot interval outside the list", () => {
+  it.each([
+    ["creating (onboarding)", createBusiness, null],
+    ["editing (configurações)", updateBusiness, EXISTING],
+  ])("rejects 1 minute when %s", async (_label, action, existing) => {
+    state.existing = existing;
+    const result = await action(INITIAL, form("barbearia-demo", "America/Sao_Paulo", "1"));
+    expect(result).toMatchObject({
+      ok: false,
+      code: "VALIDATION",
+      fieldErrors: { slotIntervalMinutes: ["Escolha um dos intervalos da lista."] },
+    });
+    expect(state.writes).toEqual([]);
+  });
+
+  it("keeps saving a negócio whose interval was set before the list", async () => {
+    state.existing = { ...EXISTING, slot_interval_minutes: 25 };
+    const result = await updateBusiness(INITIAL, form("barbearia-demo", "America/Sao_Paulo", "25"));
+    expect(result).toEqual({ ok: true, data: undefined });
+    expect(state.writes).toEqual(["update:businesses"]);
+  });
+
+  it("does not let that negócio move to another interval outside the list", async () => {
+    state.existing = { ...EXISTING, slot_interval_minutes: 25 };
+    const result = await updateBusiness(INITIAL, form("barbearia-demo", "America/Sao_Paulo", "7"));
+    expect(result).toMatchObject({ ok: false, code: "VALIDATION" });
+    expect(state.writes).toEqual([]);
   });
 });
 

@@ -80,32 +80,21 @@ Em 24 de outubro de 2026, o projeto `agendfined` estava **Em produção**, com a
    - termos `https://agendfined.com.br/termos`;
    - domínio autorizado `agendfined.com.br`.
 4. **Política de privacidade:** a seção 4 explica o acesso ao Google Calendar e declara a adesão ao Uso Limitado. O Google exige isso; não remova.
-5. Em **Data Access**, só os escopos que o app pede: `openid`, `.../auth/userinfo.email` (não sensíveis) e `https://www.googleapis.com/auth/calendar.events` (sensível).
+5. Em **Acesso a dados** (Data Access), só os escopos que o app pede: `openid`, `.../auth/userinfo.email` (não sensíveis) e `https://www.googleapis.com/auth/calendar.events` (sensível). Declarados em 24 de outubro de 2026. Sem eles a Central de verificação diz que "a verificação não é necessária" e não oferece o pedido, embora o app peça `calendar.events` ao conectar.
 
 ### Justificativa do escopo (colar em inglês no formulário)
 
+O campo "Como os escopos serão usados?", em **Acesso a dados**, aceita no máximo **1000 caracteres**. O texto abaixo tem 920.
+
 ```text
-AgendFined is an online booking platform for small service businesses in Brazil.
-When a business owner on the paid plan clicks "Conectar Google Calendar" in
-Settings and grants access, AgendFined creates one event in the owner's primary
-Google Calendar for each confirmed booking (service, date and time, customer
-name, phone and note), updates it when the booking changes and deletes it when
-the booking is cancelled. This lets the owner see their AgendFined schedule
-next to their personal calendar.
+AgendFined is an online booking platform for small service businesses in Brazil. On the paid plan, a business owner can click "Conectar Google Calendar" in Settings; AgendFined then creates one event in the owner's primary calendar for each confirmed booking (service, time, customer name, phone and note), updates it when the booking changes and deletes it when it is cancelled.
 
-We need https://www.googleapis.com/auth/calendar.events because the feature
-creates, updates and deletes events. Each event has a deterministic id derived
-from the booking id, and the app only ever touches the events it created; it
-never lists, reads or changes any other event. Read-only scopes cannot write
-events, and the full calendar scope would grant more than we need.
+calendar.events is needed because the feature creates, updates and deletes events; read-only scopes cannot write, and the full calendar scope grants more than needed. Each event id is derived from the booking id, and the app only touches events it created; it never reads other events.
 
-Tokens are encrypted at rest (AES-256-GCM). Disconnecting in Settings revokes
-the token with Google and deletes it. Google user data is not sold, not used
-for advertising and not shared with third parties, as described in
-https://agendfined.com.br/privacidade (section 4), which also states our
-compliance with the Google API Services User Data Policy, including the
-Limited Use requirements.
+Tokens are encrypted at rest. Disconnecting revokes and deletes them. Google user data is not sold, used for ads or shared, and follows the Google API Services User Data Policy, including Limited Use (https://agendfined.com.br/privacidade, section 4).
 ```
+
+Se o revisor perguntar por um escopo mais estreito, a alternativa é `.../auth/calendar.events.owned` ("Ver, criar, mudar e excluir eventos nas suas agendas do Google"), que basta para a agenda principal do dono. Trocar exige mudar o escopo em `lib/google-calendar/oauth.ts` e todos os donos reconectarem.
 
 ### Roteiro do vídeo de demonstração
 
@@ -121,6 +110,6 @@ Grave a tela, publique no YouTube como **Não listado** e cole o link no formul�
 
 ### Envio e acompanhamento
 
-1. Em **Google Auth Platform → Verification Center**, clique em **Prepare for verification** e preencha com o texto e o vídeo acima.
+1. Em **Acesso a dados**, cole a justificativa e o link do vídeo e salve. Depois, em **Central de verificação**, clique em **Prepare for verification** e siga o assistente.
 2. O Google responde nos e-mails de contato do desenvolvedor (`agendfined@outlook.com` e `diovannydev@gmail.com`), às vezes pedindo ajustes. Responda pela mesma thread.
 3. Até a aprovação, o aviso continua aparecendo. Depois dela, confira o fluxo de conexão de novo: o aviso some e a permissão já vem marcada.

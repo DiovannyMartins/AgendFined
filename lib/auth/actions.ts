@@ -7,6 +7,15 @@ import { emailSchema, loginSchema, passwordSchema, signupSchema } from "@/lib/va
 import { enforceAuthRateLimit, enforceMfaRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 import { auditSecurityEvent } from "@/lib/security/audit";
 import { mfaChallengePath, requiresMfaChallenge, safeInternalPath } from "@/lib/auth/assurance";
+import {
+  clearRecoveryCodes,
+  consumeRecoveryCode,
+  generateRecoveryCodes,
+  normalizeRecoveryCode,
+  replaceRecoveryCodes,
+} from "@/lib/auth/recovery-codes";
+import { resolveAppOrigin } from "@/lib/app-origin";
+import { sendMfaRecoveryUsedEmail } from "@/lib/email/mfa-recovery-used";
 
 export type ActionResult<T = undefined> =
   | { ok: true; data: T }
@@ -336,6 +345,99 @@ export async function removeTotp(factorId: string): Promise<ActionResult> {
   }
   const { error } = await supabase.auth.mfa.unenroll({ factorId });
   if (error) return genericError("Não foi possível remover o autenticador.");
+  // Without an authenticator the códigos de recuperação have nothing to
+  // recover; a new activation generates new ones (#169).
+  try {
+    await clearRecoveryCodes(createAdminClient(), user.id);
+  } catch {
+    // Best effort: the next activation replaces whatever is left.
+  }
   auditSecurityEvent("auth.mfa_removed", user.id);
+  return { ok: true, data: undefined };
+}
+
+// Códigos de recuperação (#169, ADR 0009). Shown once, right after the
+// authenticator is confirmed or when the dono asks for new ones; generating
+// again replaces the previous set.
+export async function generateMfaRecoveryCodes(): Promise<ActionResult<{ codes: string[] }>> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, code: "UNAUTHORIZED", message: "Faça login novamente." };
+  const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (assuranceError || assurance.currentLevel !== "aal2") {
+    return { ok: false, code: "MFA_REQUIRED", message: "Confirme seu autenticador antes de gerar os códigos." };
+  }
+  const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
+  if (factorsError || !factors.totp.some((factor) => factor.status === "verified")) {
+    return { ok: false, code: "NOT_FOUND", message: "Ative um autenticador antes de gerar os códigos." };
+  }
+
+  const { codes, hashes } = generateRecoveryCodes(user.id);
+  if (!await replaceRecoveryCodes(createAdminClient(), user.id, hashes)) {
+    return genericError("Não foi possível gerar os códigos de recuperação.");
+  }
+  auditSecurityEvent("auth.mfa_recovery_codes_generated", user.id);
+  return { ok: true, data: { codes } };
+}
+
+// The way out for a dono who lost the authenticator (#169): after the
+// password, a código de recuperação switches the second factor off so the
+// dono can activate a new one. It only answers the login challenge, and it
+// shares the attempt limit with the authenticator code.
+export async function redeemMfaRecoveryCode(input: string): Promise<ActionResult> {
+  const code = normalizeRecoveryCode(input);
+  if (!code) return { ok: false, code: "VALIDATION", message: "Informe o código de recuperação no formato XXXXX-XXXXX." };
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, code: "UNAUTHORIZED", message: "Faça login novamente." };
+  const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (assuranceError) return genericError("Não foi possível verificar a segurança da sessão.");
+  if (!requiresMfaChallenge(assurance)) {
+    return { ok: false, code: "MFA_NOT_REQUIRED", message: "Esta sessão não precisa de código de recuperação." };
+  }
+
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+    if (!await enforceMfaRateLimit(admin, user.id)) {
+      return { ok: false, code: "RATE_LIMITED", message: "Muitas tentativas. Aguarde alguns minutos." };
+    }
+  } catch {
+    return { ok: false, code: "RATE_LIMIT_UNAVAILABLE", message: "Tente novamente mais tarde." };
+  }
+
+  let consumed: boolean;
+  try {
+    consumed = await consumeRecoveryCode(admin, user.id, code);
+  } catch {
+    return genericError("Não foi possível validar o código de recuperação.");
+  }
+  if (!consumed) {
+    auditSecurityEvent("auth.mfa_recovery_code_failed", user.id);
+    return { ok: false, code: "INVALID_CODE", message: "Código de recuperação inválido ou já usado." };
+  }
+
+  // The code is spent before the factors go, so a failure here keeps the
+  // remaining codes valid for another try.
+  const { data: factors, error: factorsError } = await admin.auth.admin.mfa.listFactors({ userId: user.id });
+  const removed = !factorsError && (await Promise.all(
+    factors.factors.map((factor) => admin.auth.admin.mfa.deleteFactor({ id: factor.id, userId: user.id })),
+  )).every((result) => !result.error);
+  if (!removed) {
+    return genericError("Não foi possível desativar o autenticador. Tente outro código de recuperação.");
+  }
+
+  // The assurance level reads the factors from the user stored in the session
+  // cookie; without a refresh the session would still ask for aal2 and block
+  // the new activation. A failed refresh only means signing in again.
+  await supabase.auth.refreshSession().catch(() => undefined);
+  await clearRecoveryCodes(admin, user.id).catch(() => false);
+  if (user.email) {
+    await sendMfaRecoveryUsedEmail({
+      ownerEmail: user.email,
+      mfaUrl: new URL("/mfa", resolveAppOrigin()).toString(),
+    }).catch(() => undefined);
+  }
+  auditSecurityEvent("auth.mfa_recovery_code_used", user.id);
   return { ok: true, data: undefined };
 }

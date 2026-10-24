@@ -60,6 +60,10 @@ _Avoid_: Token, link de confirmação, código de rastreio
 Capability aleatória de 256 bits, independente do public_code, entregue uma única vez ao cliente (tela de confirmação e link do e-mail); seu detentor cancela a própria reserva. Só o digest SHA-256 é armazenado; o token nunca expõe dados pessoais e não é retornado pela consulta pública.
 _Avoid_: Token de sessão, código de cancelamento, hash
 
+**Código de recuperação**:
+Um dos dez códigos de uso único (10 símbolos Crockford base32, exibidos como XXXXX-XXXXX) que o dono do negócio recebe ao ativar a autenticação em duas etapas e precisa confirmar que guardou. Depois da senha, um código desativa o autenticador para o dono ativar um novo; o uso é avisado por e-mail. Só o digest SHA-256, ligado ao usuário, é armazenado (ADR 0009).
+_Avoid_: Código de backup, código reserva, senha de emergência
+
 **Lista de espera**:
 Fila de clientes que desejam um horário específico (serviço + início) quando ele está ocupado; deduplicada por (negócio, serviço, início, telefone). Não cria reserva automaticamente. O cliente que informa e-mail recebe um link privado para sair da lista, no mesmo contrato do token de cancelamento (ADR 0005).
 _Avoid_: Fila, agendamento pendente, banco de espera

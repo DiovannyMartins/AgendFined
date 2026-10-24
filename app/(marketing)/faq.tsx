@@ -18,6 +18,10 @@ const faqs = [
     a: "Sim. A validação acontece no servidor, os dados de clientes são isolados por negócio e tratados segundo boas práticas de privacidade.",
   },
   {
+    q: "E se eu perder o celular com o autenticador?",
+    a: "Ao ativar a autenticação em duas etapas, você guarda dez códigos de recuperação. Se perder o celular, entre com a senha, escolha \"Perdi o acesso ao autenticador\" e digite um dos códigos: ele desativa o autenticador para você ativar um novo, e avisamos por e-mail.",
+  },
+  {
     q: "Preciso instalar algo?",
     a: "Não. O AgendFined funciona direto no navegador, no celular ou no computador. Você só precisa de um link para compartilhar.",
   },

@@ -42,7 +42,7 @@ CHECK_URL=http://localhost:3000 APP_URL=http://localhost:3000 npm run check:laun
 npx supabase db push --linked
 ```
 
-4. Confirme que o cron/pg_net chama a Edge Function `booking-reminders` com `REMINDER_CRON_SECRET` e que a função possui `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY` e `RESEND_FROM_EMAIL`.
+4. Confirme que o cron/pg_net chama a Edge Function `booking-reminders` com `REMINDER_CRON_SECRET` e que a função possui `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY` e `RESEND_FROM_EMAIL`. O `npm run check:launch -- --production` confere isso por `get_booking_reminders_health()` (veja "Diagnóstico dos lembretes").
 5. Para a reconciliação, confirme no Vault os nomes `agendfined_reconciliation_cron_url` e `agendfined_reconciliation_cron_secret`, e no `cron.job` o schedule `*/30 * * * *` com `active = true`.
 6. Confirme no `cron.job` que `subscription-grace-downgrade` (rebaixa para o Grátis quem passou da carência), `booking-reminders` e `billing-reconciliation` existem com `*/30 * * * *` e `active = true`. O teste `tests/sql/cron-jobs.sql` faz essa checagem no Supabase local e roda no CI.
 7. Não altere RLS, RPCs, cron ou secrets diretamente como parte de um deploy de frontend. Faça mudanças de banco em migration, revise-as e valide com os testes de integração usando Node 22+.
@@ -52,6 +52,18 @@ npx supabase db push --linked
 `process_billing_reconciliation()` usa timeout HTTP de 60 segundos. O status `succeeded` em `cron.job_run_details` confirma o disparo, não a conclusão HTTP. Consulte `net._http_response` pelo ID retornado pela função e verifique `status_code`, `timed_out` e `error_msg`. Uma resposta 200 deve conter `ok: true`; verifique também `calendarSync.failed`, pois erros de calendário não tornam a resposta HTTP um erro.
 
 O teste `tests/sql/reconciliation-scheduler.sql` verifica a requisição real enfileirada e reverte a transação antes do envio. Execute com `npx supabase db query --linked --file tests/sql/reconciliation-scheduler.sql`. Ele exige a URL e o segredo já configurados no Vault e não revela seus valores.
+
+### Diagnóstico dos lembretes
+
+O job `booking-reminders` define `app.reminder_cron_url` e `app.reminder_cron_secret` no próprio comando antes de chamar `process_booking_reminders()`. Como o `pg_net` é assíncrono, `succeeded` em `cron.job_run_details` não prova o envio: até o #154 a URL de produção tinha um `\r` (vindo de um `.env.local` com CRLF) e nenhum lembrete saiu por semanas. Hoje uma URL com espaço ou caractere de controle faz o tick falhar com `booking_reminders: invalid cron url`.
+
+Para conferir sem expor o segredo:
+
+```bash
+npx supabase db query --linked "select public.get_booking_reminders_health();"
+```
+
+Espere `job_active`, `dispatch_configured` e `url_valid` iguais a `true` e `missed_reminders_7d = 0` (reservas que ainda aconteceram, foram reservadas para envio e nunca receberam o lembrete). O `npm run check:launch -- --production` falha em qualquer desvio. Para corrigir a configuração, rode `scripts/configure-booking-reminders.sh`; nunca leia `cron.job.command`, que contém o segredo.
 
 ### Telefone do cliente
 

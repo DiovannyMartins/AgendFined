@@ -906,6 +906,7 @@ export type Database = {
           price_cents: number
         }[]
       }
+      get_booking_reminders_health: { Args: never; Returns: Json }
       get_due_booking_reminders: {
         Args: { p_lead_minutes?: number }
         Returns: {

@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createClient } from "@supabase/supabase-js";
 
 function loadEnvFile(path) {
   if (!fs.existsSync(path)) return;
@@ -84,6 +85,33 @@ if (
 ) {
   fail("RESEND_FROM_EMAIL should use reservas@agendfined.com.br for confirmations and reminders");
 }
+
+// #154: the reminder cron reported `succeeded` for weeks while pg_net rejected
+// its URL. The health RPC reads the job wiring without exposing the secret.
+async function checkBookingReminders() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const report = productionCheck ? fail : warn;
+  if (!supabaseUrl || !serviceRoleKey) {
+    warn("booking reminders health skipped: Supabase URL or service role key is absent");
+    return;
+  }
+  const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+  const { data, error } = await admin.rpc("get_booking_reminders_health");
+  if (error || !data) {
+    report(`booking reminders health could not be read: ${error?.message ?? "empty response"}`);
+    return;
+  }
+  if (!data.job_scheduled || !data.job_active) report("booking-reminders cron job is missing or inactive");
+  else if (!data.dispatch_configured) report("booking-reminders cron job does not set the dispatch URL and secret");
+  else if (!data.url_valid) report("booking-reminders dispatch URL is malformed (whitespace or control character)");
+  else pass("booking-reminders cron job is active and wired to a valid URL");
+  if (data.missed_reminders_7d > 0) {
+    report(`${data.missed_reminders_7d} booking reminder(s) were claimed in the last 7 days but never sent`);
+  }
+}
+
+await checkBookingReminders();
 
 if (!productionCheck && !/^https:\/\//i.test(baseUrl)) {
   warn("public checks are running against a non-HTTPS URL; use --production for the launch domain");

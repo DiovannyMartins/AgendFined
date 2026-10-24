@@ -6,6 +6,8 @@ Instantes (reservas, bloqueios, lista de espera) são gravados em UTC. Cada neg�
 
 O fuso não pode mudar enquanto houver reservas agendadas: as reservas mantêm seus instantes UTC, mas a disponibilidade mudaria de significado. As Server Actions recusam a troca, e o trigger `prevent_timezone_change_with_scheduled_bookings` garante o mesmo no banco, porque o dono também consegue atualizar `businesses` direto pelo PostgREST.
 
+O fuso precisa ser brasileiro. O telefone do negócio e do cliente é sempre validado como brasileiro, então um negócio em Lisboa ou Nova York não conseguiria salvar o próprio telefone nem receber reservas de clientes locais (#189). Configurações oferece só fusos brasileiros. `createBusiness`, `updateBusiness` e o alinhamento com o Google Calendar recusam qualquer outro, mas qualquer fuso IANA do Brasil é aceito, não só os da lista. Um negócio que já tinha um fuso estrangeiro antes da regra pode mantê-lo, mas não pode trocar por outro fuso estrangeiro.
+
 ## Histórico
 
 O produto chegou a operar com fuso único America/Sao_Paulo (`20260922000000_remove_timezone.sql`). O fuso por negócio voltou em `20261013000000_restore_business_timezone.sql`, com a trava em `20261015010000_business_timezone_guard.sql`. A conversão de bloqueios digitados no dashboard foi corrigida na issue #77.

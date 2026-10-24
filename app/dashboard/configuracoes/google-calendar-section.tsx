@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { adoptGoogleCalendarTimezone, disconnectGoogleCalendar, syncGoogleCalendarNow, type GoogleCalendarActionState } from "@/lib/google-calendar/actions";
 import type { GoogleCalendarConnectionStatus } from "@/lib/google-calendar/queries";
 import { googleCalendarCallbackNotice } from "@/lib/google-calendar/callback-status";
+import { isBrazilianTimeZone } from "@/lib/app-timezone";
 
 const INITIAL: GoogleCalendarActionState = { ok: true };
 
@@ -48,12 +49,18 @@ export function GoogleCalendarSection({ connection, isPro, callbackStatus }: { c
               {connection.timezoneMismatch && (
                 <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-amber-800 dark:text-amber-200">
                   <p>Os fusos são diferentes. O horário real está correto, mas o Google Calendar pode exibir outra hora para você.</p>
-                  <form action={timezoneAction} className="mt-2">
-                    <Button type="submit" size="sm" variant="outline" disabled={timezonePending}>
-                      {timezonePending ? "Atualizando..." : "Usar o fuso do Google Calendar"}
-                    </Button>
-                  </form>
-                  <p className="mt-2 text-xs">Só é permitido alinhar automaticamente quando não há reservas futuras, para não alterar horários já publicados.</p>
+                  {connection.calendarTimezone && isBrazilianTimeZone(connection.calendarTimezone) ? (
+                    <>
+                      <form action={timezoneAction} className="mt-2">
+                        <Button type="submit" size="sm" variant="outline" disabled={timezonePending}>
+                          {timezonePending ? "Atualizando..." : "Usar o fuso do Google Calendar"}
+                        </Button>
+                      </form>
+                      <p className="mt-2 text-xs">Só é permitido alinhar automaticamente quando não há reservas futuras, para não alterar horários já publicados.</p>
+                    </>
+                  ) : (
+                    <p className="mt-2 text-xs">O fuso do Google Calendar fica fora do Brasil, e o AgendFined só atende negócios em fusos brasileiros. Para alinhar, ajuste o fuso no Google Calendar.</p>
+                  )}
                 </div>
               )}
               {connection.lastSyncAt && <p className="mt-1 text-muted-foreground">Última sincronização: {new Date(connection.lastSyncAt).toLocaleString("pt-BR")}</p>}

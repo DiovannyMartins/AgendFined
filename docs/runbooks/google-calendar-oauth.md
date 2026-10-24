@@ -18,8 +18,9 @@ Ao conectar, o sistema consulta automaticamente o fuso do calendário principal 
 guarda apenas como metadado. Se ele for diferente do fuso do negócio, Configurações
 mostra um aviso. O proprietário pode alinhar os fusos pelo botão de configuração,
 mas a alteração é bloqueada enquanto existirem reservas futuras confirmadas para
-evitar deslocar horários já publicados. Não se deve corrigir a diferença somando ou
-subtraindo uma hora manualmente.
+evitar deslocar horários já publicados. O botão só aparece quando o fuso do Google
+Calendar é brasileiro, porque o negócio só aceita fusos do Brasil (#189). Não se deve
+corrigir a diferença somando ou subtraindo uma hora manualmente.
 
 ## Google Cloud
 

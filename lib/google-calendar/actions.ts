@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isProPlan } from "@/lib/plan/plan";
+import { isBrazilianTimeZone } from "@/lib/app-timezone";
 import { decryptGoogleToken } from "./oauth";
 import { syncGoogleCalendarForBusiness } from "./sync";
 
@@ -73,6 +74,13 @@ export async function adoptGoogleCalendarTimezone(
     .maybeSingle();
   if (!connection?.calendar_timezone) {
     return { ok: false, message: "Ainda não foi possível descobrir o fuso do Google Calendar. Sincronize novamente." };
+  }
+  // Same rule as createBusiness and updateBusiness (#189).
+  if (!isBrazilianTimeZone(connection.calendar_timezone)) {
+    return {
+      ok: false,
+      message: `O Google Calendar está no fuso ${connection.calendar_timezone}, fora do Brasil. O AgendFined só atende negócios em fusos brasileiros.`,
+    };
   }
   const { count } = await admin
     .from("bookings")

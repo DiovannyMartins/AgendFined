@@ -6,18 +6,22 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/business/queries", () => ({ getCurrentBusiness: async () => ({ id: "business", plan: "pro" }) }));
 vi.mock("./sync", () => ({ syncGoogleCalendarForBusiness: vi.fn() }));
 
-import { disconnectGoogleCalendar } from "./actions";
+import { adoptGoogleCalendarTimezone, disconnectGoogleCalendar } from "./actions";
 
 let hasConnection: boolean;
 let revoke: () => Promise<Response>;
 let revokedTokens: string[];
 let deletedConnections: string[];
+let calendarTimezone: string;
+let businessUpdates: unknown[];
 
 beforeEach(() => {
   hasConnection = true;
   revoke = async () => new Response(null, { status: 200 });
   revokedTokens = [];
   deletedConnections = [];
+  calendarTimezone = "America/Sao_Paulo";
+  businessUpdates = [];
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://database.example");
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-only-key");
   vi.stubEnv("GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY", Buffer.alloc(32, 5).toString("base64"));
@@ -33,8 +37,15 @@ beforeEach(() => {
         return new Response(null, { status: 204 });
       }
       return Response.json(hasConnection
-        ? [{ id: "connection", calendar_id: "primary", refresh_token_ciphertext: encryptGoogleToken("1//refresh-secret") }]
+        ? [{ id: "connection", calendar_id: "primary", calendar_timezone: calendarTimezone, refresh_token_ciphertext: encryptGoogleToken("1//refresh-secret") }]
         : []);
+    }
+    if (url.pathname.endsWith("/bookings")) {
+      return new Response(null, { status: 200, headers: { "content-range": "*/0" } });
+    }
+    if (url.pathname.endsWith("/businesses") && init?.method === "PATCH") {
+      businessUpdates.push(JSON.parse(String(init.body)));
+      return new Response(null, { status: 204 });
     }
     throw new Error(`Unexpected request: ${url.href}`);
   }));
@@ -83,5 +94,30 @@ describe("disconnectGoogleCalendar", () => {
     expect(await disconnectGoogleCalendar({ ok: true })).toEqual({ ok: true, message: "Nenhuma conexão encontrada." });
     expect(revokedTokens).toEqual([]);
     expect(deletedConnections).toEqual([]);
+  });
+});
+
+// #189: phones are always Brazilian, so the negócio cannot follow a Google
+// Calendar set to a fuso abroad.
+describe("adoptGoogleCalendarTimezone", () => {
+  it("refuses a Google Calendar fuso outside Brazil without touching the negócio", async () => {
+    calendarTimezone = "Europe/Lisbon";
+
+    const result = await adoptGoogleCalendarTimezone({ ok: true });
+
+    expect(result).toEqual({
+      ok: false,
+      message: "O Google Calendar está no fuso Europe/Lisbon, fora do Brasil. O AgendFined só atende negócios em fusos brasileiros.",
+    });
+    expect(businessUpdates).toEqual([]);
+  });
+
+  it("adopts a Brazilian fuso, even one outside the dashboard's list", async () => {
+    calendarTimezone = "America/Fortaleza";
+
+    const result = await adoptGoogleCalendarTimezone({ ok: true });
+
+    expect(result).toEqual({ ok: true, message: "Fuso do negócio alinhado ao Google Calendar." });
+    expect(businessUpdates).toEqual([{ timezone: "America/Fortaleza" }]);
   });
 });

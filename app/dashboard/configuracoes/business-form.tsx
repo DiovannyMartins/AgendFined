@@ -337,7 +337,15 @@ export function BusinessForm({
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setSlugChangeToConfirm(null)}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  // Keeping the address means the field and its preview show
+                  // the saved slug again, like the fuso after a refusal (#179).
+                  setValue("slug", slug, { shouldValidate: true });
+                  setSlugChangeToConfirm(null);
+                }}
+              >
                 Manter o endereço atual
               </Button>
               <Button

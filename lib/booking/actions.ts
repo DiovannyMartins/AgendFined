@@ -217,6 +217,11 @@ export async function createBooking(input: {
     return { ok: false, code: "db_error", message: "Não foi possível concluir a reserva. Tente novamente." };
   }
 
+  // Judged before the e-mails so the dono's one highlights a note that needs
+  // reading before the atendimento, like the agenda does (#179).
+  const noteJudgment = parsed.data.customerNote ? classifyCustomerNote(parsed.data.customerNote) : null;
+  const trustedNoteJudgment = noteJudgment && noteJudgment.categoryConfidence >= 0.7 ? noteJudgment : null;
+
   if (data?.id && data.public_code) {
     // The dono hears about the reserva in parallel with the cliente's
     // confirmação; notifyOwner never throws (#146).
@@ -247,6 +252,8 @@ export async function createBooking(input: {
         startAt: startAtIso,
         timezone: business.timezone,
         publicCode: data.public_code,
+        customerNote: parsed.data.customerNote || null,
+        customerNoteRequiresFollowUp: trustedNoteJudgment?.requiresManualFollowUp ?? false,
       }),
     ]);
     if (!emailResult.sent) {
@@ -257,18 +264,15 @@ export async function createBooking(input: {
     }
   }
 
-  if (data?.id && parsed.data.customerNote) {
-    const judgment = await classifyCustomerNote(parsed.data.customerNote);
-    if (judgment && judgment.categoryConfidence >= 0.7) {
-      await admin
-        .from("bookings")
-        .update({
-          customer_note_category: judgment.category,
-          customer_note_requires_follow_up: judgment.requiresManualFollowUp,
-        })
-        .eq("id", data.id)
-        .eq("business_id", business.id);
-    }
+  if (data?.id && trustedNoteJudgment) {
+    await admin
+      .from("bookings")
+      .update({
+        customer_note_category: trustedNoteJudgment.category,
+        customer_note_requires_follow_up: trustedNoteJudgment.requiresManualFollowUp,
+      })
+      .eq("id", data.id)
+      .eq("business_id", business.id);
   }
 
   // Calendar sync is best effort: a temporary Google outage must never make a

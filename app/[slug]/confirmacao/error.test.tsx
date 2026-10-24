@@ -1,32 +1,18 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ConfirmationError from "./error";
-import { CONFIRMATION_RATE_LIMITED, ConfirmationLookupError } from "./confirmation-errors";
+import { CONFIRMATION_UNAVAILABLE, ConfirmationLookupError } from "./confirmation-errors";
 
-// #140: a consulta limitada ou indisponível nunca diz que a página não existe.
+// #140: uma consulta que falhou nunca diz que a página não existe. O limite de
+// consultas é respondido pelo proxy com 429 (#179).
 describe("ConfirmationError", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
-  it("asks the customer to wait when the lookup was rate limited", () => {
-    render(<ConfirmationError error={new ConfirmationLookupError("rate_limited")} retry={() => {}} />);
-
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Muitas consultas seguidas");
-    expect(screen.getByText(/Aguarde alguns minutos e recarregue\. Sua reserva não foi afetada\./)).toBeInTheDocument();
-  });
-
-  it("recognizes the rate limit by digest alone, as in production", () => {
-    const redacted = Object.assign(new Error("redacted"), { digest: CONFIRMATION_RATE_LIMITED });
-
-    render(<ConfirmationError error={redacted} retry={() => {}} />);
-
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Muitas consultas seguidas");
-  });
-
   it("offers a retry after a temporary failure", () => {
     const retry = vi.fn();
-    render(<ConfirmationError error={new ConfirmationLookupError("unavailable")} retry={retry} />);
+    render(<ConfirmationError error={new ConfirmationLookupError()} retry={retry} />);
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Não foi possível carregar sua reserva agora");
     expect(screen.getByText(/Sua reserva não foi afetada/)).toBeInTheDocument();
@@ -35,5 +21,13 @@ describe("ConfirmationError", () => {
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
 
     expect(retry).toHaveBeenCalledOnce();
+  });
+
+  it("logs only the digest, as in production", () => {
+    const redacted = Object.assign(new Error("redacted"), { digest: CONFIRMATION_UNAVAILABLE });
+
+    render(<ConfirmationError error={redacted} retry={() => {}} />);
+
+    expect(console.error).toHaveBeenCalledWith("Falha ao carregar a confirmação", CONFIRMATION_UNAVAILABLE);
   });
 });

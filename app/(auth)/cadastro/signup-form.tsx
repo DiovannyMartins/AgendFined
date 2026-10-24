@@ -77,7 +77,7 @@ export function SignupForm() {
               .
             </p>
             {captcha.widget}
-            <ResendConfirmation email={submittedEmail} captcha={captcha} label="Não recebeu o e-mail? Reenviar" />
+            <ResendConfirmation email={submittedEmail} captcha={captcha} label="Não recebeu o e-mail? Reenviar" justSent />
           </div>
         ) : (
           <form method="post" onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>

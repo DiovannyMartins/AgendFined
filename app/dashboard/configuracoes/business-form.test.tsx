@@ -213,6 +213,19 @@ describe("polimento pós-beta (#149)", () => {
     expect(updateBusiness).not.toHaveBeenCalled();
   });
 
+  // #179: o campo e a prévia voltam ao slug salvo, como o fuso depois de uma recusa.
+  it("volta o slug para o salvo quando o dono mantém o endereço atual", async () => {
+    render(<BusinessForm initial={initial} />);
+
+    fireEvent.change(screen.getByLabelText("Endereço público (slug)"), { target: { value: "barbearia-nova" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Manter o endereço atual" }));
+
+    expect(screen.getByLabelText("Endereço público (slug)")).toHaveValue("barbearia-demo");
+    expect(screen.getByText(/Seu link: agendfined\.com\.br\/barbearia-demo/)).toBeInTheDocument();
+    expect(screen.queryByText(/passa a redirecionar/)).not.toBeInTheDocument();
+  });
+
   it("volta o fuso para o salvo quando o servidor recusa a troca", async () => {
     vi.mocked(updateBusiness).mockResolvedValue({
       ok: false,

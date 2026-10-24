@@ -3,6 +3,7 @@ import { updateSession } from "@/lib/supabase/proxy";
 import { sendSecurityLog } from "@/lib/security/betterstack";
 import { buildContentSecurityPolicy } from "@/lib/security/content-security-policy";
 import { REQUEST_PATH_HEADER, requestPathOf } from "@/lib/auth/assurance";
+import { checkConfirmationOpening, confirmationRefusalResponse } from "@/lib/booking/confirmation-gate";
 
 const PROTECTED_PREFIXES = ["/dashboard"];
 // /redefinir-senha is deliberately NOT in AUTH_ROUTES: it must remain reachable
@@ -22,12 +23,16 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
   // Next.js reads the incoming CSP to apply this nonce to its framework scripts.
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicy);
   requestHeaders.set(REQUEST_PATH_HEADER, requestPathOf(request.nextUrl));
+  // Answered here so the refusal carries 429/503 and its message in the HTML (#179).
+  const confirmationRefusal = await checkConfirmationOpening(request);
   let response: NextResponse;
   if (
     /^\/(?:\.git|\.env|\.next|node_modules)(?:\/|$)/i.test(pathname) ||
     pathname.endsWith(".map")
   ) {
     response = new NextResponse(null, { status: 404 });
+  } else if (confirmationRefusal) {
+    response = confirmationRefusalResponse(confirmationRefusal, nonce);
   } else {
     const { supabaseResponse, user } = await updateSession(request, requestHeaders);
 

@@ -25,6 +25,8 @@ export type OwnerNotificationBooking = {
   startAt: string;
   timezone: string;
   publicCode: string;
+  customerNote?: string | null;
+  customerNoteRequiresFollowUp?: boolean;
 };
 
 const SENDERS = {
@@ -54,6 +56,8 @@ export async function notifyOwner(
       startAt: booking.startAt,
       timezone: booking.timezone,
       publicCode: booking.publicCode,
+      customerNote: booking.customerNote,
+      customerNoteRequiresFollowUp: booking.customerNoteRequiresFollowUp,
       agendaUrl: new URL("/dashboard/agenda", resolveAppOrigin()).toString(),
     });
     if (!result.sent) logFailure(result.reason);

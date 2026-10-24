@@ -2,21 +2,14 @@ import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const rpc = vi.fn();
-const enforceConfirmationRateLimit = vi.fn(async () => true);
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ rpc }) }));
-vi.mock("@/lib/booking/rate-limit", () => ({
-  enforceConfirmationRateLimit,
-  getClientIp: async () => "1.2.3.4",
-}));
 
 vi.mock("./current-slug-redirect", () => ({ CurrentSlugRedirect: () => null }));
 
 const { generateMetadata, default: ConfirmationPage } = await import("./page");
 const { CurrentSlugRedirect } = await import("./current-slug-redirect");
-const { CONFIRMATION_RATE_LIMITED, CONFIRMATION_UNAVAILABLE, ConfirmationLookupError } = await import(
-  "./confirmation-errors"
-);
+const { CONFIRMATION_UNAVAILABLE, ConfirmationLookupError } = await import("./confirmation-errors");
 
 const FUTURE_START = new Date(Date.now() + 7 * 24 * 60 * 60_000);
 const PAST_START = new Date(Date.now() - 60 * 60_000);
@@ -132,13 +125,10 @@ async function pageFailure(code = "65925DBB") {
 }
 
 // #140: uma reserva gravada nunca pode virar "página não existe" só porque a
-// consulta foi limitada ou falhou.
+// consulta falhou. O limite de consultas fica no proxy, que responde 429/503
+// antes da página (#179); aqui a página não conta de novo.
 describe("confirmation page when the lookup cannot answer", () => {
-  beforeEach(() => {
-    rpc.mockReset();
-    enforceConfirmationRateLimit.mockReset();
-    enforceConfirmationRateLimit.mockResolvedValue(true);
-  });
+  beforeEach(() => rpc.mockReset());
 
   it("answers 404 for an unknown code", async () => {
     rpc.mockResolvedValue({ data: [], error: null });
@@ -148,29 +138,10 @@ describe("confirmation page when the lookup cannot answer", () => {
     expect(error.digest).toBe(NOT_FOUND_DIGEST);
   });
 
-  it("answers 404 for a malformed code without spending the limiter", async () => {
+  it("answers 404 for a malformed code without a lookup", async () => {
     const error = await pageFailure("123");
 
     expect(error.digest).toBe(NOT_FOUND_DIGEST);
-    expect(enforceConfirmationRateLimit).not.toHaveBeenCalled();
-  });
-
-  it("reports a rate limit instead of a 404", async () => {
-    enforceConfirmationRateLimit.mockResolvedValue(false);
-
-    const error = await pageFailure();
-
-    expect(error).toBeInstanceOf(ConfirmationLookupError);
-    expect(error.digest).toBe(CONFIRMATION_RATE_LIMITED);
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("reports an unavailable limiter as a temporary failure (fail closed)", async () => {
-    enforceConfirmationRateLimit.mockRejectedValue(new Error("limiter down"));
-
-    const error = await pageFailure();
-
-    expect(error.digest).toBe(CONFIRMATION_UNAVAILABLE);
     expect(rpc).not.toHaveBeenCalled();
   });
 
@@ -179,11 +150,12 @@ describe("confirmation page when the lookup cannot answer", () => {
 
     const error = await pageFailure();
 
+    expect(error).toBeInstanceOf(ConfirmationLookupError);
     expect(error.digest).toBe(CONFIRMATION_UNAVAILABLE);
   });
 
-  it("keeps the neutral <title> when the lookup is limited", async () => {
-    enforceConfirmationRateLimit.mockResolvedValue(false);
+  it("keeps the neutral <title> when the lookup fails", async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: "connection refused" } });
 
     const metadata = await generateMetadata(props("65925DBB"));
 

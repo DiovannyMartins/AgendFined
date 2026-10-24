@@ -7,7 +7,6 @@ import { CalendarClock } from "lucide-react";
 import { ConfirmationStatus } from "./confirmation-status";
 import { CurrentSlugRedirect } from "./current-slug-redirect";
 import { publicCodeSchema } from "@/lib/validation/schemas";
-import { enforceConfirmationRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { publicDocumentTitle, publicStatusView } from "@/lib/bookings/public-status";
 import { BusinessPhone } from "@/components/business-contact";
@@ -15,24 +14,16 @@ import { TimezoneNotice } from "@/components/timezone-notice";
 import { ConfirmationLookupError } from "./confirmation-errors";
 
 // Shared by generateMetadata and the page within one request, so the lookup
-// (and its rate-limit hit) runs once while the <title> follows the status.
-// Only an invalid or unknown code is "not_found"; a refused or failed lookup
-// says nothing about the booking and must not read as a 404 (#140).
+// runs once while the <title> follows the status. The per-IP limiter already
+// ran in the proxy, which answers a refusal with 429/503 before this page
+// renders (lib/booking/confirmation-gate.ts, #179). Only an invalid or unknown
+// code is "not_found"; a failed lookup says nothing about the booking and must
+// not read as a 404 (#140).
 const loadConfirmation = cache(async (code: string) => {
   const parsedCode = publicCodeSchema.safeParse(code);
   if (!parsedCode.success) return { kind: "not_found" } as const;
 
-  const supabase = createAdminClient();
-  try {
-    const allowed = await enforceConfirmationRateLimit(supabase, await getClientIp());
-    if (!allowed) return { kind: "rate_limited" } as const;
-  } catch {
-    // Public confirmation is a sensitive lookup; an unavailable limiter must
-    // fail closed instead of becoming a brute-force oracle.
-    return { kind: "unavailable" } as const;
-  }
-
-  const { data, error } = await supabase.rpc("get_booking_by_public_code", { p_code: parsedCode.data });
+  const { data, error } = await createAdminClient().rpc("get_booking_by_public_code", { p_code: parsedCode.data });
   if (error) return { kind: "unavailable" } as const;
 
   const booking = data?.[0];
@@ -118,11 +109,11 @@ export default async function ConfirmationPage({ params, searchParams }: Confirm
 
   // Resolve the code before rendering anything: a notFound() thrown inside a
   // Suspense boundary arrives after the 200 status is already streamed, which
-  // turns an unknown code into a soft 404. The same applies to the lookup
-  // failures below, which error.tsx renders with a 5xx status.
+  // turns an unknown code into a soft 404. The same applies to a failed
+  // lookup below, which error.tsx renders with a 5xx status.
   const found = await loadConfirmation(code);
   if (found.kind === "not_found") notFound();
-  if (found.kind !== "found") throw new ConfirmationLookupError(found.kind);
+  if (found.kind !== "found") throw new ConfirmationLookupError();
 
   return <ConfirmationContent found={found} slug={slug} />;
 }

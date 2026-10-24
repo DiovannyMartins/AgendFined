@@ -45,6 +45,8 @@ describe("sendEmail", () => {
     ["HTTP 503", () => Promise.resolve(new Response("{}", { status: 503 }))],
     ["HTTP 500", () => Promise.resolve(new Response("{}", { status: 500 }))],
     ["HTTP 429", () => Promise.resolve(new Response("{}", { status: 429 }))],
+    // The provider answers 409 while an attempt with the same key is still in flight.
+    ["HTTP 409", () => Promise.resolve(new Response("{}", { status: 409 }))],
     ["a timeout", () => Promise.reject(timeoutError())],
     ["a network error", () => Promise.reject(new TypeError("fetch failed"))],
   ])("tries again after %s and reports the later success", async (_label, failure) => {

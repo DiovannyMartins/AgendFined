@@ -70,7 +70,9 @@ export async function sendEmail(email: Email): Promise<SendResult> {
   return { sent: false, reason: "provider_error" };
 }
 
-// Timeouts, network errors, 429 and 5xx may pass on their own; any other
+// Timeouts, network errors, 429 and 5xx may pass on their own, and so does 409:
+// Resend sends it while a timed-out attempt with the same key is still being
+// processed, and answers the repeat with that attempt's result. Any other
 // refusal (validation, auth) would fail the same way again.
 async function attemptDelivery(request: RequestInit, timeoutMs: number): Promise<AttemptOutcome> {
   try {
@@ -79,7 +81,7 @@ async function attemptDelivery(request: RequestInit, timeoutMs: number): Promise
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (response.ok) return "sent";
-    return response.status === 429 || response.status >= 500 ? "temporary" : "permanent";
+    return [409, 429].includes(response.status) || response.status >= 500 ? "temporary" : "permanent";
   } catch {
     return "temporary";
   }

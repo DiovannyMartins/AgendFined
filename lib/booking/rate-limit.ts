@@ -12,10 +12,19 @@ export type ServerClient = SupabaseClient<Database>;
 // IP + business and on a business-wide aggregate, so it never relies only on an
 // attacker-controlled phone number. It is hosted in Postgres (durable, shared
 // across serverless instances, no new infra) behind a service_role-only RPC.
+//
+// Every attempt spends the per-IP counter. The business-wide counters count only
+// what was written (reservas created, entradas na lista de espera), each kind on
+// its own: refused attempts (horário ocupado, fora da janela) from a crowd at
+// the opening of a new agenda, or from a few IPs on purpose, must not lock every
+// other cliente out of the negócio (#188).
 export const RATE_LIMIT = {
   perIpPerBusiness: { limit: 8, windowSeconds: 60 * 15 },
   perBusiness: { limit: 60, windowSeconds: 60 * 15 },
+  perBusinessWaitlist: { limit: 60, windowSeconds: 60 * 15 },
 } as const;
+
+export type PublicWriteKind = "booking" | "waitlist";
 
 // Public consultation (§16) is an anonymous, unguessable-code lookup. Keep it
 // separate from the reservation counters so a flood of lookups can't starve a
@@ -153,29 +162,66 @@ export async function enforceBillingCheckoutRateLimit(
   ]);
 }
 
-export function buildRateKeys(ip: string, businessId: string) {
-  return [
-    { key: `ip:${ip}|business:${businessId}`, ...RATE_LIMIT.perIpPerBusiness },
-    { key: `business:${businessId}`, ...RATE_LIMIT.perBusiness },
-  ] as const;
+export function buildRateKeys(ip: string, businessId: string, kind: PublicWriteKind) {
+  return {
+    perIp: { key: `ip:${ip}|business:${businessId}`, ...RATE_LIMIT.perIpPerBusiness },
+    perBusiness: buildBusinessWriteWindow(businessId, kind),
+  } as const;
 }
 
-// Returns true when the attempt is still within limits for every window.
+function buildBusinessWriteWindow(businessId: string, kind: PublicWriteKind) {
+  return kind === "booking"
+    ? { key: `business:${businessId}`, ...RATE_LIMIT.perBusiness }
+    : { key: `business:${businessId}|waitlist`, ...RATE_LIMIT.perBusinessWaitlist };
+}
+
+// Returns true when the attempt is still within limits. Spends the per-IP
+// counter and only reads the business-wide one: recordPublicWrite spends it
+// once the reserva or entrada is written.
 export async function enforceRateLimit(
   supabase: ServerClient,
   ip: string,
   businessId: string,
+  kind: PublicWriteKind,
 ): Promise<boolean> {
-  for (const { key, limit, windowSeconds } of buildRateKeys(ip, businessId)) {
-    const { data, error } = await supabase.rpc("check_booking_rate_limit", {
+  const { perIp, perBusiness } = buildRateKeys(ip, businessId, kind);
+  if (!await enforceWindows(supabase, [perIp])) return false;
+
+  const { data, error } = await supabase.rpc("peek_booking_rate_limit", {
+    p_key: perBusiness.key,
+    p_limit: perBusiness.limit,
+    p_window_seconds: perBusiness.windowSeconds,
+  });
+  if (error) throw error;
+  if (data !== true) {
+    // Nothing else tells the dono or the operação that the negócio stopped
+    // taking reservas for the rest of the window.
+    console.warn("public_write_business_rate_limited", { businessId, kind });
+    return false;
+  }
+  return true;
+}
+
+// Counts a reserva or entrada already written against the business-wide limit.
+// Never throws: the write stands even when the counter cannot be updated.
+export async function recordPublicWrite(
+  supabase: ServerClient,
+  businessId: string,
+  kind: PublicWriteKind,
+): Promise<void> {
+  const { key, limit, windowSeconds } = buildBusinessWriteWindow(businessId, kind);
+  let reason: string | null;
+  try {
+    const { error } = await supabase.rpc("check_booking_rate_limit", {
       p_key: key,
       p_limit: limit,
       p_window_seconds: windowSeconds,
     });
-    if (error) throw error;
-    if (data === false) return false;
+    reason = error ? error.message : null;
+  } catch (error) {
+    reason = error instanceof Error ? error.message : "unknown";
   }
-  return true;
+  if (reason !== null) console.error("public_write_rate_limit_record_failed", { businessId, kind, reason });
 }
 
 // Consultation is keyed only on the client IP (no business scope — the caller is

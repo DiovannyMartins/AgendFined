@@ -4,7 +4,15 @@ type SendResult = { sent: true } | { sent: false; reason: "not_configured" | "pr
 type RpcResult = { data: unknown; error: { message: string } | null };
 type RecordedQuery = { table: string; filters: [string, unknown][]; update: Record<string, unknown> | null };
 
-const { state, sendCustomerCancelledEmail, sendBookingConfirmationEmail, sendWaitlistJoinedEmail, notifyOwner } = vi.hoisted(() => ({
+const {
+  state,
+  sendCustomerCancelledEmail,
+  sendBookingConfirmationEmail,
+  sendWaitlistJoinedEmail,
+  notifyOwner,
+  enforceRateLimit,
+  recordPublicWrite,
+} = vi.hoisted(() => ({
   state: {
     business: null as Record<string, unknown> | null,
     // Per-table overrides: the row `single` resolves to and the awaited list.
@@ -18,12 +26,17 @@ const { state, sendCustomerCancelledEmail, sendBookingConfirmationEmail, sendWai
   sendBookingConfirmationEmail: vi.fn<(input: unknown) => Promise<SendResult>>(async () => ({ sent: true })),
   sendWaitlistJoinedEmail: vi.fn<(input: unknown) => Promise<SendResult>>(async () => ({ sent: true })),
   notifyOwner: vi.fn<(admin: unknown, event: string, booking: unknown) => Promise<void>>(async () => {}),
+  enforceRateLimit: vi.fn<(supabase: unknown, ip: string, businessId: string, kind: string) => Promise<boolean>>(
+    async () => true,
+  ),
+  recordPublicWrite: vi.fn<(supabase: unknown, businessId: string, kind: string) => Promise<void>>(async () => {}),
 }));
 
 vi.mock("@/lib/booking/anti-bot", () => ({ verifyTurnstile: async () => ({ ok: true }) }));
 vi.mock("@/lib/booking/rate-limit", () => ({
   getClientIp: async () => "203.0.113.7",
-  enforceRateLimit: async () => true,
+  enforceRateLimit,
+  recordPublicWrite,
   enforceConsultRateLimit: vi.fn(async () => true),
 }));
 vi.mock("@/lib/bookings/classification", () => ({
@@ -176,6 +189,8 @@ describe("createBooking", () => {
       state.rpcResults = { create_booking: { data: { id: "booking-9", public_code: "65925DBB" }, error: null } };
       notifyOwner.mockClear();
       sendBookingConfirmationEmail.mockClear();
+      enforceRateLimit.mockClear();
+      recordPublicWrite.mockClear();
     });
 
     afterEach(() => {
@@ -265,6 +280,44 @@ describe("createBooking", () => {
       expect(result).toMatchObject({ ok: false, code: "slot_taken" });
       expect(notifyOwner).not.toHaveBeenCalled();
     });
+
+    // #188: only what was written spends the negócio's limit.
+    it("counts the reserva created against the negócio's limit of reservas", async () => {
+      await createBooking(validInput);
+
+      expect(enforceRateLimit).toHaveBeenCalledWith(expect.anything(), "203.0.113.7", "business-1", "booking");
+      expect(recordPublicWrite).toHaveBeenCalledExactlyOnceWith(expect.anything(), "business-1", "booking");
+    });
+
+    it("does not count an attempt at a horário already taken", async () => {
+      state.lists.bookings = [{ start_at: "2026-10-20T12:00:00Z", end_at: "2026-10-20T12:30:00Z" }];
+      state.rpcCalls = [];
+
+      const result = await createBooking(validInput);
+
+      expect(result).toMatchObject({ ok: false, code: "slot_taken" });
+      expect(state.rpcCalls.map((call) => call.name)).not.toContain("create_booking");
+      expect(recordPublicWrite).not.toHaveBeenCalled();
+    });
+
+    it("does not count a reserva lost to the overlap constraint", async () => {
+      state.rpcResults.create_booking = { data: null, error: { message: "bookings_no_overlap" } };
+
+      await createBooking(validInput);
+
+      expect(recordPublicWrite).not.toHaveBeenCalled();
+    });
+
+    it("refuses with rate_limited when the negócio's limit is exhausted, before any write", async () => {
+      enforceRateLimit.mockResolvedValueOnce(false);
+      state.rpcCalls = [];
+
+      const result = await createBooking(validInput);
+
+      expect(result).toMatchObject({ ok: false, code: "rate_limited" });
+      expect(state.rpcCalls).toEqual([]);
+      expect(recordPublicWrite).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -312,6 +365,8 @@ describe("joinWaitlist", () => {
 
     beforeEach(() => {
       state.rpcCalls = [];
+      enforceRateLimit.mockClear();
+      recordPublicWrite.mockClear();
     });
 
     it("refuses a Grátis business without writing anything", async () => {
@@ -322,6 +377,7 @@ describe("joinWaitlist", () => {
       expect(result).toMatchObject({ ok: false, code: "waitlist_unavailable" });
       expect(result.message).not.toMatch(/plano|grátis|pro/i);
       expect(state.rpcCalls).toEqual([]);
+      expect(recordPublicWrite).not.toHaveBeenCalled();
     });
 
     it("fails closed when the business has no plan", async () => {
@@ -349,6 +405,20 @@ describe("joinWaitlist", () => {
           }),
         },
       ]);
+      // #188: the lista de espera spends its own counter, never the reservas'.
+      expect(enforceRateLimit).toHaveBeenCalledWith(expect.anything(), "203.0.113.7", "business-1", "waitlist");
+      expect(recordPublicWrite).toHaveBeenCalledExactlyOnceWith(expect.anything(), "business-1", "waitlist");
+    });
+
+    it("does not count an entrada that was not written", async () => {
+      state.business = { ...business, plan: "pro" };
+      state.rpcResults = { join_waitlist: { data: null, error: { message: "WAITLIST_SLOT_NOT_OCCUPIED" } } };
+
+      const result = await joinWaitlist(futureInput);
+
+      expect(result).toMatchObject({ ok: false, code: "slot_free" });
+      expect(recordPublicWrite).not.toHaveBeenCalled();
+      state.rpcResults = {};
     });
   });
 

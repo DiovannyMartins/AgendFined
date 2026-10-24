@@ -717,6 +717,10 @@ export type Database = {
         Args: { p_key: string; p_limit: number; p_window_seconds: number }
         Returns: boolean
       }
+      peek_booking_rate_limit: {
+        Args: { p_key: string; p_limit: number; p_window_seconds: number }
+        Returns: boolean
+      }
       convert_waitlist_entry: {
         Args: { p_cancel_token_hash: string; p_entry_id: string }
         Returns: {

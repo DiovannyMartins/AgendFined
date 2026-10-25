@@ -42,6 +42,7 @@ declare
   v_service public.services;
   v_customer public.customers;
   v_booking public.bookings;
+  v_plan_window_days integer;
 begin
   if p_cancel_token_hash is null or p_cancel_token_hash !~ '^[0-9a-f]{64}$' then
     raise exception 'INVALID_CANCEL_TOKEN_HASH';
@@ -62,9 +63,10 @@ begin
   if p_start_at <= now() then
     raise exception 'BOOKING_IN_PAST';
   end if;
+  -- Computed apart: PL/pgSQL ends an IF condition at the first THEN, the CASE's.
+  v_plan_window_days := case when v_business.plan = 'pro' then 365 else 90 end;
   if (p_start_at at time zone v_business.timezone)::date >
-     (now() at time zone v_business.timezone)::date
-       + case when v_business.plan = 'pro' then 365 else 90 end then
+     (now() at time zone v_business.timezone)::date + v_plan_window_days then
     raise exception 'BOOKING_OUTSIDE_PLAN_WINDOW';
   end if;
 

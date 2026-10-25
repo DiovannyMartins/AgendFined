@@ -76,6 +76,8 @@ async function authRateLimit(
   }
 }
 
+const ADDRESS_DEPENDENT_SIGNUP_ERRORS = new Set(["over_email_send_rate_limit", "user_already_exists", "email_exists"]);
+
 export async function signup(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();
   const parsed = signupSchema.safeParse({
@@ -107,7 +109,11 @@ export async function signup(_prev: ActionResult, formData: FormData): Promise<A
     },
   });
 
-  if (error) {
+  // With e-mail confirmation on, a confirmed address already gets the success
+  // answer. A pending signup resends its e-mail and can hit the throttle, and
+  // the "already exists" codes only come for an existing address: they all get
+  // that same answer, so the form does not tell who has an account.
+  if (error && !ADDRESS_DEPENDENT_SIGNUP_ERRORS.has(error.code ?? "")) {
     return weakPasswordError(error) ?? {
       ok: false,
       code: "SIGNUP_FAILED",
@@ -209,8 +215,14 @@ export async function requestPasswordReset(_prev: ActionResult, formData: FormDa
     captchaToken: captchaToken(formData),
   });
 
-  if (error) {
-    return genericError("Não foi possível enviar o e-mail de recuperação.");
+  // Supabase Auth only throttles, and so only errors, for an address that has
+  // an account: every answer but a rejected CAPTCHA, which is about the
+  // request and not the address, is the same as a sent e-mail.
+  if (error?.code === "captcha_failed") {
+    return { ok: false, code: "CAPTCHA_FAILED", message: "Verificação humana falhou. Tente novamente." };
+  }
+  if (error && error.code !== "over_email_send_rate_limit") {
+    console.error("password_reset_email_failed", { code: error.code ?? "unknown", status: error.status });
   }
 
   auditSecurityEvent("auth.password_reset_requested");

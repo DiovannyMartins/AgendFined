@@ -48,6 +48,15 @@ describe("checkConfirmationOpening", () => {
     await expect(checkConfirmationOpening(request("/barbearia/confirmacao?code=65925DBB"))).resolves.toBe("unavailable");
   });
 
+  // #196: the .ics resolves the same code, so it is the same lookup to limit.
+  it("counts the download of the reserva's calendar event as an opening", async () => {
+    enforceConfirmationRateLimit.mockResolvedValue(false);
+
+    await expect(checkConfirmationOpening(request("/barbearia/confirmacao/evento.ics?code=65925DBB"))).resolves.toBe(
+      "rate_limited",
+    );
+  });
+
   it.each([
     ["a malformed code, answered 404 by the page", "/barbearia/confirmacao?code=123", {}],
     ["a missing code", "/barbearia/confirmacao", {}],

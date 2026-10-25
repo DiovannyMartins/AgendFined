@@ -45,6 +45,44 @@ describe("ConfirmationStatus", () => {
     expect(screen.getByText("Código da reserva")).toBeInTheDocument();
   });
 
+  // #196: o cliente salva a reserva na própria agenda.
+  const calendar = {
+    icsHref: "/barbearia/confirmacao/evento.ics?code=65925DBB",
+    googleHref: "https://calendar.google.com/calendar/render?action=TEMPLATE",
+  };
+
+  it("offers to add a confirmed reserva to the cliente's calendar until it is cancelled", () => {
+    render(
+      <ConfirmationStatus code="65925DBB" initialStatus="confirmed" calendar={calendar}>
+        <p>detalhes</p>
+      </ConfirmationStatus>,
+    );
+    const ics = screen.getByRole("link", { name: "Adicionar à minha agenda" });
+    expect(ics).toHaveAttribute("href", calendar.icsHref);
+    // A download attribute would make iOS Safari save the file instead of opening Calendar.
+    expect(ics).not.toHaveAttribute("download");
+    const google = screen.getByRole("link", { name: /Google Agenda/ });
+    expect(google).toHaveAttribute("href", calendar.googleHref);
+    expect(google).toHaveAttribute("target", "_blank");
+
+    fireEvent.click(screen.getByRole("button", { name: "simular cancelamento" }));
+
+    expect(screen.queryByRole("link", { name: "Adicionar à minha agenda" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Google Agenda/ })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["a reserva that already started", "confirmed", true],
+    ["a cancelled reserva", "cancelled", false],
+  ] as const)("does not offer the calendar for %s", (_case, status, started) => {
+    render(
+      <ConfirmationStatus code="65925DBB" initialStatus={status} started={started} calendar={calendar}>
+        <p>detalhes</p>
+      </ConfirmationStatus>,
+    );
+    expect(screen.queryByRole("link", { name: "Adicionar à minha agenda" })).not.toBeInTheDocument();
+  });
+
   it("does not offer cancellation for a booking that is no longer confirmed", () => {
     render(
       <ConfirmationStatus code="65925DBB" initialStatus="cancelled">

@@ -800,6 +800,24 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_owner_booking: {
+        Args: {
+          p_cancel_token_hash: string
+          p_customer_email?: string
+          p_customer_name: string
+          p_customer_note?: string
+          p_customer_phone: string
+          p_service_id: string
+          p_start_at: string
+        }
+        Returns: Database["public"]["Tables"]["bookings"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "bookings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       downgrade_expired_subscriptions: { Args: never; Returns: number }
       claim_billing_attempt: {
         Args: {

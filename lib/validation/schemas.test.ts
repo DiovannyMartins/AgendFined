@@ -8,6 +8,7 @@ import {
   businessSchema,
   businessSchemaFor,
   loginSchema,
+  ownerBookingSchema,
   publicAvailabilitySchema,
   publicBookingSchema,
   publicCodeSchema,
@@ -15,6 +16,7 @@ import {
   serviceSchema,
   signupSchema,
   passwordSchema,
+  waitlistSchema,
 } from "@/lib/validation/schemas";
 
 describe("businessSchema", () => {
@@ -250,6 +252,31 @@ describe("customer e-mail (reserva pública)", () => {
     expect(parsed.success ? undefined : z.flattenError(parsed.error).fieldErrors.customerEmail).toEqual([
       "Informe um e-mail válido.",
     ]);
+  });
+});
+
+// #198: o mesmo endereço com outra caixa não pode virar outro e-mail gravado.
+describe("customer e-mail is stored in lowercase", () => {
+  const customer = {
+    customerName: "Maria",
+    customerPhone: "(11) 98888-7777",
+    customerEmail: "  QA.Senior@Example.TEST ",
+  };
+  const slot = { serviceId: "00000000-0000-0000-0000-000000000000", startAt: "2026-09-10T12:00:00.000Z" };
+
+  it("on the reserva pública", () => {
+    expect(publicBookingSchema.parse({ ...slot, ...customer }).customerEmail).toBe("qa.senior@example.test");
+  });
+
+  it("on the lista de espera", () => {
+    expect(waitlistSchema.parse({ ...slot, ...customer }).customerEmail).toBe("qa.senior@example.test");
+  });
+
+  it("on the reserva criada pelo dono", () => {
+    expect(
+      ownerBookingSchema.parse({ serviceId: slot.serviceId, date: "2026-09-10", startTime: "09:00", ...customer })
+        .customerEmail,
+    ).toBe("qa.senior@example.test");
   });
 });
 

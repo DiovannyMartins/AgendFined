@@ -223,7 +223,9 @@ export const bookingSchema = z.object({
     .min(2, "Informe seu nome completo.")
     .max(100, "O nome não pode passar de 100 caracteres."),
   customerPhone: customerPhoneSchema,
-  customerEmail: z.string().trim().email("Informe um e-mail válido.").optional().or(z.literal("")),
+  // Lowercased before it reaches customers.email and the snapshots (#198): the
+  // same address typed with another caixa must not look like another cliente.
+  customerEmail: z.string().trim().toLowerCase().email("Informe um e-mail válido.").optional().or(z.literal("")),
   customerNote: z.string().trim().max(500, "A observação não pode passar de 500 caracteres.").optional(),
 });
 export type BookingInput = z.infer<typeof bookingSchema>;
@@ -236,6 +238,7 @@ export const publicBookingSchema = bookingSchema.extend({
   customerEmail: z
     .string()
     .trim()
+    .toLowerCase()
     .max(200, "O e-mail não pode passar de 200 caracteres.")
     .refine((value) => value === "" || z.string().email().safeParse(value).success, "Informe um e-mail válido.")
     .optional(),
@@ -288,6 +291,7 @@ export const ownerBookingSchema = z.object({
   customerEmail: z
     .string()
     .trim()
+    .toLowerCase()
     .max(200, "O e-mail não pode passar de 200 caracteres.")
     .email("Informe um e-mail válido.")
     .optional()

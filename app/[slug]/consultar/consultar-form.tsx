@@ -15,6 +15,7 @@ import type { ConsultState } from "@/lib/bookings/lookup";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { BusinessPhone } from "@/components/business-contact";
 import { TimezoneNotice } from "@/components/timezone-notice";
+import { AddToCalendar } from "@/components/add-to-calendar";
 
 const INITIAL: ConsultState = { status: "idle" };
 
@@ -76,6 +77,7 @@ function ConsultarFormInner({ slug, timezone, onReset }: { slug: string; timezon
             <BusinessPhone phone={booking.businessPhone} />
           </div>
         </div>
+        {state.calendar && <AddToCalendar {...state.calendar} />}
         <div className="mt-4 flex flex-col items-center gap-1.5">
           <p className="text-xs text-muted-foreground">{publicCodeHint(booking.status)}</p>
           <CopyCode code={code.trim()} />

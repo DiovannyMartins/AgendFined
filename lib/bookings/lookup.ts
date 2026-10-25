@@ -1,5 +1,6 @@
 import { publicCodeSchema } from "@/lib/validation/schemas";
 import type { BookingStatus } from "@/lib/bookings/transitions";
+import type { CalendarLinks } from "@/lib/gcal/customer-event";
 
 // A found public booking, normalized to the shape the confirmation/consult
 // screen renders. It carries no customer personal data (§16: the public code
@@ -40,10 +41,11 @@ export type LookupResult =
 export type ConsultErrorCode = "INVALID_CODE" | "NOT_FOUND" | "DB_ERROR" | "CAPTCHA" | "RATE_LIMITED";
 
 // UI state for the consultation form: idle until the user submits, then either
-// a found booking or an error message.
+// a found booking or an error message. `calendar` is present only for a
+// confirmed reserva that has not started (#196).
 export type ConsultState =
   | { status: "idle" }
-  | { status: "success"; booking: PublicBookingLookup }
+  | { status: "success"; booking: PublicBookingLookup; calendar?: CalendarLinks }
   | { status: "error"; code: ConsultErrorCode; message: string };
 
 export function toConsultState(result: LookupResult): ConsultState {

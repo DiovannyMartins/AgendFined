@@ -90,3 +90,22 @@ describe("sendBookingConfirmationEmail", () => {
     expect(request.text).toContain("WhatsApp: https://wa.me/5551998765432");
   });
 });
+
+// #196: o cliente salva a reserva na agenda direto do e-mail.
+describe("sendBookingConfirmationEmail calendar link", () => {
+  it("links the reserva's .ics without the cancel capability", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "AgendFined <reservas@example.com>");
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await sendBookingConfirmationEmail(input);
+
+    const request = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    const icsUrl = "https://agenda.example/barbearia/confirmacao/evento.ics?code=65925DBB";
+    expect(request.text).toContain(`Adicionar à minha agenda: ${icsUrl}`);
+    expect(request.html).toContain(`href="${icsUrl}"`);
+    expect(request.html).toContain("Adicionar à minha agenda</a>");
+    expect(request.html.match(/private_token/g)).toHaveLength(1);
+  });
+});

@@ -69,3 +69,20 @@ describe("sendCustomerRescheduledEmail (#194)", () => {
     expect(request.text).toContain("O horário anterior foi liberado.");
   });
 });
+
+// #196: o evento salvo tem o código como UID, então baixar de novo atualiza o horário.
+describe("reschedule e-mail calendar link", () => {
+  it.each([
+    ["sendBusinessRescheduledEmail", sendBusinessRescheduledEmail],
+    ["sendCustomerRescheduledEmail", sendCustomerRescheduledEmail],
+  ])("%s links the updated .ics", async (_name, send) => {
+    const fetchMock = stubResend();
+
+    await send(input);
+
+    const request = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    const icsUrl = "https://agenda.example/barbearia/confirmacao/evento.ics?code=65925DBB";
+    expect(request.text).toContain(`Atualizar na minha agenda: ${icsUrl}`);
+    expect(request.html).toContain(`href="${icsUrl}"`);
+  });
+});

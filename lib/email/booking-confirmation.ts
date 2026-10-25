@@ -2,6 +2,9 @@ import { formatWhenWithTimezone } from "@/lib/format/when";
 import { escapeHtml, sendEmail, type SendResult } from "@/lib/email/resend";
 import { businessContactRowsHtml, businessContactTextLines } from "@/lib/email/business-contact";
 import { formatPublicCode } from "@/lib/bookings/public-code";
+import { calendarLinkHtml, calendarLinkText } from "@/lib/email/calendar-link";
+
+const ADD_TO_CALENDAR = "Adicionar à minha agenda";
 
 type BookingConfirmation = {
   customerName: string;
@@ -85,7 +88,7 @@ function buildBookingConfirmationHtml(input: BookingConfirmation, formattedWhen:
                       <a href="${confirmationUrl}" style="display:inline-block;padding:12px 18px;color:#111111;font-size:14px;font-weight:700;text-decoration:none;">Abrir confirmação privada</a>
                     </td>
                   </tr>
-                </table>
+                </table>${calendarLinkHtml(input.confirmationUrl, ADD_TO_CALENDAR)}
                 <p style="margin:18px 0 0;color:#b0b0b0;font-size:14px;line-height:22px;">Guarde este e-mail. O link privado permite consultar, remarcar e cancelar a reserva.</p>
               </td>
             </tr>
@@ -114,6 +117,7 @@ export async function sendBookingConfirmationEmail(input: BookingConfirmation): 
     `Data e horário: ${formattedWhen}`,
     `Código da reserva: ${formatPublicCode(input.publicCode)}`,
     `Confirmação privada: ${input.confirmationUrl}`,
+    calendarLinkText(input.confirmationUrl, ADD_TO_CALENDAR),
     "",
     "Guarde este e-mail. O link privado permite consultar, remarcar e cancelar a reserva.",
   ].join("\n");

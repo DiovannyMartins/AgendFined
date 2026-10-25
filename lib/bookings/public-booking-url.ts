@@ -11,3 +11,17 @@ export function buildPublicConfirmationUrl(origin: URL, slug: string, publicCode
   url.searchParams.set("code", publicCode);
   return url.toString();
 }
+
+// The reserva's calendar event for the cliente (#196), resolved by the code
+// alone like the page it sits under. Built from the confirmation link an
+// e-mail already carries; the capability fragment and every other parameter
+// are dropped, so the event link never holds the token de cancelamento.
+export function buildCalendarEventUrl(confirmationUrl: string): string {
+  const url = new URL(confirmationUrl);
+  const code = url.searchParams.get("code") ?? "";
+  url.pathname = `${url.pathname.replace(/\/$/, "")}/evento.ics`;
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("code", code);
+  return url.toString();
+}

@@ -1,9 +1,8 @@
 import { CalendarPlus } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import type { CalendarLinks } from "@/lib/gcal/customer-event";
 
-export type CalendarLinks = { icsHref: string; googleHref: string };
-
-// "Adicionar à minha agenda" (#196). The .ics link carries no `download`
+// "Adicionar à minha agenda" (#196), on the confirmation and the consulta. The .ics link carries no `download`
 // attribute: iOS Safari would save the file to Downloads instead of handing it
 // to Calendar, while Chrome on Android downloads a text/calendar response
 // anyway and opens it in the phone's calendar.

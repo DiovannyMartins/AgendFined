@@ -53,6 +53,7 @@ import { buildPrivateConfirmationUrl, type ConfirmationEmailStatus } from "@/lib
 import { buildPublicBookingUrl } from "@/lib/bookings/public-booking-url";
 import { BOOKING_ALREADY_STARTED_MESSAGE } from "@/lib/bookings/public-status";
 import { resolveAppOrigin } from "@/lib/app-origin";
+import { customerCalendarLinks } from "@/lib/gcal/customer-event";
 
 export type ActionResult = {
   ok: boolean;
@@ -374,7 +375,26 @@ export async function consultBooking(
   if (result.ok && result.data.businessSlug !== slug) {
     return { status: "error", code: "NOT_FOUND", message: "Nenhuma reserva encontrada com esse código." };
   }
-  return toConsultState(result);
+  const state = toConsultState(result);
+  // Same rule as the confirmation and the .ics route: only a confirmed reserva
+  // that has not started is worth saving to the cliente's calendar (#196).
+  if (state.status === "success" && state.booking.status === "confirmed" && Date.parse(state.booking.startAt) > Date.now()) {
+    const b = state.booking;
+    state.calendar = customerCalendarLinks(
+      {
+        code: parsedCode.data,
+        service_name: b.serviceName,
+        start_at: b.startAt,
+        end_at: b.endAt,
+        business_name: b.businessName,
+        business_slug: b.businessSlug,
+        business_phone: b.businessPhone,
+        business_timezone: b.timezone ?? null,
+      },
+      resolveAppOrigin(),
+    );
+  }
+  return state;
 }
 
 // Self-service cancellation requires the independent private capability issued

@@ -2,14 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type SendResult = { sent: true } | { sent: false; reason: "not_configured" | "provider_error" };
 
-const { sendOwnerNewBookingEmail, sendOwnerCustomerCancelledEmail } = vi.hoisted(() => ({
-  sendOwnerNewBookingEmail: vi.fn<(input: unknown) => Promise<SendResult>>(),
-  sendOwnerCustomerCancelledEmail: vi.fn<(input: unknown) => Promise<SendResult>>(),
-}));
+const { sendOwnerNewBookingEmail, sendOwnerCustomerCancelledEmail, sendOwnerCustomerRescheduledEmail } = vi.hoisted(
+  () => ({
+    sendOwnerNewBookingEmail: vi.fn<(input: unknown) => Promise<SendResult>>(),
+    sendOwnerCustomerCancelledEmail: vi.fn<(input: unknown) => Promise<SendResult>>(),
+    sendOwnerCustomerRescheduledEmail: vi.fn<(input: unknown) => Promise<SendResult>>(),
+  }),
+);
 
 vi.mock("@/lib/email/owner-booking-notification", () => ({
   sendOwnerNewBookingEmail,
   sendOwnerCustomerCancelledEmail,
+  sendOwnerCustomerRescheduledEmail,
 }));
 
 import { notifyOwner } from "@/lib/bookings/owner-notification";
@@ -39,6 +43,7 @@ beforeEach(() => {
   vi.stubEnv("APP_URL", "https://agenda.example");
   sendOwnerNewBookingEmail.mockReset().mockResolvedValue({ sent: true });
   sendOwnerCustomerCancelledEmail.mockReset().mockResolvedValue({ sent: true });
+  sendOwnerCustomerRescheduledEmail.mockReset().mockResolvedValue({ sent: true });
 });
 
 afterEach(() => {
@@ -76,6 +81,22 @@ describe("notifyOwner", () => {
       expect.objectContaining({ ownerEmail: "dono@example.com", publicCode: "65925DBB" }),
     );
     expect(sendOwnerNewBookingEmail).not.toHaveBeenCalled();
+  });
+
+  // #194: the dono learns the new horário and the one the remarcação freed.
+  it("e-mails a remarcação by the cliente with the previous horário", async () => {
+    const { client } = adminWithOwner({ data: { user: { email: "dono@example.com" } }, error: null });
+
+    await notifyOwner(client, "customer_rescheduled", { ...booking, previousStartAt: "2026-10-19T12:00:00Z" });
+
+    expect(sendOwnerCustomerRescheduledEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ownerEmail: "dono@example.com",
+        startAt: "2026-10-20T12:00:00Z",
+        previousStartAt: "2026-10-19T12:00:00Z",
+      }),
+    );
+    expect(sendOwnerCustomerCancelledEmail).not.toHaveBeenCalled();
   });
 
   it.each([

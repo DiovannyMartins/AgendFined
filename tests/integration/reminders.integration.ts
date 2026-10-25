@@ -40,6 +40,9 @@ let dueClaimedRow: {
 let freeDueBookingId = "";
 // Made 3 h before it starts: the confirmation is its reminder (#144).
 let lateBookingId = "";
+// Made days ahead but moved into the reminder window just now (#194): the
+// remarcação e-mail is its reminder.
+let rescheduledBookingId = "";
 
 async function insertBooking(opts: {
   businessId: string;
@@ -52,6 +55,7 @@ async function insertBooking(opts: {
   // Reservas default to being made days ahead, so each scenario only tests its
   // own exclusion; see the late-booking case for the created_at rule.
   createdAt?: string;
+  rescheduledAt?: string;
 }) {
   const { data: cust } = await admin
     .from("customers")
@@ -76,6 +80,7 @@ async function insertBooking(opts: {
       status: opts.status ?? "confirmed",
       reminder_sent_at: opts.reminderSentAt ?? null,
       created_at: opts.createdAt ?? iso(-3 * 24 * 60),
+      rescheduled_at: opts.rescheduledAt ?? null,
     })
     .select("id")
     .single();
@@ -211,6 +216,15 @@ beforeAll(async () => {
     createdAt: new Date(now).toISOString(),
   });
 
+  rescheduledBookingId = await insertBooking({
+    businessId,
+    serviceId,
+    startAt: iso(420), // within lead, moved there inside it
+    phone: "+5511980000007",
+    email: "moved@example.com",
+    rescheduledAt: new Date(now).toISOString(),
+  });
+
   // A due booking on the FREE business — must be filtered out by the plan gate.
   freeDueBookingId = await insertBooking({
     businessId: freeBusinessId,
@@ -252,6 +266,12 @@ describe("INC-2 lembretes: get_due_booking_reminders", () => {
     const { data, error } = await admin.rpc("get_due_booking_reminders", { p_lead_minutes: 1440 });
     expect(error).toBeNull();
     expect((data ?? []).map((b) => b.id)).not.toContain(lateBookingId);
+  });
+
+  it("skips a reserva rescheduled into the reminder window, which already got the remarcação e-mail", async () => {
+    const { data, error } = await admin.rpc("get_due_booking_reminders", { p_lead_minutes: 1440 });
+    expect(error).toBeNull();
+    expect((data ?? []).map((b) => b.id)).not.toContain(rescheduledBookingId);
   });
 
   it("excludes candidates from non-Pro businesses (plan gate)", async () => {

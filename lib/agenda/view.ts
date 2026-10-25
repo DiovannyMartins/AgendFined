@@ -19,6 +19,8 @@ export interface AgendaBooking {
   cancel_reason?: string | null;
   cancel_reason_category?: string | null;
   cancelled_by?: string | null;
+  // Latest remarcação (#194), null for a reserva never moved.
+  rescheduled_at?: string | null;
   customer_note?: string | null;
   customer_note_category?: string | null;
   customer_note_requires_follow_up?: boolean;

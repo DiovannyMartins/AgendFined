@@ -6,17 +6,7 @@ import { getCurrentBusiness } from "@/lib/business/queries";
 import { createClient } from "@/lib/supabase/server";
 import { ownerBookingSchema } from "@/lib/validation/schemas";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
-import { getBookingWindowLimitDays } from "@/lib/plan/plan";
-import {
-  computeAvailableSlots,
-  isWithinWindow,
-  localDayRangeUtc,
-  localTimeExists,
-  toUtcRange,
-  weekdayOf,
-  zonedTimeToUtc,
-} from "@/lib/booking/availability";
-import { bookingsOutsideAvailability } from "@/lib/availability/outside-bookings";
+import { isOutsideAvailability, listOwnerFreeSlots, resolveOwnerStart } from "@/lib/bookings/owner-slots";
 import { generateCancelToken, hashCancelToken } from "@/lib/bookings/cancel";
 import { buildPrivateConfirmationUrl } from "@/lib/bookings/private-confirmation";
 import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
@@ -91,29 +81,9 @@ export async function createOwnerBooking(
   if (!business) return { ok: false, code: "no_business", message: "Configure seu negócio primeiro." };
   const timezone = business.timezone || APP_TIMEZONE;
 
-  // A horário inside the horário de verão gap would be stored as another
-  // instant than the one the dono typed (#190).
-  if (!localTimeExists(input.date, input.startTime, timezone)) {
-    return {
-      ok: false,
-      code: "validation",
-      message: "Esse horário não existe nesse dia por causa do horário de verão. Escolha outro.",
-      fieldErrors: { startTime: ["Horário inexistente nesse dia."] },
-    };
-  }
-  const startAt = zonedTimeToUtc(input.date, input.startTime, timezone);
-  const now = new Date();
-  if (Date.parse(startAt) <= now.getTime()) {
-    return { ok: false, code: "past", message: "Esse horário já passou. Escolha um horário no futuro." };
-  }
-  const windowDays = getBookingWindowLimitDays(business.plan);
-  if (!isWithinWindow(input.date, ownerRules(business, timezone), now)) {
-    return {
-      ok: false,
-      code: "booking_window",
-      message: `Seu plano permite reservas até ${windowDays} dias à frente.`,
-    };
-  }
+  const start = resolveOwnerStart(input.date, input.startTime, business, timezone, new Date());
+  if (!start.ok) return start;
+  const { startAt } = start;
 
   const supabase = await createClient();
   const { data: service, error: serviceError } = await supabase
@@ -128,15 +98,9 @@ export async function createOwnerBooking(
   }
 
   if (!allowOutsideAvailability) {
-    const { data: faixas, error: faixasError } = await supabase
-      .from("availability")
-      .select("weekday, start_time, end_time")
-      .eq("business_id", business.id)
-      .eq("is_active", true);
-    if (faixasError) return DB_ERROR;
-    const endAt = new Date(Date.parse(startAt) + service.duration_minutes * 60_000).toISOString();
-    const candidate = { customer_name_snapshot: input.customerName, start_at: startAt, end_at: endAt };
-    if (bookingsOutsideAvailability([candidate], faixas ?? [], timezone).length > 0) {
+    const outside = await isOutsideAvailability(supabase, business.id, timezone, startAt, service.duration_minutes);
+    if (outside === null) return DB_ERROR;
+    if (outside) {
       return {
         ok: false,
         code: "outside_availability",
@@ -218,61 +182,21 @@ export async function getOwnerSlots(
   const timezone = business.timezone || APP_TIMEZONE;
 
   const supabase = await createClient();
-  const day = localDayRangeUtc(date, timezone);
-  const [service, faixas, blocks, bookings] = await Promise.all([
-    supabase
-      .from("services")
-      .select("duration_minutes")
-      .eq("id", serviceId)
-      .eq("business_id", business.id)
-      .eq("is_active", true)
-      .maybeSingle(),
-    supabase
-      .from("availability")
-      .select("start_time, end_time")
-      .eq("business_id", business.id)
-      .eq("weekday", weekdayOf(date, timezone))
-      .eq("is_active", true),
-    supabase
-      .from("availability_blocks")
-      .select("start_at, end_at")
-      .eq("business_id", business.id)
-      .lt("start_at", day.end)
-      .gt("end_at", day.start),
-    supabase
-      .from("bookings")
-      .select("start_at, end_at")
-      .eq("business_id", business.id)
-      .neq("status", "cancelled")
-      .lt("start_at", day.end)
-      .gt("end_at", day.start),
-  ]);
-  if (service.error || faixas.error || blocks.error || bookings.error) return { available: [], error: "db_error" };
+  const service = await supabase
+    .from("services")
+    .select("duration_minutes")
+    .eq("id", serviceId)
+    .eq("business_id", business.id)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (service.error) return { available: [], error: "db_error" };
   if (!service.data) return { available: [], error: "validation" };
 
-  return {
-    available: computeAvailableSlots({
-      intervals: (faixas.data ?? []).map((f) => ({ startTime: f.start_time, endTime: f.end_time })),
-      rules: ownerRules(business, timezone),
-      durationMinutes: service.data.duration_minutes,
-      date,
-      now: new Date(),
-      blocks: (blocks.data ?? []).map((b) => toUtcRange(b.start_at, b.end_at)),
-      occupancies: (bookings.data ?? []).map((b) => toUtcRange(b.start_at, b.end_at)),
-    }),
-  };
-}
-
-function ownerRules(
-  business: { slot_interval_minutes: number; plan: Parameters<typeof getBookingWindowLimitDays>[0] },
-  timezone: string,
-) {
-  return {
-    slotIntervalMinutes: business.slot_interval_minutes,
-    minNoticeMinutes: 0,
-    bookingWindowDays: getBookingWindowLimitDays(business.plan),
-    timezone,
-  };
+  const available = await listOwnerFreeSlots(supabase, business, timezone, {
+    date,
+    durationMinutes: service.data.duration_minutes,
+  });
+  return available ? { available } : { available: [], error: "db_error" };
 }
 
 function rpcErrorResult(error: { message?: string; code?: string } | null): OwnerBookingResult {

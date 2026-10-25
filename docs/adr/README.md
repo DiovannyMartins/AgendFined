@@ -23,3 +23,4 @@ Os ADRs 0001 a 0006 foram registrados retroativamente em 17/10/2026, a partir do
 - [0007 — Slug antigo reservado ao negócio e redirecionado ao atual](0007-slug-antigo-reservado-e-redirecionado.md)
 - [0008 — Carência do cancelamento mantém o mês já pago](0008-carencia-mantem-o-mes-pago.md)
 - [0009 — Códigos de recuperação desativam o autenticador](0009-codigos-de-recuperacao-do-mfa.md)
+- [0010 — Remarcar move a mesma reserva](0010-remarcar-move-a-mesma-reserva.md)

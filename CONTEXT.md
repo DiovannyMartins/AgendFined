@@ -41,15 +41,19 @@ Um horário de início possível em que um serviço pode começar. Deriva da fai
 _Avoid_: Horário, intervalo, vaga, time
 
 **Reserva**:
-O compromisso confirmado de um cliente com um serviço em um horário. Nasce como confirmed e passa por um ciclo de vida (confirmed → completed, cancelled ou no_show). Sai de confirmed uma única vez e nunca volta. completed e no_show registram o desfecho de um atendimento que já começou, então o dono pode corrigir um pelo outro ("Corrigir status" na agenda); cancelled é final, porque o horário pode já ter sido reaproveitado.
+O compromisso confirmado de um cliente com um serviço em um horário. Nasce como confirmed e passa por um ciclo de vida (confirmed → completed, cancelled ou no_show). Sai de confirmed uma única vez e nunca volta. completed e no_show registram o desfecho de um atendimento que já começou, então o dono pode corrigir um pelo outro ("Corrigir status" na agenda); cancelled é final, porque o horário pode já ter sido reaproveitado. Enquanto confirmed e antes de começar, pode ser remarcada sem mudar de status.
 _Avoid_: Agendamento, marcação, booking, appointment
 
 **Reserva pelo painel**:
 Reserva que o dono cria no painel (Reservas → Nova reserva) para o cliente que marcou por WhatsApp, telefone ou no balcão (#193). Usa `create_owner_booking`, só para o dono: o e-mail do cliente é opcional, não há consentimento nem limite por IP, e a antecedência e a janela configurada não valem. Continuam valendo o limite de janela do plano, o início no futuro, os bloqueios e a sobreposição. Com e-mail, o cliente recebe a confirmação; sem e-mail, o dono envia o link da confirmação privada pelo WhatsApp. Conta nos relatórios como qualquer reserva.
 _Avoid_: Reserva manual, reserva interna, agendamento do dono
 
+**Remarcação**:
+Mudança de uma reserva confirmada, que ainda não começou, para outro horário (#194, ADR 0010). É a mesma reserva: status, código público, link privado, snapshot e evento do Google Calendar continuam os mesmos, e a duração é a do snapshot. O dono remarca pela agenda com as regras da reserva pelo painel, inclusive o encaixe; o cliente remarca pelo link privado da confirmação, com as regras da página pública (faixas, antecedência e janela). Bloqueios e outras reservas sempre valem. O cliente recebe e-mail com o novo horário quando tem e-mail, e o dono é avisado quando o cliente remarca. Cada remarcação fica no histórico da reserva (horário anterior, novo e quem remarcou), e o horário anterior fica livre como num cancelamento.
+_Avoid_: Reagendamento, transferência, troca de horário
+
 **Encaixe**:
-Reserva pelo painel fora das faixas de disponibilidade, que o dono confirma explicitamente. Não passa por cima de bloqueios nem de outras reservas.
+Reserva pelo painel ou remarcação pelo dono fora das faixas de disponibilidade, que o dono confirma explicitamente. Não passa por cima de bloqueios nem de outras reservas.
 _Avoid_: Exceção, horário extra, sobreposição
 
 **Antecedência**:
@@ -69,7 +73,7 @@ Código de 8 caracteres em Crockford base32 padrão (alfabeto `0123456789ABCDEFG
 _Avoid_: Token, link de confirmação, código de rastreio
 
 **Token de cancelamento**:
-Capability aleatória de 256 bits, independente do public_code, entregue uma única vez ao cliente (tela de confirmação e link do e-mail); seu detentor cancela a própria reserva. Só o digest SHA-256 é armazenado; o token nunca expõe dados pessoais e não é retornado pela consulta pública.
+Capability aleatória de 256 bits, independente do public_code, entregue uma única vez ao cliente (tela de confirmação e link do e-mail); seu detentor cancela ou remarca a própria reserva. Só o digest SHA-256 é armazenado; o token nunca expõe dados pessoais e não é retornado pela consulta pública.
 _Avoid_: Token de sessão, código de cancelamento, hash
 
 **Código de recuperação**:

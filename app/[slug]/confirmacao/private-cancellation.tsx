@@ -6,17 +6,22 @@ import {
   readPrivateCancelCapability,
 } from "@/lib/bookings/private-confirmation";
 import { CancelBooking } from "./cancel-booking";
+import { RescheduleBooking } from "./reschedule-booking";
 
 // The capability is always captured and scrubbed from the URL, but the cancel
-// control is only offered while the reserva is still confirmed.
+// and remarcação (#194) controls are only offered while the reserva is still
+// confirmed and has not started.
 export function PrivateCancellation({
   code,
   canCancel,
   onCancelled,
+  reschedule,
 }: {
   code: string;
   canCancel: boolean;
   onCancelled: () => void;
+  // Where the reserva is now, for the remarcação dialog.
+  reschedule?: { timezone: string; startAt: string };
 }) {
   const [token, setToken] = useState<string | null>(null);
   const [emailFailed, setEmailFailed] = useState(false);
@@ -54,11 +59,21 @@ export function PrivateCancellation({
   }, []);
 
   return token && canCancel ? (
-    <CancelBooking
-      code={code}
-      token={token}
-      confirmationEmailSent={!emailFailed}
-      onCancelled={onCancelled}
-    />
+    <>
+      {reschedule && (
+        <RescheduleBooking
+          code={code}
+          token={token}
+          timezone={reschedule.timezone}
+          currentStartAt={reschedule.startAt}
+        />
+      )}
+      <CancelBooking
+        code={code}
+        token={token}
+        confirmationEmailSent={!emailFailed}
+        onCancelled={onCancelled}
+      />
+    </>
   ) : null;
 }

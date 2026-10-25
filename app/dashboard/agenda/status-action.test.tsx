@@ -107,6 +107,19 @@ describe("StatusAction", () => {
     expect(dialog).toHaveTextContent("O cliente recebe um e-mail avisando do cancelamento.");
   });
 
+  // #194: only a reserva that has not started can move to another horário.
+  it("offers Remarcar before the reserva starts, and not after", () => {
+    vi.setSystemTime(new Date("2026-10-17T12:00:00.000Z"));
+    const { unmount } = render(<StatusAction id="booking-1" status="confirmed" startAt={START_AT} />);
+
+    expect(screen.getByRole("link", { name: "Remarcar" })).toHaveAttribute("href", "/dashboard/agenda/remarcar/booking-1");
+    unmount();
+
+    vi.setSystemTime(new Date("2026-10-19T15:30:00.000Z"));
+    render(<StatusAction id="booking-1" status="confirmed" startAt={START_AT} />);
+    expect(screen.queryByRole("link", { name: "Remarcar" })).not.toBeInTheDocument();
+  });
+
   it("offers no action on a cancelled reserva", () => {
     vi.setSystemTime(new Date("2026-10-19T15:30:00.000Z"));
     const { container } = render(<StatusAction id="booking-1" status="cancelled" startAt={START_AT} />);

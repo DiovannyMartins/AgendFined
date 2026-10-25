@@ -54,9 +54,8 @@ export function CancelBooking({
         <div role="alert" className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-left text-sm font-normal">
           <p className="font-medium">Não conseguimos enviar o e-mail de confirmação.</p>
           <p className="mt-1 text-muted-foreground">
-            Sua reserva está confirmada, mas você não vai receber o link para cancelar depois. Se precisar,
-            cancele agora por este botão. Depois de sair desta página, para cancelar, fale com o
-            negócio.
+            Sua reserva está confirmada, mas você não vai receber o link para cancelar ou remarcar depois.
+            Se precisar, cancele agora ou remarque por esta página. Depois de sair dela, fale com o negócio.
           </p>
         </div>
       )}
@@ -91,8 +90,8 @@ export function CancelBooking({
           the button does not come back after leaving or reloading the page. */}
       {confirmationEmailSent && (
         <p className="mt-2 text-xs text-muted-foreground">
-          Este botão não aparece de novo se você sair ou recarregar a página. Para cancelar depois,
-          use o link do e-mail de confirmação.
+          Estes botões não aparecem de novo se você sair ou recarregar a página. Para cancelar ou
+          remarcar depois, use o link do e-mail de confirmação.
         </p>
       )}
     </div>

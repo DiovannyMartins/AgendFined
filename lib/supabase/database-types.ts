@@ -102,6 +102,57 @@ export type Database = {
         }
         Relationships: []
       }
+      booking_reschedules: {
+        Row: {
+          booking_id: string
+          business_id: string
+          created_at: string
+          end_at: string
+          id: string
+          previous_end_at: string
+          previous_start_at: string
+          rescheduled_by: string
+          start_at: string
+        }
+        Insert: {
+          booking_id: string
+          business_id: string
+          created_at?: string
+          end_at: string
+          id?: string
+          previous_end_at: string
+          previous_start_at: string
+          rescheduled_by: string
+          start_at: string
+        }
+        Update: {
+          booking_id?: string
+          business_id?: string
+          created_at?: string
+          end_at?: string
+          id?: string
+          previous_end_at?: string
+          previous_start_at?: string
+          rescheduled_by?: string
+          start_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_reschedules_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_reschedules_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       security_usage_daily: {
         Row: {
           category: string
@@ -156,6 +207,7 @@ export type Database = {
           reminder_claim_token: string | null
           reminder_claimed_at: string | null
           reminder_sent_at: string | null
+          rescheduled_at: string | null
           service_id: string | null
           service_name_snapshot: string
           start_at: string
@@ -185,6 +237,7 @@ export type Database = {
           reminder_claim_token?: string | null
           reminder_claimed_at?: string | null
           reminder_sent_at?: string | null
+          rescheduled_at?: string | null
           service_id: string
           service_name_snapshot: string
           start_at: string
@@ -214,6 +267,7 @@ export type Database = {
           reminder_claim_token?: string | null
           reminder_claimed_at?: string | null
           reminder_sent_at?: string | null
+          rescheduled_at?: string | null
           service_id?: string
           service_name_snapshot?: string
           start_at?: string
@@ -700,6 +754,7 @@ export type Database = {
           price_cents_snapshot: number
           public_code: string
           reminder_sent_at: string | null
+          rescheduled_at: string | null
           service_id: string | null
           service_name_snapshot: string
           start_at: string
@@ -743,6 +798,7 @@ export type Database = {
           price_cents_snapshot: number
           public_code: string
           reminder_sent_at: string | null
+          rescheduled_at: string | null
           service_id: string
           service_name_snapshot: string
           start_at: string
@@ -787,6 +843,7 @@ export type Database = {
           price_cents_snapshot: number
           public_code: string
           reminder_sent_at: string | null
+          rescheduled_at: string | null
           service_id: string | null
           service_name_snapshot: string
           start_at: string
@@ -819,6 +876,26 @@ export type Database = {
         }
       }
       downgrade_expired_subscriptions: { Args: never; Returns: number }
+      reschedule_booking_by_public_code: {
+        Args: { p_cancel_token_hash: string; p_code: string; p_start_at: string }
+        Returns: Database["public"]["Tables"]["bookings"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "bookings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reschedule_owner_booking: {
+        Args: { p_booking_id: string; p_start_at: string }
+        Returns: Database["public"]["Tables"]["bookings"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "bookings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       claim_billing_attempt: {
         Args: {
           p_business_id: string

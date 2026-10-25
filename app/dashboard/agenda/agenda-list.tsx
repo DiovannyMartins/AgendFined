@@ -117,6 +117,11 @@ export function AgendaList({
                   <p className="mt-1 font-mono text-xs text-muted-foreground">
                     Código: {formatPublicCode(booking.public_code ?? "")}
                   </p>
+                  {booking.rescheduled_at && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Remarcada em {formatBookingTime(booking.rescheduled_at, timezone)}
+                    </p>
+                  )}
                   {booking.cancel_reason && (
                     <p className="mt-1 text-xs text-muted-foreground">
                       Motivo: {booking.cancel_reason}

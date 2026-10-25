@@ -57,7 +57,12 @@ function ConfirmationContent({ found, slug }: { found: FoundConfirmation; slug: 
   return (
     <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-lg items-center justify-center px-4 py-12">
       <div className="w-full rounded-2xl border border-border bg-background p-8 text-center shadow-sm">
-        <ConfirmationStatus code={found.code} initialStatus={booking.status} started={found.started}>
+        <ConfirmationStatus
+          code={found.code}
+          initialStatus={booking.status}
+          started={found.started}
+          reschedule={{ timezone: booking.business_timezone ?? APP_TIMEZONE, startAt: booking.start_at }}
+        >
           <div className="mt-6 space-y-3 rounded-xl bg-muted/40 p-5 text-left">
             <div className="flex items-center gap-2 font-medium">
               <CalendarClock className="size-5 text-primary" />

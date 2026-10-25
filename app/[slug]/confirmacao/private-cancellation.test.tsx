@@ -8,6 +8,12 @@ vi.mock("./cancel-booking", () => ({
   ),
 }));
 
+vi.mock("./reschedule-booking", () => ({
+  RescheduleBooking: ({ token, currentStartAt }: { token: string; currentStartAt: string }) => (
+    <div data-testid="private-reschedule">{`${token}:${currentStartAt}`}</div>
+  ),
+}));
+
 const TOKEN = "A".repeat(43);
 
 describe("PrivateCancellation", () => {
@@ -52,5 +58,21 @@ describe("PrivateCancellation", () => {
 
     await waitFor(() => expect(window.location.hash).toBe(""));
     expect(screen.queryByTestId("private-cancellation")).not.toBeInTheDocument();
+  });
+
+  // #194: the same capability offers the remarcação next to the cancellation.
+  it("offers the remarcação with the same capability while the booking is confirmed", async () => {
+    const reschedule = { timezone: "America/Sao_Paulo", startAt: "2026-10-26T13:00:00.000Z" };
+    const { unmount } = render(
+      <PrivateCancellation code="65925DBB" canCancel onCancelled={() => {}} reschedule={reschedule} />,
+    );
+
+    expect(await screen.findByTestId("private-reschedule")).toHaveTextContent(`${TOKEN}:2026-10-26T13:00:00.000Z`);
+    unmount();
+
+    window.history.replaceState(null, "", `/barbearia/confirmacao?code=65925DBB#cancel=${TOKEN}`);
+    render(<PrivateCancellation code="65925DBB" canCancel={false} onCancelled={() => {}} reschedule={reschedule} />);
+    await waitFor(() => expect(window.location.hash).toBe(""));
+    expect(screen.queryByTestId("private-reschedule")).not.toBeInTheDocument();
   });
 });

@@ -79,6 +79,16 @@ describe("GET /[slug]/confirmacao/evento.ics", () => {
     expect(response.headers.get("content-type")).not.toContain("text/calendar");
   });
 
+  it("answers an unknown code and a reserva without an event alike", async () => {
+    rpc.mockResolvedValue({ data: [], error: null });
+    const unknown = await get("65925DBB");
+    rpc.mockResolvedValue({ data: [bookingRow("cancelled", FUTURE_START)], error: null });
+    const cancelled = await get("65925DBB");
+
+    expect(cancelled.status).toBe(unknown.status);
+    expect(await cancelled.text()).toBe(await unknown.text());
+  });
+
   it("answers 503 when the lookup fails, which says nothing about the reserva", async () => {
     rpc.mockResolvedValue({ data: null, error: { message: "down" } });
 

@@ -13,6 +13,9 @@ import { buildCustomerIcs, customerIcsFilename } from "@/lib/gcal/customer-event
 // confirmed reserva that has not started gets an event; the confirmation hides
 // the button in every other state.
 
+// An unknown code and a reserva without an event get the same answer.
+const NO_EVENT = "Não há evento de agenda para esta reserva.";
+
 function plain(message: string, status: number) {
   return new NextResponse(message, {
     status,
@@ -22,16 +25,15 @@ function plain(message: string, status: number) {
 
 export async function GET(request: NextRequest) {
   const parsedCode = publicCodeSchema.safeParse(request.nextUrl.searchParams.get("code") ?? "");
-  if (!parsedCode.success) return plain("Reserva não encontrada.", 404);
+  if (!parsedCode.success) return plain(NO_EVENT, 404);
   const code = parsedCode.data;
 
   const { data, error } = await createAdminClient().rpc("get_booking_by_public_code", { p_code: code });
   if (error) return plain("Não foi possível gerar o evento agora. Tente novamente em instantes.", 503);
 
   const booking = data?.[0];
-  if (!booking) return plain("Reserva não encontrada.", 404);
-  if (booking.status !== "confirmed" || Date.parse(booking.start_at) <= Date.now()) {
-    return plain("Esta reserva não está mais confirmada para um horário futuro.", 404);
+  if (!booking || booking.status !== "confirmed" || Date.parse(booking.start_at) <= Date.now()) {
+    return plain(NO_EVENT, 404);
   }
 
   return new NextResponse(buildCustomerIcs({ ...booking, code }, resolveAppOrigin()), {

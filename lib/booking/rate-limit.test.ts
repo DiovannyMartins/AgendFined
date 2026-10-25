@@ -81,7 +81,7 @@ describe("API throttling", () => {
     expect(getClientIpFromHeaders(new Headers({
       "x-real-ip": "2606:4700::1234",
       "cf-connecting-ip": "2001:db8::1",
-    }))).toBe("2001:db8::1");
+    }))).toBe("2001:db8::/64");
     expect(getClientIpFromHeaders(new Headers({
       "x-real-ip": "198.51.100.5",
       "cf-connecting-ip": "203.0.113.42",
@@ -90,6 +90,17 @@ describe("API throttling", () => {
       "x-real-ip": "104.16.42.1",
       "cf-connecting-ip": "bad,203.0.113.42",
     }))).toBe("104.16.42.1");
+  });
+
+  // One IPv6 subscriber usually holds a whole /64: counting per address would
+  // hand them billions of fresh counters.
+  it("counts an IPv6 client by its /64 and an IPv4-mapped one by its IPv4", () => {
+    const ip = (value: string) => getClientIpFromHeaders(new Headers({ "x-real-ip": value }));
+
+    expect(ip("2001:db8:1:2:aaaa::1")).toBe("2001:db8:1:2::/64");
+    expect(ip("2001:db8:1:2:ffff:ffff:ffff:fffe")).toBe("2001:db8:1:2::/64");
+    expect(ip("2001:db8:1:3::1")).toBe("2001:db8:1:3::/64");
+    expect(ip("::ffff:192.0.2.5")).toBe("192.0.2.5");
   });
 
   it("uses a dedicated per-route counter and denies an exhausted window", async () => {

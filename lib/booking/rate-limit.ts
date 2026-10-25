@@ -114,7 +114,17 @@ export function getClientIpFromHeaders(h: Pick<Headers, "get">): string {
   const realIp = h.get("x-real-ip")?.trim();
   if (!realIp || !isValidIp(realIp)) return "unknown";
   const visitorIp = h.get("cf-connecting-ip")?.trim();
-  return isCloudflareIp(realIp) && visitorIp && isValidIp(visitorIp) ? visitorIp : realIp;
+  return rateLimitSubject(isCloudflareIp(realIp) && visitorIp && isValidIp(visitorIp) ? visitorIp : realIp);
+}
+
+// One IPv6 subscriber usually holds a whole /64, so an address-level key would
+// hand a single client billions of fresh counters: IPv6 is counted by its /64.
+// An IPv4-mapped address is the IPv4 it carries.
+function rateLimitSubject(ip: string): string {
+  const address = ipaddr.process(ip);
+  if (address.kind() === "ipv4") return address.toString();
+  const network = new ipaddr.IPv6([...(address as ipaddr.IPv6).parts.slice(0, 4), 0, 0, 0, 0]);
+  return `${network.toString()}/64`;
 }
 
 function hashIdentifier(value: string): string {

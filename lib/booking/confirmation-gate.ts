@@ -17,15 +17,14 @@ const CONFIRMATION_PATH = /^\/[^/]+\/confirmacao(?:\/evento\.ics)?\/?$/;
 
 export type ConfirmationRefusal = "rate_limited" | "unavailable";
 
-// Only page loads count: GET/HEAD, including the RSC request of a client-side
-// navigation or refresh. A Server Action posted from the page (the
-// cancellation) is not an opening of the confirmation and keeps its own limit.
+// Every request that can render the page counts, including the RSC request of
+// a client-side navigation or refresh. Only a Server Action posted from the
+// page (the cancellation) is left out: Next treats a request as one only when
+// it is a POST carrying the action header, and it keeps its own limit. Any
+// other method or header combination renders the page, so it is an opening.
 export function isConfirmationOpening(request: Pick<NextRequest, "method" | "nextUrl" | "headers">): boolean {
-  return (
-    (request.method === "GET" || request.method === "HEAD") &&
-    !request.headers.has("next-action") &&
-    CONFIRMATION_PATH.test(request.nextUrl.pathname)
-  );
+  const isServerAction = request.method === "POST" && request.headers.has("next-action");
+  return !isServerAction && CONFIRMATION_PATH.test(request.nextUrl.pathname);
 }
 
 // null lets the request through. A missing or malformed code is a 404 the page

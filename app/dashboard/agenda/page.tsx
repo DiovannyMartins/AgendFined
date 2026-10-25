@@ -11,6 +11,7 @@ import { filterAgenda, parseAgendaSearchParams } from "@/lib/agenda/view";
 import { getGcalExport } from "@/lib/gcal/get-export";
 import { isUpcomingConfirmed } from "@/lib/gcal/export";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
+import { isProPlan } from "@/lib/plan/plan";
 import { AgendaView } from "./agenda-view";
 
 export const metadata: Metadata = { title: "Reservas — AgendFined" };
@@ -27,7 +28,7 @@ export default async function AgendaPage({
   const supabase = await createClient();
   const { data: bookings } = await supabase
       .from("bookings")
-      .select("id, start_at, end_at, status, service_name_snapshot, duration_minutes_snapshot, customer_name_snapshot, customer_phone_snapshot, public_code, cancel_reason, cancel_reason_category, cancelled_by, rescheduled_at, customer_note, customer_note_requires_follow_up")
+      .select("id, start_at, end_at, status, service_name_snapshot, duration_minutes_snapshot, customer_name_snapshot, customer_phone_snapshot, customer_email_snapshot, public_code, cancel_reason, cancel_reason_category, cancelled_by, rescheduled_at, customer_note, customer_note_requires_follow_up")
       .eq("business_id", business.id)
       .order("start_at", { ascending: true });
 
@@ -115,6 +116,8 @@ export default async function AgendaPage({
       <AgendaView
         bookings={list}
         timezone={business.timezone}
+        businessName={business.name}
+        automaticReminders={isProPlan(business.plan)}
         initialDate={initialFilters.dateKey}
         initialStatus={initialFilters.status}
       />

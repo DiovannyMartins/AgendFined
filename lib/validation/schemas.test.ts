@@ -224,6 +224,35 @@ describe("availabilitySchema (§8.5 faixas)", () => {
   });
 });
 
+// #195: o e-mail é opcional na reserva pública, mas, se vier, precisa ser válido.
+describe("customer e-mail (reserva pública)", () => {
+  const valid = {
+    serviceId: "00000000-0000-0000-0000-000000000000",
+    startAt: "2026-09-10T12:00:00.000Z",
+    customerName: "Maria",
+    customerPhone: "(11) 98888-7777",
+  };
+
+  it.each([undefined, "", "   "])("accepts a reserva without e-mail (%j) and keeps it blank", (customerEmail) => {
+    const parsed = publicBookingSchema.safeParse({ ...valid, customerEmail });
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.customerEmail || undefined).toBeUndefined();
+  });
+
+  it("trims a valid e-mail", () => {
+    expect(publicBookingSchema.parse({ ...valid, customerEmail: "  maria@example.com " }).customerEmail).toBe(
+      "maria@example.com",
+    );
+  });
+
+  it("rejects an invalid e-mail with a pt-BR message", () => {
+    const parsed = publicBookingSchema.safeParse({ ...valid, customerEmail: "maria" });
+    expect(parsed.success ? undefined : z.flattenError(parsed.error).fieldErrors.customerEmail).toEqual([
+      "Informe um e-mail válido.",
+    ]);
+  });
+});
+
 describe("customer phone (reserva pública)", () => {
   const valid = {
     serviceId: "00000000-0000-0000-0000-000000000000",

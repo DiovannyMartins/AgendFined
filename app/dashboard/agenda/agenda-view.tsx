@@ -40,11 +40,16 @@ function prioritizeConfirmed(bookings: AgendaBooking[]): AgendaBooking[] {
 export function AgendaView({
   bookings,
   timezone,
+  businessName = "",
+  automaticReminders = false,
   initialDate = null,
   initialStatus = null,
 }: {
   bookings: AgendaBooking[];
   timezone?: string;
+  // For the lembrete pelo WhatsApp in the list (#195).
+  businessName?: string;
+  automaticReminders?: boolean;
   initialDate?: string | null;
   initialStatus?: BookingStatus | null;
 }) {
@@ -170,6 +175,8 @@ export function AgendaView({
         <AgendaList
           bookings={listBookings}
           timezone={businessTimezone}
+          businessName={businessName}
+          automaticReminders={automaticReminders}
           filterActive={dateFilter !== null || status !== ""}
         />
       </div>

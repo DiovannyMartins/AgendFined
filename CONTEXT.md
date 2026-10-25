@@ -17,7 +17,7 @@ Pessoa que reserva um serviço. Não possui conta; os dados são coletados no fl
 _Avoid_: Usuário, consumidor, lead, paciente
 
 **Confirmação por e-mail**:
-Mensagem enviada ao endereço obrigatório informado pelo cliente após uma reserva pública ser confirmada, com os dados do atendimento e o código público. Numa reserva pelo painel, vai ao e-mail que o dono informar, quando houver.
+Mensagem enviada ao e-mail informado pelo cliente após uma reserva pública ser confirmada, com os dados do atendimento, o código público e o link privado. O e-mail é opcional, na página pública e na reserva pelo painel (#195, ADR 0011): sem ele, não há confirmação nem lembrete por e-mail, e o cliente guarda o link privado na tela de confirmação, copiando ou mandando para o próprio WhatsApp.
 _Avoid_: Recibo, token de acesso
 
 **Serviço**:
@@ -79,6 +79,10 @@ _Avoid_: Token de sessão, código de cancelamento, hash
 **Código de recuperação**:
 Um dos dez códigos de uso único (10 símbolos Crockford base32, exibidos como XXXXX-XXXXX) que o dono do negócio recebe ao ativar a autenticação em duas etapas e precisa confirmar que guardou. Depois da senha, um código desativa o autenticador para o dono ativar um novo; o uso é avisado por e-mail. Só o digest SHA-256, ligado ao usuário, é armazenado (ADR 0009).
 _Avoid_: Código de backup, código reserva, senha de emergência
+
+**Lembrete pelo WhatsApp**:
+Mensagem que o dono manda do próprio WhatsApp, pela agenda ("Lembrar pelo WhatsApp"), a um cliente com reserva confirmada que ainda não começou (#195, ADR 0011). A agenda só abre a conversa com o texto pronto; nada é enviado nem registrado pelo AgendFined. Não é um recurso profissional, ao contrário do lembrete automático, que continua só por e-mail.
+_Avoid_: Notificação, disparo, lembrete automático
 
 **Lista de espera**:
 Fila de clientes que desejam um horário específico (serviço + início) quando ele está ocupado; deduplicada por (negócio, serviço, início, telefone). Não cria reserva automaticamente. O cliente que informa e-mail recebe um link privado para sair da lista, no mesmo contrato do token de cancelamento (ADR 0005).

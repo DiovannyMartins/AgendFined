@@ -1,16 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, CalendarDays } from "lucide-react";
+import { Search, CalendarDays, MessageCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { buttonVariants } from "@/components/ui/button";
 import { StatusAction } from "./status-action";
 import type { AgendaBooking } from "@/lib/agenda/view";
 import { bookingStatusLabel } from "@/lib/bookings/status";
 import { formatPhoneBR, matchesPhone } from "@/lib/format/phone";
 import { formatPublicCode, matchesPublicCode } from "@/lib/bookings/public-code";
 import { CANCELLATION_REASON_CATEGORY_LABELS, type CancellationReasonCategory } from "@/lib/bookings/classification";
+import { isUpcomingConfirmed } from "@/lib/gcal/export";
+import { buildWhatsAppReminderHref } from "@/lib/reminders/whatsapp";
 
 type BookingRow = AgendaBooking;
 
@@ -25,10 +28,15 @@ function formatBookingTime(iso: string, timezone: string): string {
 export function AgendaList({
   bookings,
   timezone,
+  businessName = "",
+  automaticReminders = false,
   filterActive = false,
 }: {
   bookings: BookingRow[];
   timezone: string;
+  businessName?: string;
+  // PROFISSIONAL: the cliente with an e-mail gets the lembrete automático.
+  automaticReminders?: boolean;
   // True when the date/status filters narrowed `bookings`: an empty list then
   // means "nothing matches", not "no reservations yet".
   filterActive?: boolean;
@@ -49,6 +57,8 @@ export function AgendaList({
         ].some((value) => value.toLowerCase().includes(q)),
     );
   }, [bookings, query]);
+
+  const now = new Date();
 
   return (
     <div className="mt-2">
@@ -98,6 +108,20 @@ export function AgendaList({
           {filtered.map((booking) => {
             const status = bookingStatusLabel(booking.status, booking.cancelled_by);
             const note = booking.customer_note?.trim();
+            // #195: o lembrete pelo WhatsApp só faz sentido antes do atendimento.
+            const reminderHref = isUpcomingConfirmed(booking, now)
+              ? buildWhatsAppReminderHref({
+                  customerName: booking.customer_name_snapshot,
+                  customerPhone: booking.customer_phone_snapshot,
+                  businessName,
+                  serviceName: booking.service_name_snapshot,
+                  startAt: booking.start_at,
+                  timezone,
+                  publicCode: booking.public_code,
+                })
+              : null;
+            const withoutEmailReminder =
+              automaticReminders && reminderHref !== null && !booking.customer_email_snapshot?.trim();
             return (
               <div
                 key={booking.id}
@@ -142,6 +166,24 @@ export function AgendaList({
                     <p className="mt-1 text-xs font-medium text-amber-700">
                       Leia a observação antes do atendimento.
                     </p>
+                  )}
+                  {reminderHref && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <a
+                        href={reminderHref}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={buttonVariants({ size: "sm", variant: "outline" })}
+                      >
+                        <MessageCircle className="size-4" />
+                        Lembrar pelo WhatsApp
+                      </a>
+                      {withoutEmailReminder && (
+                        <span className="text-xs text-muted-foreground">
+                          Sem e-mail: não recebe o lembrete automático.
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
                 <StatusAction

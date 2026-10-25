@@ -14,6 +14,8 @@ export interface AgendaBooking {
   duration_minutes_snapshot: number;
   customer_name_snapshot: string;
   customer_phone_snapshot: string;
+  // Without it the cliente gets no lembrete por e-mail (#195).
+  customer_email_snapshot?: string | null;
   // Present on the full DB rows the agenda list renders; absent on filtered views.
   public_code?: string;
   cancel_reason?: string | null;

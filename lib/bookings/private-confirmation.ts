@@ -1,24 +1,36 @@
 import { isValidCancelToken } from "./cancel-token";
 
-const EMAIL_FAILED = "falhou";
+// What happened to the confirmação por e-mail of a reserva just made: sent,
+// failed (#187) or none, because the cliente left the e-mail blank (#195).
+export type ConfirmationEmailStatus = "sent" | "failed" | "none";
 
-// `confirmationEmailFailed` is only for the navigation right after the reserva
-// (#187): it rides in the fragment with the capability, so it is scrubbed with
-// it and never reaches the server, a reload or the e-mail link itself.
+const EMAIL_FRAGMENT: Record<Exclude<ConfirmationEmailStatus, "sent">, string> = {
+  failed: "falhou",
+  none: "sem",
+};
+
+// `confirmationEmail` is only for the navigation right after the reserva: it
+// rides in the fragment with the capability, so it is scrubbed with it and
+// never reaches the server, a reload or the e-mail link itself.
 export function buildPrivateConfirmationPath(
   slug: string,
   publicCode: string,
   cancelToken: string,
-  options: { confirmationEmailFailed?: boolean } = {},
+  options: { confirmationEmail?: ConfirmationEmailStatus } = {},
 ): string {
   const query = new URLSearchParams({ code: publicCode });
   const fragment = new URLSearchParams({ cancel: cancelToken });
-  if (options.confirmationEmailFailed) fragment.set("email", EMAIL_FAILED);
+  if (options.confirmationEmail && options.confirmationEmail !== "sent") {
+    fragment.set("email", EMAIL_FRAGMENT[options.confirmationEmail]);
+  }
   return `/${encodeURIComponent(slug)}/confirmacao?${query.toString()}#${fragment.toString()}`;
 }
 
-export function readConfirmationEmailFailed(hash: string): boolean {
-  return new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash).get("email") === EMAIL_FAILED;
+export function readConfirmationEmailStatus(hash: string): ConfirmationEmailStatus {
+  const value = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash).get("email");
+  if (value === EMAIL_FRAGMENT.failed) return "failed";
+  if (value === EMAIL_FRAGMENT.none) return "none";
+  return "sent";
 }
 
 export function buildPrivateConfirmationUrl(

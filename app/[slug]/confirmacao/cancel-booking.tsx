@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { cancelPublicBooking, type CancelState } from "@/lib/booking/actions";
 import { submitWithoutReset } from "@/lib/forms/submit-without-reset";
+import type { ConfirmationEmailStatus } from "@/lib/bookings/private-confirmation";
+import { SavePrivateLink } from "./save-private-link";
 
 const INITIAL: CancelState = { status: "idle" };
 
@@ -21,14 +23,18 @@ const INITIAL: CancelState = { status: "idle" };
 export function CancelBooking({
   code,
   token,
-  confirmationEmailSent = true,
+  confirmationEmail = "sent",
+  privateUrl,
   onCancelled,
 }: {
   code: string;
   token: string;
-  confirmationEmailSent?: boolean;
+  confirmationEmail?: ConfirmationEmailStatus;
+  // The private link of this reserva, offered to keep when no e-mail has it.
+  privateUrl?: string;
   onCancelled?: () => void;
 }) {
+  const confirmationEmailSent = confirmationEmail === "sent";
   const [state, formAction, pending] = useActionState(async (prev: CancelState, formData: FormData) => {
     const next = await cancelPublicBooking(prev, formData);
     if (next.status === "done") onCancelled?.();
@@ -48,15 +54,26 @@ export function CancelBooking({
 
   return (
     <div className="mt-6 border-t border-border pt-4">
-      {/* #187: without the e-mail there is no later link, so the cliente is
-          told up front that this button is the last self-service chance. */}
-      {!confirmationEmailSent && (
+      {/* #187/#195: without the e-mail there is no later link unless the
+          cliente keeps this one, so they are told up front. */}
+      {confirmationEmail === "failed" && (
         <div role="alert" className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-left text-sm font-normal">
           <p className="font-medium">Não conseguimos enviar o e-mail de confirmação.</p>
           <p className="mt-1 text-muted-foreground">
-            Sua reserva está confirmada, mas você não vai receber o link para cancelar ou remarcar depois.
-            Se precisar, cancele agora ou remarque por esta página. Depois de sair dela, fale com o negócio.
+            Sua reserva está confirmada, mas o link para cancelar ou remarcar não chegou por e-mail.
+            Guarde o link agora ou, se precisar, cancele ou remarque por esta página. Sem o link, fale com o negócio.
           </p>
+          {privateUrl && <SavePrivateLink code={code} url={privateUrl} />}
+        </div>
+      )}
+      {confirmationEmail === "none" && (
+        <div role="status" className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-left text-sm font-normal">
+          <p className="font-medium">Guarde o link da sua reserva.</p>
+          <p className="mt-1 text-muted-foreground">
+            Você não informou e-mail, então é por este link que você cancela ou remarca depois. Sem ele, fale
+            com o negócio.
+          </p>
+          {privateUrl && <SavePrivateLink code={code} url={privateUrl} />}
         </div>
       )}
       <Dialog>

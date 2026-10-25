@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
+import { EMAIL_LOGO_HTML } from "@/lib/email/brand-logo";
 
 const input = {
   customerName: "Ana & João <cliente>",
@@ -37,7 +38,7 @@ describe("sendBookingConfirmationEmail", () => {
     expect(request.text).toContain("10/05/2026 às 15:00 (horário de Brasília, UTC−3)");
     expect(request.text).toContain("Código da reserva: 6592-5DBB");
     expect(request.text).toContain(input.confirmationUrl);
-    expect(request.html).toContain("AgendFined");
+    expect(request.html).toContain(EMAIL_LOGO_HTML);
     expect(request.html).toContain("#141414");
     expect(request.html).toContain("#1c1c1c");
     expect(request.html).toContain("#eeeeee");

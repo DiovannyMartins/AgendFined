@@ -28,7 +28,7 @@ export function buildIcsFeed(bookings: GcalBooking[]): string {
 }
 
 function buildSingleEvent(b: GcalBooking): string[] {
-  return [
+  return ([
     "BEGIN:VEVENT",
     `UID:${b.uid ? `${escapeText(b.uid)}@agendfined` : `agendfined-${toGcalUtc(b.startAt)}-${escapeText(b.summary)}`}`,
     `DTSTAMP:${toGcalUtc(new Date().toISOString())}`,
@@ -38,7 +38,33 @@ function buildSingleEvent(b: GcalBooking): string[] {
     ...(b.location ? [`LOCATION:${escapeText(b.location)}`] : []),
     ...(b.description ? [`DESCRIPTION:${escapeText(b.description)}`] : []),
     "END:VEVENT",
-  ];
+  ]).map(foldLine);
+}
+
+// RFC 5545 §3.1: lines longer than 75 octets are folded with CRLF + a space.
+// Counted in UTF-8 octets and split only between characters, so an accented
+// letter is never cut in half.
+const MAX_LINE_OCTETS = 75;
+const utf8 = new TextEncoder();
+
+function foldLine(line: string): string {
+  const parts: string[] = [];
+  let current = "";
+  let octets = 0;
+  for (const char of line) {
+    const size = utf8.encode(char).length;
+    // Continuation lines start with a space, which counts toward the limit.
+    const limit = parts.length === 0 ? MAX_LINE_OCTETS : MAX_LINE_OCTETS - 1;
+    if (octets + size > limit) {
+      parts.push(current);
+      current = "";
+      octets = 0;
+    }
+    current += char;
+    octets += size;
+  }
+  parts.push(current);
+  return parts.join("\r\n ");
 }
 
 function calendarHeader(): string[] {

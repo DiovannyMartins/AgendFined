@@ -6,6 +6,7 @@ import { CopyCode } from "@/components/copy-code";
 import { publicCodeHint, publicDocumentTitle, publicStatusView } from "@/lib/bookings/public-status";
 import type { BookingStatus } from "@/lib/bookings/transitions";
 import { PrivateCancellation } from "./private-cancellation";
+import { AddToCalendar, type CalendarLinks } from "./add-to-calendar";
 
 // Owns the status shown on the confirmation screen so a self-service
 // cancellation immediately replaces "Reserva confirmada!" (and the tab title)
@@ -15,12 +16,14 @@ export function ConfirmationStatus({
   initialStatus,
   started = false,
   reschedule,
+  calendar,
   children,
 }: {
   code: string;
   initialStatus: BookingStatus;
   started?: boolean;
   reschedule?: { timezone: string; startAt: string };
+  calendar?: CalendarLinks;
   children: ReactNode;
 }) {
   const [status, setStatus] = useState(initialStatus);
@@ -36,6 +39,7 @@ export function ConfirmationStatus({
         <PublicBookingStatus status={view} />
       </div>
       {children}
+      {calendar && view === "confirmed" && <AddToCalendar {...calendar} />}
       <div className="mt-4 flex flex-col items-center gap-1.5">
         <p className="text-xs text-muted-foreground">{publicCodeHint(view)}</p>
         <CopyCode code={code} />

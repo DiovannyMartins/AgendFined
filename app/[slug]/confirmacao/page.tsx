@@ -12,6 +12,8 @@ import { publicDocumentTitle, publicStatusView } from "@/lib/bookings/public-sta
 import { BusinessPhone } from "@/components/business-contact";
 import { TimezoneNotice } from "@/components/timezone-notice";
 import { ConfirmationLookupError } from "./confirmation-errors";
+import { resolveAppOrigin } from "@/lib/app-origin";
+import { customerGoogleCalendarUrl } from "@/lib/gcal/customer-event";
 
 // Shared by generateMetadata and the page within one request, so the lookup
 // runs once while the <title> follows the status. The per-IP limiter already
@@ -62,6 +64,10 @@ function ConfirmationContent({ found, slug }: { found: FoundConfirmation; slug: 
           initialStatus={booking.status}
           started={found.started}
           reschedule={{ timezone: booking.business_timezone ?? APP_TIMEZONE, startAt: booking.start_at }}
+          calendar={{
+            icsHref: `/${slug}/confirmacao/evento.ics?code=${found.code}`,
+            googleHref: customerGoogleCalendarUrl({ ...booking, code: found.code }, resolveAppOrigin()),
+          }}
         >
           <div className="mt-6 space-y-3 rounded-xl bg-muted/40 p-5 text-left">
             <div className="flex items-center gap-2 font-medium">

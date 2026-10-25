@@ -54,6 +54,18 @@ describe("buildIcsString (INC-3: .ics da reserva)", () => {
     expect(ics).toContain("SUMMARY:a\\,b\\;c\\\\d");
   });
 
+  it("folds lines longer than 75 octets without splitting an accented letter", () => {
+    const description = `Reserva em Estúdio ${"é".repeat(60)}`;
+    const ics = buildIcsString({ ...booking, description });
+    const encoder = new TextEncoder();
+
+    for (const line of ics.split("\r\n")) {
+      expect(encoder.encode(line).length).toBeLessThanOrEqual(75);
+      expect(line).not.toContain("�");
+    }
+    expect(ics.replace(/\r\n /g, "")).toContain(`DESCRIPTION:${description}`);
+  });
+
   it("uses CRLF line endings as RFC 5545 requires", () => {
     const ics = buildIcsString(booking);
     expect(ics).toContain("\r\n");

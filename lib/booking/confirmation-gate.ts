@@ -9,9 +9,11 @@ import { publicCodeSchema } from "@/lib/validation/schemas";
 // before the page renders can carry 429/503: a page can only answer 404, 401
 // or 403 on its own, and anything thrown to error.tsx becomes a 500 whose
 // message only appears after hydration (#140, #179). The page itself no longer
-// counts, so each opening is counted once.
+// counts, so each opening is counted once. The cliente's calendar event
+// (/<slug>/confirmacao/evento.ics?code=…, #196) resolves the same code, so a
+// download counts as an opening too.
 
-const CONFIRMATION_PATH = /^\/[^/]+\/confirmacao\/?$/;
+const CONFIRMATION_PATH = /^\/[^/]+\/confirmacao(?:\/evento\.ics)?\/?$/;
 
 export type ConfirmationRefusal = "rate_limited" | "unavailable";
 

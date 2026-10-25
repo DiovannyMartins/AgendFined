@@ -111,6 +111,40 @@ describe("confirmation page after a slug change", () => {
   });
 });
 
+// Depth-first search for the first element of the given component type.
+function findElement(node: unknown, type: unknown): ReactElement<ContentProps> | null {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findElement(child, type);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!node || typeof node !== "object" || !("props" in node)) return null;
+  const element = node as ReactElement<ContentProps>;
+  if (element.type === type) return element;
+  return findElement(element.props.children, type);
+}
+
+// #196: o cliente salva a reserva na própria agenda.
+describe("confirmation page calendar links", () => {
+  beforeEach(() => rpc.mockReset());
+
+  it("links the .ics of this código and a Google Agenda template in the fuso do negócio", async () => {
+    rpc.mockResolvedValue({ data: [bookingRow("confirmed")], error: null });
+    const { ConfirmationStatus } = await import("./confirmation-status");
+
+    const status = findElement(await renderContent("65925DBB", "barbearia"), ConfirmationStatus);
+    const calendar = status?.props.calendar as { icsHref: string; googleHref: string };
+
+    expect(calendar.icsHref).toBe("/barbearia/confirmacao/evento.ics?code=65925DBB");
+    const google = new URL(calendar.googleHref);
+    expect(google.hostname).toBe("calendar.google.com");
+    expect(google.searchParams.get("text")).toBe("Corte — Barbearia Demo");
+    expect(google.searchParams.get("ctz")).toBe("America/Sao_Paulo");
+  });
+});
+
 // Digest that Next maps to the 404 status, and the status it gives any other
 // error thrown before streaming starts.
 const NOT_FOUND_DIGEST = "NEXT_HTTP_ERROR_FALLBACK;404";

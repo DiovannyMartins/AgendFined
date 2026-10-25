@@ -101,7 +101,10 @@ describe("buildGcalExportResult (Pro gate, ADR 0008)", () => {
     expect(result.status).toBe("ok");
     if (result.status === "ok") {
       expect(result.icsFeed).toContain("SUMMARY:Corte — Ana Souza");
-      expect(result.icsFeed).toContain("DESCRIPTION:Cliente: Ana Souza\\nTelefone: (11) 98765-4321\\nObservação: Alergia a lâmina");
+      // Long lines are folded (RFC 5545 §3.1); compare the unfolded content.
+      expect(result.icsFeed.replace(/\r\n /g, "")).toContain(
+        "DESCRIPTION:Cliente: Ana Souza\\nTelefone: (11) 98765-4321\\nObservação: Alergia a lâmina",
+      );
       expect(result.icsFeed).toContain("UID:b1@agendfined");
     }
   });

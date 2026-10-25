@@ -84,6 +84,10 @@ _Avoid_: Código de backup, código reserva, senha de emergência
 Mensagem que o dono manda do próprio WhatsApp, pela agenda ("Lembrar pelo WhatsApp"), a um cliente com reserva confirmada que ainda não começou (#195, ADR 0011). A agenda só abre a conversa com o texto pronto; nada é enviado nem registrado pelo AgendFined. Não é um recurso profissional, ao contrário do lembrete automático, que continua só por e-mail.
 _Avoid_: Notificação, disparo, lembrete automático
 
+**Evento da reserva**:
+O `.ics` de um único evento que o cliente baixa na tela de confirmação ("Adicionar à minha agenda"), ou o mesmo evento aberto no Google Agenda (#196). Leva só o que a confirmação já mostra ao cliente: serviço, início e fim em UTC, nome e telefone do negócio, código público e link público do negócio; nunca o token de cancelamento. O `UID` é o código público, então baixar de novo atualiza o mesmo evento. Só existe para reserva confirmada que ainda não começou e não é um recurso profissional, ao contrário da exportação da agenda do dono.
+_Avoid_: Exportação, convite, sincronização
+
 **Lista de espera**:
 Fila de clientes que desejam um horário específico (serviço + início) quando ele está ocupado; deduplicada por (negócio, serviço, início, telefone). Não cria reserva automaticamente. O cliente que informa e-mail recebe um link privado para sair da lista, no mesmo contrato do token de cancelamento (ADR 0005).
 _Avoid_: Fila, agendamento pendente, banco de espera
@@ -115,5 +119,5 @@ O contrato recorrente mensal que mantém um negócio no plano PROFISSIONAL. Enqu
 _Avoid_: Billing, pagamento, cobrança, subscription
 
 **Recurso profissional**:
-Funcionalidade disponível apenas no plano PROFISSIONAL (relatórios, lembretes automáticos, gestão da lista de espera e exportação Google Calendar/.ics). Nos demais planos, o recurso fica inacessível.
+Funcionalidade disponível apenas no plano PROFISSIONAL (relatórios, lembretes automáticos, gestão da lista de espera e exportação da agenda do dono para Google Calendar/.ics; o evento da reserva do cliente não conta). Nos demais planos, o recurso fica inacessível.
 _Avoid_: Recurso pago, benefício, upgrade

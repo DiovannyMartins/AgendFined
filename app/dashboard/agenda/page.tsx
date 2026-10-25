@@ -4,7 +4,8 @@ import { getCurrentBusiness } from "@/lib/business/queries";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
-import { CalendarDays, CalendarClock, Download } from "lucide-react";
+import Link from "next/link";
+import { CalendarDays, CalendarClock, CalendarPlus, Download } from "lucide-react";
 import { toLocalDate } from "@/lib/booking/availability";
 import { filterAgenda, parseAgendaSearchParams } from "@/lib/agenda/view";
 import { getGcalExport } from "@/lib/gcal/get-export";
@@ -59,18 +60,25 @@ export default async function AgendaPage({
           <h1 className="text-3xl font-semibold tracking-tight">Reservas</h1>
           <p className="mt-2 text-sm text-muted-foreground">Acompanhe e gerencie seus atendimentos.</p>
         </div>
-        {exportResult.status === "ok" && exportResult.count > 0 && (
-          // A plain styled link: wrapping a <Button> in <a> nests a button in a
-          // link and trips Base UI's native-button check.
-          <a
-            href={`data:text/calendar;charset=utf-8,${encodeURIComponent(exportResult.icsFeed)}`}
-            download="agendfined-agenda.ics"
-            className={buttonVariants({ size: "sm", variant: "outline" })}
-          >
-            <Download className="size-4" />
-            Exportar agenda (.ics)
-          </a>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {exportResult.status === "ok" && exportResult.count > 0 && (
+            // A plain styled link: wrapping a <Button> in <a> nests a button in a
+            // link and trips Base UI's native-button check.
+            <a
+              href={`data:text/calendar;charset=utf-8,${encodeURIComponent(exportResult.icsFeed)}`}
+              download="agendfined-agenda.ics"
+              className={buttonVariants({ size: "sm", variant: "outline" })}
+            >
+              <Download className="size-4" />
+              Exportar agenda (.ics)
+            </a>
+          )}
+          {/* Cliente que marcou por WhatsApp, telefone ou no balcão (#193). */}
+          <Link href="/dashboard/agenda/nova" className={buttonVariants({ size: "sm" })}>
+            <CalendarPlus className="size-4" />
+            Nova reserva
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

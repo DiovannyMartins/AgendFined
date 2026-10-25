@@ -59,7 +59,10 @@ export function DashboardNav({ slug }: { slug: string | null }) {
         )}
       >
         {links.map((link) => {
-          const active = pathname === link.href;
+          // A subpage (/dashboard/agenda/nova) keeps its section highlighted;
+          // Início matches only itself.
+          const active =
+            pathname === link.href || (link.href !== "/dashboard" && pathname.startsWith(`${link.href}/`));
           return (
             <Link
               key={link.href}

@@ -17,7 +17,7 @@ Pessoa que reserva um serviço. Não possui conta; os dados são coletados no fl
 _Avoid_: Usuário, consumidor, lead, paciente
 
 **Confirmação por e-mail**:
-Mensagem enviada ao endereço obrigatório informado pelo cliente após uma reserva pública ser confirmada, com os dados do atendimento e o código público.
+Mensagem enviada ao endereço obrigatório informado pelo cliente após uma reserva pública ser confirmada, com os dados do atendimento e o código público. Numa reserva pelo painel, vai ao e-mail que o dono informar, quando houver.
 _Avoid_: Recibo, token de acesso
 
 **Serviço**:
@@ -43,6 +43,14 @@ _Avoid_: Horário, intervalo, vaga, time
 **Reserva**:
 O compromisso confirmado de um cliente com um serviço em um horário. Nasce como confirmed e passa por um ciclo de vida (confirmed → completed, cancelled ou no_show). Sai de confirmed uma única vez e nunca volta. completed e no_show registram o desfecho de um atendimento que já começou, então o dono pode corrigir um pelo outro ("Corrigir status" na agenda); cancelled é final, porque o horário pode já ter sido reaproveitado.
 _Avoid_: Agendamento, marcação, booking, appointment
+
+**Reserva pelo painel**:
+Reserva que o dono cria no painel (Reservas → Nova reserva) para o cliente que marcou por WhatsApp, telefone ou no balcão (#193). Usa `create_owner_booking`, só para o dono: o e-mail do cliente é opcional, não há consentimento nem limite por IP, e a antecedência e a janela configurada não valem. Continuam valendo o limite de janela do plano, o início no futuro, os bloqueios e a sobreposição. Com e-mail, o cliente recebe a confirmação; sem e-mail, o dono envia o link da confirmação privada pelo WhatsApp. Conta nos relatórios como qualquer reserva.
+_Avoid_: Reserva manual, reserva interna, agendamento do dono
+
+**Encaixe**:
+Reserva pelo painel fora das faixas de disponibilidade, que o dono confirma explicitamente. Não passa por cima de bloqueios nem de outras reservas.
+_Avoid_: Exceção, horário extra, sobreposição
 
 **Antecedência**:
 O mínimo de tempo entre agora e o início da reserva (min_notice_minutes). Padrão: 120 minutos.

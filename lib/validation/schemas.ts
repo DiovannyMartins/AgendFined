@@ -263,6 +263,37 @@ export const publicSlotSchema = z.object({
   startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Horário inválido."),
 });
 
+// Reserva criada pelo dono no painel (#193). O e-mail é opcional: o cliente que
+// marca por WhatsApp, telefone ou no balcão nem sempre informa um. As mensagens
+// falam do cliente, porque quem preenche é o dono.
+export const ownerBookingSchema = z.object({
+  serviceId: z.string().uuid({ error: "Escolha um serviço." }),
+  date: z.string().min(1, { error: "Escolha a data.", abort: true }).pipe(calendarDateSchema),
+  startTime: z
+    .string()
+    .min(1, { error: "Escolha o horário.", abort: true })
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Horário inválido."),
+  customerName: z
+    .string()
+    .trim()
+    .min(2, "Informe o nome do cliente.")
+    .max(100, "O nome não pode passar de 100 caracteres."),
+  customerPhone: z
+    .string()
+    .trim()
+    .min(1, { error: "Informe o telefone do cliente.", abort: true })
+    .pipe(brazilianPhoneSchema),
+  customerEmail: z
+    .string()
+    .trim()
+    .max(200, "O e-mail não pode passar de 200 caracteres.")
+    .email("Informe um e-mail válido.")
+    .optional()
+    .or(z.literal("")),
+  customerNote: z.string().trim().max(500, "A observação não pode passar de 500 caracteres.").optional(),
+});
+export type OwnerBookingInput = z.infer<typeof ownerBookingSchema>;
+
 export const bookingStatusSchema = z.enum(["confirmed", "completed", "cancelled", "no_show"]);
 export type BookingStatus = z.infer<typeof bookingStatusSchema>;
 

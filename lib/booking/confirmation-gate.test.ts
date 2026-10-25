@@ -57,6 +57,25 @@ describe("checkConfirmationOpening", () => {
     );
   });
 
+  // Next renders the page for any request that is not a POST carrying the
+  // action header, so every such request is an opening.
+  it.each([
+    ["a GET carrying the action header", { headers: { "next-action": "abc" } }],
+    ["a HEAD carrying the action header", { method: "HEAD", headers: { "next-action": "abc" } }],
+    ["a POST without the action header", { method: "POST", headers: { "content-type": "text/plain" } }],
+    ["a form POST without the action header", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" } }],
+    ["another method", { method: "PUT" }],
+  ])("counts %s as an opening", async (_case, init) => {
+    enforceConfirmationRateLimit.mockResolvedValue(false);
+
+    await expect(checkConfirmationOpening(request("/barbearia/confirmacao?code=65925DBB", init))).resolves.toBe(
+      "rate_limited",
+    );
+    await expect(
+      checkConfirmationOpening(request("/barbearia/confirmacao/evento.ics?code=65925DBB", init)),
+    ).resolves.toBe("rate_limited");
+  });
+
   it.each([
     ["a malformed code, answered 404 by the page", "/barbearia/confirmacao?code=123", {}],
     ["a missing code", "/barbearia/confirmacao", {}],

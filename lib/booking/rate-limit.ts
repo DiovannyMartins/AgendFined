@@ -52,11 +52,14 @@ export const PUBLIC_READ_RATE_LIMIT = {
   customerSearchPerIpBusiness: { limit: 60, windowSeconds: 60 * 15 },
 } as const;
 
+// perIpEmail is the tight limit on one e-mail from one IP, so attempts from
+// someone else's connection never lock the dono out; perEmail, on the e-mail
+// alone, stays wider and only caps attempts spread across many IPs.
 export const AUTH_RATE_LIMIT = {
-  login: { perIp: 12, perEmail: 6, windowSeconds: 15 * 60 },
-  signup: { perIp: 5, perEmail: 3, windowSeconds: 60 * 60 },
-  passwordReset: { perIp: 5, perEmail: 3, windowSeconds: 60 * 60 },
-  confirmationResend: { perIp: 5, perEmail: 3, windowSeconds: 60 * 60 },
+  login: { perIp: 12, perIpEmail: 6, perEmail: 30, windowSeconds: 15 * 60 },
+  signup: { perIp: 5, perIpEmail: 3, perEmail: 3, windowSeconds: 60 * 60 },
+  passwordReset: { perIp: 5, perIpEmail: 3, perEmail: 10, windowSeconds: 60 * 60 },
+  confirmationResend: { perIp: 5, perIpEmail: 3, perEmail: 3, windowSeconds: 60 * 60 },
   mfaVerify: { perUser: 10, windowSeconds: 15 * 60 },
 } as const;
 
@@ -127,11 +130,21 @@ export async function enforceAuthRateLimit(
   action: "login" | "signup" | "passwordReset" | "confirmationResend",
   email: string,
 ): Promise<boolean> {
-  const config = AUTH_RATE_LIMIT[action];
-  return enforceWindows(supabase, [
-    { key: `auth:${action}|ip:${ip}`, limit: config.perIp, windowSeconds: config.windowSeconds },
-    { key: `auth:${action}|email:${hashIdentifier(email)}`, limit: config.perEmail, windowSeconds: config.windowSeconds },
-  ]);
+  return enforceWindows(supabase, buildAuthRateKeys(ip, action, email));
+}
+
+export function buildAuthRateKeys(
+  ip: string,
+  action: "login" | "signup" | "passwordReset" | "confirmationResend",
+  email: string,
+) {
+  const { perIp, perIpEmail, perEmail, windowSeconds } = AUTH_RATE_LIMIT[action];
+  const emailHash = hashIdentifier(email);
+  return [
+    { key: `auth:${action}|ip:${ip}`, limit: perIp, windowSeconds },
+    { key: `auth:${action}|ip:${ip}|email:${emailHash}`, limit: perIpEmail, windowSeconds },
+    { key: `auth:${action}|email:${emailHash}`, limit: perEmail, windowSeconds },
+  ] as const;
 }
 
 export async function enforceMfaRateLimit(supabase: ServerClient, userId: string): Promise<boolean> {

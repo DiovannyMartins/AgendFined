@@ -610,6 +610,7 @@ export async function joinWaitlist(input: {
   // Same capability contract as the reserva (ADR 0005): only the digest is
   // stored; the raw token goes once in the e-mail's private link to leave.
   const cancelToken = generateCancelToken();
+  const cancelTokenHash = hashCancelToken(cancelToken);
   const supabase = createAdminClient();
   const { data, error } = await supabase.rpc("join_waitlist", {
     p_business_id: business.id,
@@ -618,7 +619,7 @@ export async function joinWaitlist(input: {
     p_customer_name: parsed.data.customerName,
     p_customer_phone: parsed.data.customerPhone,
     p_customer_email: parsed.data.customerEmail || undefined,
-    p_cancel_token_hash: hashCancelToken(cancelToken),
+    p_cancel_token_hash: cancelTokenHash,
   });
 
   if (error || !data) {
@@ -631,8 +632,11 @@ export async function joinWaitlist(input: {
 
   await recordPublicWrite(supabase, business.id, "waitlist");
 
+  // An entrada that already belonged to someone else, or was converted, keeps
+  // its own digest: the new link would not work, so no e-mail goes out. The
+  // answer stays the same, so it does not tell who is on the list.
   const customerEmail = parsed.data.customerEmail;
-  if (customerEmail) {
+  if (customerEmail && data.cancel_token_hash === cancelTokenHash) {
     await notifyWaitlistJoined(supabase, {
       entryId: data.id,
       customerName: parsed.data.customerName,

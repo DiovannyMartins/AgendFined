@@ -29,6 +29,9 @@ CHECK_URL=http://localhost:3000 APP_URL=http://localhost:3000 npm run check:laun
 5. Em **Domains**, confirme o domínio principal, HTTPS e redirecionamento canônico.
 6. Depois do deploy, rode `npm run check:launch -- --production` e faça uma visita manual à landing, cadastro, login e uma rota pública.
 7. Configure `CRON_SECRET` e `RECONCILIATION_CRON_SECRET` como Secrets em Production. O scheduler de reconciliação está configurado no Supabase `pg_cron` com o job `billing-reconciliation` a cada 30 minutos; o mesmo segredo é mantido no Supabase Vault e enviado no header `Authorization: Bearer ...`. O Vercel Cron não é usado para essa rotina.
+8. As Functions rodam em `gru1` (São Paulo), ao lado do Supabase em `sa-east-1`; a região está versionada em `vercel.json`. Depois de um deploy, o header `x-vercel-id` deve mostrar `::gru1::`. Se o Supabase mudar de região, mude a do `vercel.json` junto.
+9. O Speed Insights está no root layout. Para coletar, ative-o em **Speed Insights** no painel do projeto. A URL enviada não tem query nem fragmento, e as páginas de login e de capacidade privada ficam de fora (`lib/analytics/speed-insights.ts`).
+10. O log `http.request` do proxy tem `durationMs`: o tempo gasto no proxy (renovação de sessão e gate da confirmação), não o render da página.
 
 ## Supabase
 

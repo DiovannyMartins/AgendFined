@@ -12,6 +12,7 @@ const PROTECTED_PREFIXES = ["/dashboard"];
 const AUTH_ROUTES = ["/login", "/cadastro", "/recuperar-senha"];
 
 export async function proxy(request: NextRequest, event: NextFetchEvent) {
+  const startedAt = performance.now();
   const pathname = request.nextUrl.pathname;
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const contentSecurityPolicy = buildContentSecurityPolicy(
@@ -65,12 +66,15 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
 
   // Log path and status only: query strings may contain booking codes or OAuth
   // tokens. The numeric status enables a Better Stack alert for HTTP 5xx.
+  // durationMs covers the proxy only (session refresh and the confirmation
+  // gate), not the page render; it shows the round-trip cost to Supabase (#213).
   if (process.env.NODE_ENV === "production") {
     const entry = {
       event: "http.request",
       method: request.method,
       path: pathname,
       status: response.status,
+      durationMs: Math.round(performance.now() - startedAt),
       at: new Date().toISOString(),
     };
     console.info(JSON.stringify(entry));
@@ -81,7 +85,8 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
 }
 
 export const config = {
+  // _vercel/ serves the Speed Insights script and beacons: no session to refresh.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|_vercel/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

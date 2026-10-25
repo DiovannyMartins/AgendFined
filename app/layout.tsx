@@ -5,6 +5,7 @@ import "./globals.css";
 import { SupportWidget } from "@/components/support-widget";
 import { GoogleAnalytics } from "@/components/google-analytics";
 import { LoginAnalyticsTracker } from "@/components/login-analytics-tracker";
+import { SpeedInsights } from "@/components/speed-insights";
 
 export const viewport: Viewport = {
   themeColor: "#141414",
@@ -68,6 +69,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <SupportWidget />
         <GoogleAnalytics nonce={nonce} />
         <LoginAnalyticsTracker />
+        <SpeedInsights />
       </body>
     </html>
   );

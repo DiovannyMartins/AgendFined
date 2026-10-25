@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingWidget } from "./booking-widget";
 import { createBooking, joinWaitlist } from "@/lib/booking/actions";
 import { getSlotsForDate } from "@/lib/availability/actions";
-import { readConfirmationEmailFailed } from "@/lib/bookings/private-confirmation";
+import { readConfirmationEmailStatus } from "@/lib/bookings/private-confirmation";
 
 const { push } = vi.hoisted(() => ({ push: vi.fn() }));
 
@@ -28,7 +28,7 @@ async function fillAndSubmit(customerName: string, offersWaitlist = true) {
   fireEvent.click(await screen.findByRole("button", { name: "09:00" }));
   fireEvent.change(screen.getByLabelText("Nome"), { target: { value: customerName } });
   fireEvent.change(screen.getByLabelText("Telefone / WhatsApp"), { target: { value: "11987654321" } });
-  fireEvent.change(screen.getByLabelText("E-mail para confirmação"), { target: { value: "maria@example.com" } });
+  fireEvent.change(screen.getByLabelText("E-mail (opcional)"), { target: { value: "maria@example.com" } });
   fireEvent.click(screen.getByRole("checkbox"));
   fireEvent.click(screen.getByRole("button", { name: "Confirmar reserva" }));
 }
@@ -63,25 +63,35 @@ describe("BookingWidget", () => {
     expect(screen.getByRole("button", { name: "09:00" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  // #187: the confirmation page only learns the e-mail failed from this navigation.
-  it.each([
-    [true, false],
-    [false, true],
-  ])("goes to the private confirmation saying whether the e-mail went out (sent: %s)", async (sent, warns) => {
-    push.mockClear();
-    mockedCreateBooking.mockResolvedValue({
-      ok: true,
-      publicCode: "65925DBB",
-      cancelToken: "A".repeat(43),
-      confirmationEmailSent: sent,
-    });
+  // #187/#195: the confirmation page only learns what happened to the e-mail
+  // from this navigation.
+  it.each(["sent", "failed", "none"] as const)(
+    "goes to the private confirmation saying what happened to the e-mail (%s)",
+    async (confirmationEmail) => {
+      push.mockClear();
+      mockedCreateBooking.mockResolvedValue({
+        ok: true,
+        publicCode: "65925DBB",
+        cancelToken: "A".repeat(43),
+        confirmationEmail,
+      });
 
-    await fillAndSubmit("Maria Souza");
+      await fillAndSubmit("Maria Souza");
 
-    await waitFor(() => expect(push).toHaveBeenCalledTimes(1));
-    const url = new URL(push.mock.calls[0][0], "https://agenda.example");
-    expect(url.pathname).toBe("/barbearia/confirmacao");
-    expect(readConfirmationEmailFailed(url.hash)).toBe(warns);
+      await waitFor(() => expect(push).toHaveBeenCalledTimes(1));
+      const url = new URL(push.mock.calls[0][0], "https://agenda.example");
+      expect(url.pathname).toBe("/barbearia/confirmacao");
+      expect(readConfirmationEmailStatus(url.hash)).toBe(confirmationEmail);
+    },
+  );
+
+  // #195: o e-mail é opcional; o formulário não trava sem ele.
+  it("lets the cliente book without an e-mail", () => {
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
+
+    const email = screen.getByLabelText("E-mail (opcional)");
+    expect(email).not.toBeRequired();
+    expect(email).toHaveAccessibleDescription(expect.stringContaining("Sem e-mail, guarde o link"));
   });
 
   it("limits the date picker to the janela futura", () => {
@@ -100,12 +110,11 @@ describe("BookingWidget", () => {
     expect(screen.getByText("Horário selecionado: terça-feira, 20/10/2026 às 09:00 (Corte)")).toBeInTheDocument();
   });
 
-  it("asks consent for the e-mail as a required field", () => {
+  it("asks consent for the e-mail only when the cliente gives one", () => {
     render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
 
     const consent = screen.getByRole("checkbox", { name: /Autorizo o tratamento/ });
-    expect(consent).toHaveAccessibleName(expect.stringContaining("(nome, telefone e e-mail)"));
-    expect(consent).not.toHaveAccessibleName(expect.stringContaining("se informado"));
+    expect(consent).toHaveAccessibleName(expect.stringContaining("(nome, telefone e e-mail, se informado)"));
   });
 
   it("associates the consent text to the checkbox explicitly", () => {
@@ -145,7 +154,7 @@ describe("BookingWidget", () => {
     expect(phone).toHaveAttribute("inputmode", "tel");
     expect(phone).toHaveAttribute("autocomplete", "tel");
     expect(screen.getByLabelText("Nome")).toHaveAttribute("autocomplete", "name");
-    expect(screen.getByLabelText("E-mail para confirmação")).toHaveAttribute("autocomplete", "email");
+    expect(screen.getByLabelText("E-mail (opcional)")).toHaveAttribute("autocomplete", "email");
   });
 
   it("shows the waitlist's field error next to the phone", async () => {

@@ -49,7 +49,7 @@ import {
   classifyOperationalError,
 } from "@/lib/bookings/classification";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
-import { buildPrivateConfirmationUrl } from "@/lib/bookings/private-confirmation";
+import { buildPrivateConfirmationUrl, type ConfirmationEmailStatus } from "@/lib/bookings/private-confirmation";
 import { buildPublicBookingUrl } from "@/lib/bookings/public-booking-url";
 import { BOOKING_ALREADY_STARTED_MESSAGE } from "@/lib/bookings/public-status";
 import { resolveAppOrigin } from "@/lib/app-origin";
@@ -61,9 +61,9 @@ export type ActionResult = {
   fieldErrors?: Record<string, string[]>;
   publicCode?: string;
   cancelToken?: string;
-  // Set by createBooking: false means the cliente did not get the e-mail with
-  // the private link, so the confirmation page must say so (#187).
-  confirmationEmailSent?: boolean;
+  // Set by createBooking: anything but "sent" means the cliente has no e-mail
+  // with the private link, so the confirmation page must say so (#187, #195).
+  confirmationEmail?: ConfirmationEmailStatus;
 };
 
 type ServerClient = ReturnType<typeof createAdminClient>;
@@ -203,7 +203,7 @@ export async function createBooking(input: {
     p_start_at: startAtIso,
     p_customer_name: parsed.data.customerName,
     p_customer_phone: parsed.data.customerPhone,
-    p_customer_email: parsed.data.customerEmail,
+    p_customer_email: parsed.data.customerEmail || undefined,
     p_customer_note: parsed.data.customerNote || undefined,
     p_cancel_token_hash: hashCancelToken(cancelToken),
   });
@@ -235,27 +235,32 @@ export async function createBooking(input: {
   const noteJudgment = parsed.data.customerNote ? classifyCustomerNote(parsed.data.customerNote) : null;
   const trustedNoteJudgment = noteJudgment && noteJudgment.categoryConfidence >= 0.7 ? noteJudgment : null;
 
-  let confirmationEmailSent = false;
+  const customerEmail = parsed.data.customerEmail || null;
+  let confirmationEmail: ConfirmationEmailStatus = customerEmail ? "failed" : "none";
   if (data?.id && data.public_code) {
     // The dono hears about the reserva in parallel with the cliente's
     // confirmação; notifyOwner never throws (#146).
     const [emailResult] = await Promise.all([
-      sendBookingConfirmationEmail({
-        customerName: parsed.data.customerName,
-        customerEmail: parsed.data.customerEmail,
-        businessName: business.name,
-        serviceName: service.name,
-        startAt: startAtIso,
-        timezone: business.timezone,
-        publicCode: data.public_code,
-        businessPhone: business.phone,
-        confirmationUrl: buildPrivateConfirmationUrl(
-          resolveAppOrigin(),
-          input.slug,
-          data.public_code,
-          cancelToken,
-        ),
-      }),
+      // Without an e-mail (#195) there is nothing to send and nothing failed:
+      // the confirmation page tells the cliente to keep the private link.
+      customerEmail
+        ? sendBookingConfirmationEmail({
+            customerName: parsed.data.customerName,
+            customerEmail,
+            businessName: business.name,
+            serviceName: service.name,
+            startAt: startAtIso,
+            timezone: business.timezone,
+            publicCode: data.public_code,
+            businessPhone: business.phone,
+            confirmationUrl: buildPrivateConfirmationUrl(
+              resolveAppOrigin(),
+              input.slug,
+              data.public_code,
+              cancelToken,
+            ),
+          })
+        : null,
       notifyOwner(admin, "new_booking", {
         bookingId: data.id,
         ownerId: business.owner_id,
@@ -270,8 +275,8 @@ export async function createBooking(input: {
         customerNoteRequiresFollowUp: trustedNoteJudgment?.requiresManualFollowUp ?? false,
       }),
     ]);
-    confirmationEmailSent = emailResult.sent;
-    if (!emailResult.sent) {
+    if (emailResult?.sent) confirmationEmail = "sent";
+    if (emailResult && !emailResult.sent) {
       console.error("booking_confirmation_email_failed", {
         bookingId: data.id,
         reason: emailResult.reason,
@@ -301,7 +306,7 @@ export async function createBooking(input: {
   }
 
   return data?.public_code
-    ? { ok: true, publicCode: data.public_code, cancelToken, confirmationEmailSent }
+    ? { ok: true, publicCode: data.public_code, cancelToken, confirmationEmail }
     : { ok: false, code: "db_error", message: "Não foi possível concluir a reserva. Tente novamente." };
 }
 

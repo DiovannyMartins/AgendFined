@@ -6,7 +6,7 @@ O cancelamento self-service usa uma capability própria: na criação da reserva
 
 A RPC de cancelamento, restrita à service role, exige o digest e o compara na mesma transação com lock que muda o status. Todas as falhas têm a mesma resposta genérica. A única exceção vem depois de o digest bater: uma reserva confirmada cujo `start_at` já passou é recusada com `BOOKING_ALREADY_STARTED` (#141), que só revela algo a quem já detém o token, e preserva o no-show para o negócio registrar.
 
-Como só o digest fica guardado, o e-mail de confirmação não pode ser reenviado depois por uma fila: o link com o token só existe durante a Server Action. Por isso o envio repete na hora as falhas temporárias (timeout, rede, HTTP 429/5xx), dentro de um orçamento de tempo curto e com a mesma chave de idempotência, e `createBooking` devolve `confirmationEmailSent`. Quando o e-mail não sai, a tela de confirmação avisa que o botão é a última chance de cancelar sozinho e manda falar com o negócio depois (#187).
+Como só o digest fica guardado, o e-mail de confirmação não pode ser reenviado depois por uma fila: o link com o token só existe durante a Server Action. Por isso o envio repete na hora as falhas temporárias (timeout, rede, HTTP 429/5xx), dentro de um orçamento de tempo curto e com a mesma chave de idempotência, e `createBooking` devolve `confirmationEmailSent`. Quando o e-mail não sai, a tela de confirmação avisa que o botão é a última chance de cancelar sozinho e manda falar com o negócio depois (#187). Desde o #195 o e-mail é opcional na página pública (ADR 0011): sem e-mail, ou quando ele não sai, a mesma tela oferece copiar o link privado ou mandá-lo para o próprio WhatsApp.
 
 ## Alternativas consideradas
 

@@ -3,8 +3,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PrivateCancellation } from "./private-cancellation";
 
 vi.mock("./cancel-booking", () => ({
-  CancelBooking: ({ code, token, confirmationEmailSent = true }: { code: string; token: string; confirmationEmailSent?: boolean }) => (
-    <div data-testid="private-cancellation">{`${code}:${token}:${confirmationEmailSent ? "email" : "sem-email"}`}</div>
+  CancelBooking: ({
+    code,
+    token,
+    confirmationEmail = "sent",
+    privateUrl,
+  }: {
+    code: string;
+    token: string;
+    confirmationEmail?: string;
+    privateUrl?: string;
+  }) => (
+    <div data-testid="private-cancellation" data-private-url={privateUrl}>{`${code}:${token}:${confirmationEmail}`}</div>
   ),
 }));
 
@@ -25,7 +35,7 @@ describe("PrivateCancellation", () => {
     render(<PrivateCancellation code="65925DBB" canCancel onCancelled={() => {}} />);
 
     expect(await screen.findByTestId("private-cancellation")).toHaveTextContent(
-      `65925DBB:${TOKEN}:email`,
+      `65925DBB:${TOKEN}:sent`,
     );
     await waitFor(() => expect(window.location.hash).toBe(""));
     expect(window.location.search).toBe("?code=65925DBB");
@@ -36,7 +46,22 @@ describe("PrivateCancellation", () => {
 
     render(<PrivateCancellation code="65925DBB" canCancel onCancelled={() => {}} />);
 
-    expect(await screen.findByTestId("private-cancellation")).toHaveTextContent(`65925DBB:${TOKEN}:sem-email`);
+    expect(await screen.findByTestId("private-cancellation")).toHaveTextContent(`65925DBB:${TOKEN}:failed`);
+    await waitFor(() => expect(window.location.hash).toBe(""));
+  });
+
+  // #195: sem e-mail, o cliente guarda o link; ele não leva a marca do e-mail.
+  it("offers the private link to keep when the cliente gave no e-mail", async () => {
+    window.history.replaceState(null, "", `/barbearia/confirmacao?code=65925DBB#cancel=${TOKEN}&email=sem`);
+
+    render(<PrivateCancellation code="65925DBB" canCancel onCancelled={() => {}} />);
+
+    const control = await screen.findByTestId("private-cancellation");
+    expect(control).toHaveTextContent(`65925DBB:${TOKEN}:none`);
+    expect(control).toHaveAttribute(
+      "data-private-url",
+      `${window.location.origin}/barbearia/confirmacao?code=65925DBB#cancel=${TOKEN}`,
+    );
     await waitFor(() => expect(window.location.hash).toBe(""));
   });
 

@@ -217,10 +217,15 @@ export function BookingWidget({
       setSubmitting(false);
     }
     if (result.ok && result.publicCode && result.cancelToken) {
-      trackAnalyticsEvent("booking_complete", { method: "public_form" });
+      // `with_email` measures in GA how many clientes keep the e-mail now that
+      // it is optional (#195).
+      trackAnalyticsEvent("booking_complete", {
+        method: "public_form",
+        with_email: result.confirmationEmail !== "none",
+      });
       router.push(
         buildPrivateConfirmationPath(slug, result.publicCode, result.cancelToken, {
-          confirmationEmailFailed: result.confirmationEmailSent === false,
+          confirmationEmail: result.confirmationEmail,
         }),
       );
     } else if (result.code === "slot_taken" && offersWaitlist) {
@@ -418,7 +423,7 @@ export function BookingWidget({
             <FieldError id="customerPhone-error" message={fieldErrors.customerPhone} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="customerEmail">E-mail para confirmação</Label>
+            <Label htmlFor="customerEmail">E-mail (opcional)</Label>
             <Input
               id="customerEmail"
               type="email"
@@ -426,11 +431,11 @@ export function BookingWidget({
               value={customerEmail}
               onChange={(e) => updateCustomerField("customerEmail", setCustomerEmail, e.target.value)}
               {...fieldErrorProps("customerEmail", "customerEmail-help")}
-              required
             />
             <FieldError id="customerEmail-error" message={fieldErrors.customerEmail} />
             <p id="customerEmail-help" className="text-xs text-muted-foreground">
-              Enviaremos os dados da reserva para este endereço.
+              Com e-mail, você recebe a confirmação e o link para remarcar ou cancelar. Sem e-mail, guarde o
+              link na próxima tela.
             </p>
           </div>
         </div>
@@ -485,7 +490,7 @@ export function BookingWidget({
             className="mt-0.5 size-4 shrink-0"
           />
           <label htmlFor="consent">
-            Autorizo o tratamento dos meus dados (nome, telefone e e-mail) para fins
+            Autorizo o tratamento dos meus dados (nome, telefone e e-mail, se informado) para fins
             de agendamento, conforme a{" "}
             <Link href="/privacidade" className="font-medium text-foreground underline">
               Política de Privacidade

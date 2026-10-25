@@ -228,15 +228,17 @@ export const bookingSchema = z.object({
 });
 export type BookingInput = z.infer<typeof bookingSchema>;
 
-// Public reservations need an address so the customer can receive their
-// confirmation. Keep `bookingSchema` optional for existing non-public callers.
+// The e-mail is optional on the public page too (#195, ADR 0011): many clientes
+// of a barbearia or salão have none at hand and gave up on the form. Without
+// it, the confirmation page is where the cliente keeps the private link.
+// Blank (or only spaces) means "no e-mail", so the check runs after the trim.
 export const publicBookingSchema = bookingSchema.extend({
   customerEmail: z
     .string()
     .trim()
-    .min(1, { error: "Informe seu e-mail.", abort: true })
     .max(200, "O e-mail não pode passar de 200 caracteres.")
-    .email("Informe um e-mail válido."),
+    .refine((value) => value === "" || z.string().email().safeParse(value).success, "Informe um e-mail válido.")
+    .optional(),
 });
 export type PublicBookingInput = z.infer<typeof publicBookingSchema>;
 

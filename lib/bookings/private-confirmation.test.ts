@@ -4,7 +4,7 @@ import {
   buildPrivateConfirmationUrl,
   moveConfirmationToSlug,
   readCancelTokenFromHash,
-  readConfirmationEmailFailed,
+  readConfirmationEmailStatus,
   readPrivateCancelCapability,
 } from "./private-confirmation";
 
@@ -34,18 +34,30 @@ describe("private confirmation navigation", () => {
   // #187: only the navigation right after a failed e-mail carries the warning;
   // the link inside the e-mail never does.
   it("marks in the fragment that the confirmação e-mail was not sent", () => {
-    const path = buildPrivateConfirmationPath("barbearia", "65925DBB", TOKEN, { confirmationEmailFailed: true });
+    const path = buildPrivateConfirmationPath("barbearia", "65925DBB", TOKEN, { confirmationEmail: "failed" });
     const url = new URL(path, "https://agenda.example");
 
     expect(readCancelTokenFromHash(url.hash)).toBe(TOKEN);
-    expect(readConfirmationEmailFailed(url.hash)).toBe(true);
+    expect(readConfirmationEmailStatus(url.hash)).toBe("failed");
     expect(url.searchParams.toString()).toBe("code=65925DBB");
-    expect(readConfirmationEmailFailed(new URL(buildPrivateConfirmationPath("barbearia", "65925DBB", TOKEN), "https://agenda.example").hash)).toBe(false);
+    expect(readConfirmationEmailStatus(new URL(buildPrivateConfirmationPath("barbearia", "65925DBB", TOKEN), "https://agenda.example").hash)).toBe("sent");
     expect(
-      readConfirmationEmailFailed(
+      readConfirmationEmailStatus(
         new URL(buildPrivateConfirmationUrl(new URL("https://agenda.example"), "barbearia", "65925DBB", TOKEN)).hash,
       ),
-    ).toBe(false);
+    ).toBe("sent");
+  });
+
+  // #195: a reserva without e-mail has no later link at all, and that is not a failure.
+  it("marks in the fragment that the cliente gave no e-mail", () => {
+    const path = buildPrivateConfirmationPath("barbearia", "65925DBB", TOKEN, { confirmationEmail: "none" });
+    const url = new URL(path, "https://agenda.example");
+
+    expect(readCancelTokenFromHash(url.hash)).toBe(TOKEN);
+    expect(readConfirmationEmailStatus(url.hash)).toBe("none");
+    expect(buildPrivateConfirmationPath("barbearia", "65925DBB", TOKEN, { confirmationEmail: "sent" })).toBe(
+      buildPrivateConfirmationPath("barbearia", "65925DBB", TOKEN),
+    );
   });
 
   it("rejects malformed capabilities from the fragment", () => {

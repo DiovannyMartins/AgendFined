@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgendaBooking } from "@/lib/agenda/view";
 import { AgendaList } from "./agenda-list";
 
@@ -96,4 +96,56 @@ describe("AgendaList", () => {
     expect(screen.getByText(label)).toBeInTheDocument();
   });
 
+  // #195: o dono lembra o cliente pelo próprio WhatsApp, antes do atendimento.
+  describe("lembrete pelo WhatsApp", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-19T12:00:00Z") });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("abre a conversa com o cliente e o lembrete pronto numa reserva confirmada por vir", () => {
+      render(<AgendaList bookings={[booking()]} timezone="America/Sao_Paulo" businessName="Barbearia Demo" />);
+
+      const link = screen.getByRole("link", { name: "Lembrar pelo WhatsApp" });
+      expect(link.getAttribute("href")).toMatch(/^https:\/\/wa\.me\/5511999990000\?text=/);
+      expect(decodeURIComponent(link.getAttribute("href") ?? "")).toContain("Barbearia Demo");
+      expect(link).toHaveAttribute("target", "_blank");
+    });
+
+    it.each(["cancelled", "completed", "no_show"] as const)("não oferece lembrete numa reserva %s", (status) => {
+      render(<AgendaList bookings={[booking({ status })]} timezone="America/Sao_Paulo" />);
+
+      expect(screen.queryByRole("link", { name: "Lembrar pelo WhatsApp" })).not.toBeInTheDocument();
+    });
+
+    it("não oferece lembrete depois que o atendimento começou", () => {
+      vi.setSystemTime(new Date("2026-10-20T13:30:00Z"));
+      render(<AgendaList bookings={[booking()]} timezone="America/Sao_Paulo" />);
+
+      expect(screen.queryByRole("link", { name: "Lembrar pelo WhatsApp" })).not.toBeInTheDocument();
+    });
+
+    it("avisa, no PROFISSIONAL, que o cliente sem e-mail não recebe o lembrete automático", () => {
+      const { rerender } = render(
+        <AgendaList bookings={[booking({ customer_email_snapshot: null })]} timezone="America/Sao_Paulo" automaticReminders />,
+      );
+      expect(screen.getByText("Sem e-mail: não recebe o lembrete automático.")).toBeInTheDocument();
+
+      rerender(
+        <AgendaList
+          bookings={[booking({ customer_email_snapshot: "ana@example.com" })]}
+          timezone="America/Sao_Paulo"
+          automaticReminders
+        />,
+      );
+      expect(screen.queryByText(/não recebe o lembrete automático/)).not.toBeInTheDocument();
+
+      // No Grátis ninguém recebe lembrete automático, então o aviso não diz nada.
+      rerender(<AgendaList bookings={[booking({ customer_email_snapshot: null })]} timezone="America/Sao_Paulo" />);
+      expect(screen.queryByText(/não recebe o lembrete automático/)).not.toBeInTheDocument();
+    });
+  });
 });

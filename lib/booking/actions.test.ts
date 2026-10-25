@@ -138,12 +138,6 @@ describe("createBooking", () => {
     });
   });
 
-  it("asks for the e-mail when it is left blank", async () => {
-    const result = await createBooking({ ...validInput, customerEmail: "" });
-
-    expect(result.fieldErrors).toEqual({ customerEmail: ["Informe seu e-mail."] });
-  });
-
   it.each([
     { date: "2026-13-45" },
     { date: "not-a-date" },
@@ -266,7 +260,23 @@ describe("createBooking", () => {
     it("tells the page the confirmação e-mail went out", async () => {
       const result = await createBooking(validInput);
 
-      expect(result).toMatchObject({ ok: true, confirmationEmailSent: true });
+      expect(result).toMatchObject({ ok: true, confirmationEmail: "sent" });
+    });
+
+    // #195: o e-mail é opcional na página pública; sem ele, não há envio nem falha.
+    it.each(["", "   ", undefined])("confirms a reserva without e-mail (%j) and sends nothing to the cliente", async (customerEmail) => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      state.rpcCalls = [];
+
+      const result = await createBooking({ ...validInput, customerEmail });
+
+      expect(result).toMatchObject({ ok: true, publicCode: "65925DBB", confirmationEmail: "none" });
+      const call = state.rpcCalls.find((c) => c.name === "create_booking");
+      expect(call?.args.p_customer_email).toBeUndefined();
+      expect(sendBookingConfirmationEmail).not.toHaveBeenCalled();
+      expect(notifyOwner).toHaveBeenCalledTimes(1);
+      expect(consoleError).not.toHaveBeenCalled();
+      consoleError.mockRestore();
     });
 
     // #187: the e-mail is the only other way to cancel, so the page must know.
@@ -276,7 +286,7 @@ describe("createBooking", () => {
 
       const result = await createBooking(validInput);
 
-      expect(result).toMatchObject({ ok: true, publicCode: "65925DBB", confirmationEmailSent: false });
+      expect(result).toMatchObject({ ok: true, publicCode: "65925DBB", confirmationEmail: "failed" });
       expect(consoleError).toHaveBeenCalledWith("booking_confirmation_email_failed", {
         bookingId: "booking-9",
         reason: "provider_error",

@@ -24,3 +24,4 @@ Os ADRs 0001 a 0006 foram registrados retroativamente em 17/10/2026, a partir do
 - [0008 — Carência do cancelamento mantém o mês já pago](0008-carencia-mantem-o-mes-pago.md)
 - [0009 — Códigos de recuperação desativam o autenticador](0009-codigos-de-recuperacao-do-mfa.md)
 - [0010 — Remarcar move a mesma reserva](0010-remarcar-move-a-mesma-reserva.md)
+- [0011 — E-mail opcional na reserva pública e lembrete manual pelo WhatsApp](0011-email-opcional-e-lembrete-pelo-whatsapp.md)

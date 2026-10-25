@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import {
-  readConfirmationEmailFailed,
+  buildPrivateConfirmationUrl,
+  readConfirmationEmailStatus,
   readPrivateCancelCapability,
+  type ConfirmationEmailStatus,
 } from "@/lib/bookings/private-confirmation";
 import { CancelBooking } from "./cancel-booking";
 import { RescheduleBooking } from "./reschedule-booking";
@@ -24,7 +26,8 @@ export function PrivateCancellation({
   reschedule?: { timezone: string; startAt: string };
 }) {
   const [token, setToken] = useState<string | null>(null);
-  const [emailFailed, setEmailFailed] = useState(false);
+  const [confirmationEmail, setConfirmationEmail] = useState<ConfirmationEmailStatus>("sent");
+  const [privateUrl, setPrivateUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -36,7 +39,11 @@ export function PrivateCancellation({
       );
       if (cancelToken) {
         setToken(cancelToken);
-        setEmailFailed(readConfirmationEmailFailed(window.location.hash));
+        setConfirmationEmail(readConfirmationEmailStatus(window.location.hash));
+        // Rebuilt without the e-mail flag, so the link the cliente keeps is the
+        // same one the e-mail would have carried (#195).
+        const slug = decodeURIComponent(window.location.pathname.split("/")[1] ?? "");
+        setPrivateUrl(buildPrivateConfirmationUrl(new URL(window.location.origin), slug, code, cancelToken));
       }
 
       // The fragment is not sent in HTTP requests. Remove it from the visible URL
@@ -56,7 +63,7 @@ export function PrivateCancellation({
       active = false;
       window.removeEventListener("hashchange", captureCapability);
     };
-  }, []);
+  }, [code]);
 
   return token && canCancel ? (
     <>
@@ -71,7 +78,8 @@ export function PrivateCancellation({
       <CancelBooking
         code={code}
         token={token}
-        confirmationEmailSent={!emailFailed}
+        confirmationEmail={confirmationEmail}
+        privateUrl={privateUrl ?? undefined}
         onCancelled={onCancelled}
       />
     </>

@@ -85,7 +85,7 @@ Mensagem que o dono manda do próprio WhatsApp, pela agenda ("Lembrar pelo Whats
 _Avoid_: Notificação, disparo, lembrete automático
 
 **Evento da reserva**:
-O `.ics` de um único evento que o cliente baixa na tela de confirmação ("Adicionar à minha agenda"), ou o mesmo evento aberto no Google Agenda (#196). Leva só o que a confirmação já mostra ao cliente: serviço, início e fim em UTC, nome e telefone do negócio, código público e link público do negócio; nunca o token de cancelamento. O `UID` é o código público, então baixar de novo atualiza o mesmo evento. Só existe para reserva confirmada que ainda não começou e não é um recurso profissional, ao contrário da exportação da agenda do dono.
+O `.ics` de um único evento que o cliente baixa na tela de confirmação, na consulta por código e pelos e-mails de confirmação e de remarcação ("Adicionar à minha agenda"), ou o mesmo evento aberto no Google Agenda (#196). Leva só o que a confirmação já mostra ao cliente: serviço, início e fim em UTC, nome e telefone do negócio, código público e link público do negócio; nunca o token de cancelamento. O `UID` é o código público, então baixar de novo atualiza o mesmo evento. Só existe para reserva confirmada que ainda não começou e não é um recurso profissional, ao contrário da exportação da agenda do dono.
 _Avoid_: Exportação, convite, sincronização
 
 **Lista de espera**:

@@ -48,6 +48,19 @@ export function customerGoogleCalendarUrl(b: CustomerCalendarBooking, origin: UR
   return buildGoogleCalendarUrl(customerCalendarEvent(b, origin));
 }
 
+// The two "add to calendar" links a public screen shows (confirmation and
+// consulta). The .ics stays a same-origin path, so it opens on whatever host
+// the cliente is browsing.
+export type CalendarLinks = { icsHref: string; googleHref: string };
+
+export function customerCalendarLinks(b: CustomerCalendarBooking, origin: URL): CalendarLinks {
+  const params = new URLSearchParams({ code: b.code });
+  return {
+    icsHref: `/${encodeURIComponent(b.business_slug)}/confirmacao/evento.ics?${params.toString()}`,
+    googleHref: customerGoogleCalendarUrl(b, origin),
+  };
+}
+
 export function customerIcsFilename(code: string): string {
   return `reserva-${formatPublicCode(code)}.ics`;
 }

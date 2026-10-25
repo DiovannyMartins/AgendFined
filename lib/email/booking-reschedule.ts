@@ -2,6 +2,7 @@ import { formatPublicCode } from "@/lib/bookings/public-code";
 import { escapeHtml, sendEmail, type SendResult } from "@/lib/email/resend";
 import { businessContactRowsHtml, businessContactTextLines } from "@/lib/email/business-contact";
 import { formatWhenWithTimezone } from "@/lib/format/when";
+import { calendarLinkHtml, calendarLinkText } from "@/lib/email/calendar-link";
 
 // Sent when a reserva moves to another horário (#194), by the negócio from the
 // dashboard or by the cliente through the private link. The reserva is the
@@ -38,6 +39,9 @@ const CUSTOMER_RESCHEDULED: Wording = {
   heading: "Você remarcou sua reserva.",
   intro: (businessName) => `Você remarcou sua reserva com ${businessName}. O horário anterior foi liberado.`,
 };
+
+// The saved event keeps the código público as UID, so it moves to the new horário.
+const UPDATE_CALENDAR = "Atualizar na minha agenda";
 
 const KEEP_PRIVATE_LINK = "O link do e-mail de confirmação continua valendo para cancelar ou remarcar.";
 
@@ -120,7 +124,7 @@ function buildBookingRescheduleHtml(
                       <a href="${bookingUrl}" style="display:inline-block;padding:12px 18px;color:#111111;font-size:14px;font-weight:700;text-decoration:none;">Ver reserva</a>
                     </td>
                   </tr>
-                </table>
+                </table>${calendarLinkHtml(input.bookingUrl, UPDATE_CALENDAR)}
                 <p style="margin:18px 0 0;color:#b0b0b0;font-size:14px;line-height:22px;">${KEEP_PRIVATE_LINK} Em caso de dúvida, fale diretamente com ${businessName}.</p>
               </td>
             </tr>
@@ -152,6 +156,7 @@ async function sendRescheduleEmail(input: BookingReschedule, wording: Wording): 
     `Código da reserva: ${formatPublicCode(input.publicCode)}`,
     "",
     `Ver reserva: ${input.bookingUrl}`,
+    calendarLinkText(input.bookingUrl, UPDATE_CALENDAR),
     KEEP_PRIVATE_LINK,
     `Em caso de dúvida, fale diretamente com ${input.businessName}.`,
   ].join("\n");

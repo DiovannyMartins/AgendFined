@@ -97,6 +97,53 @@ describe("consultBooking", () => {
       message: "Informe um código de reserva válido.",
     });
   });
+
+  // #196: a consulta também oferece "Adicionar à minha agenda".
+  function consultRow(status: string, startAt: Date) {
+    return {
+      service_name: "Corte",
+      start_at: startAt.toISOString(),
+      end_at: new Date(startAt.getTime() + 30 * 60_000).toISOString(),
+      business_name: "Barbearia Demo",
+      business_slug: "barbearia",
+      business_phone: "11987654321",
+      business_timezone: "America/Sao_Paulo",
+      status,
+    };
+  }
+
+  function consult() {
+    const formData = new FormData();
+    formData.set("code", "6592-5dbb");
+    formData.set("slug", "barbearia");
+    return consultBooking({ status: "idle" }, formData);
+  }
+
+  it("links the calendar event of a confirmed future reserva", async () => {
+    state.rpcResults.get_booking_by_public_code = {
+      data: [consultRow("confirmed", new Date(Date.now() + 86_400_000))],
+      error: null,
+    };
+
+    const result = await consult();
+
+    expect(result.status).toBe("success");
+    if (result.status !== "success") return;
+    expect(result.calendar?.icsHref).toBe("/barbearia/confirmacao/evento.ics?code=65925DBB");
+    expect(new URL(result.calendar?.googleHref ?? "").searchParams.get("text")).toBe("Corte — Barbearia Demo");
+  });
+
+  it.each([
+    ["cancelled", new Date(Date.now() + 86_400_000)],
+    ["confirmed", new Date(Date.now() - 3_600_000)],
+  ])("offers no calendar event for a %s reserva starting %s", async (status, startAt) => {
+    state.rpcResults.get_booking_by_public_code = { data: [consultRow(status, startAt)], error: null };
+
+    const result = await consult();
+
+    expect(result.status).toBe("success");
+    expect(result.status === "success" && result.calendar).toBeFalsy();
+  });
 });
 
 describe("createBooking", () => {

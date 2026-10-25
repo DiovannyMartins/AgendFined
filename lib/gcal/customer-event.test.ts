@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCustomerIcs,
+  customerCalendarLinks,
   customerGoogleCalendarUrl,
   customerIcsFilename,
   type CustomerCalendarBooking,
@@ -80,6 +81,15 @@ describe("customerGoogleCalendarUrl", () => {
     expect(url.searchParams.get("dates")).toBe("20261103T130000Z/20261103T134500Z");
     expect(url.searchParams.get("ctz")).toBe("America/Manaus");
     expect(url.searchParams.get("details")).toContain("https://agendfined.test/barbearia");
+  });
+});
+
+describe("customerCalendarLinks", () => {
+  it("points the .ics at this código on the negócio's confirmation path", () => {
+    const links = customerCalendarLinks(booking, ORIGIN);
+
+    expect(links.icsHref).toBe("/barbearia/confirmacao/evento.ics?code=65925DBB");
+    expect(links.googleHref).toBe(customerGoogleCalendarUrl(booking, ORIGIN));
   });
 });
 

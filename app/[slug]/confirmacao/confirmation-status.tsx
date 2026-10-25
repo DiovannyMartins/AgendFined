@@ -6,7 +6,8 @@ import { CopyCode } from "@/components/copy-code";
 import { publicCodeHint, publicDocumentTitle, publicStatusView } from "@/lib/bookings/public-status";
 import type { BookingStatus } from "@/lib/bookings/transitions";
 import { PrivateCancellation } from "./private-cancellation";
-import { AddToCalendar, type CalendarLinks } from "./add-to-calendar";
+import { AddToCalendar } from "@/components/add-to-calendar";
+import type { CalendarLinks } from "@/lib/gcal/customer-event";
 
 // Owns the status shown on the confirmation screen so a self-service
 // cancellation immediately replaces "Reserva confirmada!" (and the tab title)

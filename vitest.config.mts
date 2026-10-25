@@ -26,6 +26,7 @@ export default defineConfig({
           globals: true,
           setupFiles: ["./tests/setup.ts"],
           include: [
+            "proxy.test.ts",
             "lib/**/*.test.{ts,tsx}",
             "app/**/*.test.{ts,tsx}",
             "components/**/*.test.{ts,tsx}",

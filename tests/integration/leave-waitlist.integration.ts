@@ -150,6 +150,102 @@ describe("join_waitlist capability (#152)", () => {
   });
 });
 
+// The dedup key is horário + telefone, and a telefone is not a secret: a join
+// for an entrada someone else already holds must not take it over (e-mail,
+// link de saída) nor revive one the dono already converted.
+describe("join_waitlist on an entrada that already exists", () => {
+  async function join(phone: string, hash: string | undefined, email: string | undefined, name = "Maria") {
+    const { data, error } = await admin.rpc("join_waitlist", {
+      p_business_id: businessId,
+      p_service_id: serviceId,
+      p_start_at: SLOT,
+      p_customer_name: name,
+      p_customer_phone: phone,
+      p_cancel_token_hash: hash,
+      p_customer_email: email,
+    });
+    expect(error).toBeNull();
+    return data!;
+  }
+
+  async function stored(entryId: string) {
+    const { data } = await admin
+      .from("waitlist_entries")
+      .select("customer_name, customer_email, cancel_token_hash, status")
+      .eq("id", entryId)
+      .single();
+    return data!;
+  }
+
+  it("keeps an active entrada untouched when the join brings another e-mail", async () => {
+    const victimHash = tokenHash();
+    const victim = await join("+5511980000040", victimHash, `vitima.${stamp}@agendfined.dev`, "Vítima");
+
+    const attempt = await join("+5511980000040", tokenHash(), `outro.${stamp}@agendfined.dev`, "Outro");
+    expect(attempt.id).toBe(victim.id);
+    expect(attempt.cancel_token_hash).toBe(victimHash);
+    expect(await stored(victim.id)).toEqual({
+      customer_name: "Vítima",
+      customer_email: `vitima.${stamp}@agendfined.dev`,
+      cancel_token_hash: victimHash,
+      status: "pending",
+    });
+
+    const victimLeaves = await admin.rpc("cancel_waitlist_entry_by_token", { p_cancel_token_hash: victimHash });
+    expect(victimLeaves.error).toBeNull();
+  });
+
+  it("does not attach an e-mail to an active entrada that had none", async () => {
+    const hash = tokenHash();
+    const entry = await join("+5511980000041", hash, undefined);
+
+    await join("+5511980000041", tokenHash(), `outro.${stamp}@agendfined.dev`);
+    expect(await stored(entry.id)).toMatchObject({ customer_email: null, cancel_token_hash: hash });
+  });
+
+  it("keeps a notified entrada notified when the join brings another e-mail", async () => {
+    const hash = tokenHash();
+    const entry = await join("+5511980000042", hash, `vitima.${stamp}@agendfined.dev`);
+    await admin.from("waitlist_entries").update({ status: "notified" }).eq("id", entry.id);
+
+    await join("+5511980000042", tokenHash(), `outro.${stamp}@agendfined.dev`);
+    expect(await stored(entry.id)).toMatchObject({ status: "notified", cancel_token_hash: hash });
+  });
+
+  it("never revives a converted entrada", async () => {
+    const hash = tokenHash();
+    const entry = await join("+5511980000043", hash, `vitima.${stamp}@agendfined.dev`);
+    await admin.from("waitlist_entries").update({ status: "converted" }).eq("id", entry.id);
+
+    await join("+5511980000043", tokenHash(), `vitima.${stamp}@agendfined.dev`);
+    expect(await stored(entry.id)).toMatchObject({ status: "converted", cancel_token_hash: hash });
+  });
+
+  it("rotates the link for the same e-mail, whatever its case", async () => {
+    const entry = await join("+5511980000044", tokenHash(), `cliente.${stamp}@agendfined.dev`);
+    const newHash = tokenHash();
+
+    const again = await join("+5511980000044", newHash, `Cliente.${stamp}@AgendFined.dev`);
+    expect(again.id).toBe(entry.id);
+    expect(again.cancel_token_hash).toBe(newHash);
+  });
+
+  it("starts over a cancelled entrada as a new one", async () => {
+    const entry = await join("+5511980000045", tokenHash(), `antes.${stamp}@agendfined.dev`, "Antes");
+    await admin.from("waitlist_entries").update({ status: "cancelled" }).eq("id", entry.id);
+
+    const newHash = tokenHash();
+    const again = await join("+5511980000045", newHash, undefined, "Depois");
+    expect(again.id).toBe(entry.id);
+    expect(await stored(entry.id)).toEqual({
+      customer_name: "Depois",
+      customer_email: null,
+      cancel_token_hash: newHash,
+      status: "pending",
+    });
+  });
+});
+
 describe("cancel_waitlist_entry_by_token (#152)", () => {
   it("moves a pending entrada to cancelled", async () => {
     const hash = tokenHash();

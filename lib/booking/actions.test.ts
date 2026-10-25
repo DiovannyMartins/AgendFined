@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type SendResult = { sent: true } | { sent: false; reason: "not_configured" | "provider_error" };
-type RpcResult = { data: unknown; error: { message: string } | null };
+type RpcOutcome = { data: unknown; error: { message: string } | null };
+type RpcResult = RpcOutcome | ((args: Record<string, unknown>) => RpcOutcome);
 type RecordedQuery = { table: string; filters: [string, unknown][]; update: Record<string, unknown> | null };
 
 const {
@@ -72,7 +73,9 @@ vi.mock("@/lib/supabase/admin", () => ({
       from,
       rpc: async (name: string, args: Record<string, unknown>) => {
         state.rpcCalls.push({ name, args });
-        return state.rpcResults[name] ?? { data: "waitlist-entry-1", error: null };
+        const result = state.rpcResults[name];
+        if (typeof result === "function") return result(args);
+        return result ?? { data: "waitlist-entry-1", error: null };
       },
     };
   },
@@ -522,7 +525,9 @@ describe("joinWaitlist", () => {
         timezone: "America/Sao_Paulo",
       };
       state.singles = { services: { name: "Corte" } };
-      state.rpcResults = { join_waitlist: { data: { id: "entry-1" }, error: null } };
+      state.rpcResults = {
+        join_waitlist: (args) => ({ data: { id: "entry-1", cancel_token_hash: args.p_cancel_token_hash }, error: null }),
+      };
       sendWaitlistJoinedEmail.mockReset();
       sendWaitlistJoinedEmail.mockResolvedValue({ sent: true });
     });
@@ -553,6 +558,20 @@ describe("joinWaitlist", () => {
       const { leaveUrl } = sendWaitlistJoinedEmail.mock.calls[0][0] as { leaveUrl: string };
       const token = new URL(leaveUrl).hash.slice("#token=".length);
       expect(createHash("sha256").update(token).digest("hex")).toBe(hash);
+    });
+
+    // The entrada already belonged to someone else (another e-mail) or was
+    // converted: the RPC keeps it and its digest, so the new link would not
+    // work and the e-mail would go to whoever asked. Same answer, no e-mail.
+    it("sends nothing and answers the same when the RPC kept the existing entrada", async () => {
+      state.rpcResults = {
+        join_waitlist: { data: { id: "entry-1", cancel_token_hash: "a".repeat(64) }, error: null },
+      };
+
+      const result = await joinWaitlist(futureInput);
+
+      expect(result).toEqual({ ok: true, message: "Você entrou na lista de espera deste horário." });
+      expect(sendWaitlistJoinedEmail).not.toHaveBeenCalled();
     });
 
     it("sends nothing when the cliente gave no e-mail", async () => {

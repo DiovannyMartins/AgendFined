@@ -13,6 +13,7 @@ const barbearia = {
 const { state, navigation } = vi.hoisted(() => ({
   state: {
     businesses: [] as Array<Record<string, unknown>>,
+    businessError: null as { message: string } | null,
     previousSlugTarget: [] as Array<{ slug: string }>,
     previousSlugError: null as { message: string } | null,
     services: [] as Array<Record<string, unknown>>,
@@ -32,7 +33,11 @@ vi.mock("next/navigation", () => navigation);
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
     rpc: async (name: string) => {
-      if (name === "get_public_business") return { data: state.businesses, error: null };
+      if (name === "get_public_business") {
+        return state.businessError
+          ? { data: null, error: state.businessError }
+          : { data: state.businesses, error: null };
+      }
       if (name === "get_business_slug_redirect") {
         return state.previousSlugError
           ? { data: null, error: state.previousSlugError }
@@ -63,6 +68,7 @@ async function renderPage(slug = "barbearia") {
 describe("página pública do negócio", () => {
   beforeEach(() => {
     state.businesses = [barbearia];
+    state.businessError = null;
     state.previousSlugTarget = [];
     state.previousSlugError = null;
     state.services = [corte];
@@ -124,6 +130,13 @@ describe("página pública do negócio", () => {
     await expect(renderPage("barbearia")).rejects.toThrow("NEXT_REDIRECT:308:/barbearia-nova");
   });
 
+  // #197: uma falha do banco não vira 404; quem responde é o error.tsx do segmento.
+  it("lança erro, e não 404, quando a busca do negócio falha", async () => {
+    state.businessError = { message: "fetch failed" };
+
+    await expect(renderPage()).rejects.toThrow("PUBLIC_BUSINESS_LOOKUP_FAILED");
+  });
+
   it("dá 404 quando o slug não é atual nem antigo", async () => {
     state.businesses = [];
 
@@ -142,6 +155,7 @@ describe("página pública do negócio", () => {
 describe("metadados da página pública do negócio", () => {
   beforeEach(() => {
     state.businesses = [barbearia];
+    state.businessError = null;
   });
 
   async function metadataFor(slug = "barbearia") {
@@ -162,6 +176,25 @@ describe("metadados da página pública do negócio", () => {
     const metadata = await metadataFor();
 
     expect(metadata.title).toBe("Barbearia — AgendFined");
+    expect(metadata.robots).toEqual({ index: false, follow: false });
+  });
+
+  // #197: a aba não diz "Página não encontrada" numa página que existe.
+  it("usa um título neutro quando a busca do negócio falha", async () => {
+    state.businessError = { message: "fetch failed" };
+
+    const metadata = await metadataFor();
+
+    expect(metadata.title).toBe("Agendamento online — AgendFined");
+    expect(metadata.robots).toBeUndefined();
+  });
+
+  it("marca como não encontrada só quando o negócio não existe", async () => {
+    state.businesses = [];
+
+    const metadata = await metadataFor("nao-existe");
+
+    expect(metadata.title).toBe("Página não encontrada — AgendFined");
     expect(metadata.robots).toEqual({ index: false, follow: false });
   });
 });

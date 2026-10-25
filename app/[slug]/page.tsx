@@ -18,7 +18,9 @@ export async function generateMetadata({
 
   try {
     const supabase = await createClient();
-    const { data } = await supabase.rpc("get_public_business", { p_slug: slug });
+    const { data, error } = await supabase.rpc("get_public_business", { p_slug: slug });
+    // A failed lookup is not "not found" (#197): it gets the neutral title below.
+    if (error) throw error;
     const business = data?.[0];
     if (!business) {
       return { title: "Página não encontrada — AgendFined", robots: { index: false, follow: false } };

@@ -1,13 +1,6 @@
--- Entrar de novo na lista de espera não toma a entrada de outra pessoa.
+-- Entrar de novo na lista de espera preserva a entrada existente.
 --
--- A deduplicação é por horário + telefone, e o telefone não é segredo. Até aqui
--- o upsert de `join_waitlist` trocava nome, e-mail e o digest do link de saída
--- de qualquer entrada existente e a voltava para `pending`. Com isso, quem
--- soubesse o telefone de um cliente passava a receber o aviso de vaga e a
--- confirmação da conversão (com o link privado da reserva), e invalidava o
--- link de saída do cliente.
---
--- Agora, para uma entrada que já existe:
+-- A deduplicação é por horário + telefone. Para uma entrada que já existe:
 --   * `cancelled`: recomeça como entrada nova (nome, e-mail e digest novos);
 --   * `pending`/`notified` com o mesmo e-mail (sem diferenciar maiúsculas):
 --     mantém o comportamento do #152, o digest é trocado e vale o link mais

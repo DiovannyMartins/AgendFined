@@ -14,6 +14,11 @@ const ROUTES: [string, () => Promise<{ metadata?: Metadata }>, string][] = [
   ["/dashboard/servicos", () => import("./dashboard/servicos/page"), "Serviços — AgendFined"],
   ["/dashboard/agenda", () => import("./dashboard/agenda/page"), "Reservas — AgendFined"],
   ["/dashboard/agenda/nova", () => import("./dashboard/agenda/nova/page"), "Nova reserva — AgendFined"],
+  [
+    "/dashboard/agenda/remarcar/[id]",
+    () => import("./dashboard/agenda/remarcar/[id]/page"),
+    "Remarcar reserva — AgendFined",
+  ],
   ["/dashboard/clientes", () => import("./dashboard/clientes/page"), "Clientes — AgendFined"],
   ["/dashboard/relatorios", () => import("./dashboard/relatorios/page"), "Relatórios — AgendFined"],
   ["/dashboard/lista-de-espera", () => import("./dashboard/lista-de-espera/page"), "Lista de espera — AgendFined"],

@@ -14,11 +14,13 @@ export function ConfirmationStatus({
   code,
   initialStatus,
   started = false,
+  reschedule,
   children,
 }: {
   code: string;
   initialStatus: BookingStatus;
   started?: boolean;
+  reschedule?: { timezone: string; startAt: string };
   children: ReactNode;
 }) {
   const [status, setStatus] = useState(initialStatus);
@@ -43,6 +45,7 @@ export function ConfirmationStatus({
           code={code}
           canCancel={view === "confirmed"}
           onCancelled={() => setStatus("cancelled")}
+          reschedule={reschedule}
         />
       </div>
     </>

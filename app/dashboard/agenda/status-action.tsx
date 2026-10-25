@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -64,6 +65,12 @@ export function StatusAction({
         description="A reserva será marcada como no-show (o cliente não compareceu). Se for engano, use Corrigir status para trocar por concluída."
         confirmLabel="Confirmar no-show"
       />
+      {/* #194: once it started, the reserva only gets a desfecho. */}
+      {!started && (
+        <Link href={`/dashboard/agenda/remarcar/${id}`} className={buttonVariants({ size: "sm", variant: "outline" })}>
+          Remarcar
+        </Link>
+      )}
       <CancelDialog id={id} summary={summary} />
     </div>
   );

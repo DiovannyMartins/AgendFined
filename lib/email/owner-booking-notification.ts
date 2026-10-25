@@ -4,7 +4,8 @@ import { formatPhoneBR } from "@/lib/format/phone";
 import { formatWhen, formatWhenWithTimezone } from "@/lib/format/when";
 
 // Sent to the dono (the e-mail of the account that owns the negócio) when a
-// cliente reserves or cancels through the public page (#146). It carries what
+// cliente reserves, cancels or reschedules through the public page (#146,
+// #194). It carries what
 // the dono needs to act without opening the painel (who, what, when and the
 // phone to call back) and a link to the agenda, never the cliente's cancel
 // token, private link or cancel reason.
@@ -21,6 +22,8 @@ type OwnerBookingNotification = {
   // and whether it needs reading before the atendimento, as the agenda shows (#179).
   customerNote?: string | null;
   customerNoteRequiresFollowUp?: boolean;
+  // Set for a remarcação: startAt is the new horário and this the freed one.
+  previousStartAt?: string;
   agendaUrl: string;
 };
 
@@ -51,6 +54,15 @@ const CUSTOMER_CANCELLED: Wording = {
   strikeWhen: true,
 };
 
+const CUSTOMER_RESCHEDULED: Wording = {
+  label: "RESERVA REMARCADA PELO CLIENTE",
+  subject: "Reserva remarcada",
+  heading: "Uma reserva foi remarcada.",
+  intro: (customerName, businessName) =>
+    `${customerName} remarcou a reserva em ${businessName}. O horário anterior foi liberado.`,
+  strikeWhen: false,
+};
+
 function detailRows(rows: [label: string, value: string, style?: string][]): string {
   return rows
     .map(
@@ -62,6 +74,24 @@ function detailRows(rows: [label: string, value: string, style?: string][]): str
                   </tr>`,
     )
     .join("\n");
+}
+
+function whenRows(
+  input: OwnerBookingNotification,
+  wording: Wording,
+  formattedWhen: string,
+): [label: string, value: string, style?: string][] {
+  if (!input.previousStartAt) {
+    return [["DATA E HORÁRIO", escapeHtml(formattedWhen), wording.strikeWhen ? "text-decoration:line-through;" : ""]];
+  }
+  return [
+    ["NOVO HORÁRIO", escapeHtml(formattedWhen)],
+    [
+      "HORÁRIO ANTERIOR",
+      escapeHtml(formatWhenWithTimezone(input.previousStartAt, input.timezone)),
+      "color:#b0b0b0;font-weight:400;text-decoration:line-through;",
+    ],
+  ];
 }
 
 function noteRow(input: OwnerBookingNotification): [label: string, value: string, style?: string][] {
@@ -115,7 +145,7 @@ ${detailRows([
   ["CLIENTE", customerName],
   ["TELEFONE", escapeHtml(formatPhoneBR(input.customerPhone))],
   ["SERVIÇO", escapeHtml(input.serviceName)],
-  ["DATA E HORÁRIO", escapeHtml(formattedWhen), wording.strikeWhen ? "text-decoration:line-through;" : ""],
+  ...whenRows(input, wording, formattedWhen),
   ["CÓDIGO DA RESERVA", escapeHtml(formatPublicCode(input.publicCode)), "color:#ffffff;font-size:17px;letter-spacing:1.4px;"],
   ...noteRow(input),
 ])}
@@ -153,7 +183,12 @@ async function sendOwnerNotification(input: OwnerBookingNotification, wording: W
     `Cliente: ${input.customerName}`,
     `Telefone: ${formatPhoneBR(input.customerPhone)}`,
     `Serviço: ${input.serviceName}`,
-    `Data e horário: ${formattedWhen}`,
+    ...(input.previousStartAt
+      ? [
+          `Novo horário: ${formattedWhen}`,
+          `Horário anterior: ${formatWhenWithTimezone(input.previousStartAt, input.timezone)}`,
+        ]
+      : [`Data e horário: ${formattedWhen}`]),
     `Código da reserva: ${formatPublicCode(input.publicCode)}`,
     ...(note ? [`Observação: ${note}`, ...(input.customerNoteRequiresFollowUp ? [NOTE_ATTENTION] : [])] : []),
     "",
@@ -171,4 +206,8 @@ export function sendOwnerNewBookingEmail(input: OwnerBookingNotification): Promi
 
 export function sendOwnerCustomerCancelledEmail(input: OwnerBookingNotification): Promise<SendResult> {
   return sendOwnerNotification(input, CUSTOMER_CANCELLED);
+}
+
+export function sendOwnerCustomerRescheduledEmail(input: OwnerBookingNotification): Promise<SendResult> {
+  return sendOwnerNotification(input, CUSTOMER_RESCHEDULED);
 }

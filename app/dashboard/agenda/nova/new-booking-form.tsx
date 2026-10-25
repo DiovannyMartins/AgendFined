@@ -244,7 +244,7 @@ function BookingFields({
           aria-invalid={errors.customerEmail?.[0] ? true : undefined}
         />
         <p id="customerEmail-hint" className="text-xs text-muted-foreground">
-          Com e-mail, o cliente recebe a confirmação e o link para cancelar. Sem e-mail, você envia o link pelo WhatsApp.
+          Com e-mail, o cliente recebe a confirmação e o link para remarcar ou cancelar. Sem e-mail, você envia o link pelo WhatsApp.
         </p>
         {fieldError("customerEmail")}
       </div>
@@ -286,7 +286,7 @@ function CreatedBooking({ result, onAnother }: { result: OwnerBookingResult; onA
   const whatsapp = result.customerPhone ? whatsappHref(result.customerPhone) : null;
   const whatsappText = `Olá, ${result.customerName ?? ""}! Sua reserva está confirmada (código ${formatPublicCode(
     result.publicCode ?? "",
-  )}). Veja os detalhes ou cancele por este link: ${confirmationUrl}`;
+  )}). Veja os detalhes, remarque ou cancele por este link: ${confirmationUrl}`;
 
   async function copy() {
     try {
@@ -312,7 +312,7 @@ function CreatedBooking({ result, onAnother }: { result: OwnerBookingResult; onA
       {confirmationUrl && (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">
-            Este link só aparece agora. Com ele o cliente consulta e cancela a reserva.
+            Este link só aparece agora. Com ele o cliente consulta, remarca e cancela a reserva.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" onClick={copy}>

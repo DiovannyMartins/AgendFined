@@ -294,6 +294,11 @@ export const ownerBookingSchema = z.object({
 });
 export type OwnerBookingInput = z.infer<typeof ownerBookingSchema>;
 
+// Remarcação pelo dono (#194): a mesma reserva vai para outra data e horário.
+export const ownerRescheduleSchema = ownerBookingSchema.pick({ date: true, startTime: true }).extend({
+  bookingId: z.string().uuid({ error: "Reserva inválida." }),
+});
+
 export const bookingStatusSchema = z.enum(["confirmed", "completed", "cancelled", "no_show"]);
 export type BookingStatus = z.infer<typeof bookingStatusSchema>;
 

@@ -86,7 +86,7 @@ function buildBookingConfirmationHtml(input: BookingConfirmation, formattedWhen:
                     </td>
                   </tr>
                 </table>
-                <p style="margin:18px 0 0;color:#b0b0b0;font-size:14px;line-height:22px;">Guarde este e-mail. O link privado permite consultar e cancelar a reserva.</p>
+                <p style="margin:18px 0 0;color:#b0b0b0;font-size:14px;line-height:22px;">Guarde este e-mail. O link privado permite consultar, remarcar e cancelar a reserva.</p>
               </td>
             </tr>
             <tr>
@@ -115,7 +115,7 @@ export async function sendBookingConfirmationEmail(input: BookingConfirmation): 
     `Código da reserva: ${formatPublicCode(input.publicCode)}`,
     `Confirmação privada: ${input.confirmationUrl}`,
     "",
-    "Guarde este e-mail. O link privado permite consultar e cancelar a reserva.",
+    "Guarde este e-mail. O link privado permite consultar, remarcar e cancelar a reserva.",
   ].join("\n");
   const html = buildBookingConfirmationHtml(input, formattedWhen);
 

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   sendOwnerCustomerCancelledEmail,
+  sendOwnerCustomerRescheduledEmail,
   sendOwnerNewBookingEmail,
 } from "@/lib/email/owner-booking-notification";
 
@@ -117,5 +118,22 @@ describe("sendOwnerCustomerCancelledEmail", () => {
     expect(body.html).toContain("RESERVA CANCELADA PELO CLIENTE");
     expect(body.html).toContain("text-decoration:line-through");
     expect(body.html).not.toContain("<cliente>");
+  });
+});
+
+describe("sendOwnerCustomerRescheduledEmail (#194)", () => {
+  it("tells the dono the new horário and the one the cliente freed", async () => {
+    const request = stubResend();
+
+    await sendOwnerCustomerRescheduledEmail({ ...input, startAt: "2026-05-12T13:30:00Z", previousStartAt: input.startAt });
+
+    const body = request();
+    expect(body.subject).toBe("Reserva remarcada: Ana & João <cliente>, 12/05/2026 às 10:30");
+    expect(body.text).toContain("remarcou a reserva em Barbearia \"Demo\". O horário anterior foi liberado.");
+    expect(body.text).toContain("Novo horário: 12/05/2026 às 10:30");
+    expect(body.text).toContain("Horário anterior: 10/05/2026 às 15:00");
+    expect(body.text).not.toContain("Data e horário:");
+    expect(body.html).toContain("RESERVA REMARCADA PELO CLIENTE");
+    expect(body.html).toContain("HORÁRIO ANTERIOR");
   });
 });

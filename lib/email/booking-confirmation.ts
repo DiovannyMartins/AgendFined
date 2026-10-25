@@ -1,5 +1,6 @@
 import { formatWhenWithTimezone } from "@/lib/format/when";
 import { escapeHtml, sendEmail, type SendResult } from "@/lib/email/resend";
+import { EMAIL_LOGO_HTML } from "@/lib/email/brand-logo";
 import { businessContactRowsHtml, businessContactTextLines } from "@/lib/email/business-contact";
 import { formatPublicCode } from "@/lib/bookings/public-code";
 import { calendarLinkHtml, calendarLinkText } from "@/lib/email/calendar-link";
@@ -41,12 +42,7 @@ function buildBookingConfirmationHtml(input: BookingConfirmation, formattedWhen:
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;border:1px solid #333333;border-radius:12px;border-collapse:separate;background-color:#1c1c1c;overflow:hidden;">
             <tr>
               <td style="padding:28px 32px 22px;border-bottom:1px solid #333333;">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
-                  <tr>
-                    <td valign="middle" style="width:34px;height:34px;border-radius:9px;background-color:#ffffff;color:#111111;font-size:18px;font-weight:700;line-height:34px;text-align:center;">A</td>
-                    <td valign="middle" style="padding-left:10px;color:#eeeeee;font-size:17px;font-weight:700;letter-spacing:-0.2px;">AgendFined</td>
-                  </tr>
-                </table>
+                ${EMAIL_LOGO_HTML}
               </td>
             </tr>
             <tr>

@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  AUTH_RATE_LIMIT,
   CONFIRMATION_RATE_LIMIT,
   CONSULT_RATE_LIMIT,
   PUBLIC_READ_RATE_LIMIT,
   RATE_LIMIT,
+  buildAuthRateKeys,
   buildAvailabilityRateKeys,
   buildRateKeys,
   buildServiceSearchRateKeys,
@@ -128,6 +130,34 @@ describe("public read rate-limit keys", () => {
       { key: "ip:1.2.3.4|service-search", ...PUBLIC_READ_RATE_LIMIT.serviceSearchPerIp },
       { key: "business:biz-1|service-search", ...PUBLIC_READ_RATE_LIMIT.serviceSearchPerBusiness },
     ]);
+  });
+});
+
+// The tight per-e-mail limit is per IP too: someone else's wrong passwords
+// must not lock the dono out from their own connection. A wider limit on the
+// e-mail alone still caps guesses spread across many IPs.
+describe("auth rate-limit keys", () => {
+  it.each(["login", "passwordReset"] as const)("limits %s per IP + e-mail and, more loosely, per e-mail", (action) => {
+    const keys = buildAuthRateKeys("1.2.3.4", action, "dono@example.com");
+    const config = AUTH_RATE_LIMIT[action];
+
+    expect(keys.map(({ limit }) => limit)).toEqual([config.perIp, config.perIpEmail, config.perEmail]);
+    expect(config.perEmail).toBeGreaterThan(config.perIpEmail);
+    expect(keys[1].key).toContain("ip:1.2.3.4");
+    expect(keys[2].key).not.toContain("1.2.3.4");
+  });
+
+  it("gives each IP its own e-mail counter", () => {
+    const [, fromA] = buildAuthRateKeys("1.2.3.4", "login", "dono@example.com");
+    const [, fromB] = buildAuthRateKeys("5.6.7.8", "login", "dono@example.com");
+
+    expect(fromA.key).not.toBe(fromB.key);
+  });
+
+  it("keeps the e-mail out of the keys", () => {
+    for (const { key } of buildAuthRateKeys("1.2.3.4", "login", "dono@example.com")) {
+      expect(key).not.toContain("dono");
+    }
   });
 });
 

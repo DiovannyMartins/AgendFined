@@ -273,6 +273,33 @@ describe("signup confirmation link", () => {
   });
 });
 
+// With e-mail confirmation on, Supabase Auth answers a confirmed address like
+// a new one, but a pending signup resends its e-mail and hits max_frequency:
+// that answer, and the ones only an existing address gets, look like success.
+describe("signup for an address that may already have an account", () => {
+  it.each(["over_email_send_rate_limit", "user_already_exists", "email_exists"])(
+    "answers %s like a new signup",
+    async (code) => {
+      auth.signUp.mockResolvedValue({ error: { code, status: 429, message: "x" } });
+
+      const result = await signup(
+        INITIAL,
+        form({ email: "novo@agendfined.dev", password: "Senha-forte-1", displayName: "Ana" }),
+      );
+
+      expect(result).toEqual({ ok: true, data: undefined });
+    },
+  );
+
+  it("still reports a failure that does not depend on the address", async () => {
+    auth.signUp.mockResolvedValue({ error: { code: "unexpected_failure", status: 500, message: "boom" } });
+
+    const result = await signup(INITIAL, form({ email: "novo@agendfined.dev", password: "Senha-forte-1", displayName: "Ana" }));
+
+    expect(result).toMatchObject({ ok: false, code: "SIGNUP_FAILED" });
+  });
+});
+
 describe("signup with a password Supabase Auth considers weak", () => {
   it("reports the problem on the password field instead of the generic failure", async () => {
     auth.signUp.mockResolvedValue({
@@ -308,6 +335,32 @@ describe("requestPasswordReset", () => {
       redirectTo: "https://agendfined.dev/auth/callback?next=/redefinir-senha",
       captchaToken: "tok-reset",
     });
+    vi.unstubAllEnvs();
+  });
+
+  // Supabase Auth only throttles (max_frequency) and only errors for an
+  // address that has an account, so every error but the CAPTCHA, which is
+  // about the request, gets the success answer.
+  it.each([
+    ["the e-mail throttle", { code: "over_email_send_rate_limit", status: 429, message: "only request this after 50 seconds" }],
+    ["an unexpected error", { code: "unexpected_failure", status: 500, message: "boom" }],
+  ])("answers %s like a sent e-mail", async (_case, error) => {
+    vi.stubEnv("APP_URL", "https://agendfined.dev");
+    auth.resetPasswordForEmail.mockResolvedValue({ error });
+
+    const result = await requestPasswordReset(INITIAL, form({ email: "dono@agendfined.dev" }));
+
+    expect(result).toEqual({ ok: true, data: undefined });
+    vi.unstubAllEnvs();
+  });
+
+  it("asks for the human verification again when the CAPTCHA is rejected", async () => {
+    vi.stubEnv("APP_URL", "https://agendfined.dev");
+    auth.resetPasswordForEmail.mockResolvedValue({ error: { code: "captcha_failed", message: "captcha protection" } });
+
+    const result = await requestPasswordReset(INITIAL, form({ email: "dono@agendfined.dev", cfTurnstileToken: "old" }));
+
+    expect(result).toMatchObject({ ok: false, code: "CAPTCHA_FAILED" });
     vi.unstubAllEnvs();
   });
 

@@ -204,6 +204,11 @@ cli_path() {
 # "\r" inside the cron URL silently broke every reminder dispatch).
 strip_cr() { printf '%s' "${1//$'\r'/}"; }
 
+# sql_literal VALUE doubles single quotes for a SQL string literal.
+sql_literal() { local q="'"; printf '%s' "${1//$q/$q$q}"; }
+
+# Secret-bearing temp files live outside the repository ($TMPDIR, owner-only).
+umask 077
 TEMP_ENV_FILE=""
 TEMP_CRON_SQL=""
 cleanup() {
@@ -236,7 +241,7 @@ else
 fi
 
 stage "Supabase: secrets e Edge Function"
-TEMP_ENV_FILE="$(mktemp .reminder-secrets.XXXXXX)"
+TEMP_ENV_FILE="$(mktemp "${TMPDIR:-/tmp}/reminder-secrets.XXXXXX")"
 printf 'REMINDER_CRON_SECRET=%s\nRESEND_API_KEY=%s\nRESEND_FROM_EMAIL=%s\n' \
   "$REMINDER_CRON_SECRET" "$RESEND_API_KEY" "$RESEND_FROM_EMAIL" > "$TEMP_ENV_FILE"
 step "Configurando os três secrets no projeto Supabase vinculado."
@@ -264,19 +269,38 @@ if [[ ! "$SUPABASE_URL" =~ ^https://[^[:space:][:cntrl:]\']+$ ]]; then
   warn "A URL do projeto Supabase deve ser https:// sem espaços, aspas ou caracteres de controle."
   exit 1
 fi
-TEMP_CRON_SQL="$(mktemp .reminder-cron.XXXXXX)"
+TEMP_CRON_SQL="$(mktemp "${TMPDIR:-/tmp}/reminder-cron.XXXXXX")"
+REMINDER_URL_SQL="$(sql_literal "${SUPABASE_URL}/functions/v1/booking-reminders")"
+REMINDER_SECRET_SQL="$(sql_literal "$REMINDER_CRON_SECRET")"
+# URL and secret go to Supabase Vault (read by process_booking_reminders since
+# 20261027030000); the job command no longer carries the secret. One block, so
+# nothing changes when that migration is not applied yet.
 cat > "$TEMP_CRON_SQL" <<SQL
-select cron.unschedule('booking-reminders');
-select cron.schedule(
-  'booking-reminders',
-  '*/30 * * * *',
-  'select set_config(''app.reminder_cron_url'', ''${SUPABASE_URL}/functions/v1/booking-reminders'', false); select set_config(''app.reminder_cron_secret'', ''${REMINDER_CRON_SECRET}'', false); select public.process_booking_reminders();'
-);
+do \$reminders\$
+declare
+  v_url text := '${REMINDER_URL_SQL}';
+  v_secret text := '${REMINDER_SECRET_SQL}';
+begin
+  if pg_get_functiondef('public.process_booking_reminders()'::regprocedure) !~ 'agendfined_reminder_cron_secret' then
+    raise exception 'aplique a migration 20261027030000_reminder_cron_secret_vault antes de rodar este script';
+  end if;
+  perform vault.update_secret(s.id, v_url) from vault.secrets s where s.name = 'agendfined_reminder_cron_url';
+  if not found then
+    perform vault.create_secret(v_url, 'agendfined_reminder_cron_url');
+  end if;
+  perform vault.update_secret(s.id, v_secret) from vault.secrets s where s.name = 'agendfined_reminder_cron_secret';
+  if not found then
+    perform vault.create_secret(v_secret, 'agendfined_reminder_cron_secret');
+  end if;
+  perform cron.unschedule(j.jobid) from cron.job j where j.jobname = 'booking-reminders';
+  perform cron.schedule('booking-reminders', '*/30 * * * *', 'select public.process_booking_reminders();');
+end
+\$reminders\$;
 select jobname, schedule, active
 from cron.job
 where jobname = 'booking-reminders';
 SQL
-step "Atualizando o job booking-reminders para executar a cada 30 minutos."
+step "Gravando URL e segredo no Vault e reagendando o job booking-reminders (a cada 30 minutos)."
 npx supabase db query --linked --file "$(cli_path "$TEMP_CRON_SQL")"
 rm -f "$TEMP_CRON_SQL"
 TEMP_CRON_SQL=""
@@ -284,9 +308,9 @@ TEMP_CRON_SQL=""
 stage "Verificação"
 step "Confirmando que os secrets existem sem imprimir seus valores."
 npx supabase secrets list
-step "Confirmando o job do pg_cron sem mostrar o comando que contém o segredo."
+step "Confirmando a configuração dos lembretes sem mostrar o segredo."
 npx supabase db query --linked "select public.get_booking_reminders_health();"
-note "Espere dispatch_configured e url_valid = true."
+note "Espere dispatch_configured e url_valid = true, dispatch_source = vault e secret_in_job_command = false."
 note "A verificação não dispara e-mails imediatamente; os próximos ticks processarão reservas elegíveis."
 
 finish

@@ -304,7 +304,10 @@ describe("INC-2 lembretes: set_booking_reminders_sent (dedup)", () => {
   });
 
   it("is idempotent: marking an already-reminded booking changes nothing", async () => {
-    const { data: marked } = await admin.rpc("set_booking_reminders_sent", { p_booking_ids: [dueBookingId] });
+    const { data: marked } = await admin.rpc("set_booking_reminders_sent", {
+      p_booking_ids: [dueBookingId],
+      p_claim_tokens: [dueClaimedRow!.reminder_claim_token],
+    });
     expect(marked).toBe(0);
   });
 });

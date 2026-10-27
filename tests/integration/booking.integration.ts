@@ -216,10 +216,19 @@ describe("createBooking RPC (§11.4)", () => {
 describe("RLS (§13.2)", () => {
   it("the business owner can read their own bookings via the anon client", async () => {
     const owner = await anonClientForUser(EMAIL, PASSWORD);
-    const { data } = await owner.from("bookings").select("*").eq("business_id", businessId);
+    const { data } = await owner.from("bookings").select("id, status").eq("business_id", businessId);
     // The owner owns the business, so their confirmed booking (created above) is visible.
     expect(Array.isArray(data)).toBe(true);
     expect(data!.length).toBeGreaterThan(0);
+  });
+
+  it("the owner cannot read the reminder claim token or the cliente's token hash", async () => {
+    const owner = await anonClientForUser(EMAIL, PASSWORD);
+    for (const column of ["reminder_claim_token", "cancel_token_hash"]) {
+      const { data, error } = await owner.from("bookings").select(column).eq("business_id", businessId);
+      expect(data).toBeNull();
+      expect(error).not.toBeNull();
+    }
   });
 
   it("an outsider reads the minimal public business RPC but cannot read its bookings", async () => {
@@ -239,7 +248,7 @@ describe("RLS (§13.2)", () => {
       "timezone",
     ]);
     // But the outsider cannot read the owner's bookings (private data).
-    const { data: rows } = await outsider.from("bookings").select("*").eq("business_id", businessId);
+    const { data: rows } = await outsider.from("bookings").select("id").eq("business_id", businessId);
     expect(rows?.length ?? 0).toBe(0);
   });
 });

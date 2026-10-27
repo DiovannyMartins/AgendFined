@@ -31,6 +31,18 @@ async function createReserva(): Promise<string> {
   return data.id;
 }
 
+// Moves a reserva into the past, as if its atendimento had already started:
+// completed and no_show are refused before start_at.
+let hoursAgo = 0;
+async function startReserva(id: string): Promise<void> {
+  const startAt = new Date(Date.now() - (hoursAgo += 2) * 3_600_000);
+  const { error } = await admin
+    .from("bookings")
+    .update({ start_at: startAt.toISOString(), end_at: new Date(startAt.getTime() + 30 * 60_000).toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(`startReserva: ${error.message}`);
+}
+
 beforeAll(async () => {
   admin = adminClient();
   const { data: user, error: userError } = await admin.auth.admin.createUser({
@@ -178,9 +190,21 @@ describe("owner writes to reservas outside the Server Actions", () => {
     expect(data?.status).toBe("cancelled");
   });
 
+  it("cannot mark a reserva completed or no_show before it starts", async () => {
+    const owner = await anonClientForUser(EMAIL, PASSWORD);
+    const id = await createReserva();
+    for (const status of ["completed", "no_show"] as const) {
+      const { error } = await owner.from("bookings").update({ status }).eq("id", id);
+      expect(error?.message).toContain("BOOKING_NOT_STARTED");
+    }
+    const { data } = await owner.from("bookings").select("status").eq("id", id).single();
+    expect(data?.status).toBe("confirmed");
+  });
+
   it("can correct completed and no_show into each other, but not reopen them (#145)", async () => {
     const owner = await anonClientForUser(EMAIL, PASSWORD);
     const id = await createReserva();
+    await startReserva(id);
     const noShow = await owner.from("bookings").update({ status: "no_show" }).eq("id", id);
     expect(noShow.error).toBeNull();
 

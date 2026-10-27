@@ -33,6 +33,8 @@ function makeDeps(overrides: Partial<HandleWebhookDeps> = {}) {
       subscriptionId: input.subscriptionId,
       businessId: input.businessId,
       subscriptionStatus: input.status,
+      previousStatus: "pending" as const,
+      applied: true,
       isCurrent: true,
       effectivePlan: input.status === "authorized" ? "pro" as const : "free" as const,
       effectiveGracePeriodEnd: input.gracePeriodEnd,
@@ -272,6 +274,8 @@ describe("handleWebhook (issue #24) lifecycle", () => {
       subscriptionId: "sub_old",
       businessId: "biz_1",
       subscriptionStatus: "authorized" as const,
+      previousStatus: "cancelled" as const,
+      applied: true,
       isCurrent: false,
       effectivePlan: "free" as const,
       effectiveGracePeriodEnd: null,
@@ -318,6 +322,8 @@ describe("handleWebhook (issue #24) lifecycle", () => {
       subscriptionId: input.subscriptionId,
       businessId: input.businessId,
       subscriptionStatus: input.status,
+      previousStatus: "pending" as const,
+      applied: true,
       isCurrent: true,
       effectivePlan: "pro" as const,
       effectiveGracePeriodEnd: null,
@@ -338,6 +344,8 @@ const applyKeepingPro: HandleWebhookDeps["applySnapshot"] = async (input) => ({
   subscriptionId: input.subscriptionId,
   businessId: input.businessId,
   subscriptionStatus: input.status,
+  previousStatus: "authorized",
+  applied: true,
   isCurrent: true,
   effectivePlan: "pro",
   effectiveGracePeriodEnd: input.gracePeriodEnd,
@@ -362,12 +370,28 @@ describe("handleWebhook failed payment e-mail (issue #151)", () => {
     const deps = makeDeps({
       findSubscription: vi.fn(async () => ({ ...authorizedSubscription, status: "paused" as const, gracePeriodEnd: "2026-09-14T12:00:00.000Z" })),
       getPreapproval: vi.fn(async () => makePreapproval("paused")),
-      applySnapshot: vi.fn(applyKeepingPro),
+      applySnapshot: vi.fn(async (input) => ({ ...(await applyKeepingPro(input)), previousStatus: "paused" as const })),
       notifyPaymentFailed,
     });
 
     await handleWebhook(deps);
     expect(notifyPaymentFailed).not.toHaveBeenCalled();
+  });
+
+  it("tells the dono once when two deliveries of the same paused race", async () => {
+    // Both deliveries read the row authorized; the database applies them one
+    // after the other and the second finds it already paused.
+    const notifyPaymentFailed = vi.fn();
+    const previous: Array<"authorized" | "paused"> = ["authorized", "paused"];
+    const deps = makeDeps({
+      findSubscription: vi.fn(async () => authorizedSubscription),
+      getPreapproval: vi.fn(async () => makePreapproval("paused")),
+      applySnapshot: vi.fn(async (input) => ({ ...(await applyKeepingPro(input)), previousStatus: previous.shift()! })),
+      notifyPaymentFailed,
+    });
+
+    await Promise.all([handleWebhook(deps), handleWebhook(deps)]);
+    expect(notifyPaymentFailed).toHaveBeenCalledTimes(1);
   });
 
   it("sends nothing for a cancellation or for a checkout that was never paid", async () => {
@@ -462,6 +486,8 @@ describe("handleWebhook superseded checkouts", () => {
         subscriptionId: input.subscriptionId,
         businessId: input.businessId,
         subscriptionStatus: input.status,
+        previousStatus: "pending" as const,
+        applied: true,
         isCurrent: false,
         effectivePlan: "pro" as const,
         effectiveGracePeriodEnd: null,
@@ -558,5 +584,40 @@ describe("handleWebhook unexpected checkout terms", () => {
     expect(deps.applySnapshot).not.toHaveBeenCalled();
     expect(deps.cancelPreapproval).toHaveBeenCalledWith("mp_1");
     expect(deps.reportUnexpectedTermsCharge).toHaveBeenCalledWith({ businessId: "biz_1", mpPreapprovalId: "mp_1" });
+  });
+});
+
+describe("handleWebhook snapshot ordering", () => {
+  it("passes the provider's last_modified so the database can refuse an older snapshot", async () => {
+    const deps = makeDeps({
+      getPreapproval: vi.fn(async () => makePreapproval("authorized", { lastModified: "2026-09-07T11:00:00.000Z" })),
+    });
+
+    await handleWebhook(deps);
+
+    expect(deps.applySnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({ providerModifiedAt: "2026-09-07T11:00:00.000Z" }),
+    );
+  });
+
+  it("acknowledges a snapshot older than the stored one without side effects", async () => {
+    const notifyPaymentFailed = vi.fn();
+    const deps = makeDeps({
+      findSubscription: vi.fn(async () => authorizedSubscription),
+      getPreapproval: vi.fn(async () => makePreapproval("paused", { lastModified: "2026-09-01T00:00:00.000Z" })),
+      applySnapshot: vi.fn(async (input) => ({
+        ...(await applyKeepingPro(input)),
+        subscriptionStatus: "authorized" as const,
+        applied: false,
+        effectiveGracePeriodEnd: null,
+      })),
+      listOtherPendingSubscriptions: vi.fn(async () => [pendingSubscription("sub_2", "mp_2")]),
+      notifyPaymentFailed,
+    });
+
+    await expect(handleWebhook(deps)).resolves.toEqual({ ok: true, applied: "stale" });
+    expect(notifyPaymentFailed).not.toHaveBeenCalled();
+    expect(deps.listOtherPendingSubscriptions).not.toHaveBeenCalled();
+    expect(deps.cancelPreapproval).not.toHaveBeenCalled();
   });
 });

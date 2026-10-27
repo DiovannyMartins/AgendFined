@@ -148,6 +148,7 @@ describe("createMercadoPagoProvider", () => {
         // the paid period ends on `next_payment_date` (issue #142).
         auto_recurring: { start_date: "2026-09-01T00:00:00.000Z" },
         next_payment_date: "2026-10-01T00:00:00.000Z",
+        last_modified: "2026-09-01T09:30:00.000-04:00",
       }),
     );
 
@@ -164,6 +165,7 @@ describe("createMercadoPagoProvider", () => {
       currencyId: null,
       frequency: null,
       frequencyType: null,
+      lastModified: "2026-09-01T13:30:00.000Z",
     });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.mercadopago.com/preapproval/mp_1");
@@ -185,6 +187,14 @@ describe("createMercadoPagoProvider", () => {
     await expect(provider.getPreapproval("mp_1")).resolves.toEqual(
       expect.objectContaining({ id: "mp_1", status: "pending", transactionAmount: 19 }),
     );
+  });
+
+  it("reads no version when last_modified is absent or unreadable", async () => {
+    stubFetch(async () => jsonResponse({ id: "mp_1", status: "paused", last_modified: "ontem" }));
+
+    const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });
+
+    await expect(provider.getPreapproval("mp_1")).resolves.toEqual(expect.objectContaining({ lastModified: null }));
   });
 
   it("rejects a response that describes another preapproval", async () => {

@@ -2,6 +2,7 @@ import type { Preapproval } from "./provider";
 import type { AppliedSubscriptionSnapshot, ApplySubscriptionSnapshotInput } from "./handle-webhook";
 import type { BillingSubscription } from "./types";
 import { refuseUnacceptedCheckout, type CheckoutTermsDeps, type CheckoutTermsRefusal } from "./checkout-terms";
+import { snapshotGraceEnd } from "./grace";
 
 export type ReturnSyncResult =
   | { ok: true; status: Preapproval["status"]; effectivePlan: "free" | "pro" }
@@ -13,6 +14,8 @@ export interface ReturnSyncDeps extends CheckoutTermsDeps {
   fetchSubscription: (businessId: string) => Promise<BillingSubscription | null>;
   getPreapproval: (id: string) => Promise<Preapproval>;
   applySnapshot: (input: ApplySubscriptionSnapshotInput) => Promise<AppliedSubscriptionSnapshot>;
+  graceDays?: number;
+  now?: () => Date;
 }
 
 /**
@@ -49,16 +52,26 @@ export async function syncReturnedSubscription(
     status: snapshot.status,
     currentPeriodStart: snapshot.currentPeriodStart,
     currentPeriodEnd: snapshot.currentPeriodEnd,
-    gracePeriodEnd:
-      snapshot.status === "paused" || snapshot.status === "cancelled"
-        ? current.gracePeriodEnd ?? null
-        : null,
+    // Computed as the webhook does: this GET can reach the database first, and
+    // a `paused`/`cancelled` row without a carência would let the downgrade
+    // cron drop the negócio before the webhook arrives.
+    gracePeriodEnd: snapshotGraceEnd({
+      now: deps.now?.() ?? new Date(),
+      graceDays: deps.graceDays,
+      localStatus: current.status,
+      existingGracePeriodEnd: current.gracePeriodEnd ?? null,
+      snapshotStatus: snapshot.status,
+      snapshotPeriodEnd: snapshot.currentPeriodEnd,
+    }),
+    providerModifiedAt: snapshot.lastModified ?? null,
   };
   const applied = await deps.applySnapshot(input);
 
+  // A snapshot older than the stored one is refused by the database; the
+  // stored state is what the negócio has.
   return {
     ok: true,
-    status: snapshot.status,
+    status: applied.subscriptionStatus,
     effectivePlan: applied.effectivePlan,
   };
 }

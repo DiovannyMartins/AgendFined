@@ -22,7 +22,7 @@
 // path that makes a business Pro, and a missing/invalid status fails closed.
 import type { SubscriptionStatus } from "./types";
 import { refuseUnacceptedCheckout, type CheckoutTermsRefusal } from "./checkout-terms";
-import { graceEnd } from "./grace";
+import { snapshotGraceEnd } from "./grace";
 
 // The current state of a preapproval, as read from the provider (`GET
 // /preapproval/{id}`). `externalReference` is the caller's `external_reference`,
@@ -39,6 +39,8 @@ export interface PreapprovalResource {
   currencyId: string | null;
   frequency: number | null;
   frequencyType: string | null;
+  // The provider's `last_modified`: the version of this snapshot.
+  lastModified?: string | null;
 }
 
 export interface WebhookEvent {
@@ -57,7 +59,13 @@ export interface SubscriptionForWebhook {
 export interface AppliedSubscriptionSnapshot {
   subscriptionId: string;
   businessId: string;
+  // The status the row has after the call, and the one it had before it, read
+  // under the row lock.
   subscriptionStatus: SubscriptionStatus;
+  previousStatus: SubscriptionStatus;
+  // False when the snapshot is older than the one already stored: nothing was
+  // written and the result describes the stored state.
+  applied: boolean;
   isCurrent: boolean;
   effectivePlan: "free" | "pro";
   effectiveGracePeriodEnd: string | null;
@@ -71,6 +79,9 @@ export interface ApplySubscriptionSnapshotInput {
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
   gracePeriodEnd: string | null;
+  // The provider's `last_modified` of the snapshot; an older one than the
+  // stored version is ignored. Absent, the snapshot is always applied.
+  providerModifiedAt?: string | null;
   // Repoint the negócio at this subscription, compare-and-swap against the
   // current one read before the call.
   makeCurrent?: { expectedCurrentSubscriptionId: string | null };
@@ -108,7 +119,7 @@ export interface HandleWebhookDeps {
 }
 
 export type HandleWebhookResult =
-  | { ok: true; applied: "authorized" | "duplicate" | "stale_price" | "unexpected_terms" | "grace" | "closed" | "pending" | "ignored" }
+  | { ok: true; applied: "authorized" | "duplicate" | "stale_price" | "unexpected_terms" | "grace" | "closed" | "pending" | "stale" | "ignored" }
   | { ok: false; code: string; message: string };
 
 // The `type` values Mercado Pago sends for a preapproval (subscription)
@@ -174,18 +185,14 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
   // closing it (e.g. a superseded checkout cancelled below) keeps no grace.
   const closedUnpaid =
     sub.status === "pending" && (preapproval.status === "paused" || preapproval.status === "cancelled");
-  let gracePeriodEnd: string | null = null;
-  if (!closedUnpaid && (preapproval.status === "paused" || preapproval.status === "cancelled")) {
-    const existingGrace = sub.gracePeriodEnd ? new Date(sub.gracePeriodEnd) : null;
-    // Only a cancellation of an assinatura still authorized locally keeps the
-    // paid month; after a failed payment the next charge date was never paid.
-    const paidPeriodEnd =
-      preapproval.status === "cancelled" && sub.status === "authorized" ? preapproval.currentPeriodEnd : null;
-    gracePeriodEnd =
-      existingGrace && existingGrace.getTime() > now.getTime()
-        ? existingGrace.toISOString()
-        : graceEnd({ now, graceDays: deps.graceDays, paidPeriodEnd });
-  }
+  const gracePeriodEnd = snapshotGraceEnd({
+    now,
+    graceDays: deps.graceDays,
+    localStatus: sub.status,
+    existingGracePeriodEnd: sub.gracePeriodEnd,
+    snapshotStatus: preapproval.status,
+    snapshotPeriodEnd: preapproval.currentPeriodEnd,
+  });
 
   let superseded: SubscriptionForWebhook[] = [];
   let duplicate = false;
@@ -211,9 +218,13 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
       currentPeriodStart: preapproval.currentPeriodStart,
       currentPeriodEnd: preapproval.currentPeriodEnd,
       gracePeriodEnd,
+      providerModifiedAt: preapproval.lastModified ?? null,
       ...(makeCurrent ? { makeCurrent } : {}),
     });
     appliedSnapshot = applied;
+    // A newer snapshot was already applied; its own notification carries the
+    // side effects of the state it wrote.
+    if (!applied.applied) return { ok: true, applied: "stale" };
 
     if (duplicate) {
       superseded = [sub];
@@ -229,11 +240,13 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
   }
 
   // Only the first `paused` of a paid, current assinatura is news to the dono:
-  // a repeated notification finds the row already paused.
+  // a repeated notification finds the row already paused. The status before
+  // the write is read under the row lock, so concurrent deliveries of the same
+  // `paused` tell the dono once.
   const noticeGraceEnd = appliedSnapshot.effectiveGracePeriodEnd ?? gracePeriodEnd;
   if (
     preapproval.status === "paused" &&
-    sub.status === "authorized" &&
+    appliedSnapshot.previousStatus === "authorized" &&
     noticeGraceEnd &&
     appliedSnapshot.isCurrent &&
     appliedSnapshot.effectivePlan === "pro" &&

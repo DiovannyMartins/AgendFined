@@ -83,6 +83,14 @@ async function putPreapproval(url: string, accessToken: string, body: unknown, o
   }
 }
 
+// The provider's `last_modified`, as an ISO instant, or null when absent or
+// unreadable. It versions the snapshot so an older read is never applied over
+// a newer one (apply_subscription_snapshot).
+function providerTimestamp(value: string | null | undefined): string | null {
+  const ms = value ? Date.parse(value) : Number.NaN;
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+}
+
 export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingProvider {
   const apiBaseUrl = config.apiBaseUrl ?? DEFAULT_API_BASE_URL;
 
@@ -175,6 +183,7 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
         status?: string;
         external_reference?: string | null;
         next_payment_date?: string | null;
+        last_modified?: string | null;
         auto_recurring?: {
           start_date?: string | null;
           transaction_amount?: number | null;
@@ -206,6 +215,7 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
         currencyId: body.auto_recurring?.currency_id ?? null,
         frequency: typeof body.auto_recurring?.frequency === "number" ? body.auto_recurring.frequency : null,
         frequencyType: body.auto_recurring?.frequency_type ?? null,
+        lastModified: providerTimestamp(body.last_modified),
       };
     },
 

@@ -502,6 +502,7 @@ export type Database = {
           id: string
           mp_preapproval_id: string
           plan: Database["public"]["Enums"]["business_plan"]
+          provider_modified_at: string | null
           status: Database["public"]["Enums"]["subscription_status"]
           updated_at: string
         }
@@ -514,6 +515,7 @@ export type Database = {
           id?: string
           mp_preapproval_id: string
           plan?: Database["public"]["Enums"]["business_plan"]
+          provider_modified_at?: string | null
           status?: Database["public"]["Enums"]["subscription_status"]
           updated_at?: string
         }
@@ -526,6 +528,7 @@ export type Database = {
           id?: string
           mp_preapproval_id?: string
           plan?: Database["public"]["Enums"]["business_plan"]
+          provider_modified_at?: string | null
           status?: Database["public"]["Enums"]["subscription_status"]
           updated_at?: string
         }
@@ -914,14 +917,17 @@ export type Database = {
           p_grace_period_end?: string | null
           p_make_current?: boolean
           p_mp_preapproval_id: string
+          p_provider_modified_at?: string | null
           p_status: Database["public"]["Enums"]["subscription_status"]
           p_subscription_id: string
         }
         Returns: {
+          applied: boolean
           business_id: string
           effective_grace_period_end: string | null
           effective_plan: Database["public"]["Enums"]["business_plan"]
           is_current: boolean
+          previous_status: Database["public"]["Enums"]["subscription_status"]
           subscription_id: string
           subscription_status: Database["public"]["Enums"]["subscription_status"]
         }[]

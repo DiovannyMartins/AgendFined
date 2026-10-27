@@ -33,5 +33,5 @@ Verification receives token, expected action, and optional client address. Trust
 ## Other boundaries
 
 - Billing retains stable machine codes and application-owned messages, never upstream error text.
-- Auth supports `code`, or `token_hash` plus supported `type`; other combinations redirect to `{trustedOrigin}/login?error=auth`.
+- Auth supports only the PKCE `code`; any other request (including `token_hash`/`type`) redirects to `{trustedOrigin}/login?error=auth`.
 - All paths receive CSP, HSTS, `nosniff`, frame denial, `no-referrer`, and restrictive permissions policies; Next.js `X-Powered-By` is disabled.

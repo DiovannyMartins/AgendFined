@@ -18,10 +18,19 @@ export type ServerClient = SupabaseClient<Database>;
 // its own: refused attempts (horário ocupado, fora da janela) from a crowd at
 // the opening of a new agenda, or from a few IPs on purpose, must not lock every
 // other cliente out of the negócio (#188).
+//
+// perIpPublicWrite caps one IP across every negócio and both kinds, so the
+// per-negócio budget does not grow with the number of negócios picked; it stays
+// well above what a cliente (or a few on one CGNAT address) books in 15 min.
+// perRecipientEmail caps the e-mails a public write sends to one address in a
+// day; past it the write still happens and only the e-mail is skipped, so
+// nobody can lock a cliente out of booking by spending their address.
 export const RATE_LIMIT = {
+  perIpPublicWrite: { limit: 20, windowSeconds: 60 * 15 },
   perIpPerBusiness: { limit: 8, windowSeconds: 60 * 15 },
   perBusiness: { limit: 60, windowSeconds: 60 * 15 },
   perBusinessWaitlist: { limit: 60, windowSeconds: 60 * 15 },
+  perRecipientEmail: { limit: 10, windowSeconds: 60 * 60 * 24 },
 } as const;
 
 export type PublicWriteKind = "booking" | "waitlist";
@@ -76,6 +85,24 @@ export const BILLING_CHECKOUT_RATE_LIMIT = {
   perBusinessShort: { limit: 5, windowSeconds: 15 * 60 },
   perBusinessDaily: { limit: 20, windowSeconds: 24 * 60 * 60 },
 } as const;
+
+// E-mails the dono's actions send to a cliente (reserva pelo painel,
+// remarcação, cancelamento, aviso e conversão da lista de espera) go out from
+// the AgendFined sender, so they share one budget per negócio. Sized well
+// above a busy agenda (a full day of reservas, remarcações and cancelamentos);
+// past it the action still goes through and the dono warns the cliente by
+// WhatsApp, as when the e-mail fails.
+export const OWNER_EMAIL_RATE_LIMIT = {
+  perBusinessHourly: { limit: 40, windowSeconds: 60 * 60 },
+  perBusinessDaily: { limit: 200, windowSeconds: 24 * 60 * 60 },
+} as const;
+
+export type OwnerEmailKind =
+  | "booking_confirmation"
+  | "reschedule"
+  | "cancellation"
+  | "waitlist_slot_freed"
+  | "waitlist_conversion";
 
 function isValidIp(value: string): boolean {
   return value.length <= 64 && isIP(value) !== 0;
@@ -185,8 +212,25 @@ export async function enforceBillingCheckoutRateLimit(
   ]);
 }
 
+// Spends one e-mail of the negócio's budget; true while within it. Throws when
+// the counter fails, so the caller can skip the e-mail (fail closed). Call it
+// with the admin client: the RPC is service_role only.
+export async function enforceOwnerEmailRateLimit(
+  supabase: ServerClient,
+  businessId: string,
+  kind: OwnerEmailKind,
+): Promise<boolean> {
+  const allowed = await enforceWindows(supabase, [
+    { key: `business:${businessId}|owner_email|1h`, ...OWNER_EMAIL_RATE_LIMIT.perBusinessHourly },
+    { key: `business:${businessId}|owner_email|24h`, ...OWNER_EMAIL_RATE_LIMIT.perBusinessDaily },
+  ]);
+  if (!allowed) console.warn("owner_email_rate_limited", { businessId, kind });
+  return allowed;
+}
+
 export function buildRateKeys(ip: string, businessId: string, kind: PublicWriteKind) {
   return {
+    perIpGlobal: { key: `ip:${ip}|public-write`, ...RATE_LIMIT.perIpPublicWrite },
     perIp: { key: `ip:${ip}|business:${businessId}`, ...RATE_LIMIT.perIpPerBusiness },
     perBusiness: buildBusinessWriteWindow(businessId, kind),
   } as const;
@@ -199,16 +243,16 @@ function buildBusinessWriteWindow(businessId: string, kind: PublicWriteKind) {
 }
 
 // Returns true when the attempt is still within limits. Spends the per-IP
-// counter and only reads the business-wide one: recordPublicWrite spends it
-// once the reserva or entrada is written.
+// counters (global first) and only reads the business-wide one:
+// recordPublicWrite spends it once the reserva or entrada is written.
 export async function enforceRateLimit(
   supabase: ServerClient,
   ip: string,
   businessId: string,
   kind: PublicWriteKind,
 ): Promise<boolean> {
-  const { perIp, perBusiness } = buildRateKeys(ip, businessId, kind);
-  if (!await enforceWindows(supabase, [perIp])) return false;
+  const { perIpGlobal, perIp, perBusiness } = buildRateKeys(ip, businessId, kind);
+  if (!await enforceWindows(supabase, [perIpGlobal, perIp])) return false;
 
   const { data, error } = await supabase.rpc("peek_booking_rate_limit", {
     p_key: perBusiness.key,
@@ -245,6 +289,20 @@ export async function recordPublicWrite(
     reason = error instanceof Error ? error.message : "unknown";
   }
   if (reason !== null) console.error("public_write_rate_limit_record_failed", { businessId, kind, reason });
+}
+
+// Spends one e-mail of the address's daily budget and tells whether the
+// confirmação (or entrada) e-mail may go out. Never throws: when the counter
+// is unavailable the e-mail is skipped and the write stands.
+export async function allowPublicWriteEmail(supabase: ServerClient, email: string): Promise<boolean> {
+  const key = `email:${hashIdentifier(email.trim().toLowerCase())}|public-write`;
+  try {
+    return await enforceWindows(supabase, [{ key, ...RATE_LIMIT.perRecipientEmail }]);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : (error as { message?: string })?.message ?? "unknown";
+    console.error("public_write_email_rate_limit_failed", { reason });
+    return false;
+  }
 }
 
 // Consultation is keyed only on the client IP (no business scope — the caller is

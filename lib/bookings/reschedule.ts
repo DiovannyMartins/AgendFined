@@ -9,6 +9,7 @@ import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { isOutsideAvailability, listOwnerFreeSlots, resolveOwnerStart } from "@/lib/bookings/owner-slots";
 import { buildPublicConfirmationUrl } from "@/lib/bookings/public-booking-url";
 import { sendBusinessRescheduledEmail } from "@/lib/email/booking-reschedule";
+import { spendOwnerEmail } from "@/lib/email/owner-email-budget";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
 import { resolveAppOrigin } from "@/lib/app-origin";
 
@@ -157,8 +158,16 @@ export async function rescheduleOwnerBooking(
     };
   }
 
-  // Best effort, like the cancellation e-mail: a delivery failure never undoes
-  // the remarcação, the dono is told to warn the cliente instead.
+  // Best effort, like the cancellation e-mail: a delivery failure (or the
+  // negócio's e-mail budget spent) never undoes the remarcação, the dono is
+  // told to warn the cliente instead.
+  const emailNotSent: OwnerRescheduleResult = {
+    ...done,
+    notifyByWhatsApp: true,
+    message: "Reserva remarcada, mas o e-mail não saiu. Avise o novo horário pelo WhatsApp.",
+  };
+  if (!await spendOwnerEmail(business.id, "reschedule")) return emailNotSent;
+
   const emailResult = await sendBusinessRescheduledEmail({
     customerName: moved.customer_name_snapshot,
     customerEmail: moved.customer_email_snapshot,
@@ -173,11 +182,7 @@ export async function rescheduleOwnerBooking(
   });
   if (!emailResult.sent) {
     console.error("booking_reschedule_email_failed", { bookingId: moved.id, reason: emailResult.reason });
-    return {
-      ...done,
-      notifyByWhatsApp: true,
-      message: "Reserva remarcada, mas o e-mail não saiu. Avise o novo horário pelo WhatsApp.",
-    };
+    return emailNotSent;
   }
   return { ...done, message: `Reserva remarcada. O cliente foi avisado por e-mail (${moved.customer_email_snapshot}).` };
 }

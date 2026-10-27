@@ -58,6 +58,18 @@ describe("buildCustomerIcs", () => {
     );
   });
 
+  it("writes a single VEVENT with only CRLF terminators when the names carry line breaks", () => {
+    const ics = buildCustomerIcs(
+      { ...booking, service_name: "Corte\rBarba", business_name: "Barbearia\u2028Demo\u0085Centro" },
+      ORIGIN,
+    );
+    const lines = unfold(ics);
+
+    expect(ics.replace(/\r\n/g, "")).not.toMatch(/[\p{Cc}\u2028\u2029]/u);
+    expect(lines.filter((line) => line === "BEGIN:VEVENT")).toHaveLength(1);
+    expect(lines).toContain("SUMMARY:Corte\\nBarba — Barbearia\\nDemo\\nCentro");
+  });
+
   it("never carries the token de cancelamento or a confirmation link", () => {
     const ics = buildCustomerIcs(booking, ORIGIN);
 

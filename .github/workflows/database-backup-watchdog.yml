@@ -17,13 +17,19 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          latest=$(gh run list \
-            --repo "$GITHUB_REPOSITORY" \
-            --workflow database-backup.yml \
-            --status success \
-            --limit 1 \
-            --json createdAt \
-            --jq '.[0].createdAt // empty')
+          set -euo pipefail
+          # Only scheduled or manually dispatched runs of the backup workflow,
+          # on the default branch of this same repository, count as fresh.
+          default_branch=$(gh api "repos/$GITHUB_REPOSITORY" --jq .default_branch)
+          latest=$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/database-backup.yml/runs?branch=$default_branch&status=success&per_page=50" \
+            | jq -r --arg repo "$GITHUB_REPOSITORY" '
+              [.workflow_runs[]
+                | select(.event == "schedule" or .event == "workflow_dispatch")
+                | select(.repository.full_name == $repo and .head_repository.full_name == $repo)
+                | select(.path == ".github/workflows/database-backup.yml")
+                | .created_at]
+              | max // empty')
 
           if [ -z "$latest" ]; then
             echo "::error::No successful encrypted database backup found."

@@ -88,3 +88,40 @@ describe("buildIcsFeed (export de várias reservas do dono)", () => {
     expect(feed).toContain("UID:agendfined-20260901T200000Z-Corte de cabelo");
   });
 });
+
+describe("quebras de linha e caracteres de controle nos textos", () => {
+  // Every line break a reserva text can carry: CRLF, a lone CR or LF, NEL and
+  // the Unicode line/paragraph separators, plus other control characters.
+  const messy = "Ana\r\nSilva\rObs\nlinha\u0085nel\u2028ls\u2029ps\u0000nul\u0007bel\u001besc\u007fdel\ttab";
+
+  // Outside the CRLF that separates content lines there is no control
+  // character nor Unicode line break left.
+  function expectOnlyCrlfTerminators(ics: string) {
+    expect(ics.replace(/\r\n/g, "")).not.toMatch(/[\p{Cc}\u2028\u2029]/u);
+  }
+
+  it("escapes every line terminator as \\n and drops the other control characters", () => {
+    const ics = buildIcsString({ ...booking, uid: messy, summary: messy, description: messy, location: messy });
+    const lines = ics.replace(/\r\n /g, "").split("\r\n");
+
+    expectOnlyCrlfTerminators(ics);
+    const expected = "Ana\\nSilva\\nObs\\nlinha\\nnel\\nls\\npsnulbelescdel tab";
+    expect(lines).toContain(`SUMMARY:${expected}`);
+    expect(lines).toContain(`DESCRIPTION:${expected}`);
+    expect(lines).toContain(`LOCATION:${expected}`);
+    expect(lines).toContain(`UID:${expected}@agendfined`);
+  });
+
+  it("keeps one VEVENT per reserva in the feed whatever the texts carry", () => {
+    const feed = buildIcsFeed([
+      { ...booking, uid: "r1", summary: `Corte — ${messy}`, description: `Observação: ${messy}` },
+      { ...booking, uid: "r2", summary: "Barba\rEND:VEVENT\rBEGIN:VEVENT", description: "a\u2028b" },
+    ]);
+    const lines = feed.replace(/\r\n /g, "").split("\r\n");
+
+    expectOnlyCrlfTerminators(feed);
+    expect(lines.filter((line) => line === "BEGIN:VEVENT")).toHaveLength(2);
+    expect(lines.filter((line) => line === "END:VEVENT")).toHaveLength(2);
+    expect(lines).toContain("SUMMARY:Barba\\nEND:VEVENT\\nBEGIN:VEVENT");
+  });
+});

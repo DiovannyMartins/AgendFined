@@ -13,6 +13,7 @@ const { state, sendBookingConfirmationEmail, sendWaitlistSlotFreedEmail } = vi.h
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/supabase/admin", () => import("@/tests/mocks/rate-limit-admin"));
 vi.mock("@/lib/bookings/classification", () => ({ classifyOperationalError: vi.fn(async () => null) }));
 vi.mock("@/lib/email/booking-confirmation", () => ({ sendBookingConfirmationEmail }));
 vi.mock("@/lib/email/waitlist-slot-freed", () => ({ sendWaitlistSlotFreedEmail }));
@@ -44,6 +45,8 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import { convertWaitlistEntry, notifyWaitlistEntry } from "./actions";
+import { OWNER_EMAIL_RATE_LIMIT } from "@/lib/booking/rate-limit";
+import { rateLimitAdmin } from "@/tests/mocks/rate-limit-admin";
 
 const START_AT = "2026-10-27T16:00:00.000Z";
 
@@ -86,6 +89,7 @@ beforeEach(() => {
   state.serviceName = "Corte";
   sendBookingConfirmationEmail.mockClear().mockResolvedValue({ sent: true });
   sendWaitlistSlotFreedEmail.mockClear().mockResolvedValue({ sent: true });
+  rateLimitAdmin.reset();
 });
 
 afterEach(() => {
@@ -143,6 +147,20 @@ describe("notifyWaitlistEntry", () => {
     expect(result).toEqual({ ok: false, message: "Essa entrada não pode ser notificada." });
     expect(sendWaitlistSlotFreedEmail).not.toHaveBeenCalled();
   });
+
+  it("notifies without emailing past the negócio's e-mail budget", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    state.rpcResults.notify_waitlist_entry = { data: entry("bruna@example.com"), error: null };
+    rateLimitAdmin.counts.set("business:business-1|owner_email|1h", OWNER_EMAIL_RATE_LIMIT.perBusinessHourly.limit);
+
+    const result = await notifyWaitlistEntry({ ok: true }, entryForm());
+
+    expect(sendWaitlistSlotFreedEmail).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      ok: true,
+      message: "Não foi possível enviar o e-mail. Avise o cliente pelo telefone ou WhatsApp.",
+    });
+  });
 });
 
 describe("convertWaitlistEntry", () => {
@@ -194,6 +212,33 @@ describe("convertWaitlistEntry", () => {
       publicCode: "58FTBJNV",
       message: "Não foi possível enviar o e-mail. Envie ao cliente o link da confirmação privada.",
     });
+  });
+
+  it("converts without emailing past the negócio's e-mail budget", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    state.rpcResults.convert_waitlist_entry = { data: convertedBooking("bruna@example.com"), error: null };
+    rateLimitAdmin.counts.set("business:business-1|owner_email|24h", OWNER_EMAIL_RATE_LIMIT.perBusinessDaily.limit);
+
+    const result = await convertWaitlistEntry({ ok: true }, entryForm());
+
+    expect(sendBookingConfirmationEmail).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      ok: true,
+      publicCode: "58FTBJNV",
+      message: "Não foi possível enviar o e-mail. Envie ao cliente o link da confirmação privada.",
+    });
+    expect(result.cancellationUrl).toBeTruthy();
+  });
+
+  it("converts without emailing when the e-mail counter is unavailable", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    state.rpcResults.convert_waitlist_entry = { data: convertedBooking("bruna@example.com"), error: null };
+    rateLimitAdmin.failing = true;
+
+    const result = await convertWaitlistEntry({ ok: true }, entryForm());
+
+    expect(sendBookingConfirmationEmail).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ ok: true, publicCode: "58FTBJNV" });
   });
 
   it("sends nothing while the horário is still taken", async () => {

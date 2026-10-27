@@ -29,6 +29,7 @@ import {
   type UtcRange,
 } from "@/lib/booking/availability";
 import {
+  allowPublicWriteEmail,
   enforceRateLimit,
   enforceConsultRateLimit,
   getClientIp,
@@ -239,12 +240,16 @@ export async function createBooking(input: {
   const customerEmail = parsed.data.customerEmail || null;
   let confirmationEmail: ConfirmationEmailStatus = customerEmail ? "failed" : "none";
   if (data?.id && data.public_code) {
+    // Past the address's daily budget the reserva stands and only the e-mail
+    // is skipped: the page reports it as not sent and offers the private link.
+    const emailAllowed = customerEmail ? await allowPublicWriteEmail(admin, customerEmail) : false;
+    if (customerEmail && !emailAllowed) console.warn("booking_confirmation_email_skipped", { bookingId: data.id });
     // The dono hears about the reserva in parallel with the cliente's
     // confirmação; notifyOwner never throws (#146).
     const [emailResult] = await Promise.all([
       // Without an e-mail (#195) there is nothing to send and nothing failed:
       // the confirmation page tells the cliente to keep the private link.
-      customerEmail
+      customerEmail && emailAllowed
         ? sendBookingConfirmationEmail({
             customerName: parsed.data.customerName,
             customerEmail,
@@ -635,8 +640,13 @@ export async function joinWaitlist(input: {
   // An entrada that already belonged to someone else, or was converted, keeps
   // its own digest: the new link would not work, so no e-mail goes out. The
   // answer stays the same, so it does not tell who is on the list.
+  // Past the address's daily budget the entrada stands without the e-mail.
   const customerEmail = parsed.data.customerEmail;
-  if (customerEmail && data.cancel_token_hash === cancelTokenHash) {
+  if (
+    customerEmail &&
+    data.cancel_token_hash === cancelTokenHash &&
+    await allowPublicWriteEmail(supabase, customerEmail)
+  ) {
     await notifyWaitlistJoined(supabase, {
       entryId: data.id,
       customerName: parsed.data.customerName,

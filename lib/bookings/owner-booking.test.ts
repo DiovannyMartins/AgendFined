@@ -16,6 +16,7 @@ const { state, sendBookingConfirmationEmail, syncGoogleCalendarBooking } = vi.ho
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/supabase/admin", () => import("@/tests/mocks/rate-limit-admin"));
 vi.mock("@/lib/email/booking-confirmation", () => ({ sendBookingConfirmationEmail }));
 vi.mock("@/lib/google-calendar/sync", () => ({ syncGoogleCalendarBooking }));
 vi.mock("@/lib/app-origin", () => ({ resolveAppOrigin: () => new URL("https://agendfined.test") }));
@@ -43,6 +44,8 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import { createOwnerBooking, getOwnerSlots } from "./owner-booking";
+import { OWNER_EMAIL_RATE_LIMIT } from "@/lib/booking/rate-limit";
+import { rateLimitAdmin } from "@/tests/mocks/rate-limit-admin";
 
 // 09:10 em São Paulo, sábado 24/10/2026.
 const NOW = new Date("2026-10-24T12:10:00.000Z");
@@ -97,6 +100,7 @@ beforeEach(() => {
   state.lists = { availability: [{ weekday: 2, start_time: "09:00:00", end_time: "18:00:00" }] };
   state.rpcCalls = [];
   state.rpcResult = null;
+  rateLimitAdmin.reset();
 });
 
 afterEach(() => {
@@ -151,6 +155,33 @@ describe("createOwnerBooking (#193)", () => {
     expect(result.ok).toBe(true);
     expect(result.confirmationUrl).toBeTruthy();
     expect(result.message).toContain("Não foi possível enviar o e-mail");
+  });
+
+  it("acima do orçamento de e-mails do negócio, cria a reserva sem enviar e pede o WhatsApp", async () => {
+    const { limit } = OWNER_EMAIL_RATE_LIMIT.perBusinessHourly;
+    for (let sent = 0; sent < limit; sent += 1) {
+      await create(bookingForm({ customerEmail: `cliente${sent}@example.com` }));
+    }
+    expect(sendBookingConfirmationEmail).toHaveBeenCalledTimes(limit);
+    state.rpcCalls = [];
+
+    const result = await create(bookingForm({ customerEmail: "bruna@example.com" }));
+
+    expect(state.rpcCalls.map(({ name }) => name)).toEqual(["create_owner_booking"]);
+    expect(sendBookingConfirmationEmail).toHaveBeenCalledTimes(limit);
+    expect(result).toMatchObject({ ok: true, publicCode: "AB12CD34" });
+    expect(result.confirmationUrl).toBeTruthy();
+    expect(result.message).toBe("Não foi possível enviar o e-mail. Envie o link da confirmação pelo WhatsApp.");
+  });
+
+  it("sem o contador de e-mails, cria a reserva e não envia", async () => {
+    rateLimitAdmin.failing = true;
+
+    const result = await create(bookingForm({ customerEmail: "bruna@example.com" }));
+
+    expect(result).toMatchObject({ ok: true, publicCode: "AB12CD34" });
+    expect(sendBookingConfirmationEmail).not.toHaveBeenCalled();
+    expect(result.message).toContain("WhatsApp");
   });
 
   it("ignora a antecedência do cliente", async () => {

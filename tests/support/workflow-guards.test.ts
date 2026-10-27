@@ -22,9 +22,42 @@ describe("backup restore drill workflow", () => {
   });
 
   it("only trusts the backup workflow on the default branch and always stops the database", () => {
-    expect(drill).toContain("--workflow database-backup.yml");
-    expect(drill).toContain("--status success");
-    expect(drill).toContain("--branch \"${{ github.event.repository.default_branch }}\"");
+    expect(drill).toContain("actions/workflows/database-backup.yml/runs?branch=$default_branch&status=success");
+    expect(drill).toContain('select(.event == "schedule" or .event == "workflow_dispatch")');
+    expect(drill).toContain("select(.repository.full_name == $repo and .head_repository.full_name == $repo)");
+    expect(drill).toContain('select(.path == ".github/workflows/database-backup.yml")');
+    expect(drill).toContain('compare/$candidate_sha...$default_branch');
+    expect(drill).toContain('[ "$relation" = "identical" ] || [ "$relation" = "ahead" ]');
     expect(drill).toMatch(/Stop isolated database\r?\n\s+if: always\(\)/);
+  });
+
+  it("derives backup paths from the run id and validates them before use", () => {
+    expect(drill).toContain('--name "agendfined-db-$run_id"');
+    expect(drill).toContain('public_backup="backup/agendfined-$run_id.sql.gz.aes256gcm"');
+    expect(drill).toContain('auth_backup="backup/agendfined-auth-$run_id.sql.gz.aes256gcm"');
+    expect(drill.split("=~ ^backup/[A-Za-z0-9._/-]+$ ]]").length - 1).toBe(2);
+    expect(drill).toContain('[ "$entries" -eq 2 ]');
+    expect(drill).toContain(">> \"$GITHUB_OUTPUT\"");
+    expect(drill).not.toContain("GITHUB_ENV");
+  });
+
+  it("exposes the encryption key only to the restore step", () => {
+    const keyLines = drill.split(/\r?\n/).filter((line) => line.includes("secrets.BACKUP_ENCRYPTION_KEY"));
+    expect(keyLines).toEqual(["          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}"]);
+    const restoreStep = drill.indexOf("- name: Restore public and Auth dumps");
+    const nextStep = drill.indexOf("- name: Verify restored data");
+    const keyAt = drill.indexOf("secrets.BACKUP_ENCRYPTION_KEY");
+    expect(keyAt).toBeGreaterThan(restoreStep);
+    expect(keyAt).toBeLessThan(nextStep);
+  });
+});
+
+describe("backup freshness watchdog workflow", () => {
+  const watchdog = readFileSync(".github/workflows/database-backup-watchdog.yml", "utf8");
+
+  it("only counts backup runs from this repository's default branch", () => {
+    expect(watchdog).toContain("actions/workflows/database-backup.yml/runs?branch=$default_branch&status=success");
+    expect(watchdog).toContain('select(.event == "schedule" or .event == "workflow_dispatch")');
+    expect(watchdog).toContain("select(.repository.full_name == $repo and .head_repository.full_name == $repo)");
   });
 });

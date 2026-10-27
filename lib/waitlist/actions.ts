@@ -10,6 +10,7 @@ import { buildPrivateConfirmationPath, buildPrivateConfirmationUrl } from "@/lib
 import { buildPublicBookingUrl } from "@/lib/bookings/public-booking-url";
 import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
 import { sendWaitlistSlotFreedEmail } from "@/lib/email/waitlist-slot-freed";
+import { spendOwnerEmail } from "@/lib/email/owner-email-budget";
 import { resolveAppOrigin } from "@/lib/app-origin";
 
 // Server actions for the waitlist management dashboard (issue #22, ADR 0008).
@@ -86,6 +87,8 @@ export async function notifyWaitlistEntry(
   }
 
   const { business } = gate;
+  const emailNotSent = "Não foi possível enviar o e-mail. Avise o cliente pelo telefone ou WhatsApp.";
+  if (!await spendOwnerEmail(business.id, "waitlist_slot_freed")) return { ok: true, message: emailNotSent };
   // The owner's own catálogo, read under RLS like the dashboard list.
   const { data: service } = await supabase
     .from("services")
@@ -105,7 +108,7 @@ export async function notifyWaitlistEntry(
   });
   if (!emailResult.sent) {
     console.error("waitlist_slot_freed_email_failed", { entryId: id, reason: emailResult.reason });
-    return { ok: true, message: "Não foi possível enviar o e-mail. Avise o cliente pelo telefone ou WhatsApp." };
+    return { ok: true, message: emailNotSent };
   }
   return { ok: true, message: `Aviso enviado por e-mail para ${entry.customer_email}.` };
 }
@@ -170,6 +173,9 @@ export async function convertWaitlistEntry(
     return { ...converted, message: "Sem e-mail cadastrado. Envie ao cliente o link da confirmação privada." };
   }
 
+  const emailNotSent = "Não foi possível enviar o e-mail. Envie ao cliente o link da confirmação privada.";
+  if (!await spendOwnerEmail(business.id, "waitlist_conversion")) return { ...converted, message: emailNotSent };
+
   const emailResult = await sendBookingConfirmationEmail({
     customerName: data.customer_name_snapshot,
     customerEmail: data.customer_email_snapshot,
@@ -183,7 +189,7 @@ export async function convertWaitlistEntry(
   });
   if (!emailResult.sent) {
     console.error("booking_confirmation_email_failed", { bookingId: data.id, reason: emailResult.reason });
-    return { ...converted, message: "Não foi possível enviar o e-mail. Envie ao cliente o link da confirmação privada." };
+    return { ...converted, message: emailNotSent };
   }
   return { ...converted, message: `Confirmação enviada por e-mail para ${data.customer_email_snapshot}.` };
 }

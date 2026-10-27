@@ -9,6 +9,7 @@ import { classifyCancellationReason } from "@/lib/bookings/classification";
 import { statusLabel } from "@/lib/bookings/status";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
 import { sendBusinessCancelledEmail } from "@/lib/email/booking-cancellation";
+import { spendOwnerEmail } from "@/lib/email/owner-email-budget";
 import { buildPublicBookingUrl } from "@/lib/bookings/public-booking-url";
 import { resolveAppOrigin } from "@/lib/app-origin";
 
@@ -69,8 +70,11 @@ export async function updateBookingStatus(
   }
 
   // Best effort, like the confirmação por e-mail: a delivery failure never
-  // undoes the cancellation, it is only logged.
-  if (nextStatus === "cancelled" && booking.customer_email_snapshot) {
+  // undoes the cancellation, it is only logged. Past the negócio's e-mail
+  // budget the e-mail is skipped and the dono warns the cliente by WhatsApp.
+  const emailSkipped = nextStatus === "cancelled" && !!booking.customer_email_snapshot
+    && !await spendOwnerEmail(business.id, "cancellation");
+  if (nextStatus === "cancelled" && booking.customer_email_snapshot && !emailSkipped) {
     const emailResult = await sendBusinessCancelledEmail({
       customerName: booking.customer_name_snapshot,
       customerEmail: booking.customer_email_snapshot,
@@ -108,5 +112,8 @@ export async function updateBookingStatus(
 
   revalidatePath("/dashboard/agenda");
   revalidatePath("/dashboard/clientes");
+  if (emailSkipped) {
+    return { ok: true, message: "Reserva cancelada, mas o e-mail não saiu. Avise o cliente pelo WhatsApp." };
+  }
   return { ok: true };
 }

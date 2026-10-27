@@ -77,6 +77,24 @@ export const BILLING_CHECKOUT_RATE_LIMIT = {
   perBusinessDaily: { limit: 20, windowSeconds: 24 * 60 * 60 },
 } as const;
 
+// E-mails the dono's actions send to a cliente (reserva pelo painel,
+// remarcação, cancelamento, aviso e conversão da lista de espera) go out from
+// the AgendFined sender, so they share one budget per negócio. Sized well
+// above a busy agenda (a full day of reservas, remarcações and cancelamentos);
+// past it the action still goes through and the dono warns the cliente by
+// WhatsApp, as when the e-mail fails.
+export const OWNER_EMAIL_RATE_LIMIT = {
+  perBusinessHourly: { limit: 40, windowSeconds: 60 * 60 },
+  perBusinessDaily: { limit: 200, windowSeconds: 24 * 60 * 60 },
+} as const;
+
+export type OwnerEmailKind =
+  | "booking_confirmation"
+  | "reschedule"
+  | "cancellation"
+  | "waitlist_slot_freed"
+  | "waitlist_conversion";
+
 function isValidIp(value: string): boolean {
   return value.length <= 64 && isIP(value) !== 0;
 }
@@ -183,6 +201,22 @@ export async function enforceBillingCheckoutRateLimit(
     { key: `billing:checkout|business:${businessId}|15m`, ...BILLING_CHECKOUT_RATE_LIMIT.perBusinessShort },
     { key: `billing:checkout|business:${businessId}|24h`, ...BILLING_CHECKOUT_RATE_LIMIT.perBusinessDaily },
   ]);
+}
+
+// Spends one e-mail of the negócio's budget; true while within it. Throws when
+// the counter fails, so the caller can skip the e-mail (fail closed). Call it
+// with the admin client: the RPC is service_role only.
+export async function enforceOwnerEmailRateLimit(
+  supabase: ServerClient,
+  businessId: string,
+  kind: OwnerEmailKind,
+): Promise<boolean> {
+  const allowed = await enforceWindows(supabase, [
+    { key: `business:${businessId}|owner_email|1h`, ...OWNER_EMAIL_RATE_LIMIT.perBusinessHourly },
+    { key: `business:${businessId}|owner_email|24h`, ...OWNER_EMAIL_RATE_LIMIT.perBusinessDaily },
+  ]);
+  if (!allowed) console.warn("owner_email_rate_limited", { businessId, kind });
+  return allowed;
 }
 
 export function buildRateKeys(ip: string, businessId: string, kind: PublicWriteKind) {

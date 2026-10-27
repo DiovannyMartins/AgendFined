@@ -22,6 +22,7 @@ const { state, sendBusinessCancelledEmail } = vi.hoisted(() => ({
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/supabase/admin", () => import("@/tests/mocks/rate-limit-admin"));
 vi.mock("@/lib/bookings/classification", () => ({ classifyCancellationReason: vi.fn(async () => null) }));
 vi.mock("@/lib/google-calendar/sync", () => ({ syncGoogleCalendarBooking: vi.fn() }));
 vi.mock("@/lib/email/booking-cancellation", () => ({ sendBusinessCancelledEmail }));
@@ -59,6 +60,8 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import { updateBookingStatus } from "./actions";
+import { OWNER_EMAIL_RATE_LIMIT } from "@/lib/booking/rate-limit";
+import { rateLimitAdmin } from "@/tests/mocks/rate-limit-admin";
 
 const START_AT = "2026-10-19T15:00:00.000Z";
 
@@ -86,6 +89,7 @@ describe("updateBookingStatus", () => {
     state.conflict = false;
     sendBusinessCancelledEmail.mockClear();
     sendBusinessCancelledEmail.mockResolvedValue({ sent: true });
+    rateLimitAdmin.reset();
   });
 
   afterEach(() => {
@@ -202,6 +206,35 @@ describe("updateBookingStatus", () => {
 
     await expect(updateBookingStatus({ ok: true }, statusForm("cancelled"))).resolves.toEqual({ ok: true });
 
+    expect(sendBusinessCancelledEmail).not.toHaveBeenCalled();
+    expect(rateLimitAdmin.counts.size).toBe(0);
+  });
+
+  it("cancels without emailing past the negócio's e-mail budget and asks for WhatsApp", async () => {
+    vi.setSystemTime(new Date("2026-10-17T12:00:00.000Z"));
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { limit } = OWNER_EMAIL_RATE_LIMIT.perBusinessHourly;
+    rateLimitAdmin.counts.set("business:business-1|owner_email|1h", limit);
+
+    const result = await updateBookingStatus({ ok: true }, statusForm("cancelled"));
+
+    expect(result).toEqual({
+      ok: true,
+      message: "Reserva cancelada, mas o e-mail não saiu. Avise o cliente pelo WhatsApp.",
+    });
+    expect(state.booking?.status).toBe("cancelled");
+    expect(sendBusinessCancelledEmail).not.toHaveBeenCalled();
+  });
+
+  it("cancels without emailing when the e-mail counter is unavailable", async () => {
+    vi.setSystemTime(new Date("2026-10-17T12:00:00.000Z"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    rateLimitAdmin.failing = true;
+
+    const result = await updateBookingStatus({ ok: true }, statusForm("cancelled"));
+
+    expect(result.ok).toBe(true);
+    expect(state.booking?.status).toBe("cancelled");
     expect(sendBusinessCancelledEmail).not.toHaveBeenCalled();
   });
 

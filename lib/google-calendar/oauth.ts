@@ -7,6 +7,7 @@ const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
 const TOKEN_CIPHER_SEPARATOR = ".";
+const GCM_TAG_LENGTH = 16;
 
 type GoogleTokenResponse = {
   access_token?: string;
@@ -132,7 +133,13 @@ export function encryptGoogleToken(value: string): string {
 export function decryptGoogleToken(payload: string): string {
   const [ivEncoded, tagEncoded, ciphertextEncoded] = payload.split(TOKEN_CIPHER_SEPARATOR);
   if (!ivEncoded || !tagEncoded || !ciphertextEncoded) throw new Error("GOOGLE_CALENDAR_TOKEN_CIPHERTEXT_INVALID");
-  const decipher = createDecipheriv("aes-256-gcm", encryptionKey(), Buffer.from(ivEncoded, "base64url"));
-  decipher.setAuthTag(Buffer.from(tagEncoded, "base64url"));
+  // GCM accepts a shortened tag unless told its length; every token this app
+  // writes carries the full 16 bytes, so a shorter one is a forgery.
+  const tag = Buffer.from(tagEncoded, "base64url");
+  if (tag.length !== GCM_TAG_LENGTH) throw new Error("GOOGLE_CALENDAR_TOKEN_CIPHERTEXT_INVALID");
+  const decipher = createDecipheriv("aes-256-gcm", encryptionKey(), Buffer.from(ivEncoded, "base64url"), {
+    authTagLength: GCM_TAG_LENGTH,
+  });
+  decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(Buffer.from(ciphertextEncoded, "base64url")), decipher.final()]).toString("utf8");
 }

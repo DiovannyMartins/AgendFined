@@ -156,7 +156,7 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
       );
       let res: Response;
       try {
-        res = await fetch(`${apiBaseUrl}/preapproval/${id}`, {
+        res = await fetch(`${apiBaseUrl}/preapproval/${encodeURIComponent(id)}`, {
           method: "GET",
           headers: {
             Authorization: `Bearer ${config.accessToken}`,
@@ -211,7 +211,7 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
 
     async updatePreapprovalAmount(id: string, amountCents: number): Promise<void> {
       const res = await putPreapproval(
-        `${apiBaseUrl}/preapproval/${id}`,
+        `${apiBaseUrl}/preapproval/${encodeURIComponent(id)}`,
         config.accessToken,
         { auto_recurring: { transaction_amount: amountCents / 100, currency_id: "BRL" } },
         "preapproval amount update",
@@ -222,7 +222,7 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
 
     async cancelPreapproval(id: string): Promise<void> {
       const res = await putPreapproval(
-        `${apiBaseUrl}/preapproval/${id}`,
+        `${apiBaseUrl}/preapproval/${encodeURIComponent(id)}`,
         config.accessToken,
         { status: CANCELLED },
         "preapproval cancel",

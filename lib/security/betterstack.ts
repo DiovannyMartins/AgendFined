@@ -1,3 +1,5 @@
+import "server-only";
+
 const INGESTING_HOST = "s2774229.us-west-2a.betterstackdata.com";
 
 // Better Stack accepts one JSON object per request. Keep the source token only

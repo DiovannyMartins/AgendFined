@@ -57,6 +57,22 @@ describe("checkConfirmationOpening", () => {
     );
   });
 
+  // O roteador decodifica o caminho antes de achar a página, então a forma
+  // codificada abre a mesma confirmação.
+  it.each([
+    "/barbearia/confirma%63ao?code=65925DBB",
+    "/barbearia/%63onfirmacao/evento%2Eics?code=65925DBB",
+    "/barbe%61ria/confirmacao/?code=65925DBB",
+  ])("counts the percent-encoded path %s as an opening", async (path) => {
+    enforceConfirmationRateLimit.mockResolvedValue(false);
+
+    await expect(checkConfirmationOpening(request(path))).resolves.toBe("rate_limited");
+  });
+
+  it("does not throw on a path with a malformed escape", async () => {
+    await expect(checkConfirmationOpening(request("/barbearia/consultar%E0%A4%A?code=65925DBB"))).resolves.toBeNull();
+  });
+
   // Next renders the page for any request that is not a POST carrying the
   // action header, so every such request is an opening.
   it.each([

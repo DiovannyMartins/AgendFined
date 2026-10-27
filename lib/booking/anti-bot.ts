@@ -1,4 +1,10 @@
+import "server-only";
+import { isIP } from "node:net";
+
 export type TurnstileAction = "booking_write" | "booking_consult";
+
+// A siteverify that hangs fails closed instead of holding the request.
+const SITEVERIFY_TIMEOUT_MS = 5000;
 
 type VerifyTurnstileOptions = {
   expectedAction: TurnstileAction;
@@ -40,13 +46,17 @@ export async function verifyTurnstile(
   if (!token) return { ok: false };
 
   const body = new URLSearchParams({ secret, response: token });
-  if (options.remoteIp && options.remoteIp !== "unknown") body.set("remoteip", options.remoteIp);
+  // remoteip is optional. The caller passes the rate-limit subject, which for
+  // IPv6 is the client's /64 and not an address Cloudflare can compare, so only
+  // a plain address (IPv4) is sent.
+  if (options.remoteIp && isIP(options.remoteIp) !== 0) body.set("remoteip", options.remoteIp);
 
   let response: Response;
   try {
     response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
       method: "POST",
       body,
+      signal: AbortSignal.timeout(SITEVERIFY_TIMEOUT_MS),
     });
   } catch {
     return { ok: false };

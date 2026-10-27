@@ -21,6 +21,7 @@
 // in flight. Unmarked failures are retried by the next tick.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { isAuthorizedCronRequest } from "./auth.ts";
 import { buildReminderEmail } from "./email.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -86,8 +87,7 @@ function json(body: unknown, status = 200): Response {
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
-  const auth = req.headers.get("Authorization");
-  if (!CRON_SECRET || auth !== `Bearer ${CRON_SECRET}`) {
+  if (!(await isAuthorizedCronRequest(req.headers.get("Authorization"), CRON_SECRET))) {
     return json({ error: "unauthorized" }, 401);
   }
 

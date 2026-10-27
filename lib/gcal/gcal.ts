@@ -98,7 +98,16 @@ function toGcalUtc(iso: string): string {
   return new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 }
 
-// RFC 5545: escape `\`, `;`, `,` and newlines inside text values.
+// RFC 5545: escape `\`, `;`, `,` and newlines inside text values. Every line
+// break (CRLF, a lone CR or LF, NEL, U+2028, U+2029) becomes `\n`, a tab a
+// space, and the other control characters are dropped, so the only CRLFs in
+// the file are the ones between content lines.
 function escapeText(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\r\n|[\r\n\u0085\u2028\u2029]/g, "\\n")
+    .replace(/\t/g, " ")
+    .replace(/\p{Cc}/gu, "");
 }

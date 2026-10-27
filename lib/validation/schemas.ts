@@ -35,9 +35,22 @@ export const emailSchema = z.string().trim().max(254).email("Informe um e-mail v
 const wholeNumber = (min: number, max: number, message: string) =>
   z.number({ error: message }).int(message).min(min, message).max(max, message);
 
-const descriptionField = z
-  .string()
-  .trim()
+// Names and notes reach the agenda, the e-mails and the .ics. A name stays on
+// one line: each run of line breaks or control characters becomes a space. A
+// multi-line text (observação, descrição) keeps its line breaks as plain LF
+// (CRLF, CR, NEL, U+2028 and U+2029 alike), a tab becomes a space and the other
+// control characters are dropped. Both run before trim and the length checks.
+const toSingleLine = (value: string) => value.replace(/[\p{Cc}\p{Zl}\p{Zp}]+/gu, " ");
+const toPlainLines = (value: string) =>
+  value
+    .replace(/\r\n|[\r\x85\p{Zl}\p{Zp}]/gu, "\n")
+    .replace(/\t/g, " ")
+    .replace(/[^\P{Cc}\n]/gu, "");
+
+const singleLineText = () => z.string().overwrite(toSingleLine).trim();
+const multiLineText = () => z.string().overwrite(toPlainLines).trim();
+
+const descriptionField = multiLineText()
   .max(500, "A descrição não pode passar de 500 caracteres.")
   // nullish: accepts "", null (empty in the form maps to null server-side) and
   // undefined, so the optional description can genuinely be left blank.
@@ -80,9 +93,7 @@ export const brazilianPhoneSchema = z
 export const customerPhoneSchema = brazilianPhoneSchema;
 
 const businessFields = {
-  name: z
-    .string()
-    .trim()
+  name: singleLineText()
     .min(2, "Informe um nome com pelo menos 2 caracteres.")
     .max(100, "O nome não pode passar de 100 caracteres."),
   slug: z
@@ -141,9 +152,7 @@ export const businessFormSchema = z.object({
 export type BusinessFormValues = z.infer<typeof businessFormSchema>;
 
 const serviceFields = {
-  name: z
-    .string()
-    .trim()
+  name: singleLineText()
     .min(2, "Informe um nome com pelo menos 2 caracteres.")
     .max(80, "O nome não pode passar de 80 caracteres."),
   description: descriptionField,
@@ -217,16 +226,14 @@ export type BlockInput = z.infer<typeof blockSchema>;
 export const bookingSchema = z.object({
   serviceId: z.string().uuid(),
   startAt: z.string().datetime(),
-  customerName: z
-    .string()
-    .trim()
+  customerName: singleLineText()
     .min(2, "Informe seu nome completo.")
     .max(100, "O nome não pode passar de 100 caracteres."),
   customerPhone: customerPhoneSchema,
   // Lowercased before it reaches customers.email and the snapshots (#198): the
   // same address typed with another caixa must not look like another cliente.
   customerEmail: z.string().trim().toLowerCase().email("Informe um e-mail válido.").optional().or(z.literal("")),
-  customerNote: z.string().trim().max(500, "A observação não pode passar de 500 caracteres.").optional(),
+  customerNote: multiLineText().max(500, "A observação não pode passar de 500 caracteres.").optional(),
 });
 export type BookingInput = z.infer<typeof bookingSchema>;
 
@@ -278,9 +285,7 @@ export const ownerBookingSchema = z.object({
     .string()
     .min(1, { error: "Escolha o horário.", abort: true })
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Horário inválido."),
-  customerName: z
-    .string()
-    .trim()
+  customerName: singleLineText()
     .min(2, "Informe o nome do cliente.")
     .max(100, "O nome não pode passar de 100 caracteres."),
   customerPhone: z
@@ -296,7 +301,7 @@ export const ownerBookingSchema = z.object({
     .email("Informe um e-mail válido.")
     .optional()
     .or(z.literal("")),
-  customerNote: z.string().trim().max(500, "A observação não pode passar de 500 caracteres.").optional(),
+  customerNote: multiLineText().max(500, "A observação não pode passar de 500 caracteres.").optional(),
 });
 export type OwnerBookingInput = z.infer<typeof ownerBookingSchema>;
 

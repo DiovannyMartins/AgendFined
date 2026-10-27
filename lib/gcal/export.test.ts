@@ -109,6 +109,25 @@ describe("buildGcalExportResult (Pro gate, ADR 0008)", () => {
     }
   });
 
+  it("keeps one VEVENT per reserva when the nome or the observação carries line breaks", async () => {
+    const rows = [
+      { ...upcoming, customer_name_snapshot: "Ana\rSouza", customer_note: "linha 1\r\nlinha 2\u2028linha 3" },
+      { ...upcoming, id: "b2", customer_note: "a\u0085b\rc\u0000d" },
+    ];
+    const result = await buildGcalExportResult(proBusiness, async () => rows, now);
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      const lines = result.icsFeed.replace(/\r\n /g, "").split("\r\n");
+      expect(result.icsFeed.replace(/\r\n/g, "")).not.toMatch(/[\p{Cc}\u2028\u2029]/u);
+      expect(lines.filter((line) => line === "BEGIN:VEVENT")).toHaveLength(2);
+      expect(lines).toContain("SUMMARY:Corte — Ana\\nSouza");
+      expect(lines).toContain(
+        "DESCRIPTION:Cliente: Ana\\nSouza\\nTelefone: (11) 98765-4321\\nObservação: linha 1\\nlinha 2\\nlinha 3",
+      );
+      expect(lines.some((line) => line.endsWith("Observação: a\\nb\\ncd"))).toBe(true);
+    }
+  });
+
   it("keeps the UID when the serviço is renamed, so a reimport does not duplicate", async () => {
     const before = await buildGcalExportResult(proBusiness, async () => [upcoming], now);
     const after = await buildGcalExportResult(proBusiness, async () => [{ ...upcoming, service_name_snapshot: "Corte novo" }], now);

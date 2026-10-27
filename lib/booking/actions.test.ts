@@ -14,6 +14,7 @@ const {
   enforceRateLimit,
   recordPublicWrite,
   allowPublicWriteEmail,
+  allowPublicCapabilityEmail,
 } = vi.hoisted(() => ({
   state: {
     business: null as Record<string, unknown> | null,
@@ -33,6 +34,9 @@ const {
   ),
   recordPublicWrite: vi.fn<(supabase: unknown, businessId: string, kind: string) => Promise<void>>(async () => {}),
   allowPublicWriteEmail: vi.fn<(supabase: unknown, email: string) => Promise<boolean>>(async () => true),
+  allowPublicCapabilityEmail: vi.fn<
+    (supabase: unknown, businessId: string, kind: string, recipientEmail?: string) => Promise<boolean>
+  >(async () => true),
 }));
 
 vi.mock("@/lib/booking/anti-bot", () => ({ verifyTurnstile: async () => ({ ok: true }) }));
@@ -41,6 +45,7 @@ vi.mock("@/lib/booking/rate-limit", () => ({
   enforceRateLimit,
   recordPublicWrite,
   allowPublicWriteEmail,
+  allowPublicCapabilityEmail,
   enforceConsultRateLimit: vi.fn(async () => true),
 }));
 vi.mock("@/lib/bookings/classification", () => ({
@@ -785,6 +790,19 @@ describe("cancelPublicBooking", () => {
     expect(emailInput).not.toContain(token);
     expect(emailInput).not.toContain("confirmacao");
     expect(emailInput).not.toContain("Imprevisto");
+  });
+
+  it("cancels without e-mailing anyone when the negócio's budget for these e-mails is spent", async () => {
+    allowPublicCapabilityEmail.mockResolvedValue(false);
+
+    const result = await cancelPublicBooking({ status: "idle" }, cancelForm());
+
+    expect(result).toEqual({ status: "done" });
+    expect(allowPublicCapabilityEmail).toHaveBeenCalledWith(expect.anything(), "business-1", "cancellation", "maria@example.com");
+    expect(allowPublicCapabilityEmail).toHaveBeenCalledWith(expect.anything(), "business-1", "cancellation");
+    expect(sendCustomerCancelledEmail).not.toHaveBeenCalled();
+    expect(notifyOwner).not.toHaveBeenCalled();
+    allowPublicCapabilityEmail.mockResolvedValue(true);
   });
 
   it("does not e-mail when the reserva has no customer e-mail", async () => {

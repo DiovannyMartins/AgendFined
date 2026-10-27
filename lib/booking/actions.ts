@@ -29,6 +29,7 @@ import {
   type UtcRange,
 } from "@/lib/booking/availability";
 import {
+  allowPublicCapabilityEmail,
   allowPublicWriteEmail,
   enforceRateLimit,
   enforceConsultRateLimit,
@@ -497,7 +498,15 @@ async function notifyCancellation(
       .maybeSingle();
     if (!business) return logFailure("business_not_found");
 
-    const customerEmail = cancelled.customer_email_snapshot;
+    // A cancellation happens once per reserva, but its e-mails still share the
+    // negócio's budget for the private-link flows with the remarcação.
+    const snapshotEmail = cancelled.customer_email_snapshot;
+    const customerEmail =
+      snapshotEmail &&
+      (await allowPublicCapabilityEmail(supabase, cancelled.business_id, "cancellation", snapshotEmail))
+        ? snapshotEmail
+        : null;
+    const emailOwner = await allowPublicCapabilityEmail(supabase, cancelled.business_id, "cancellation");
     const [emailResult] = await Promise.all([
       customerEmail
         ? sendCustomerCancelledEmail({
@@ -512,17 +521,19 @@ async function notifyCancellation(
             businessPhone: business.phone,
           })
         : null,
-      notifyOwner(supabase, "customer_cancelled", {
-        bookingId: cancelled.id,
-        ownerId: business.owner_id,
-        businessName: business.name,
-        customerName: cancelled.customer_name_snapshot,
-        customerPhone: cancelled.customer_phone_snapshot,
-        serviceName: cancelled.service_name_snapshot,
-        startAt: cancelled.start_at,
-        timezone: business.timezone,
-        publicCode: cancelled.public_code,
-      }),
+      emailOwner
+        ? notifyOwner(supabase, "customer_cancelled", {
+            bookingId: cancelled.id,
+            ownerId: business.owner_id,
+            businessName: business.name,
+            customerName: cancelled.customer_name_snapshot,
+            customerPhone: cancelled.customer_phone_snapshot,
+            serviceName: cancelled.service_name_snapshot,
+            startAt: cancelled.start_at,
+            timezone: business.timezone,
+            publicCode: cancelled.public_code,
+          })
+        : null,
     ]);
     if (emailResult && !emailResult.sent) logFailure(emailResult.reason);
   } catch {

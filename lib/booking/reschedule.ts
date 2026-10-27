@@ -13,7 +13,13 @@ import {
   weekdayOf,
   zonedTimeToUtc,
 } from "@/lib/booking/availability";
-import { enforceAvailabilityRateLimit, enforceConsultRateLimit, getClientIp } from "@/lib/booking/rate-limit";
+import {
+  allowPublicCapabilityEmail,
+  enforceAvailabilityRateLimit,
+  enforceConsultRateLimit,
+  enforcePublicRescheduleLimit,
+  getClientIp,
+} from "@/lib/booking/rate-limit";
 import { getEffectiveBookingWindowDays, type Plan } from "@/lib/plan/plan";
 import { sendCustomerRescheduledEmail } from "@/lib/email/booking-reschedule";
 import { notifyOwner } from "@/lib/bookings/owner-notification";
@@ -41,6 +47,7 @@ export type PublicRescheduleState =
         | "INVALID_TOKEN"
         | "VALIDATION"
         | "RATE_LIMITED"
+        | "RESCHEDULE_LIMIT"
         | "ALREADY_STARTED"
         | "SLOT_TAKEN"
         | "SAME_START"
@@ -231,6 +238,22 @@ export async function reschedulePublicBooking(
   }
   if (!available.includes(startTime)) return SLOT_TAKEN;
 
+  // Spent only for a horário that passed every check above, so a cliente
+  // trying taken horários does not lose a remarcação.
+  let withinLimit: boolean;
+  try {
+    withinLimit = await enforcePublicRescheduleLimit(admin, context.booking.id);
+  } catch {
+    withinLimit = false;
+  }
+  if (!withinLimit) {
+    return {
+      status: "error",
+      code: "RESCHEDULE_LIMIT",
+      message: "Esta reserva já foi remarcada várias vezes hoje. Para mudar de novo, fale com o negócio.",
+    };
+  }
+
   const startAt = zonedTimeToUtc(date, startTime, context.business.timezone);
   const { data: moved, error } = await admin.rpc("reschedule_booking_by_public_code", {
     p_code: parsedCode.data,
@@ -253,7 +276,8 @@ export async function reschedulePublicBooking(
 }
 
 // E-mails the cliente (when the reserva has an e-mail) and tells the dono
-// (#146). Best effort: no failure here ever undoes the remarcação.
+// (#146), within the e-mail budget of the private-link flows. Best effort: no
+// failure here ever undoes the remarcação.
 async function notifyReschedule(
   admin: ServerClient,
   moved: Database["public"]["Tables"]["bookings"]["Row"],
@@ -270,7 +294,12 @@ async function notifyReschedule(
       .maybeSingle();
     if (!business) return logFailure("business_not_found");
 
-    const customerEmail = moved.customer_email_snapshot;
+    const snapshotEmail = moved.customer_email_snapshot;
+    const customerEmail =
+      snapshotEmail && (await allowPublicCapabilityEmail(admin, moved.business_id, "reschedule", snapshotEmail))
+        ? snapshotEmail
+        : null;
+    const emailOwner = await allowPublicCapabilityEmail(admin, moved.business_id, "reschedule");
     const [emailResult] = await Promise.all([
       customerEmail
         ? sendCustomerRescheduledEmail({
@@ -286,18 +315,20 @@ async function notifyReschedule(
             businessPhone: business.phone,
           })
         : null,
-      notifyOwner(admin, "customer_rescheduled", {
-        bookingId: moved.id,
-        ownerId: business.owner_id,
-        businessName: business.name,
-        customerName: moved.customer_name_snapshot,
-        customerPhone: moved.customer_phone_snapshot,
-        serviceName: moved.service_name_snapshot,
-        startAt: moved.start_at,
-        timezone: business.timezone,
-        publicCode: moved.public_code,
-        previousStartAt,
-      }),
+      emailOwner
+        ? notifyOwner(admin, "customer_rescheduled", {
+            bookingId: moved.id,
+            ownerId: business.owner_id,
+            businessName: business.name,
+            customerName: moved.customer_name_snapshot,
+            customerPhone: moved.customer_phone_snapshot,
+            serviceName: moved.service_name_snapshot,
+            startAt: moved.start_at,
+            timezone: business.timezone,
+            publicCode: moved.public_code,
+            previousStartAt,
+          })
+        : null,
     ]);
     if (emailResult && !emailResult.sent) logFailure(emailResult.reason);
   } catch {

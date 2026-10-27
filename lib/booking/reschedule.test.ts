@@ -11,6 +11,8 @@ const { state, mocks } = vi.hoisted(() => ({
     rpcCalls: [] as { name: string; args: Record<string, unknown> }[],
     rpcResult: null as RpcResult | null,
     allowed: true,
+    // Counters of check_booking_rate_limit, by key, as the RPC keeps them.
+    counters: new Map<string, number>(),
   },
   mocks: {
     sendCustomerRescheduledEmail: vi.fn(async () => ({ sent: true as const })),
@@ -23,7 +25,8 @@ vi.mock("@/lib/email/booking-reschedule", () => ({ sendCustomerRescheduledEmail:
 vi.mock("@/lib/bookings/owner-notification", () => ({ notifyOwner: mocks.notifyOwner }));
 vi.mock("@/lib/google-calendar/sync", () => ({ syncGoogleCalendarBooking: mocks.syncGoogleCalendarBooking }));
 vi.mock("@/lib/app-origin", () => ({ resolveAppOrigin: () => new URL("https://agendfined.test") }));
-vi.mock("@/lib/booking/rate-limit", () => ({
+vi.mock("@/lib/booking/rate-limit", async (importActual) => ({
+  ...(await importActual<typeof import("@/lib/booking/rate-limit")>()),
   getClientIp: async () => "203.0.113.7",
   enforceConsultRateLimit: async () => state.allowed,
   enforceAvailabilityRateLimit: async () => state.allowed,
@@ -50,6 +53,12 @@ vi.mock("@/lib/supabase/admin", () => ({
       return query;
     },
     rpc: async (name: string, args: Record<string, unknown>) => {
+      if (name === "check_booking_rate_limit") {
+        const key = String(args.p_key);
+        const count = (state.counters.get(key) ?? 0) + 1;
+        state.counters.set(key, count);
+        return { data: count <= Number(args.p_limit), error: null };
+      }
       state.rpcCalls.push({ name, args });
       return state.rpcResult ?? { data: moved(args), error: null };
     },
@@ -58,6 +67,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 import { getPublicRescheduleSlots, reschedulePublicBooking } from "./reschedule";
 import { hashCancelToken } from "@/lib/bookings/cancel";
+import { PUBLIC_CAPABILITY_RATE_LIMIT, RATE_LIMIT } from "@/lib/booking/rate-limit";
 
 // 09:10 em São Paulo, sábado 24/10/2026.
 const NOW = new Date("2026-10-24T12:10:00.000Z");
@@ -120,6 +130,7 @@ beforeEach(() => {
   state.rpcCalls = [];
   state.rpcResult = null;
   state.allowed = true;
+  state.counters = new Map();
 });
 
 afterEach(() => {
@@ -192,6 +203,54 @@ describe("reschedulePublicBooking (#194)", () => {
     state.allowed = false;
     expect(await reschedule(form())).toMatchObject({ code: "RATE_LIMITED" });
     expect(state.rpcCalls).toHaveLength(0);
+  });
+
+  it("recusa a remarcação além do limite diário da reserva, sem mover nem enviar e-mails", async () => {
+    const { limit } = PUBLIC_CAPABILITY_RATE_LIMIT.reschedulesPerBooking;
+    for (let move = 0; move < limit; move += 1) {
+      expect((await reschedule(form())).status).toBe("done");
+    }
+    vi.clearAllMocks();
+    state.rpcCalls = [];
+
+    const result = await reschedule(form());
+
+    expect(result).toMatchObject({ status: "error", code: "RESCHEDULE_LIMIT" });
+    expect(state.rpcCalls).toHaveLength(0);
+    expect(mocks.sendCustomerRescheduledEmail).not.toHaveBeenCalled();
+    expect(mocks.notifyOwner).not.toHaveBeenCalled();
+    // Counted per reserva: another reserva of the negócio still moves.
+    state.singles.bookings = booking({ id: "booking-2" });
+    expect((await reschedule(form())).status).toBe("done");
+  });
+
+  it("não gasta o limite da reserva com um horário recusado antes do banco", async () => {
+    expect(await reschedule(form({ startTime: "17:30" }))).toMatchObject({ code: "SLOT_TAKEN" });
+    expect(state.counters.get("booking:booking-1|public-reschedule")).toBeUndefined();
+  });
+
+  it("remarca sem enviar e-mails quando o negócio esgotou o orçamento dos fluxos públicos", async () => {
+    state.counters.set(
+      "business:business-1|public_capability_email|1h",
+      PUBLIC_CAPABILITY_RATE_LIMIT.emailPerBusinessHourly.limit,
+    );
+
+    expect((await reschedule(form())).status).toBe("done");
+    expect(mocks.sendCustomerRescheduledEmail).not.toHaveBeenCalled();
+    expect(mocks.notifyOwner).not.toHaveBeenCalled();
+  });
+
+  it("gasta um e-mail do orçamento do negócio por envio e respeita o teto do destinatário", async () => {
+    expect((await reschedule(form())).status).toBe("done");
+    expect(state.counters.get("business:business-1|public_capability_email|1h")).toBe(2);
+
+    for (const key of state.counters.keys()) {
+      if (key.endsWith("|public-write")) state.counters.set(key, RATE_LIMIT.perRecipientEmail.limit);
+    }
+    vi.clearAllMocks();
+    expect((await reschedule(form())).status).toBe("done");
+    expect(mocks.sendCustomerRescheduledEmail).not.toHaveBeenCalled();
+    expect(mocks.notifyOwner).toHaveBeenCalledTimes(1);
   });
 
   it("traduz os erros do banco", async () => {

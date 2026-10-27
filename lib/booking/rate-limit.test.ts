@@ -19,6 +19,9 @@ import {
   enforceRateLimit,
   recordPublicWrite,
   allowPublicWriteEmail,
+  allowPublicCapabilityEmail,
+  enforcePublicRescheduleLimit,
+  PUBLIC_CAPABILITY_RATE_LIMIT,
 } from "@/lib/booking/rate-limit";
 import type { Database } from "@/lib/supabase/database-types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -381,6 +384,71 @@ describe("enforceOwnerEmailRateLimit", () => {
     const client = { rpc } as unknown as SupabaseClient<Database>;
 
     await expect(enforceOwnerEmailRateLimit(client, "biz-1", "booking_confirmation")).rejects.toBeTruthy();
+  });
+});
+
+describe("enforcePublicRescheduleLimit", () => {
+  it("allows the reserva's daily remarcações and refuses the next one, per reserva", async () => {
+    const { client, counts } = windowClient();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { limit } = PUBLIC_CAPABILITY_RATE_LIMIT.reschedulesPerBooking;
+
+    for (let move = 0; move < limit; move += 1) {
+      await expect(enforcePublicRescheduleLimit(client, "booking-1")).resolves.toBe(true);
+    }
+
+    await expect(enforcePublicRescheduleLimit(client, "booking-1")).resolves.toBe(false);
+    await expect(enforcePublicRescheduleLimit(client, "booking-2")).resolves.toBe(true);
+    expect(counts.get("booking:booking-1|public-reschedule")).toBe(limit + 1);
+  });
+
+  it("throws when the counter cannot be updated", async () => {
+    const rpc = vi.fn(async () => ({ data: null, error: { message: "boom" } }));
+    const client = { rpc } as unknown as SupabaseClient<Database>;
+
+    await expect(enforcePublicRescheduleLimit(client, "booking-1")).rejects.toBeTruthy();
+  });
+});
+
+describe("allowPublicCapabilityEmail", () => {
+  it("shares one hourly budget of the negócio across kinds and recipients, then skips the next e-mail", async () => {
+    const { client } = windowClient();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { limit } = PUBLIC_CAPABILITY_RATE_LIMIT.emailPerBusinessHourly;
+
+    for (let sent = 0; sent < limit; sent += 1) {
+      await expect(
+        allowPublicCapabilityEmail(client, "biz-1", sent % 2 ? "cancellation" : "reschedule"),
+      ).resolves.toBe(true);
+    }
+
+    await expect(allowPublicCapabilityEmail(client, "biz-1", "reschedule")).resolves.toBe(false);
+    await expect(allowPublicCapabilityEmail(client, "biz-2", "reschedule")).resolves.toBe(true);
+  });
+
+  it("also spends the cliente's address cap when given a recipient", async () => {
+    const { client, counts } = windowClient();
+
+    await expect(allowPublicCapabilityEmail(client, "biz-1", "reschedule", "maria@example.com")).resolves.toBe(true);
+
+    const recipientKey = [...counts.keys()].find((key) => key.endsWith("|public-write"));
+    expect(recipientKey).toMatch(/^email:[0-9a-f]{32}\|public-write$/);
+    counts.set(recipientKey!, RATE_LIMIT.perRecipientEmail.limit);
+    await expect(allowPublicCapabilityEmail(client, "biz-1", "reschedule", "maria@example.com")).resolves.toBe(false);
+    await expect(allowPublicCapabilityEmail(client, "biz-1", "reschedule")).resolves.toBe(true);
+  });
+
+  it("skips the e-mail and logs when the counter fails", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const rpc = vi.fn(async () => ({ data: null, error: { message: "boom" } }));
+    const client = { rpc } as unknown as SupabaseClient<Database>;
+
+    await expect(allowPublicCapabilityEmail(client, "biz-1", "cancellation", "maria@example.com")).resolves.toBe(false);
+    expect(error).toHaveBeenCalledWith("public_capability_email_rate_limit_failed", {
+      businessId: "biz-1",
+      kind: "cancellation",
+      reason: "boom",
+    });
   });
 });
 

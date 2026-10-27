@@ -97,6 +97,23 @@ export const OWNER_EMAIL_RATE_LIMIT = {
   perBusinessDaily: { limit: 200, windowSeconds: 24 * 60 * 60 },
 } as const;
 
+// Remarcação and cancelamento through the private link (ADR 0005, ADR 0010)
+// carry no anti-bot and each sends e-mails to the cliente and to the dono.
+// reschedulesPerBooking caps how often one reserva moves in a day: past it the
+// remarcação is refused and the cliente talks to the negócio, who can still
+// move it from the painel. It is spent before the move, atomically, so
+// parallel requests cannot all slip under it. The e-mails of these flows share
+// one budget per negócio, sized like the dono's (OWNER_EMAIL_RATE_LIMIT); past
+// it, or past the cliente's address cap (RATE_LIMIT.perRecipientEmail), the
+// action still happens and only the e-mail is skipped, as when it fails.
+export const PUBLIC_CAPABILITY_RATE_LIMIT = {
+  reschedulesPerBooking: { limit: 3, windowSeconds: 24 * 60 * 60 },
+  emailPerBusinessHourly: { limit: 40, windowSeconds: 60 * 60 },
+  emailPerBusinessDaily: { limit: 200, windowSeconds: 24 * 60 * 60 },
+} as const;
+
+export type PublicCapabilityEmailKind = "reschedule" | "cancellation";
+
 export type OwnerEmailKind =
   | "booking_confirmation"
   | "reschedule"
@@ -226,6 +243,43 @@ export async function enforceOwnerEmailRateLimit(
   ]);
   if (!allowed) console.warn("owner_email_rate_limited", { businessId, kind });
   return allowed;
+}
+
+// Spends one remarcação of the reserva's daily allowance; true while within
+// it. Throws when the counter fails, so the caller refuses (fail closed).
+export async function enforcePublicRescheduleLimit(supabase: ServerClient, bookingId: string): Promise<boolean> {
+  const allowed = await enforceWindows(supabase, [
+    { key: `booking:${bookingId}|public-reschedule`, ...PUBLIC_CAPABILITY_RATE_LIMIT.reschedulesPerBooking },
+  ]);
+  if (!allowed) console.warn("public_reschedule_rate_limited", { bookingId });
+  return allowed;
+}
+
+// Spends one e-mail of the negócio's budget for the private-link flows and,
+// for the cliente's e-mail, one of the address's daily cap. Never throws: when
+// a counter is unavailable the e-mail is skipped and the action stands.
+export async function allowPublicCapabilityEmail(
+  supabase: ServerClient,
+  businessId: string,
+  kind: PublicCapabilityEmailKind,
+  recipientEmail?: string,
+): Promise<boolean> {
+  let allowed: boolean;
+  try {
+    allowed = await enforceWindows(supabase, [
+      { key: `business:${businessId}|public_capability_email|1h`, ...PUBLIC_CAPABILITY_RATE_LIMIT.emailPerBusinessHourly },
+      { key: `business:${businessId}|public_capability_email|24h`, ...PUBLIC_CAPABILITY_RATE_LIMIT.emailPerBusinessDaily },
+    ]);
+  } catch (error) {
+    const reason = String((error as { message?: unknown } | null)?.message ?? "unknown");
+    console.error("public_capability_email_rate_limit_failed", { businessId, kind, reason });
+    return false;
+  }
+  if (!allowed) {
+    console.warn("public_capability_email_rate_limited", { businessId, kind });
+    return false;
+  }
+  return recipientEmail === undefined || allowPublicWriteEmail(supabase, recipientEmail);
 }
 
 export function buildRateKeys(ip: string, businessId: string, kind: PublicWriteKind) {

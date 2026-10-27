@@ -5,6 +5,7 @@ import {
   moveConfirmationToSlug,
   readCancelTokenFromHash,
   readConfirmationEmailStatus,
+  LEGACY_CANCEL_QUERY_UNTIL,
   readPrivateCancelCapability,
 } from "./private-confirmation";
 
@@ -66,7 +67,14 @@ describe("private confirmation navigation", () => {
   });
 
   it("can consume a legacy query capability so the client can scrub old links", () => {
-    expect(readPrivateCancelCapability("", `?code=65925DBB&cancel=${TOKEN}`)).toBe(TOKEN);
+    expect(readPrivateCancelCapability("", `?code=65925DBB&cancel=${TOKEN}`, Date.UTC(2026, 9, 27))).toBe(TOKEN);
+  });
+
+  // Links com ?cancel= saíram até 14/10/2026; a reserva mais distante que um
+  // deles pode ter já começou depois de 365 dias.
+  it("stops reading the legacy query once the last old link's reserva has started", () => {
+    expect(readPrivateCancelCapability("", `?code=65925DBB&cancel=${TOKEN}`, LEGACY_CANCEL_QUERY_UNTIL)).toBeNull();
+    expect(readPrivateCancelCapability(`#cancel=${TOKEN}`, "?code=65925DBB", LEGACY_CANCEL_QUERY_UNTIL)).toBe(TOKEN);
   });
 });
 
@@ -89,6 +97,6 @@ describe("moveConfirmationToSlug", () => {
     );
 
     expect(url.pathname).toBe("/novo/confirmacao");
-    expect(readPrivateCancelCapability(url.hash, url.search)).toBe(TOKEN);
+    expect(readPrivateCancelCapability(url.hash, url.search, Date.UTC(2026, 9, 27))).toBe(TOKEN);
   });
 });

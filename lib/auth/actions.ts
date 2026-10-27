@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { emailSchema, loginSchema, passwordSchema, signupSchema } from "@/lib/validation/schemas";
 import { enforceAuthRateLimit, enforceMfaRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 import { auditSecurityEvent } from "@/lib/security/audit";
-import { mfaChallengePath, requiresMfaChallenge, safeInternalPath } from "@/lib/auth/assurance";
+import { getVerifiedAssurance, mfaChallengePath, requiresMfaChallenge, safeInternalPath } from "@/lib/auth/assurance";
 import {
   clearRecoveryCodes,
   consumeRecoveryCode,
@@ -164,7 +164,7 @@ export async function login(_prev: ActionResult, formData: FormData): Promise<Ac
   }
 
   const safeNext = safeInternalPath(next);
-  const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  const { data: assurance, error: assuranceError } = await getVerifiedAssurance(supabase);
   if (assuranceError) return genericError("Não foi possível verificar a segurança da sessão.");
   auditSecurityEvent("auth.login", signIn?.user?.id);
   const successfulLoginPath = withLoginFlag(safeNext);
@@ -270,7 +270,7 @@ export async function updatePassword(_prev: ActionResult, formData: FormData): P
   }
 
   const { data: assurance, error: assuranceError } =
-    await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    await getVerifiedAssurance(supabase);
   if (assuranceError) {
     return genericError("Não foi possível verificar a segurança da sessão.");
   }
@@ -305,9 +305,24 @@ export async function beginTotpEnrollment(): Promise<ActionResult<{ factorId: st
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, code: "UNAUTHORIZED", message: "Faça login novamente." };
-  const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  const { data: assurance, error: assuranceError } = await getVerifiedAssurance(supabase);
   if (assuranceError || requiresMfaChallenge(assurance)) {
     return { ok: false, code: "MFA_REQUIRED", message: "Confirme seu autenticador atual antes de adicionar outro." };
+  }
+
+  // Códigos de recuperação left over from a removed authenticator (removeTotp
+  // clears them only on a best-effort basis) must not unlock the new one. While
+  // another authenticator is active, its códigos stay valid.
+  const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
+  if (factorsError) return genericError("Não foi possível iniciar a autenticação em duas etapas.");
+  if (!factors.totp.some((factor) => factor.status === "verified")) {
+    let cleared: boolean;
+    try {
+      cleared = await clearRecoveryCodes(createAdminClient(), user.id);
+    } catch {
+      cleared = false;
+    }
+    if (!cleared) return genericError("Não foi possível iniciar a autenticação em duas etapas.");
   }
 
   const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp" });
@@ -347,7 +362,7 @@ export async function removeTotp(factorId: string): Promise<ActionResult> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, code: "UNAUTHORIZED", message: "Faça login novamente." };
-  const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  const { data: assurance, error: assuranceError } = await getVerifiedAssurance(supabase);
   if (assuranceError || assurance.currentLevel !== "aal2") {
     return { ok: false, code: "MFA_REQUIRED", message: "Confirme seu autenticador antes de removê-lo." };
   }
@@ -375,7 +390,7 @@ export async function generateMfaRecoveryCodes(): Promise<ActionResult<{ codes: 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, code: "UNAUTHORIZED", message: "Faça login novamente." };
-  const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  const { data: assurance, error: assuranceError } = await getVerifiedAssurance(supabase);
   if (assuranceError || assurance.currentLevel !== "aal2") {
     return { ok: false, code: "MFA_REQUIRED", message: "Confirme seu autenticador antes de gerar os códigos." };
   }
@@ -402,7 +417,7 @@ export async function redeemMfaRecoveryCode(input: string): Promise<ActionResult
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, code: "UNAUTHORIZED", message: "Faça login novamente." };
-  const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  const { data: assurance, error: assuranceError } = await getVerifiedAssurance(supabase);
   if (assuranceError) return genericError("Não foi possível verificar a segurança da sessão.");
   if (!requiresMfaChallenge(assurance)) {
     return { ok: false, code: "MFA_NOT_REQUIRED", message: "Esta sessão não precisa de código de recuperação." };
@@ -439,9 +454,9 @@ export async function redeemMfaRecoveryCode(input: string): Promise<ActionResult
     return genericError("Não foi possível desativar o autenticador. Tente outro código de recuperação.");
   }
 
-  // The assurance level reads the factors from the user stored in the session
-  // cookie; without a refresh the session would still ask for aal2 and block
-  // the new activation. A failed refresh only means signing in again.
+  // The assurance level comes from Supabase Auth, which no longer lists the
+  // factors; the refresh also drops them from the copy in the session cookie.
+  // A failed refresh only means signing in again.
   await supabase.auth.refreshSession().catch(() => undefined);
   await clearRecoveryCodes(admin, user.id).catch(() => false);
   if (user.email) {

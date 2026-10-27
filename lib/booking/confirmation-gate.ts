@@ -24,7 +24,18 @@ export type ConfirmationRefusal = "rate_limited" | "unavailable";
 // other method or header combination renders the page, so it is an opening.
 export function isConfirmationOpening(request: Pick<NextRequest, "method" | "nextUrl" | "headers">): boolean {
   const isServerAction = request.method === "POST" && request.headers.has("next-action");
-  return !isServerAction && CONFIRMATION_PATH.test(request.nextUrl.pathname);
+  const { pathname } = request.nextUrl;
+  return !isServerAction && (CONFIRMATION_PATH.test(pathname) || CONFIRMATION_PATH.test(decodedPath(pathname)));
+}
+
+// The router decodes the path before matching a page, so /x/confirma%63ao
+// renders the confirmation screen too; the gate must see it the same way.
+function decodedPath(pathname: string): string {
+  try {
+    return decodeURIComponent(pathname);
+  } catch {
+    return pathname;
+  }
 }
 
 // null lets the request through. A missing or malformed code is a 404 the page

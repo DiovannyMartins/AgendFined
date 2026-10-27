@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { mfaChallengePath, requestPathOf, requiresMfaChallenge, safeInternalPath } from "./assurance";
+import { describe, expect, it, vi } from "vitest";
+import { getVerifiedAssurance, mfaChallengePath, requestPathOf, requiresMfaChallenge, safeInternalPath } from "./assurance";
 
 describe("authentication assurance policy", () => {
   it.each(["/\t/example.org", "/\n/example.org", "/\r/example.org", "/dashboard\u0000"])("rejects control characters in return path %j", (path) => {
@@ -41,5 +41,42 @@ describe("requestPathOf (#149)", () => {
     expect(mfaChallengePath(requestPathOf(new URL("https://agendfined.com.br/dashboard/agenda")))).toBe(
       "/mfa?next=%2Fdashboard%2Fagenda",
     );
+  });
+});
+
+describe("getVerifiedAssurance", () => {
+  function client(session: { access_token: string } | null) {
+    return {
+      auth: {
+        getSession: vi.fn(async () => ({ data: { session }, error: null })),
+        mfa: {
+          getAuthenticatorAssuranceLevel: vi.fn(async () => ({
+            data: { currentLevel: "aal1" as const, nextLevel: "aal2" as const, currentAuthenticationMethods: [] },
+            error: null,
+          })),
+        },
+      },
+    };
+  }
+
+  // Sem o token, o Supabase lê os fatores da cópia do usuário no cookie, que
+  // quem tem o cookie pode editar.
+  it("asks Supabase Auth with the session access token, not the cookie's user", async () => {
+    const supabase = client({ access_token: "access-token" });
+
+    const result = await getVerifiedAssurance(supabase as never);
+
+    expect(supabase.auth.mfa.getAuthenticatorAssuranceLevel).toHaveBeenCalledWith("access-token");
+    expect(requiresMfaChallenge(result.data!)).toBe(true);
+  });
+
+  it("answers without levels when there is no session", async () => {
+    const supabase = client(null);
+
+    await expect(getVerifiedAssurance(supabase as never)).resolves.toEqual({
+      data: { currentLevel: null, nextLevel: null, currentAuthenticationMethods: [] },
+      error: null,
+    });
+    expect(supabase.auth.mfa.getAuthenticatorAssuranceLevel).not.toHaveBeenCalled();
   });
 });

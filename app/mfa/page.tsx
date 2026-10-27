@@ -4,7 +4,7 @@ import { BrandLogo } from "@/components/brand-logo";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MfaPanel } from "./mfa-panel";
-import { requiresMfaChallenge, safeInternalPath } from "@/lib/auth/assurance";
+import { getVerifiedAssurance, requiresMfaChallenge, safeInternalPath } from "@/lib/auth/assurance";
 import { logout } from "@/lib/auth/actions";
 import { countRecoveryCodes } from "@/lib/auth/recovery-codes";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -26,7 +26,7 @@ export default async function MfaPage({
   if (!user) redirect(`/login?${new URLSearchParams({ next: returnTo }).toString()}`);
   const { data, error } = await supabase.auth.mfa.listFactors();
   if (error) throw error;
-  const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  const { data: assurance, error: assuranceError } = await getVerifiedAssurance(supabase);
   if (assuranceError) throw assuranceError;
 
   const factorId = data.totp.find((factor) => factor.status === "verified")?.id ?? null;

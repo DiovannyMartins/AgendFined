@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { refresh, getPublicRescheduleSlots, reschedulePublicBooking } = vi.hoisted(() => ({
   refresh: vi.fn(),
@@ -26,6 +26,16 @@ function renderDialog() {
 }
 
 describe("RescheduleBooking (#194)", () => {
+  // The reserva is on a fixed day; frozen before it, so the day stays in the
+  // future the dialog offers whatever the date the suite runs on.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-20T12:00:00.000Z"));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     getPublicRescheduleSlots.mockResolvedValue({ available: ["14:00", "15:00"] });

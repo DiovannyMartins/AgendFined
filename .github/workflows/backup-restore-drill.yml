@@ -17,37 +17,62 @@ jobs:
   restore:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
 
       - name: Download latest successful encrypted backup
+        id: download
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Only artifacts produced by the expected backup workflow, on the
-          # default branch of this same repository, are trusted.
-          run_id=$(gh run list \
-            --repo "$GITHUB_REPOSITORY" \
-            --workflow database-backup.yml \
-            --branch "${{ github.event.repository.default_branch }}" \
-            --status success \
-            --limit 1 \
-            --json databaseId \
-            --jq '.[0].databaseId // empty')
-          test -n "$run_id"
+          # Only artifacts produced by the backup workflow itself (schedule or
+          # manual dispatch), in this same repository, from a commit that is
+          # part of the default branch, are trusted.
+          default_branch=$(gh api "repos/$GITHUB_REPOSITORY" --jq .default_branch)
+          candidates=$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/database-backup.yml/runs?branch=$default_branch&status=success&per_page=50" \
+            | jq -r --arg repo "$GITHUB_REPOSITORY" '
+              .workflow_runs[]
+              | select(.event == "schedule" or .event == "workflow_dispatch")
+              | select(.repository.full_name == $repo and .head_repository.full_name == $repo)
+              | select(.path == ".github/workflows/database-backup.yml")
+              | "\(.id) \(.head_sha)"')
+          run_id=""
+          while read -r candidate_id candidate_sha; do
+            [[ "$candidate_id" =~ ^[0-9]+$ && "$candidate_sha" =~ ^[0-9a-f]{40}$ ]] || continue
+            # "identical" or "ahead": the run's commit is reachable from the default branch.
+            relation=$(gh api "repos/$GITHUB_REPOSITORY/compare/$candidate_sha...$default_branch" --jq .status || true)
+            if [ "$relation" = "identical" ] || [ "$relation" = "ahead" ]; then
+              run_id="$candidate_id"
+              break
+            fi
+          done <<< "$candidates"
+          if [ -z "$run_id" ]; then
+            echo "::error::Nenhum backup confiável encontrado no branch padrão."
+            exit 1
+          fi
           mkdir -p backup
-          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --dir backup
-          public_backup=$(find backup -type f -name 'agendfined-[0-9]*.sql.gz.aes256gcm' ! -name '*-auth-*' -print -quit)
-          auth_backup=$(find backup -type f -name 'agendfined-auth-[0-9]*.sql.gz.aes256gcm' -print -quit)
-          test -n "$public_backup"
-          test -n "$auth_backup"
-          printf 'PUBLIC_BACKUP=%s\nAUTH_BACKUP=%s\n' "$public_backup" "$auth_backup" >> "$GITHUB_ENV"
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name "agendfined-db-$run_id" --dir backup
+          # File names derive from the trusted run id, never from the artifact,
+          # and the artifact must contain exactly these two regular files.
+          public_backup="backup/agendfined-$run_id.sql.gz.aes256gcm"
+          auth_backup="backup/agendfined-auth-$run_id.sql.gz.aes256gcm"
+          for file in "$public_backup" "$auth_backup"; do
+            [[ "$file" =~ ^backup/[A-Za-z0-9._/-]+$ ]] || { echo "::error::Nome de backup inválido"; exit 1; }
+            [[ -f "$file" && ! -L "$file" ]] || { echo "::error::Arquivo de backup ausente"; exit 1; }
+          done
+          entries=$(find backup -mindepth 1 -printf x | wc -c)
+          [ "$entries" -eq 2 ] || { echo "::error::Artefato com conteúdo inesperado"; exit 1; }
+          {
+            echo "public_backup=$public_backup"
+            echo "auth_backup=$auth_backup"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Prepare disposable Supabase project
         run: |
@@ -64,7 +89,14 @@ jobs:
           npx supabase db reset --local --workdir restore-project --no-seed --yes
 
       - name: Restore public and Auth dumps into isolated database
+        env:
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+          PUBLIC_BACKUP: ${{ steps.download.outputs.public_backup }}
+          AUTH_BACKUP: ${{ steps.download.outputs.auth_backup }}
         run: |
+          for file in "$PUBLIC_BACKUP" "$AUTH_BACKUP"; do
+            [[ "$file" =~ ^backup/[A-Za-z0-9._/-]+$ ]] || { echo "::error::Nome de backup inválido"; exit 1; }
+          done
           node scripts/backup/restore-to-local-docker.mjs "$PUBLIC_BACKUP" supabase_db_af-restore-ci public
           node scripts/backup/restore-to-local-docker.mjs "$AUTH_BACKUP" supabase_db_af-restore-ci auth
 

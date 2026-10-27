@@ -17,6 +17,7 @@ const { state, sendBusinessRescheduledEmail, syncGoogleCalendarBooking } = vi.ho
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/supabase/admin", () => import("@/tests/mocks/rate-limit-admin"));
 vi.mock("@/lib/email/booking-reschedule", () => ({ sendBusinessRescheduledEmail }));
 vi.mock("@/lib/google-calendar/sync", () => ({ syncGoogleCalendarBooking }));
 vi.mock("@/lib/app-origin", () => ({ resolveAppOrigin: () => new URL("https://agendfined.test") }));
@@ -47,6 +48,8 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import { getOwnerRescheduleSlots, rescheduleOwnerBooking } from "./reschedule";
+import { OWNER_EMAIL_RATE_LIMIT } from "@/lib/booking/rate-limit";
+import { rateLimitAdmin } from "@/tests/mocks/rate-limit-admin";
 
 // 09:10 em São Paulo, sábado 24/10/2026.
 const NOW = new Date("2026-10-24T12:10:00.000Z");
@@ -98,6 +101,7 @@ beforeEach(() => {
   state.neqs = [];
   state.rpcCalls = [];
   state.rpcResult = null;
+  rateLimitAdmin.reset();
 });
 
 afterEach(() => {
@@ -143,6 +147,31 @@ describe("rescheduleOwnerBooking (#194)", () => {
 
     expect(result).toMatchObject({ ok: true, notifyByWhatsApp: true });
     expect(result.message).toContain("o e-mail não saiu");
+  });
+
+  it("acima do orçamento de e-mails do negócio, remarca sem enviar e pede o WhatsApp", async () => {
+    const { limit } = OWNER_EMAIL_RATE_LIMIT.perBusinessHourly;
+    rateLimitAdmin.counts.set("business:business-1|owner_email|1h", limit);
+
+    const result = await reschedule(form());
+
+    expect(state.rpcCalls.map(({ name }) => name)).toEqual(["reschedule_owner_booking"]);
+    expect(sendBusinessRescheduledEmail).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      ok: true,
+      startAt: "2026-10-26T18:00:00.000Z",
+      notifyByWhatsApp: true,
+      message: "Reserva remarcada, mas o e-mail não saiu. Avise o novo horário pelo WhatsApp.",
+    });
+  });
+
+  it("sem o contador de e-mails, remarca e não envia", async () => {
+    rateLimitAdmin.failing = true;
+
+    const result = await reschedule(form());
+
+    expect(sendBusinessRescheduledEmail).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ ok: true, notifyByWhatsApp: true });
   });
 
   it("recusa reserva que não está confirmada ou que já começou, sem chamar o banco", async () => {

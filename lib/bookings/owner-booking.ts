@@ -10,6 +10,7 @@ import { isOutsideAvailability, listOwnerFreeSlots, resolveOwnerStart } from "@/
 import { generateCancelToken, hashCancelToken } from "@/lib/bookings/cancel";
 import { buildPrivateConfirmationUrl } from "@/lib/bookings/private-confirmation";
 import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
+import { spendOwnerEmail } from "@/lib/email/owner-email-budget";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
 import { resolveAppOrigin } from "@/lib/app-origin";
 
@@ -149,6 +150,9 @@ export async function createOwnerBooking(
     return { ...created, message: "Sem e-mail do cliente. Envie o link da confirmação pelo WhatsApp." };
   }
 
+  const emailNotSent = "Não foi possível enviar o e-mail. Envie o link da confirmação pelo WhatsApp.";
+  if (!await spendOwnerEmail(business.id, "booking_confirmation")) return { ...created, message: emailNotSent };
+
   const emailResult = await sendBookingConfirmationEmail({
     customerName: booking.customer_name_snapshot,
     customerEmail: booking.customer_email_snapshot,
@@ -162,7 +166,7 @@ export async function createOwnerBooking(
   });
   if (!emailResult.sent) {
     console.error("booking_confirmation_email_failed", { bookingId: booking.id, reason: emailResult.reason });
-    return { ...created, message: "Não foi possível enviar o e-mail. Envie o link da confirmação pelo WhatsApp." };
+    return { ...created, message: emailNotSent };
   }
   return { ...created, message: `Confirmação enviada por e-mail para ${booking.customer_email_snapshot}.` };
 }

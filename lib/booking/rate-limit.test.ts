@@ -13,6 +13,8 @@ import {
   enforceConsultRateLimit,
   enforceApiRateLimit,
   enforceBillingCheckoutRateLimit,
+  enforceOwnerEmailRateLimit,
+  OWNER_EMAIL_RATE_LIMIT,
   getClientIpFromHeaders,
   enforceRateLimit,
   recordPublicWrite,
@@ -274,6 +276,46 @@ describe("enforceBillingCheckoutRateLimit", () => {
     const client = { rpc } as unknown as SupabaseClient<Database>;
 
     await expect(enforceBillingCheckoutRateLimit(client, "biz-1")).resolves.toBe(false);
+  });
+});
+
+describe("enforceOwnerEmailRateLimit", () => {
+  it("counts the e-mails of the dono's actions in an hourly and a daily window of the negócio", async () => {
+    const rpc = vi.fn(async () => ({ data: true, error: null }));
+    const client = { rpc } as unknown as SupabaseClient<Database>;
+
+    await expect(enforceOwnerEmailRateLimit(client, "biz-1", "booking_confirmation")).resolves.toBe(true);
+
+    expect(rpc).toHaveBeenCalledWith("check_booking_rate_limit", {
+      p_key: "business:biz-1|owner_email|1h",
+      p_limit: OWNER_EMAIL_RATE_LIMIT.perBusinessHourly.limit,
+      p_window_seconds: 3_600,
+    });
+    expect(rpc).toHaveBeenCalledWith("check_booking_rate_limit", {
+      p_key: "business:biz-1|owner_email|24h",
+      p_limit: OWNER_EMAIL_RATE_LIMIT.perBusinessDaily.limit,
+      p_window_seconds: 86_400,
+    });
+  });
+
+  it("shares one budget across the kinds of e-mail and refuses the one past the limit", async () => {
+    const { client } = windowClient();
+    const { limit } = OWNER_EMAIL_RATE_LIMIT.perBusinessHourly;
+    for (let sent = 0; sent < limit; sent += 1) {
+      await expect(
+        enforceOwnerEmailRateLimit(client, "biz-1", sent % 2 ? "cancellation" : "reschedule"),
+      ).resolves.toBe(true);
+    }
+
+    await expect(enforceOwnerEmailRateLimit(client, "biz-1", "waitlist_slot_freed")).resolves.toBe(false);
+    await expect(enforceOwnerEmailRateLimit(client, "biz-2", "waitlist_slot_freed")).resolves.toBe(true);
+  });
+
+  it("throws when the counter cannot be updated", async () => {
+    const rpc = vi.fn(async () => ({ data: null, error: { message: "boom" } }));
+    const client = { rpc } as unknown as SupabaseClient<Database>;
+
+    await expect(enforceOwnerEmailRateLimit(client, "biz-1", "booking_confirmation")).rejects.toBeTruthy();
   });
 });
 

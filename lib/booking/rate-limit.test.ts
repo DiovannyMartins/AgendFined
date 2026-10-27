@@ -16,6 +16,7 @@ import {
   getClientIpFromHeaders,
   enforceRateLimit,
   recordPublicWrite,
+  allowPublicWriteEmail,
 } from "@/lib/booking/rate-limit";
 import type { Database } from "@/lib/supabase/database-types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -47,8 +48,9 @@ afterEach(() => {
 });
 
 describe("buildRateKeys (§16)", () => {
-  it("keys on IP+business and on a business-wide aggregate, never on phone", () => {
+  it("keys on the IP, on IP+business and on a business-wide aggregate, never on phone", () => {
     expect(buildRateKeys("1.2.3.4", "biz-1", "booking")).toEqual({
+      perIpGlobal: { key: "ip:1.2.3.4|public-write", limit: 20, windowSeconds: 900 },
       perIp: { key: "ip:1.2.3.4|business:biz-1", limit: 8, windowSeconds: 900 },
       perBusiness: { key: "business:biz-1", limit: 60, windowSeconds: 900 },
     });
@@ -56,15 +58,18 @@ describe("buildRateKeys (§16)", () => {
 
   it("counts the lista de espera apart from the reservas", () => {
     expect(buildRateKeys("1.2.3.4", "biz-1", "waitlist")).toEqual({
+      perIpGlobal: { key: "ip:1.2.3.4|public-write", limit: 20, windowSeconds: 900 },
       perIp: { key: "ip:1.2.3.4|business:biz-1", limit: 8, windowSeconds: 900 },
       perBusiness: { key: "business:biz-1|waitlist", limit: 60, windowSeconds: 900 },
     });
   });
 
   it("uses the documented default limits", () => {
+    expect(RATE_LIMIT.perIpPublicWrite.limit).toBe(20);
     expect(RATE_LIMIT.perIpPerBusiness.limit).toBe(8);
     expect(RATE_LIMIT.perBusiness.limit).toBe(60);
     expect(RATE_LIMIT.perBusinessWaitlist.limit).toBe(60);
+    expect(RATE_LIMIT.perRecipientEmail).toEqual({ limit: 10, windowSeconds: 86_400 });
   });
 });
 
@@ -162,12 +167,13 @@ describe("auth rate-limit keys", () => {
 });
 
 describe("enforceRateLimit", () => {
-  it("spends the per-IP window and only reads the business aggregate", async () => {
+  it("spends the per-IP windows, the global one first, and only reads the business aggregate", async () => {
     const { client, rpc } = fakeClient({ perIp: true, perBusiness: true });
 
     await expect(enforceRateLimit(client, "1.2.3.4", "biz-1", "booking")).resolves.toBe(true);
 
     expect(rpc.mock.calls).toEqual([
+      ["check_booking_rate_limit", { p_key: "ip:1.2.3.4|public-write", p_limit: 20, p_window_seconds: 900 }],
       ["check_booking_rate_limit", { p_key: "ip:1.2.3.4|business:biz-1", p_limit: 8, p_window_seconds: 900 }],
       ["peek_booking_rate_limit", { p_key: "business:biz-1", p_limit: 60, p_window_seconds: 900 }],
     ]);
@@ -178,6 +184,24 @@ describe("enforceRateLimit", () => {
 
     await expect(enforceRateLimit(client, "1.2.3.4", "biz-1", "booking")).resolves.toBe(false);
     expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  // The per-business budget alone grows with every negócio an IP picks.
+  it("caps one IP across negócios, whatever their number", async () => {
+    const { client } = windowClient();
+    const results: boolean[] = [];
+
+    for (let business = 1; business <= 5; business++) {
+      for (let attempt = 0; attempt < RATE_LIMIT.perIpPerBusiness.limit; attempt++) {
+        results.push(await enforceRateLimit(client, "1.2.3.4", `biz-${business}`, "booking"));
+      }
+    }
+
+    expect(results.filter(Boolean)).toHaveLength(RATE_LIMIT.perIpPublicWrite.limit);
+    expect(results.slice(RATE_LIMIT.perIpPublicWrite.limit).every((allowed) => !allowed)).toBe(true);
+    // The lista de espera shares the same IP budget; another IP keeps its own.
+    await expect(enforceRateLimit(client, "1.2.3.4", "biz-6", "waitlist")).resolves.toBe(false);
+    await expect(enforceRateLimit(client, "5.6.7.8", "biz-1", "booking")).resolves.toBe(true);
   });
 
   it("blocks and logs the negócio when the business aggregate is exhausted", async () => {
@@ -247,6 +271,47 @@ describe("recordPublicWrite", () => {
       kind: "booking",
       reason: "boom",
     });
+  });
+});
+
+describe("allowPublicWriteEmail", () => {
+  it("allows up to the limit per address, then suppresses the next e-mail", async () => {
+    const { client } = windowClient();
+
+    for (let sent = 0; sent < RATE_LIMIT.perRecipientEmail.limit; sent++) {
+      await expect(allowPublicWriteEmail(client, "maria@example.com")).resolves.toBe(true);
+    }
+
+    await expect(allowPublicWriteEmail(client, "maria@example.com")).resolves.toBe(false);
+    await expect(allowPublicWriteEmail(client, "outra@example.com")).resolves.toBe(true);
+  });
+
+  it("counts an address the same whatever its case, and keeps it out of the key", async () => {
+    const rpc = vi.fn(async () => ({ data: true, error: null }));
+    const client = { rpc } as unknown as SupabaseClient<Database>;
+
+    await allowPublicWriteEmail(client, "Maria@Example.com");
+    await allowPublicWriteEmail(client, "maria@example.com");
+
+    const [first, second] = rpc.mock.calls.map((call) => (call as unknown[])[1] as { p_key: string });
+    expect(first.p_key).toBe(second.p_key);
+    expect(first.p_key).toMatch(/^email:[0-9a-f]{32}\|public-write$/);
+    expect(rpc).toHaveBeenCalledWith("check_booking_rate_limit", expect.objectContaining({
+      p_limit: 10,
+      p_window_seconds: 86_400,
+    }));
+  });
+
+  it.each([
+    ["returns an error", async () => ({ data: null, error: { message: "boom" } })],
+    ["throws", async () => { throw new Error("boom"); }],
+  ])("skips the e-mail and logs when the RPC %s", async (_case, rpc) => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const client = { rpc: vi.fn(rpc) } as unknown as SupabaseClient<Database>;
+
+    await expect(allowPublicWriteEmail(client, "maria@example.com")).resolves.toBe(false);
+    expect(error).toHaveBeenCalledWith("public_write_email_rate_limit_failed", { reason: "boom" });
+    expect(JSON.stringify(error.mock.calls)).not.toContain("maria");
   });
 });
 

@@ -13,6 +13,7 @@ const {
   notifyOwner,
   enforceRateLimit,
   recordPublicWrite,
+  allowPublicWriteEmail,
 } = vi.hoisted(() => ({
   state: {
     business: null as Record<string, unknown> | null,
@@ -31,6 +32,7 @@ const {
     async () => true,
   ),
   recordPublicWrite: vi.fn<(supabase: unknown, businessId: string, kind: string) => Promise<void>>(async () => {}),
+  allowPublicWriteEmail: vi.fn<(supabase: unknown, email: string) => Promise<boolean>>(async () => true),
 }));
 
 vi.mock("@/lib/booking/anti-bot", () => ({ verifyTurnstile: async () => ({ ok: true }) }));
@@ -38,6 +40,7 @@ vi.mock("@/lib/booking/rate-limit", () => ({
   getClientIp: async () => "203.0.113.7",
   enforceRateLimit,
   recordPublicWrite,
+  allowPublicWriteEmail,
   enforceConsultRateLimit: vi.fn(async () => true),
 }));
 vi.mock("@/lib/bookings/classification", () => ({
@@ -235,6 +238,7 @@ describe("createBooking", () => {
       sendBookingConfirmationEmail.mockClear();
       enforceRateLimit.mockClear();
       recordPublicWrite.mockClear();
+      allowPublicWriteEmail.mockClear();
     });
 
     afterEach(() => {
@@ -379,6 +383,36 @@ describe("createBooking", () => {
       await createBooking(validInput);
 
       expect(recordPublicWrite).not.toHaveBeenCalled();
+    });
+
+    // The reserva stands; only the e-mail to an address already sent too many
+    // is held back, and the page offers the private link instead.
+    it("keeps the reserva but skips the confirmação once the address had its share of e-mails", async () => {
+      const sentTo = new Map<string, number>();
+      allowPublicWriteEmail.mockImplementation(async (_supabase, email) => {
+        const count = (sentTo.get(email) ?? 0) + 1;
+        sentTo.set(email, count);
+        return count <= 10;
+      });
+      const results = [];
+
+      for (let booking = 0; booking < 11; booking++) results.push(await createBooking(validInput));
+
+      expect(sendBookingConfirmationEmail).toHaveBeenCalledTimes(10);
+      expect(results.slice(0, 10).every((result) => result.confirmationEmail === "sent")).toBe(true);
+      expect(results[10]).toMatchObject({ ok: true, publicCode: "65925DBB", confirmationEmail: "failed" });
+      expect(notifyOwner).toHaveBeenCalledTimes(11);
+      expect(recordPublicWrite).toHaveBeenCalledTimes(11);
+      expect(allowPublicWriteEmail).toHaveBeenCalledWith(expect.anything(), "maria@example.com");
+      allowPublicWriteEmail.mockImplementation(async () => true);
+    });
+
+    it("spends no e-mail budget when the reserva has no e-mail or was not created", async () => {
+      await createBooking({ ...validInput, customerEmail: "" });
+      state.rpcResults.create_booking = { data: null, error: { message: "bookings_no_overlap" } };
+      await createBooking(validInput);
+
+      expect(allowPublicWriteEmail).not.toHaveBeenCalled();
     });
 
     it("refuses with rate_limited when the negócio's limit is exhausted, before any write", async () => {
@@ -571,6 +605,16 @@ describe("joinWaitlist", () => {
       const result = await joinWaitlist(futureInput);
 
       expect(result).toEqual({ ok: true, message: "Você entrou na lista de espera deste horário." });
+      expect(sendWaitlistJoinedEmail).not.toHaveBeenCalled();
+    });
+
+    it("keeps the entrada but sends nothing once the address had its share of e-mails", async () => {
+      allowPublicWriteEmail.mockResolvedValueOnce(false);
+
+      const result = await joinWaitlist(futureInput);
+
+      expect(result).toEqual({ ok: true, message: "Você entrou na lista de espera deste horário." });
+      expect(allowPublicWriteEmail).toHaveBeenCalledWith(expect.anything(), "maria@example.com");
       expect(sendWaitlistJoinedEmail).not.toHaveBeenCalled();
     });
 

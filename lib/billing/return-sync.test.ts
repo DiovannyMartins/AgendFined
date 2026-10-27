@@ -34,6 +34,8 @@ function deps(current: BillingSubscription, snapshot: Preapproval, overrides: Pa
       subscriptionId: input.subscriptionId,
       businessId: input.businessId,
       subscriptionStatus: input.status,
+      previousStatus: current.status,
+      applied: true,
       isCurrent: true,
       effectivePlan: input.status === "authorized" ? ("pro" as const) : ("free" as const),
       effectiveGracePeriodEnd: null,
@@ -61,6 +63,7 @@ describe("syncReturnedSubscription", () => {
       currentPeriodStart: "2026-09-21T00:00:00.000Z",
       currentPeriodEnd: "2026-10-21T00:00:00.000Z",
       gracePeriodEnd: null,
+      providerModifiedAt: null,
     });
   });
 
@@ -109,5 +112,91 @@ describe("syncReturnedSubscription", () => {
     expect(result).toEqual({ ok: true, status: "authorized", effectivePlan: "pro" });
     expect(d.cancelPreapproval).not.toHaveBeenCalled();
     expect(d.reportStalePriceCharge).not.toHaveBeenCalled();
+  });
+});
+
+describe("syncReturnedSubscription carência (ADR 0008)", () => {
+  const NOW = new Date("2026-10-26T12:00:00.000Z");
+  const authorizedLocal: BillingSubscription = { ...pendingCheckout, status: "authorized" };
+
+  it("abre a carência mínima quando o retorno encontra a assinatura pausada antes do webhook", async () => {
+    const d = deps(authorizedLocal, { ...authorizedSnapshot, status: "paused" }, { now: () => NOW });
+
+    await syncReturnedSubscription("biz_1", d);
+
+    expect(d.applySnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "paused", gracePeriodEnd: "2026-11-02T12:00:00.000Z" }),
+    );
+  });
+
+  it("mantém o mês pago ao encontrar a assinatura cancelada antes do webhook", async () => {
+    const d = deps(
+      authorizedLocal,
+      { ...authorizedSnapshot, status: "cancelled", currentPeriodEnd: "2026-11-20T00:00:00.000Z" },
+      { now: () => NOW },
+    );
+
+    await syncReturnedSubscription("biz_1", d);
+
+    expect(d.applySnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "cancelled", gracePeriodEnd: "2026-11-20T00:00:00.000Z" }),
+    );
+  });
+
+  it("preserva uma carência futura já registrada", async () => {
+    const d = deps(
+      { ...authorizedLocal, status: "paused", gracePeriodEnd: "2026-10-30T00:00:00.000Z" },
+      { ...authorizedSnapshot, status: "paused" },
+      { now: () => NOW },
+    );
+
+    await syncReturnedSubscription("biz_1", d);
+
+    expect(d.applySnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({ gracePeriodEnd: "2026-10-30T00:00:00.000Z" }),
+    );
+  });
+
+  it("respeita a carência configurada", async () => {
+    const d = deps(authorizedLocal, { ...authorizedSnapshot, status: "paused" }, { now: () => NOW, graceDays: 3 });
+
+    await syncReturnedSubscription("biz_1", d);
+
+    expect(d.applySnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({ gracePeriodEnd: "2026-10-29T12:00:00.000Z" }),
+    );
+  });
+
+  it("fecha sem carência um checkout que nunca foi pago", async () => {
+    const d = deps(pendingCheckout, { ...authorizedSnapshot, status: "cancelled" }, { now: () => NOW });
+
+    await syncReturnedSubscription("biz_1", d);
+
+    expect(d.applySnapshot).toHaveBeenCalledWith(expect.objectContaining({ status: "cancelled", gracePeriodEnd: null }));
+  });
+
+  it("passa o last_modified do provedor como versão do retrato", async () => {
+    const d = deps(authorizedLocal, { ...authorizedSnapshot, lastModified: "2026-10-26T11:00:00.000Z" }, { now: () => NOW });
+
+    await syncReturnedSubscription("biz_1", d);
+
+    expect(d.applySnapshot).toHaveBeenCalledWith(expect.objectContaining({ providerModifiedAt: "2026-10-26T11:00:00.000Z" }));
+  });
+
+  it("devolve o estado guardado quando o banco recusa um retrato antigo", async () => {
+    const d = deps(authorizedLocal, authorizedSnapshot, {
+      applySnapshot: vi.fn(async (input: ApplySubscriptionSnapshotInput): Promise<AppliedSubscriptionSnapshot> => ({
+        subscriptionId: input.subscriptionId,
+        businessId: input.businessId,
+        subscriptionStatus: "cancelled",
+        previousStatus: "cancelled",
+        applied: false,
+        isCurrent: true,
+        effectivePlan: "pro",
+        effectiveGracePeriodEnd: "2026-11-20T00:00:00.000Z",
+      })),
+    });
+
+    await expect(syncReturnedSubscription("biz_1", d)).resolves.toEqual({ ok: true, status: "cancelled", effectivePlan: "pro" });
   });
 });

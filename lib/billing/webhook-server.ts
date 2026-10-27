@@ -80,6 +80,7 @@ export function createWebhookPersistence() {
         p_grace_period_end: input.gracePeriodEnd,
         p_make_current: input.makeCurrent !== undefined,
         p_expected_current_subscription_id: input.makeCurrent?.expectedCurrentSubscriptionId ?? null,
+        p_provider_modified_at: input.providerModifiedAt ?? null,
       });
       if (error) throw new Error(error.message);
       const row = data?.[0];
@@ -88,6 +89,8 @@ export function createWebhookPersistence() {
         subscriptionId: row.subscription_id,
         businessId: row.business_id,
         subscriptionStatus: row.subscription_status,
+        previousStatus: row.previous_status,
+        applied: row.applied,
         isCurrent: row.is_current,
         effectivePlan: row.effective_plan,
         effectiveGracePeriodEnd: row.effective_grace_period_end,

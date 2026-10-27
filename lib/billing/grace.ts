@@ -11,3 +11,26 @@ export function graceEnd(input: { now: Date; graceDays?: number; paidPeriodEnd?:
   const paid = input.paidPeriodEnd ? Date.parse(input.paidPeriodEnd) : Number.NaN;
   return new Date(Number.isFinite(paid) && paid > minimum ? paid : minimum).toISOString();
 }
+
+// The carência to record when a provider snapshot is applied over the local
+// assinatura, shared by the webhook and the checkout return so neither writes a
+// `paused`/`cancelled` row without one. A checkout still `pending` locally was
+// never paid and closes without a grace; a future grace already recorded is
+// kept; only a cancellation of an assinatura still authorized keeps the paid
+// month.
+export function snapshotGraceEnd(input: {
+  now: Date;
+  graceDays?: number;
+  localStatus: "pending" | "authorized" | "paused" | "cancelled";
+  existingGracePeriodEnd: string | null;
+  snapshotStatus: "pending" | "authorized" | "paused" | "cancelled";
+  snapshotPeriodEnd: string | null;
+}): string | null {
+  if (input.snapshotStatus !== "paused" && input.snapshotStatus !== "cancelled") return null;
+  if (input.localStatus === "pending") return null;
+  const existing = input.existingGracePeriodEnd ? Date.parse(input.existingGracePeriodEnd) : Number.NaN;
+  if (Number.isFinite(existing) && existing > input.now.getTime()) return new Date(existing).toISOString();
+  const paidPeriodEnd =
+    input.snapshotStatus === "cancelled" && input.localStatus === "authorized" ? input.snapshotPeriodEnd : null;
+  return graceEnd({ now: input.now, graceDays: input.graceDays, paidPeriodEnd });
+}

@@ -44,6 +44,9 @@ export interface Preapproval {
   currencyId: string | null;
   frequency: number | null;
   frequencyType: string | null;
+  // When the provider last changed the preapproval (`last_modified`): the
+  // version of this snapshot. Null or absent when the provider omits it.
+  lastModified?: string | null;
 }
 
 export interface BillingProvider {

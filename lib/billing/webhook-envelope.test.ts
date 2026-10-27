@@ -10,6 +10,11 @@ describe("Mercado Pago webhook envelope", () => {
     expect(resolveSignedWebhookDataId(null, "preapproval-123")).toBeNull();
   });
 
+  it("normalizes the case once, as the signature manifest does", () => {
+    expect(resolveSignedWebhookDataId("2C9380848F", "2c9380848f")).toBe("2c9380848f");
+    expect(resolveSignedWebhookDataId("2C9380848F", undefined)).toBe("2c9380848f");
+  });
+
   it("rejects a body ID that differs from the signed query ID", () => {
     expect(resolveSignedWebhookDataId("signed-id", "different-id")).toBeNull();
   });

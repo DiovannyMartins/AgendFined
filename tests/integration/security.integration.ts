@@ -219,7 +219,9 @@ describe("RLS isolation User A vs User B (§35)", () => {
       // A column the dashboard may update, so RLS (not the column grant) decides.
       .update({ cancel_reason: "hacked" })
       .eq("business_id", businessA)
-      .select("*");
+      // Only the columns authenticated may read; select("*") would hit the
+      // hidden reminder_claim_token and cancel_token_hash.
+      .select("id, cancel_reason");
     expect(error).toBeNull();
     expect(data?.length ?? 0).toBe(0);
   });

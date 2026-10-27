@@ -31,12 +31,18 @@ describe("authentication callback", () => {
     expect(verifyOtp).not.toHaveBeenCalled();
   });
 
-  it("rejects an incomplete OTP tuple", async () => {
+  it.each([
+    ["?token_hash=only-token"],
+    ["?token_hash=hash&type=signup"],
+    ["?token_hash=hash&type=magiclink&next=/dashboard"],
+    ["?token_hash=hash&type=recovery&next=/redefinir-senha"],
+  ])("rejects a token_hash callback (%s) without verifying it", async (query) => {
     vi.stubEnv("APP_URL", "https://agenda.example");
-    const response = await GET(request("?token_hash=only-token"));
+    const response = await GET(request(query));
 
     expect(response.headers.get("location")).toBe("https://agenda.example/login?error=auth");
     expect(verifyOtp).not.toHaveBeenCalled();
+    expect(exchangeCodeForSession).not.toHaveBeenCalled();
   });
 
   it("exchanges a valid code and keeps a safe relative destination", async () => {
@@ -46,5 +52,36 @@ describe("authentication callback", () => {
 
     expect(exchangeCodeForSession).toHaveBeenCalledWith("pkce-code");
     expect(response.headers.get("location")).toBe("https://agenda.example/dashboard/configuracoes");
+  });
+
+  it("uses only the code when token_hash is also present", async () => {
+    vi.stubEnv("APP_URL", "https://agenda.example");
+    exchangeCodeForSession.mockResolvedValue({ error: null });
+    const response = await GET(request("?code=pkce-code&token_hash=hash&type=signup"));
+
+    expect(exchangeCodeForSession).toHaveBeenCalledWith("pkce-code");
+    expect(verifyOtp).not.toHaveBeenCalled();
+    expect(response.headers.get("location")).toBe("https://agenda.example/dashboard");
+  });
+
+  it("redirects to login when the code exchange fails", async () => {
+    vi.stubEnv("APP_URL", "https://agenda.example");
+    exchangeCodeForSession.mockResolvedValue({ error: { message: "invalid" } });
+    const response = await GET(request("?code=bad-code&next=/dashboard"));
+
+    expect(response.headers.get("location")).toBe("https://agenda.example/login?error=auth");
+  });
+
+  it.each([
+    ["https://evil.example/x"],
+    ["//evil.example/x"],
+    ["/\\evil.example/x"],
+    ["evil.example"],
+  ])("falls back to /dashboard for an unsafe next (%s)", async (next) => {
+    vi.stubEnv("APP_URL", "https://agenda.example");
+    exchangeCodeForSession.mockResolvedValue({ error: null });
+    const response = await GET(request(`?code=pkce-code&next=${encodeURIComponent(next)}`));
+
+    expect(response.headers.get("location")).toBe("https://agenda.example/dashboard");
   });
 });

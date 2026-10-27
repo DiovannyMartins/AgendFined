@@ -22,7 +22,7 @@ export default async function ClientesPage() {
       .order("created_at", { ascending: true }),
     supabase
       .from("bookings")
-      .select("*")
+      .select("id, customer_id, start_at, status, service_name_snapshot, duration_minutes_snapshot")
       .eq("business_id", business.id)
       .order("start_at", { ascending: false }),
   ]);

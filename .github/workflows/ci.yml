@@ -44,4 +44,5 @@ jobs:
       - run: docker exec -i supabase_db_projeto psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 < tests/sql/cron-jobs.sql
       - run: docker exec -i supabase_db_projeto psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 < tests/sql/booking-reminders-dispatch.sql
       - run: docker exec -i supabase_db_projeto psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 < tests/sql/downgrade-current-subscription.sql
+      - run: docker exec -i supabase_db_projeto psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 < tests/sql/security-hardening-grants-triggers.sql
       - run: npm run test:integration:local

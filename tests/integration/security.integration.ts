@@ -202,7 +202,7 @@ describe("create_booking integrity (§8/§9/§32/§33/§34)", () => {
 describe("RLS isolation User A vs User B (§35)", () => {
   it("outsider cannot read the owner's bookings", async () => {
     const outsider = await anonClientForUser(`outsider.${stamp}@agendfined.dev`, PASSWORD);
-    const { data } = await outsider.from("bookings").select("*").eq("business_id", businessA);
+    const { data } = await outsider.from("bookings").select("id").eq("business_id", businessA);
     expect(data?.length ?? 0).toBe(0);
   });
 

@@ -1136,7 +1136,7 @@ export type Database = {
         Returns: string
       }
       set_booking_reminders_sent: {
-        Args: { p_booking_ids: string[]; p_claim_tokens?: string[] }
+        Args: { p_booking_ids: string[]; p_claim_tokens: string[] }
         Returns: number
       }
       consume_security_usage_budget: {

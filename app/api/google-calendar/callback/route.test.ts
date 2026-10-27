@@ -29,10 +29,16 @@ function calendarStatus(response: Response) {
 
 let tokenExchanges: URLSearchParams[];
 let savedConnections: Record<string, unknown>[];
+let existingConnections: Record<string, unknown>[];
+let tokenResponse: Record<string, unknown>;
+let profileEmail: string | undefined;
 
 beforeEach(() => {
   tokenExchanges = [];
   savedConnections = [];
+  existingConnections = [];
+  tokenResponse = { access_token: "ya29.access", refresh_token: "1//refresh", expires_in: 3600, scope: "openid email https://www.googleapis.com/auth/calendar.events" };
+  profileEmail = "dono@example.com";
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://database.example");
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-only-key");
   vi.stubEnv("GOOGLE_CALENDAR_CLIENT_ID", "client-id");
@@ -46,15 +52,15 @@ beforeEach(() => {
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
     if (url.href === "https://oauth2.googleapis.com/token") {
       tokenExchanges.push(new URLSearchParams(String(init?.body)));
-      return Response.json({ access_token: "ya29.access", refresh_token: "1//refresh", expires_in: 3600, scope: "openid email https://www.googleapis.com/auth/calendar.events" });
+      return Response.json(tokenResponse);
     }
-    if (url.hostname === "openidconnect.googleapis.com") return Response.json({ email: "dono@example.com" });
+    if (url.hostname === "openidconnect.googleapis.com") return Response.json({ email: profileEmail });
     if (url.pathname.endsWith("/google_calendar_connections")) {
       if (init?.method === "POST") {
         savedConnections.push(JSON.parse(String(init.body)));
         return new Response(null, { status: 201 });
       }
-      return Response.json([]);
+      return Response.json(existingConnections);
     }
     throw new Error(`Unexpected request: ${url.href}`);
   }));
@@ -134,6 +140,40 @@ describe("Google Calendar OAuth callback", () => {
     const response = await GET(callback("?state=expected-state&code=auth-code"));
 
     expect(calendarStatus(response)).toBe("connection_failed");
+    expect(response.headers.get("set-cookie")).toContain(`${STATE_COOKIE}=;`);
+    expect(savedConnections).toEqual([]);
+  });
+
+  it("clears the state when Google does not share the account e-mail", async () => {
+    profileEmail = undefined;
+
+    const response = await GET(callback("?state=expected-state&code=auth-code"));
+
+    expect(calendarStatus(response)).toBe("missing_email");
+    expect(response.headers.get("set-cookie")).toContain(`${STATE_COOKIE}=;`);
+    expect(savedConnections).toEqual([]);
+  });
+
+  it("keeps the stored refresh token when the same account reconnects", async () => {
+    delete tokenResponse.refresh_token;
+    existingConnections = [{ google_email: "Dono@example.com", refresh_token_ciphertext: "stored-ciphertext" }];
+
+    const response = await GET(callback("?state=expected-state&code=auth-code"));
+
+    expect(calendarStatus(response)).toBe("connected");
+    expect(savedConnections[0]).toMatchObject({ refresh_token_ciphertext: "stored-ciphertext" });
+  });
+
+  // O refresh token guardado é da conta anterior: reaproveitá-lo ligaria a
+  // agenda de uma conta à conexão de outra.
+  it("does not reuse the previous account's refresh token for a different account", async () => {
+    delete tokenResponse.refresh_token;
+    existingConnections = [{ google_email: "outra@example.com", refresh_token_ciphertext: "stored-ciphertext" }];
+
+    const response = await GET(callback("?state=expected-state&code=auth-code"));
+
+    expect(calendarStatus(response)).toBe("missing_refresh_token");
+    expect(response.headers.get("set-cookie")).toContain(`${STATE_COOKIE}=;`);
     expect(savedConnections).toEqual([]);
   });
 });

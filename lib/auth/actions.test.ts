@@ -9,6 +9,7 @@ const auth = {
   resend: vi.fn(),
   getUser: vi.fn(),
   updateUser: vi.fn(),
+  getSession: vi.fn(),
   mfa: { getAuthenticatorAssuranceLevel: vi.fn() },
 };
 
@@ -40,6 +41,7 @@ function form(fields: Record<string, string>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  auth.getSession.mockResolvedValue({ data: { session: { access_token: "access-token" } }, error: null });
   auth.mfa.getAuthenticatorAssuranceLevel.mockResolvedValue({
     data: { currentLevel: "aal1", nextLevel: "aal1" },
     error: null,

@@ -55,9 +55,16 @@ export function readCancelTokenFromHash(hash: string): string | null {
   return token && isValidCancelToken(token) ? token : null;
 }
 
-export function readPrivateCancelCapability(hash: string, search: string): string | null {
+// The capability moved from the query (?cancel=, which reaches the server and
+// its logs) to the fragment on 2026-10-14. A link sent before then belongs to a
+// reserva at most 365 days ahead (the PROFISSIONAL window), so the query form
+// stops being read after that last reserva could have started.
+export const LEGACY_CANCEL_QUERY_UNTIL = Date.UTC(2027, 9, 15);
+
+export function readPrivateCancelCapability(hash: string, search: string, now = Date.now()): string | null {
   const fragmentToken = readCancelTokenFromHash(hash);
   if (fragmentToken) return fragmentToken;
+  if (now >= LEGACY_CANCEL_QUERY_UNTIL) return null;
 
   // Compatibility for links issued before capabilities moved to fragments.
   // Callers must immediately scrub this legacy query parameter from the URL.

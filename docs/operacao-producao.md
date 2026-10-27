@@ -58,7 +58,7 @@ O teste `tests/sql/reconciliation-scheduler.sql` verifica a requisição real en
 
 ### Diagnóstico dos lembretes
 
-O job `booking-reminders` define `app.reminder_cron_url` e `app.reminder_cron_secret` no próprio comando antes de chamar `process_booking_reminders()`. Como o `pg_net` é assíncrono, `succeeded` em `cron.job_run_details` não prova o envio: até o #154 a URL de produção tinha um `\r` (vindo de um `.env.local` com CRLF) e nenhum lembrete saiu por semanas. Hoje uma URL com espaço ou caractere de controle faz o tick falhar com `booking_reminders: invalid cron url`.
+Desde a migration `20261027030000_reminder_cron_secret_vault.sql`, `process_booking_reminders()` lê a URL e o segredo do Vault (`agendfined_reminder_cron_url` e `agendfined_reminder_cron_secret`), como a reconciliação, e o job `booking-reminders` só chama `select public.process_booking_reminders();`. Enquanto faltar alguma das duas entradas no Vault, a função ainda aceita o formato antigo (`app.reminder_cron_url` e `app.reminder_cron_secret` definidos no comando do job). Como o `pg_net` é assíncrono, `succeeded` em `cron.job_run_details` não prova o envio: até o #154 a URL de produção tinha um `\r` (vindo de um `.env.local` com CRLF) e nenhum lembrete saiu por semanas. Hoje uma URL com espaço ou caractere de controle faz o tick falhar com `booking_reminders: invalid cron url`.
 
 Para conferir sem expor o segredo:
 
@@ -66,7 +66,7 @@ Para conferir sem expor o segredo:
 npx supabase db query --linked "select public.get_booking_reminders_health();"
 ```
 
-Espere `job_active`, `dispatch_configured` e `url_valid` iguais a `true` e `missed_reminders_7d = 0` (reservas que ainda aconteceram, foram reservadas para envio e nunca receberam o lembrete). O `npm run check:launch -- --production` falha em qualquer desvio. Para corrigir a configuração, rode `scripts/configure-booking-reminders.sh`; nunca leia `cron.job.command`, que contém o segredo.
+Espere `job_active`, `dispatch_configured` e `url_valid` iguais a `true`, `dispatch_source = "vault"`, `secret_in_job_command = false` e `missed_reminders_7d = 0` (reservas que ainda aconteceram, foram reservadas para envio e nunca receberam o lembrete). O `npm run check:launch -- --production` falha em qualquer desvio. Para corrigir a configuração, rode `scripts/configure-booking-reminders.sh` (depois de aplicar a migration; o script recusa rodar sem ela): ele grava a URL e o segredo no Vault e reagenda o job sem o segredo. Enquanto `secret_in_job_command = true`, não leia `cron.job.command`, que ainda contém o segredo.
 
 ### Telefone do cliente
 

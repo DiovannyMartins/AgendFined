@@ -35,31 +35,40 @@ export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   if (!code) return settingsRedirect(request, "invalid_state");
 
+  // From here on the state has been used: every answer clears it, so the same
+  // authorization cannot be replayed.
+  const finish = (status: GoogleCalendarCallbackStatus) => {
+    const response = settingsRedirect(request, status);
+    response.cookies.delete("agendfined_google_calendar_oauth_state");
+    return response;
+  };
+
   const business = await getCurrentBusiness();
-  if (!business || business.id !== businessId || !isProPlan(business.plan)) return settingsRedirect(request, "unauthorized");
+  if (!business || business.id !== businessId || !isProPlan(business.plan)) return finish("unauthorized");
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return settingsRedirect(request, "unauthorized");
-
-  const response = settingsRedirect(request, "connected");
-  response.cookies.delete("agendfined_google_calendar_oauth_state");
+  if (!user) return finish("unauthorized");
 
   try {
     const tokens = await exchangeGoogleAuthorizationCode(code);
     const profile = await getGoogleUserInfo(tokens.access_token);
-    if (!profile.email) return settingsRedirect(request, "missing_email");
+    if (!profile.email) return finish("missing_email");
 
     const admin = createAdminClient();
     const { data: existing } = await admin
       .from("google_calendar_connections")
-      .select("refresh_token_ciphertext")
+      .select("google_email, refresh_token_ciphertext")
       .eq("business_id", business.id)
       .maybeSingle();
+    // Google omits the refresh token when the account already granted access.
+    // The stored one is reused only for that same account: it would act on the
+    // previous account's calendar.
+    const sameAccount = existing?.google_email?.toLowerCase() === profile.email.toLowerCase();
     const refreshToken = tokens.refresh_token
       ? encryptGoogleToken(tokens.refresh_token)
-      : existing?.refresh_token_ciphertext;
-    if (!refreshToken) return settingsRedirect(request, "missing_refresh_token");
+      : sameAccount ? existing?.refresh_token_ciphertext : undefined;
+    if (!refreshToken) return finish("missing_refresh_token");
 
     const { error } = await admin.from("google_calendar_connections").upsert({
       business_id: business.id,
@@ -78,8 +87,8 @@ export async function GET(request: NextRequest) {
     } catch {
       // The connection is valid even if the first import needs a manual retry.
     }
-    return response;
+    return finish("connected");
   } catch {
-    return settingsRedirect(request, "connection_failed");
+    return finish("connection_failed");
   }
 }

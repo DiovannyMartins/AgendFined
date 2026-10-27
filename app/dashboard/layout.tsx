@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { DashboardNav } from "./nav";
 import { GraceBanner } from "./grace-banner";
-import { REQUEST_PATH_HEADER, mfaChallengePath, requiresMfaChallenge } from "@/lib/auth/assurance";
+import { REQUEST_PATH_HEADER, getVerifiedAssurance, mfaChallengePath, requiresMfaChallenge } from "@/lib/auth/assurance";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -18,7 +18,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  const { data: assurance, error: assuranceError } = await getVerifiedAssurance(supabase);
   if (assuranceError || requiresMfaChallenge(assurance)) {
     // Back to the page that was asked for, not just the painel (#149);
     // mfaChallengePath only accepts internal paths.

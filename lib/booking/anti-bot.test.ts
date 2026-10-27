@@ -39,6 +39,19 @@ describe("verifyTurnstile", () => {
     expect(request[0]).toBe("https://challenges.cloudflare.com/turnstile/v0/siteverify");
     const body = (request[1] as RequestInit).body as URLSearchParams;
     expect(body.get("remoteip")).toBe("203.0.113.7");
+    expect((request[1] as RequestInit).signal).toBeTruthy();
+  });
+
+  // O sujeito do rate limit de um IPv6 é a rede /64, que não é um endereço.
+  it.each(["2001:db8:1:2::/64", "unknown"])("does not send %s as the remote IP", async (remoteIp) => {
+    configureVerifier();
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ success: true, action: "booking_write", hostname: "agenda.example" })),
+    );
+
+    expect((await verifyTurnstile("valid-token", { ...options, remoteIp })).ok).toBe(true);
+    const body = (vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as URLSearchParams;
+    expect(body.has("remoteip")).toBe(false);
   });
 
   it.each([

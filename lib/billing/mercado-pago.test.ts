@@ -295,6 +295,21 @@ describe("createMercadoPagoProvider", () => {
     await expect(provider.getPreapproval("mp_1")).rejects.toThrow("missing a valid status");
   });
 
+  // O id vem do webhook e do banco; no caminho ele não pode virar outro
+  // recurso da API.
+  it("encodes the preapproval id in the request path", async () => {
+    const fetchMock = stubFetch(async () => jsonResponse({}));
+    const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });
+
+    await provider.getPreapproval("../payments/1?x=y").catch(() => undefined);
+    await provider.cancelPreapproval("../payments/1?x=y").catch(() => undefined);
+
+    for (const [url] of fetchMock.mock.calls) {
+      expect(String(url)).toMatch(/\/preapproval\/\.\.%2Fpayments%2F1%3Fx%3Dy$/);
+    }
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
   it("cancels a preapproval via PUT with status cancelled", async () => {
     const fetchMock = stubFetch(async () => jsonResponse({}));
 

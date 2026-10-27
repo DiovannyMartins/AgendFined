@@ -1,3 +1,5 @@
+import type { AuthMFAGetAuthenticatorAssuranceLevelResponse, SupabaseClient } from "@supabase/supabase-js";
+
 // Supabase leaves room for future assurance levels (`string & {}`), while the
 // current policy only needs to distinguish aal2 from every lower level.
 export type AssuranceLevel = string | null;
@@ -7,6 +9,28 @@ export function requiresMfaChallenge(assurance: {
   nextLevel: AssuranceLevel;
 }): boolean {
   return assurance.nextLevel === "aal2" && assurance.currentLevel !== "aal2";
+}
+
+type AssuranceClient = {
+  auth: Pick<SupabaseClient["auth"], "getSession"> & {
+    mfa: Pick<SupabaseClient["auth"]["mfa"], "getAuthenticatorAssuranceLevel">;
+  };
+};
+
+// Without an argument, getAuthenticatorAssuranceLevel reads nextLevel from the
+// user copied into the session cookie, which whoever holds the cookie can
+// edit. Given the access token, Supabase Auth validates it and answers with
+// the factors it stores, so a session cannot skip the second factor by
+// dropping its factors from the cookie.
+export async function getVerifiedAssurance(
+  supabase: AssuranceClient,
+): Promise<AuthMFAGetAuthenticatorAssuranceLevelResponse> {
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error) return { data: null, error };
+  if (!session) {
+    return { data: { currentLevel: null, nextLevel: null, currentAuthenticationMethods: [] }, error: null };
+  }
+  return supabase.auth.mfa.getAuthenticatorAssuranceLevel(session.access_token);
 }
 
 export function safeInternalPath(value: string | null | undefined, fallback = "/dashboard"): string {

@@ -7,10 +7,12 @@ const USER = { id: "7f3c1a52-8f4e-4c55-9d1e-0a6b2f1c9e10", email: "dono@agendfin
 const auth = {
   getUser: vi.fn(),
   refreshSession: vi.fn(),
+  getSession: vi.fn(),
   mfa: {
     getAuthenticatorAssuranceLevel: vi.fn(),
     listFactors: vi.fn(),
     unenroll: vi.fn(),
+    enroll: vi.fn(),
   },
 };
 const admin = {
@@ -36,7 +38,7 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const { generateMfaRecoveryCodes, redeemMfaRecoveryCode, removeTotp } = await import("./actions");
+const { beginTotpEnrollment, generateMfaRecoveryCodes, redeemMfaRecoveryCode, removeTotp } = await import("./actions");
 const { hashRecoveryCode } = await import("./recovery-codes");
 
 function assurance(currentLevel: string, nextLevel: string) {
@@ -49,6 +51,7 @@ function rpcCalls(name: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  auth.getSession.mockResolvedValue({ data: { session: { access_token: "access-token" } }, error: null });
   vi.stubEnv("APP_URL", "https://agenda.example");
   auth.getUser.mockResolvedValue({ data: { user: USER } });
   auth.mfa.listFactors.mockResolvedValue({
@@ -179,5 +182,41 @@ describe("removeTotp (#169)", () => {
     await expect(removeTotp("factor-1")).resolves.toEqual({ ok: true, data: undefined });
 
     expect(rpcCalls("clear_mfa_recovery_codes")).toEqual([["clear_mfa_recovery_codes", { p_user_id: USER.id }]]);
+  });
+});
+
+describe("beginTotpEnrollment", () => {
+  beforeEach(() => {
+    assurance("aal1", "aal1");
+    auth.mfa.enroll.mockResolvedValue({
+      data: { id: "factor-new", totp: { qr_code: "data:image/svg+xml;qr", secret: "SECRET" } },
+      error: null,
+    });
+    auth.mfa.listFactors.mockResolvedValue({ data: { totp: [] }, error: null });
+  });
+
+  // removeTotp apaga os códigos só como melhor esforço; sobras não podem
+  // valer para o autenticador novo.
+  it("apaga os códigos de recuperação antigos antes de ativar o primeiro autenticador", async () => {
+    await expect(beginTotpEnrollment()).resolves.toMatchObject({ ok: true, data: { factorId: "factor-new" } });
+
+    expect(rpcCalls("clear_mfa_recovery_codes")).toEqual([["clear_mfa_recovery_codes", { p_user_id: USER.id }]]);
+  });
+
+  it("não inicia a ativação se não conseguir apagar os códigos antigos", async () => {
+    admin.rpc.mockResolvedValue({ data: null, error: { message: "unavailable" } });
+
+    await expect(beginTotpEnrollment()).resolves.toMatchObject({ ok: false });
+
+    expect(auth.mfa.enroll).not.toHaveBeenCalled();
+  });
+
+  it("mantém os códigos de um autenticador que continua ativo", async () => {
+    assurance("aal2", "aal2");
+    auth.mfa.listFactors.mockResolvedValue({ data: { totp: [{ id: "factor-1", status: "verified" }] }, error: null });
+
+    await expect(beginTotpEnrollment()).resolves.toMatchObject({ ok: true });
+
+    expect(rpcCalls("clear_mfa_recovery_codes")).toEqual([]);
   });
 });

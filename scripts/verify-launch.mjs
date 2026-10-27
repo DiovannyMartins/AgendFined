@@ -106,6 +106,9 @@ async function checkBookingReminders() {
   else if (!data.dispatch_configured) report("booking-reminders cron job does not set the dispatch URL and secret");
   else if (!data.url_valid) report("booking-reminders dispatch URL is malformed (whitespace or control character)");
   else pass("booking-reminders cron job is active and wired to a valid URL");
+  if (data.secret_in_job_command) {
+    report("booking-reminders cron job command still holds the secret; re-run scripts/configure-booking-reminders.sh to move it to Vault");
+  }
   if (data.missed_reminders_7d > 0) {
     report(`${data.missed_reminders_7d} booking reminder(s) were claimed in the last 7 days but never sent`);
   }

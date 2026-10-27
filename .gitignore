@@ -64,3 +64,7 @@ documento-projeto.md
 
 # marketing (vídeos, narração, cards, marca): fica só local, fora do repositório
 design/
+
+# segredos temporários de scripts/configure-booking-reminders.sh (versões antigas)
+.reminder-secrets.*
+.reminder-cron.*

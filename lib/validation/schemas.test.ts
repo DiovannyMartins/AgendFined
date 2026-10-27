@@ -435,3 +435,68 @@ describe("dashboard schemas speak pt-BR", () => {
     }
   }
 });
+
+// Names and notes reach the agenda, the e-mails and the .ics: a name stays on
+// one line and a note keeps only plain line breaks, never control characters.
+describe("quebras de linha e caracteres de controle nos textos", () => {
+  const breaks = "Ana\r\nMaria\rde\nSouza\u0085da\u2028Silva\u2029Costa\u0000\u0007\u001b\u007f\tJr";
+  const singleLine = "Ana Maria de Souza da Silva Costa Jr";
+
+  it("puts the cliente's name on one line, in the reserva and in the owner's form", () => {
+    const booking = bookingSchema.parse({
+      serviceId: "00000000-0000-0000-0000-000000000000",
+      startAt: "2026-09-10T12:00:00.000Z",
+      customerName: ` ${breaks}\r\n`,
+      customerPhone: "+5511988888888",
+    });
+    const owner = ownerBookingSchema.parse({
+      serviceId: "00000000-0000-0000-0000-000000000000",
+      date: "2026-09-10",
+      startTime: "09:00",
+      customerName: breaks,
+      customerPhone: "11988888888",
+    });
+
+    expect(booking.customerName).toBe(singleLine);
+    expect(owner.customerName).toBe(singleLine);
+  });
+
+  it("does not count control characters toward the name's minimum length", () => {
+    expect(waitlistSchema.safeParse({
+      serviceId: "00000000-0000-0000-0000-000000000000",
+      startAt: "2026-09-10T12:00:00.000Z",
+      customerName: "A\u0000\u0007",
+      customerPhone: "+5511988888888",
+    }).success).toBe(false);
+  });
+
+  it("keeps the observação's line breaks as plain LF and drops the control characters", () => {
+    const booking = publicBookingSchema.parse({
+      serviceId: "00000000-0000-0000-0000-000000000000",
+      startAt: "2026-09-10T12:00:00.000Z",
+      customerName: "Maria",
+      customerPhone: "+5511988888888",
+      customerNote: "linha 1\r\nlinha 2\rlinha 3\u2028linha 4\u2029linha 5\u0085fim\u0000\u001b\tok",
+    });
+
+    expect(booking.customerNote).toBe("linha 1\nlinha 2\nlinha 3\nlinha 4\nlinha 5\nfim ok");
+  });
+
+  it("puts the negócio and serviço names on one line, keeping descriptions multi-line", () => {
+    const business = businessSchema.parse({
+      name: breaks,
+      slug: "barbearia-demo",
+      phone: "+5511999999999",
+      slotIntervalMinutes: 30,
+      minNoticeMinutes: 120,
+      bookingWindowDays: 60,
+      timezone: "America/Sao_Paulo",
+      description: "Aberto\r\nde terça\u2028a sábado\u0007",
+    });
+    const service = serviceSchema.parse({ name: "Corte\rBarba\u0000", durationMinutes: 30, priceCents: 4000 });
+
+    expect(business.name).toBe(singleLine);
+    expect(business.description).toBe("Aberto\nde terça\na sábado");
+    expect(service.name).toBe("Corte Barba");
+  });
+});

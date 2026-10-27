@@ -64,6 +64,40 @@ begin
   if position(v_secret in v_health::text) > 0 then
     raise exception 'health must never return the cron secret';
   end if;
+  if v_health->>'dispatch_source' <> 'job_command'
+     or (v_health->>'secret_in_job_command')::boolean is not true then
+    raise exception 'health must flag the legacy secret in the job command, got %', v_health;
+  end if;
+
+  -- Vault wiring (20261027030000): the job command carries no secret.
+  perform cron.alter_job(v_job_id, command := 'select public.process_booking_reminders();');
+  perform set_config('app.reminder_cron_url', '', true);
+  perform set_config('app.reminder_cron_secret', '', true);
+  perform vault.create_secret(v_secret, 'agendfined_reminder_cron_secret');
+  perform vault.create_secret(E'https://example.supabase.co\r/functions/v1/booking-reminders', 'agendfined_reminder_cron_url');
+  v_raised := false;
+  begin
+    perform public.process_booking_reminders();
+  exception when others then
+    v_raised := sqlerrm like 'booking_reminders: invalid cron url%';
+  end;
+  if not v_raised then
+    raise exception 'process_booking_reminders must read the URL from Vault and reject control characters';
+  end if;
+
+  perform vault.update_secret(s.id, 'https://example.supabase.co/functions/v1/booking-reminders')
+     from vault.secrets s
+    where s.name = 'agendfined_reminder_cron_url';
+  v_health := public.get_booking_reminders_health();
+  if v_health->>'dispatch_source' <> 'vault'
+     or (v_health->>'dispatch_configured')::boolean is not true
+     or (v_health->>'url_valid')::boolean is not true
+     or (v_health->>'secret_in_job_command')::boolean is not false then
+    raise exception 'health must report the Vault wiring, got %', v_health;
+  end if;
+  if position(v_secret in v_health::text) > 0 then
+    raise exception 'health must never return the Vault secret';
+  end if;
 
   if has_function_privilege('anon', 'public.get_booking_reminders_health()', 'execute')
      or has_function_privilege('authenticated', 'public.get_booking_reminders_health()', 'execute') then

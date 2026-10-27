@@ -82,11 +82,11 @@ jobs:
 
       - name: Start isolated database and apply migrations
         run: |
-          npx supabase start \
+          npx --yes supabase@2.116.0 start \
             --workdir restore-project \
             --exclude gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor \
             --yes
-          npx supabase db reset --local --workdir restore-project --no-seed --yes
+          npx --yes supabase@2.116.0 db reset --local --workdir restore-project --no-seed --yes
 
       - name: Restore public and Auth dumps into isolated database
         env:
@@ -127,4 +127,4 @@ jobs:
 
       - name: Stop isolated database
         if: always()
-        run: npx supabase stop --workdir restore-project --no-backup
+        run: npx --yes supabase@2.116.0 stop --workdir restore-project --no-backup

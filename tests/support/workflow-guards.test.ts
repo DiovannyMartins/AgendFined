@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 // Static guard: keeps the restore drill from silently losing assertions.
@@ -59,5 +59,25 @@ describe("backup freshness watchdog workflow", () => {
     expect(watchdog).toContain("actions/workflows/database-backup.yml/runs?branch=$default_branch&status=success");
     expect(watchdog).toContain('select(.event == "schedule" or .event == "workflow_dispatch")');
     expect(watchdog).toContain("select(.repository.full_name == $repo and .head_repository.full_name == $repo)");
+  });
+});
+
+describe("workflow supply chain", () => {
+  const workflows = readdirSync(".github/workflows")
+    .filter((name) => name.endsWith(".yml"))
+    .map((name) => ({ name, text: readFileSync(`.github/workflows/${name}`, "utf8") }));
+
+  it("pins every action to a full commit SHA with the version in a comment", () => {
+    for (const { name, text } of workflows) {
+      for (const line of text.split(/\r?\n/).filter((l) => /^\s*(-\s+)?uses:/.test(l))) {
+        expect(line, name).toMatch(/uses: [\w.-]+\/[\w.-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$/);
+      }
+    }
+  });
+
+  it("runs the Supabase CLI at a fixed version in the restore drill", () => {
+    const calls = drill.match(/npx [^\n]*supabase\S*/g) ?? [];
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) expect(call).toMatch(/npx --yes supabase@\d+\.\d+\.\d+$/);
   });
 });

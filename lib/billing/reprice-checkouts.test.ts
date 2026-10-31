@@ -24,6 +24,7 @@ function makeDeps(overrides: Partial<RepriceCheckoutsDeps> = {}): RepriceCheckou
     getPreapproval: vi.fn(async (id: string) => snapshot(id)),
     updatePreapprovalAmount: vi.fn(async () => undefined),
     cancelPreapproval: vi.fn(async () => undefined),
+    reportRacedCharge: vi.fn(async () => undefined),
     currentPriceCents: 1990,
     ...overrides,
   };
@@ -119,6 +120,92 @@ describe("repricePendingCheckouts", () => {
     expect(reportFailure).toHaveBeenCalledWith({
       mpPreapprovalId: "mp_down",
       reason: "Mercado Pago preapproval fetch failed (429): Too many requests",
+    });
+  });
+
+  // GHSA-xqc5: o pagador autoriza o preço antigo entre o GET e o PUT. Com o
+  // valor já reescrito, o gate de termos do webhook não vê mais o preço antigo.
+  describe("when the payer authorizes the old price while the checkout is repriced", () => {
+    function racedDeps(overrides: Partial<RepriceCheckoutsDeps> = {}) {
+      let calls = 0;
+      return makeDeps({
+        getPreapproval: vi.fn(async (id: string) =>
+          calls++ === 0 ? snapshot(id) : snapshot(id, { status: "authorized", transactionAmount: 19.9 }),
+        ),
+        ...overrides,
+      });
+    }
+
+    it("reports the charge for a refund and cancels the assinatura", async () => {
+      const deps = racedDeps();
+
+      const result = await repricePendingCheckouts(deps);
+
+      expect(deps.reportRacedCharge).toHaveBeenCalledWith({ mpPreapprovalId: "mp_old" });
+      expect(deps.cancelPreapproval).toHaveBeenCalledWith("mp_old");
+      expect(vi.mocked(deps.reportRacedCharge).mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(deps.cancelPreapproval).mock.invocationCallOrder[0],
+      );
+      expect(result).toEqual({ checked: 1, repriced: 0, cancelled: 1, failed: 0 });
+    });
+
+    it("also reports it when Mercado Pago refuses the new amount on the authorized assinatura", async () => {
+      const deps = racedDeps({
+        updatePreapprovalAmount: vi.fn(async () => {
+          throw new Error("Mercado Pago preapproval amount update failed (400)");
+        }),
+      });
+
+      const result = await repricePendingCheckouts(deps);
+
+      expect(deps.reportRacedCharge).toHaveBeenCalledWith({ mpPreapprovalId: "mp_old" });
+      expect(deps.cancelPreapproval).toHaveBeenCalledWith("mp_old");
+      expect(result).toEqual({ checked: 1, repriced: 0, cancelled: 1, failed: 0 });
+    });
+
+    it("never cancels before the charge is reported", async () => {
+      const reportFailure = vi.fn();
+      const deps = racedDeps({
+        reportRacedCharge: vi.fn(async () => {
+          throw new Error("report failed");
+        }),
+        reportFailure,
+      });
+
+      const result = await repricePendingCheckouts(deps);
+
+      expect(deps.cancelPreapproval).not.toHaveBeenCalled();
+      expect(result).toEqual({ checked: 1, repriced: 0, cancelled: 0, failed: 1 });
+    });
+  });
+
+  it("does not report a repricing that Mercado Pago confirms as still pending", async () => {
+    const deps = makeDeps();
+
+    await repricePendingCheckouts(deps);
+
+    expect(deps.getPreapproval).toHaveBeenCalledTimes(2);
+    expect(deps.reportRacedCharge).not.toHaveBeenCalled();
+  });
+
+  it("reports a repricing it could not confirm, so it is checked by hand", async () => {
+    const reportFailure = vi.fn();
+    let calls = 0;
+    const deps = makeDeps({
+      getPreapproval: vi.fn(async (id: string) => {
+        if (calls++ === 0) return snapshot(id);
+        throw new Error("Mercado Pago preapproval fetch timed out");
+      }),
+      reportFailure,
+    });
+
+    const result = await repricePendingCheckouts(deps);
+
+    expect(deps.cancelPreapproval).not.toHaveBeenCalled();
+    expect(result).toEqual({ checked: 1, repriced: 0, cancelled: 0, failed: 1 });
+    expect(reportFailure).toHaveBeenCalledWith({
+      mpPreapprovalId: "mp_old",
+      reason: expect.stringContaining("not confirmed"),
     });
   });
 });

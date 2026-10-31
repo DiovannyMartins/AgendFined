@@ -67,6 +67,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 import { getPublicRescheduleSlots, reschedulePublicBooking } from "./reschedule";
 import { hashCancelToken } from "@/lib/bookings/cancel";
+import { flushAfterResponse } from "@/tests/mocks/after-response";
 import { PUBLIC_CAPABILITY_RATE_LIMIT, RATE_LIMIT } from "@/lib/booking/rate-limit";
 
 // 09:10 em São Paulo, sábado 24/10/2026.
@@ -150,6 +151,10 @@ describe("reschedulePublicBooking (#194)", () => {
         args: { p_code: CODE, p_cancel_token_hash: hashCancelToken(TOKEN), p_start_at: "2026-10-26T18:00:00.000Z" },
       },
     ]);
+    // #217: the response awaits only the cliente's e-mail.
+    expect(mocks.syncGoogleCalendarBooking).not.toHaveBeenCalled();
+    expect(mocks.notifyOwner).not.toHaveBeenCalled();
+    await flushAfterResponse();
     expect(mocks.syncGoogleCalendarBooking).toHaveBeenCalledWith("business-1", "booking-1");
     expect(mocks.sendCustomerRescheduledEmail).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -243,12 +248,14 @@ describe("reschedulePublicBooking (#194)", () => {
   it("gasta um e-mail do orçamento do negócio por envio e respeita o teto do destinatário", async () => {
     expect((await reschedule(form())).status).toBe("done");
     expect(state.counters.get("business:business-1|public_capability_email|1h")).toBe(2);
+    await flushAfterResponse();
 
     for (const key of state.counters.keys()) {
       if (key.endsWith("|public-write")) state.counters.set(key, RATE_LIMIT.perRecipientEmail.limit);
     }
     vi.clearAllMocks();
     expect((await reschedule(form())).status).toBe("done");
+    await flushAfterResponse();
     expect(mocks.sendCustomerRescheduledEmail).not.toHaveBeenCalled();
     expect(mocks.notifyOwner).toHaveBeenCalledTimes(1);
   });

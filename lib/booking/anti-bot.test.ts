@@ -64,6 +64,27 @@ describe("verifyTurnstile", () => {
     expect((await verifyTurnstile("token", options)).ok).toBe(false);
   });
 
+  // #217: a siteverify that hangs must not hold the reserva; it is refused.
+  it("refuses in production when siteverify does not answer within 5 s", async () => {
+    configureVerifier();
+    vi.stubEnv("NODE_ENV", "production");
+    const timeout = new AbortController();
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout").mockReturnValue(timeout.signal);
+    vi.mocked(fetch).mockImplementation(
+      (_input, init) =>
+        new Promise((_resolve, reject) =>
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason)),
+        ),
+    );
+
+    const pending = verifyTurnstile("token", options);
+    timeout.abort(new DOMException("The operation timed out.", "TimeoutError"));
+
+    expect((await pending).ok).toBe(false);
+    expect(timeoutSpy).toHaveBeenCalledWith(5000);
+    timeoutSpy.mockRestore();
+  });
+
   it("fails closed for missing tokens, network failures, invalid JSON, and non-2xx responses", async () => {
     configureVerifier();
     expect((await verifyTurnstile(undefined, options)).ok).toBe(false);

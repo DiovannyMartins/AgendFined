@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { decryptGoogleToken } from "@/lib/google-calendar/oauth";
+import { flushAfterResponse } from "@/tests/mocks/after-response";
 
 const { getCurrentBusiness, getUser, syncGoogleCalendarForBusiness } = vi.hoisted(() => ({
   getCurrentBusiness: vi.fn(),
@@ -117,7 +118,7 @@ describe("Google Calendar OAuth callback", () => {
     expect(tokenExchanges).toEqual([]);
   });
 
-  it("stores only encrypted tokens and starts the first sync", async () => {
+  it("stores only encrypted tokens and starts the first sync after the redirect", async () => {
     const response = await GET(callback("?state=expected-state&code=auth-code"));
 
     expect(calendarStatus(response)).toBe("connected");
@@ -131,7 +132,26 @@ describe("Google Calendar OAuth callback", () => {
     expect(decryptGoogleToken(String(saved.access_token_ciphertext))).toBe("ya29.access");
     expect(decryptGoogleToken(String(saved.refresh_token_ciphertext))).toBe("1//refresh");
     expect(response.headers.get("location")).not.toContain("ya29");
+    // #217: the first import can be hundreds of Google calls; the dono does not wait.
+    expect(syncGoogleCalendarForBusiness).not.toHaveBeenCalled();
+    await flushAfterResponse();
     expect(syncGoogleCalendarForBusiness).toHaveBeenCalledWith("business");
+  });
+
+  it("keeps the connection and logs it when the first sync fails after the redirect", async () => {
+    syncGoogleCalendarForBusiness.mockRejectedValueOnce(new Error("quota exceeded"));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await GET(callback("?state=expected-state&code=auth-code"));
+    await flushAfterResponse();
+
+    expect(calendarStatus(response)).toBe("connected");
+    expect(savedConnections).toHaveLength(1);
+    expect(consoleError).toHaveBeenCalledWith("google_calendar_initial_sync_failed", {
+      businessId: "business",
+      reason: "quota exceeded",
+    });
+    consoleError.mockRestore();
   });
 
   it("reports a failed connection when Google rejects the code", async () => {

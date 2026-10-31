@@ -10,6 +10,7 @@ import {
   GOOGLE_CALENDAR_SCOPE,
 } from "@/lib/google-calendar/oauth";
 import { syncGoogleCalendarForBusiness } from "@/lib/google-calendar/sync";
+import { runAfterResponse } from "@/lib/after-response";
 import type { GoogleCalendarCallbackStatus } from "@/lib/google-calendar/callback-status";
 
 export const runtime = "nodejs";
@@ -82,11 +83,12 @@ export async function GET(request: NextRequest) {
     }, { onConflict: "business_id" });
     if (error) throw new Error("GOOGLE_CALENDAR_CONNECTION_SAVE_FAILED");
 
-    try {
-      await syncGoogleCalendarForBusiness(business.id);
-    } catch {
-      // The connection is valid even if the first import needs a manual retry.
-    }
+    // The first import can take hundreds of Google calls, so it runs after the
+    // redirect (#217). The connection is valid even if it needs a manual retry.
+    const businessId = business.id;
+    runAfterResponse("google_calendar_initial_sync_failed", { businessId }, () =>
+      syncGoogleCalendarForBusiness(businessId),
+    );
     return finish("connected");
   } catch {
     return finish("connection_failed");

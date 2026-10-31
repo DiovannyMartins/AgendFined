@@ -50,6 +50,7 @@ vi.mock("@/lib/supabase/server", () => ({
 import { getOwnerRescheduleSlots, rescheduleOwnerBooking } from "./reschedule";
 import { OWNER_EMAIL_RATE_LIMIT } from "@/lib/booking/rate-limit";
 import { rateLimitAdmin } from "@/tests/mocks/rate-limit-admin";
+import { flushAfterResponse } from "@/tests/mocks/after-response";
 
 // 09:10 em São Paulo, sábado 24/10/2026.
 const NOW = new Date("2026-10-24T12:10:00.000Z");
@@ -116,6 +117,9 @@ describe("rescheduleOwnerBooking (#194)", () => {
     expect(state.rpcCalls).toEqual([
       { name: "reschedule_owner_booking", args: { p_booking_id: BOOKING_ID, p_start_at: "2026-10-26T18:00:00.000Z" } },
     ]);
+    // #217: Google is synced after the response.
+    expect(syncGoogleCalendarBooking).not.toHaveBeenCalled();
+    await flushAfterResponse();
     expect(syncGoogleCalendarBooking).toHaveBeenCalledWith("business-1", BOOKING_ID);
     expect(sendBusinessRescheduledEmail).toHaveBeenCalledWith(
       expect.objectContaining({

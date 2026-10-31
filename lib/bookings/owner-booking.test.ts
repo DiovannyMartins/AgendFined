@@ -46,6 +46,7 @@ vi.mock("@/lib/supabase/server", () => ({
 import { createOwnerBooking, getOwnerSlots } from "./owner-booking";
 import { OWNER_EMAIL_RATE_LIMIT } from "@/lib/booking/rate-limit";
 import { rateLimitAdmin } from "@/tests/mocks/rate-limit-admin";
+import { flushAfterResponse } from "@/tests/mocks/after-response";
 
 // 09:10 em São Paulo, sábado 24/10/2026.
 const NOW = new Date("2026-10-24T12:10:00.000Z");
@@ -131,6 +132,9 @@ describe("createOwnerBooking (#193)", () => {
     expect(result.confirmationUrl).not.toContain(String(args.p_cancel_token_hash));
     expect(result.message).toContain("WhatsApp");
     expect(sendBookingConfirmationEmail).not.toHaveBeenCalled();
+    // #217: Google is synced after the response.
+    expect(syncGoogleCalendarBooking).not.toHaveBeenCalled();
+    await flushAfterResponse();
     expect(syncGoogleCalendarBooking).toHaveBeenCalledWith("business-1", "booking-1");
   });
 

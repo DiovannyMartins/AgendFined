@@ -7,7 +7,7 @@ import { canTransition, isTooEarlyFor, type BookingStatus } from "@/lib/bookings
 import { bookingStatusSchema } from "@/lib/validation/schemas";
 import { classifyCancellationReason } from "@/lib/bookings/classification";
 import { statusLabel } from "@/lib/bookings/status";
-import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
+import { syncGoogleCalendarBookingAfterResponse } from "@/lib/after-response";
 import { sendBusinessCancelledEmail } from "@/lib/email/booking-cancellation";
 import { spendOwnerEmail } from "@/lib/email/owner-email-budget";
 import { buildPublicBookingUrl } from "@/lib/bookings/public-booking-url";
@@ -102,13 +102,7 @@ export async function updateBookingStatus(
     }
   }
 
-  if (nextStatus === "cancelled") {
-    try {
-      await syncGoogleCalendarBooking(business.id, id);
-    } catch (syncError) {
-      console.error("google_calendar_booking_sync_failed", { bookingId: id, reason: syncError instanceof Error ? syncError.message : "unknown" });
-    }
-  }
+  if (nextStatus === "cancelled") syncGoogleCalendarBookingAfterResponse(business.id, id);
 
   revalidatePath("/dashboard/agenda");
   revalidatePath("/dashboard/clientes");

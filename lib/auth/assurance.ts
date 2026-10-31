@@ -1,4 +1,4 @@
-import type { AuthMFAGetAuthenticatorAssuranceLevelResponse, SupabaseClient } from "@supabase/supabase-js";
+import { AuthError, type AuthMFAGetAuthenticatorAssuranceLevelResponse, type SupabaseClient } from "@supabase/supabase-js";
 
 // Supabase leaves room for future assurance levels (`string & {}`), while the
 // current policy only needs to distinguish aal2 from every lower level.
@@ -15,6 +15,7 @@ type AssuranceClient = {
   auth: Pick<SupabaseClient["auth"], "getSession"> & {
     mfa: Pick<SupabaseClient["auth"]["mfa"], "getAuthenticatorAssuranceLevel">;
   };
+  rpc: (fn: "current_session_mfa_verified") => PromiseLike<{ data: boolean | null; error: unknown }>;
 };
 
 // Without an argument, getAuthenticatorAssuranceLevel reads nextLevel from the
@@ -22,6 +23,11 @@ type AssuranceClient = {
 // edit. Given the access token, Supabase Auth validates it and answers with
 // the factors it stores, so a session cannot skip the second factor by
 // dropping its factors from the cookie.
+//
+// An aal2 counts only when the session confirmed the code through verifyTotp
+// (GHSA-vjcg): one verified straight against Supabase Auth skipped the attempt
+// limit, so the app treats it as aal1 and sends it back to /mfa, just like
+// private.mfa_aal_allowed() does for RLS.
 export async function getVerifiedAssurance(
   supabase: AssuranceClient,
 ): Promise<AuthMFAGetAuthenticatorAssuranceLevelResponse> {
@@ -30,7 +36,12 @@ export async function getVerifiedAssurance(
   if (!session) {
     return { data: { currentLevel: null, nextLevel: null, currentAuthenticationMethods: [] }, error: null };
   }
-  return supabase.auth.mfa.getAuthenticatorAssuranceLevel(session.access_token);
+  const result = await supabase.auth.mfa.getAuthenticatorAssuranceLevel(session.access_token);
+  if (result.error || result.data.currentLevel !== "aal2" || result.data.nextLevel !== "aal2") return result;
+
+  const { data: verifiedByApp, error: verifiedError } = await supabase.rpc("current_session_mfa_verified");
+  if (verifiedError) return { data: null, error: new AuthError("Could not check the MFA session.") };
+  return verifiedByApp === true ? result : { data: { ...result.data, currentLevel: "aal1" }, error: null };
 }
 
 export function safeInternalPath(value: string | null | undefined, fallback = "/dashboard"): string {

@@ -45,19 +45,62 @@ describe("requestPathOf (#149)", () => {
 });
 
 describe("getVerifiedAssurance", () => {
-  function client(session: { access_token: string } | null) {
+  function client(
+    session: { access_token: string } | null,
+    currentLevel: "aal1" | "aal2" = "aal1",
+    verifiedByApp: { data: boolean | null; error: unknown } = { data: true, error: null },
+  ) {
     return {
       auth: {
         getSession: vi.fn(async () => ({ data: { session }, error: null })),
         mfa: {
           getAuthenticatorAssuranceLevel: vi.fn(async () => ({
-            data: { currentLevel: "aal1" as const, nextLevel: "aal2" as const, currentAuthenticationMethods: [] },
+            data: { currentLevel, nextLevel: "aal2" as const, currentAuthenticationMethods: [] },
             error: null,
           })),
         },
       },
+      rpc: vi.fn(async () => verifiedByApp),
     };
   }
+
+  // GHSA-vjcg: um aal2 obtido direto no Supabase Auth pulou o limite de
+  // tentativas do app; a sessão volta para /mfa.
+  it("keeps an aal2 the session confirmed through the app", async () => {
+    const supabase = client({ access_token: "access-token" }, "aal2");
+
+    const result = await getVerifiedAssurance(supabase as never);
+
+    expect(supabase.rpc).toHaveBeenCalledWith("current_session_mfa_verified");
+    expect(result.data?.currentLevel).toBe("aal2");
+    expect(requiresMfaChallenge(result.data!)).toBe(false);
+  });
+
+  it("treats an aal2 confirmed straight against Supabase Auth as aal1", async () => {
+    const supabase = client({ access_token: "access-token" }, "aal2", { data: false, error: null });
+
+    const result = await getVerifiedAssurance(supabase as never);
+
+    expect(result.data?.currentLevel).toBe("aal1");
+    expect(requiresMfaChallenge(result.data!)).toBe(true);
+  });
+
+  it("fails closed when the database cannot tell how the aal2 was confirmed", async () => {
+    const supabase = client({ access_token: "access-token" }, "aal2", { data: null, error: { message: "down" } });
+
+    const result = await getVerifiedAssurance(supabase as never);
+
+    expect(result.data).toBeNull();
+    expect(result.error).not.toBeNull();
+  });
+
+  it("does not ask the database while the session is still aal1", async () => {
+    const supabase = client({ access_token: "access-token" });
+
+    await getVerifiedAssurance(supabase as never);
+
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
 
   // Sem o token, o Supabase lê os fatores da cópia do usuário no cookie, que
   // quem tem o cookie pode editar.

@@ -9,7 +9,10 @@ no servidor.
 - MFA TOTP: o proprietário ativa em `/mfa`; após a ativação, cada login precisa
   confirmar o código. A migração `20261001000000_mfa_opt_in_rls.sql` exige
   `aal2` nas tabelas da aplicação quando a conta tem fator verificado. A
-  verificação de código tem limite por usuário. A página de configurações
+  verificação de código tem limite por usuário, e o banco só aceita o `aal2`
+  confirmado pela Server Action (migration `20261031060000_mfa_verified_by_app.sql`,
+  ADR 0012): o código confirmado direto no Supabase Auth não abre os dados. A
+  página de configurações
   contém o acesso ao cadastro do autenticador.
 - Senhas: cadastro e redefinição exigem ao menos 8 caracteres, com letras minúsculas e maiúsculas,
   números e símbolos; o login aceita

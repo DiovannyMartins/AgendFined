@@ -1210,6 +1210,18 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: number
       }
+      grant_mfa_challenge: {
+        Args: { p_challenge_id: string; p_session_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      grant_mfa_factor_removal: {
+        Args: { p_factor_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      current_session_mfa_verified: {
+        Args: never
+        Returns: boolean
+      }
     }
     Enums: {
       booking_status: "confirmed" | "completed" | "cancelled" | "no_show"

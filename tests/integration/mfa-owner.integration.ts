@@ -1,6 +1,6 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
-import { adminClient, anonClientForUser } from "./index";
+import { adminClient, anonClientForUser, verifyTotpThroughApp } from "./index";
 
 const admin = adminClient();
 const stamp = randomBytes(5).toString("hex");
@@ -90,11 +90,7 @@ describe("MFA and owner-only business access with disposable accounts", () => {
     const enrolled = await ownerClient.auth.mfa.enroll({ factorType: "totp" });
     if (enrolled.error || !enrolled.data) throw enrolled.error;
     const { id: factorId, totp: factor } = enrolled.data;
-    const enrollmentChallenge = await ownerClient.auth.mfa.challenge({ factorId });
-    if (enrollmentChallenge.error || !enrollmentChallenge.data) throw enrollmentChallenge.error;
-    const enrollmentVerify = await ownerClient.auth.mfa.verify({
-      factorId, challengeId: enrollmentChallenge.data.id, code: totp(factor.secret),
-    });
+    const enrollmentVerify = await verifyTotpThroughApp(ownerClient, admin, factorId, totp(factor.secret));
     if (enrollmentVerify.error) throw enrollmentVerify.error;
 
     await ownerClient.auth.signOut();
@@ -105,14 +101,65 @@ describe("MFA and owner-only business access with disposable accounts", () => {
     const blocked = await ownerAal1.from("services").select("id").eq("id", service.id);
     expect(blocked.data).toHaveLength(0);
 
-    const loginChallenge = await ownerAal1.auth.mfa.challenge({ factorId });
-    if (loginChallenge.error || !loginChallenge.data) throw loginChallenge.error;
-    const loginVerify = await ownerAal1.auth.mfa.verify({
-      factorId, challengeId: loginChallenge.data.id, code: totp(factor.secret),
-    });
+    const loginVerify = await verifyTotpThroughApp(ownerAal1, admin, factorId, totp(factor.secret));
     if (loginVerify.error) throw loginVerify.error;
     const allowed = await ownerAal1.from("services").select("id").eq("id", service.id);
     expect(allowed.error).toBeNull();
     expect(allowed.data).toHaveLength(1);
+    expect((await ownerAal1.rpc("current_session_mfa_verified")).data).toBe(true);
+
+    // GHSA-vjcg: the code confirmed straight against Supabase Auth skips the
+    // app's attempt limit. Auth still issues aal2, but the database does not
+    // accept it, and the app refuses to verify for a while afterwards.
+    const direct = await anonClientForUser(owner.email, password);
+    const directChallenge = await direct.auth.mfa.challenge({ factorId });
+    if (directChallenge.error || !directChallenge.data) throw directChallenge.error;
+    const directVerify = await direct.auth.mfa.verify({
+      factorId, challengeId: directChallenge.data.id, code: totp(factor.secret),
+    });
+    if (directVerify.error) throw directVerify.error;
+    expect((await direct.auth.mfa.getAuthenticatorAssuranceLevel()).data?.currentLevel).toBe("aal2");
+    expect((await direct.from("services").select("id").eq("id", service.id)).data).toHaveLength(0);
+    expect((await direct.rpc("current_session_mfa_verified")).data).toBe(false);
+    await expect(verifyTotpThroughApp(direct, admin, factorId, totp(factor.secret))).rejects.toThrow("refused");
+
+    // Nor can that session drop the factor to fall back to a password-only account.
+    expect((await direct.auth.mfa.unenroll({ factorId })).error).not.toBeNull();
+    const { data: factors } = await admin.auth.admin.mfa.listFactors({ userId: owner.id });
+    expect(factors?.factors.map((f) => f.id)).toContain(factorId);
+
+    // The session confirmed through the app keeps its access.
+    expect((await ownerAal1.from("services").select("id").eq("id", service.id)).data).toHaveLength(1);
+    expect((await ownerAal1.rpc("current_session_mfa_verified")).data).toBe(true);
   }, 120_000);
+
+  it("registers only a challenge of the user's own factor and session", async () => {
+    const owner = await createUser("grant-owner");
+    const other = await createUser("grant-other");
+    const ownerClient = await anonClientForUser(owner.email, password);
+    const otherClient = await anonClientForUser(other.email, password);
+    const enrolled = await ownerClient.auth.mfa.enroll({ factorType: "totp" });
+    if (enrolled.error || !enrolled.data) throw enrolled.error;
+    const challenge = await ownerClient.auth.mfa.challenge({ factorId: enrolled.data.id });
+    if (challenge.error || !challenge.data) throw challenge.error;
+    const { data: otherClaims } = await otherClient.auth.getClaims();
+    const otherSession = String(otherClaims?.claims.session_id);
+
+    const wrongSession = await admin.rpc("grant_mfa_challenge", {
+      p_user_id: owner.id, p_session_id: otherSession, p_challenge_id: challenge.data.id,
+    });
+    expect(wrongSession.error?.message).toContain("INVALID_MFA_CHALLENGE");
+    const wrongUser = await admin.rpc("grant_mfa_challenge", {
+      p_user_id: other.id, p_session_id: otherSession, p_challenge_id: challenge.data.id,
+    });
+    expect(wrongUser.error?.message).toContain("INVALID_MFA_CHALLENGE");
+    const fromBrowser = await ownerClient.rpc("grant_mfa_challenge", {
+      p_user_id: owner.id, p_session_id: otherSession, p_challenge_id: challenge.data.id,
+    });
+    expect(fromBrowser.error).not.toBeNull();
+    const removalFromBrowser = await ownerClient.rpc("grant_mfa_factor_removal", {
+      p_user_id: owner.id, p_factor_id: enrolled.data.id,
+    });
+    expect(removalFromBrowser.error).not.toBeNull();
+  }, 60_000);
 });

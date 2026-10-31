@@ -13,6 +13,7 @@ type SecurityEvent =
   | "auth.mfa_enrollment_started"
   | "auth.mfa_verified"
   | "auth.mfa_verification_failed"
+  | "auth.mfa_out_of_band_blocked"
   | "auth.mfa_removed"
   | "auth.mfa_recovery_codes_generated"
   | "auth.mfa_recovery_code_used"

@@ -14,6 +14,7 @@ import {
   normalizeRecoveryCode,
   replaceRecoveryCodes,
 } from "@/lib/auth/recovery-codes";
+import { grantMfaChallenge, grantMfaFactorRemoval } from "@/lib/auth/mfa-grants";
 import { resolveAppOrigin } from "@/lib/app-origin";
 import { sendMfaRecoveryUsedEmail } from "@/lib/email/mfa-recovery-used";
 
@@ -341,16 +342,33 @@ export async function verifyTotp(factorId: string, code: string): Promise<Action
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, code: "UNAUTHORIZED", message: "Faça login novamente." };
 
+  let admin: ReturnType<typeof createAdminClient>;
   try {
-    if (!await enforceMfaRateLimit(createAdminClient(), user.id)) {
+    admin = createAdminClient();
+    if (!await enforceMfaRateLimit(admin, user.id)) {
       return { ok: false, code: "RATE_LIMITED", message: "Muitas tentativas. Aguarde alguns minutos." };
     }
   } catch {
     return { ok: false, code: "RATE_LIMIT_UNAVAILABLE", message: "Tente novamente mais tarde." };
   }
 
+  const { data: claims, error: claimsError } = await supabase.auth.getClaims();
+  const sessionId = claims?.claims.session_id;
+  if (claimsError || typeof sessionId !== "string") return { ok: false, code: "UNAUTHORIZED", message: "Faça login novamente." };
   const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
   if (challengeError) return genericError("Não foi possível validar o autenticador.");
+  // The database only accepts an aal2 from a challenge registered here, behind
+  // the attempt limit above (GHSA-vjcg).
+  let granted: boolean;
+  try {
+    granted = await grantMfaChallenge(admin, user.id, sessionId, challenge.id);
+  } catch {
+    return genericError("Não foi possível validar o autenticador.");
+  }
+  if (!granted) {
+    auditSecurityEvent("auth.mfa_out_of_band_blocked", user.id);
+    return { ok: false, code: "RATE_LIMITED", message: "Muitas tentativas. Aguarde alguns minutos." };
+  }
   const { error } = await supabase.auth.mfa.verify({ factorId, challengeId: challenge.id, code });
   if (error) {
     auditSecurityEvent("auth.mfa_verification_failed", user.id);
@@ -371,6 +389,9 @@ export async function removeTotp(factorId: string): Promise<ActionResult> {
   const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
   if (factorsError || !factors.totp.some((factor) => factor.id === factorId && factor.status === "verified")) {
     return { ok: false, code: "NOT_FOUND", message: "Autenticador não encontrado." };
+  }
+  if (!await grantMfaFactorRemoval(createAdminClient(), user.id, factorId)) {
+    return genericError("Não foi possível remover o autenticador.");
   }
   const { error } = await supabase.auth.mfa.unenroll({ factorId });
   if (error) return genericError("Não foi possível remover o autenticador.");
@@ -450,8 +471,9 @@ export async function redeemMfaRecoveryCode(input: string): Promise<ActionResult
   // remaining codes valid for another try.
   const { data: factors, error: factorsError } = await admin.auth.admin.mfa.listFactors({ userId: user.id });
   const removed = !factorsError && (await Promise.all(
-    factors.factors.map((factor) => admin.auth.admin.mfa.deleteFactor({ id: factor.id, userId: user.id })),
-  )).every((result) => !result.error);
+    factors.factors.map(async (factor) => await grantMfaFactorRemoval(admin, user.id, factor.id) &&
+      !(await admin.auth.admin.mfa.deleteFactor({ id: factor.id, userId: user.id })).error),
+  )).every(Boolean);
   if (!removed) {
     return genericError("Não foi possível desativar o autenticador. Tente outro código de recuperação.");
   }

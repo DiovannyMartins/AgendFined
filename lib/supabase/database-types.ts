@@ -794,39 +794,10 @@ export type Database = {
       }
       convert_waitlist_entry: {
         Args: { p_cancel_token_hash: string; p_entry_id: string }
-        Returns: {
-          business_id: string
-          cancel_reason: string | null
-          cancel_reason_category: string | null
-
-          cancelled_by: string | null
-          created_at: string
-          customer_email_snapshot: string | null
-          customer_id: string
-          customer_name_snapshot: string
-          customer_note: string | null
-          customer_note_category: string | null
-          customer_note_requires_follow_up: boolean
-          customer_phone_snapshot: string
-          duration_minutes_snapshot: number
-          end_at: string
-          id: string
-          price_cents_snapshot: number
-          public_code: string
-          reminder_sent_at: string | null
-          rescheduled_at: string | null
-          service_id: string
-          service_name_snapshot: string
-          start_at: string
-          status: Database["public"]["Enums"]["booking_status"]
-          updated_at: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "waitlist_entries"
-          isOneToOne: true
-          isSetofReturn: false
-        }
+        Returns: Omit<
+          Database["public"]["Tables"]["bookings"]["Row"],
+          "cancel_token_hash" | "reminder_claim_token"
+        >
       }
       create_booking: {
         Args: {
@@ -883,13 +854,10 @@ export type Database = {
           p_service_id: string
           p_start_at: string
         }
-        Returns: Database["public"]["Tables"]["bookings"]["Row"]
-        SetofOptions: {
-          from: "*"
-          to: "bookings"
-          isOneToOne: true
-          isSetofReturn: false
-        }
+        Returns: Omit<
+          Database["public"]["Tables"]["bookings"]["Row"],
+          "cancel_token_hash" | "reminder_claim_token"
+        >
       }
       downgrade_expired_subscriptions: { Args: never; Returns: number }
       reschedule_booking_by_public_code: {
@@ -904,13 +872,10 @@ export type Database = {
       }
       reschedule_owner_booking: {
         Args: { p_booking_id: string; p_start_at: string }
-        Returns: Database["public"]["Tables"]["bookings"]["Row"]
-        SetofOptions: {
-          from: "*"
-          to: "bookings"
-          isOneToOne: true
-          isSetofReturn: false
-        }
+        Returns: Omit<
+          Database["public"]["Tables"]["bookings"]["Row"],
+          "cancel_token_hash" | "reminder_claim_token"
+        >
       }
       claim_billing_attempt: {
         Args: {
@@ -1125,24 +1090,10 @@ export type Database = {
       }
       notify_waitlist_entry: {
         Args: { p_entry_id: string }
-        Returns: {
-          business_id: string
-          cancel_token_hash: string | null
-          created_at: string
-          customer_email: string | null
-          customer_name: string
-          customer_phone: string
-          id: string
-          service_id: string
-          start_at: string
-          status: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "waitlist_entries"
-          isOneToOne: true
-          isSetofReturn: false
-        }
+        Returns: Omit<
+          Database["public"]["Tables"]["waitlist_entries"]["Row"],
+          "cancel_token_hash"
+        >
       }
       cancel_waitlist_entry_by_token: {
         Args: { p_cancel_token_hash: string }

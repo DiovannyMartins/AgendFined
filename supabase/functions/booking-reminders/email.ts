@@ -1,4 +1,4 @@
-type ReminderCandidate = {
+export type ReminderCandidate = {
   business_name: string;
   customer_name_snapshot: string;
   customer_email_snapshot: string;

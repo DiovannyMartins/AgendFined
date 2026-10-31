@@ -1,10 +1,12 @@
 import "server-only";
 
-import { createHash, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 
-// String equality without an early exit. Both sides are hashed first, so the
-// comparison always runs over 32 bytes and does not reveal the length either.
+// String equality without an early exit over the contents. Only the length is
+// compared openly, so use it for values whose length is not secret (a random
+// OAuth state, a fixed-size token).
 export function constantTimeEqual(given: string, expected: string): boolean {
-  const digest = (value: string) => createHash("sha256").update(value).digest();
-  return timingSafeEqual(digest(given), digest(expected));
+  const givenBytes = Buffer.from(given);
+  const expectedBytes = Buffer.from(expected);
+  return givenBytes.length === expectedBytes.length && timingSafeEqual(givenBytes, expectedBytes);
 }

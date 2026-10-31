@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingWidget } from "./booking-widget";
 import { createBooking, joinWaitlist } from "@/lib/booking/actions";
-import { getSlotsForDate } from "@/lib/availability/actions";
+import { fetchSlots } from "@/lib/availability/slots-client";
 import { readConfirmationEmailStatus } from "@/lib/bookings/private-confirmation";
 
 const { push } = vi.hoisted(() => ({ push: vi.fn() }));
@@ -10,13 +10,13 @@ const { push } = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("@/components/turnstile-widget", () => ({ TurnstileWidget: () => null }));
 vi.mock("@/lib/booking/actions", () => ({ createBooking: vi.fn(), joinWaitlist: vi.fn() }));
-vi.mock("@/lib/availability/actions", () => ({
-  getSlotsForDate: vi.fn().mockResolvedValue({ available: ["09:00", "09:30"] }),
+vi.mock("@/lib/availability/slots-client", () => ({
+  fetchSlots: vi.fn().mockResolvedValue({ available: ["09:00", "09:30"] }),
 }));
 
 const mockedCreateBooking = vi.mocked(createBooking);
 const mockedJoinWaitlist = vi.mocked(joinWaitlist);
-const mockedGetSlotsForDate = vi.mocked(getSlotsForDate);
+const mockedFetchSlots = vi.mocked(fetchSlots);
 
 const services = [
   { id: "svc-1", name: "Corte", description: null, durationMinutes: 30, priceCents: 5000 },
@@ -39,7 +39,7 @@ describe("BookingWidget", () => {
     vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-18T12:00:00Z") });
     mockedCreateBooking.mockReset();
     mockedJoinWaitlist.mockReset();
-    mockedGetSlotsForDate.mockReset().mockResolvedValue({ available: ["09:00", "09:30"] });
+    mockedFetchSlots.mockReset().mockResolvedValue({ available: ["09:00", "09:30"] });
   });
 
   afterEach(() => {
@@ -128,7 +128,7 @@ describe("BookingWidget", () => {
   });
 
   it("says once, in a live region, that the date has no slots", async () => {
-    mockedGetSlotsForDate.mockResolvedValue({ available: [] });
+    mockedFetchSlots.mockResolvedValue({ available: [] });
     render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
     fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-20" } });
 
@@ -138,7 +138,7 @@ describe("BookingWidget", () => {
   });
 
   it("explains an invalid date instead of blaming the business", async () => {
-    mockedGetSlotsForDate.mockResolvedValue({ available: [], error: "validation" });
+    mockedFetchSlots.mockResolvedValue({ available: [], error: "validation" });
     render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
     fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-20" } });
 
@@ -184,8 +184,8 @@ describe("BookingWidget", () => {
       code: "slot_taken",
       message: "Esse horário não está mais disponível. Escolha outro.",
     });
-    mockedGetSlotsForDate.mockResolvedValueOnce({ available: ["09:00", "09:30"] });
-    mockedGetSlotsForDate.mockResolvedValueOnce({ available: ["09:30"] });
+    mockedFetchSlots.mockResolvedValueOnce({ available: ["09:00", "09:30"] });
+    mockedFetchSlots.mockResolvedValueOnce({ available: ["09:30"] });
 
     await fillAndSubmit("Maria Souza", false);
 
@@ -203,8 +203,8 @@ describe("BookingWidget", () => {
       message: "Esse horário acabou de ser reservado.",
     });
     mockedJoinWaitlist.mockResolvedValue({ ok: true, message: "Você entrou na lista de espera deste horário." });
-    mockedGetSlotsForDate.mockResolvedValueOnce({ available: ["09:00", "09:30"] });
-    mockedGetSlotsForDate.mockResolvedValueOnce({ available: ["09:30"] });
+    mockedFetchSlots.mockResolvedValueOnce({ available: ["09:00", "09:30"] });
+    mockedFetchSlots.mockResolvedValueOnce({ available: ["09:30"] });
 
     await fillAndSubmit("Maria Souza");
 
@@ -242,7 +242,7 @@ describe("BookingWidget", () => {
   });
 
   it("says the serviço is no longer available when it was turned off with the page open", async () => {
-    mockedGetSlotsForDate.mockResolvedValue({ available: [], error: "service_not_found" });
+    mockedFetchSlots.mockResolvedValue({ available: [], error: "service_not_found" });
     render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
     fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-20" } });
 
@@ -260,5 +260,40 @@ describe("BookingWidget", () => {
 
     await screen.findByText(/fora da janela de reservas/);
     expect(screen.getByRole("button", { name: "09:00" })).toHaveAttribute("aria-pressed", "false");
+  });
+});
+
+describe("BookingWidget — consulta de horários", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-18T12:00:00Z") });
+    mockedFetchSlots.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // #216: trocar a data rapidamente cancela a consulta anterior, e só a última responde.
+  it("cancela a consulta anterior quando a data muda e mostra só a resposta da última", async () => {
+    const pending: Array<{ signal?: AbortSignal; resolve: (r: { available: string[] }) => void }> = [];
+    mockedFetchSlots.mockImplementation(
+      (_b, _s, _d, signal) => new Promise((resolve) => pending.push({ signal, resolve })),
+    );
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
+
+    fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-20" } });
+    await waitFor(() => expect(pending).toHaveLength(1));
+    fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-21" } });
+    await waitFor(() => expect(pending).toHaveLength(2));
+
+    expect(mockedFetchSlots.mock.calls.map((call) => call[2])).toEqual(["2026-10-20", "2026-10-21"]);
+    expect(pending[0].signal?.aborted).toBe(true);
+    expect(pending[1].signal?.aborted).toBe(false);
+
+    pending[1].resolve({ available: ["10:00"] });
+    pending[0].resolve({ available: ["09:00"] });
+
+    expect(await screen.findByRole("button", { name: "10:00" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "09:00" })).not.toBeInTheDocument();
   });
 });

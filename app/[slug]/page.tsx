@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { getPublicBusinessOrRedirect } from "@/lib/business/public-business";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { getEffectiveBookingWindowDays, isProPlan } from "@/lib/plan/plan";
-import { hasActiveAvailability } from "@/lib/business/readiness";
+import { redirectToCurrentSlugOrNotFound } from "@/lib/business/public-business";
+import { getPublicBookingPage } from "@/lib/business/public-booking-page";
 import { BookingWidget } from "./booking-widget";
 import { BookingUnavailable } from "./booking-unavailable";
 import { CalendarClock } from "lucide-react";
@@ -17,11 +15,8 @@ export async function generateMetadata({
   const { slug } = await params;
 
   try {
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc("get_public_business", { p_slug: slug });
     // A failed lookup is not "not found" (#197): it gets the neutral title below.
-    if (error) throw error;
-    const business = data?.[0];
+    const business = await getPublicBookingPage(slug);
     if (!business) {
       return { title: "Página não encontrada — AgendFined", robots: { index: false, follow: false } };
     }
@@ -32,7 +27,7 @@ export async function generateMetadata({
       description,
       // A business kept out of search (e.g. a test business in production)
       // stays bookable but out of the index; the sitemap leaves it out too.
-      ...(business.search_indexing_enabled ? {} : { robots: { index: false, follow: false } }),
+      ...(business.searchIndexingEnabled ? {} : { robots: { index: false, follow: false } }),
       alternates: { canonical: `/${encodeURIComponent(slug)}` },
       openGraph: {
         type: "website",
@@ -49,30 +44,14 @@ export async function generateMetadata({
 
 export default async function PublicPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const supabase = await createClient();
-
-  const business = await getPublicBusinessOrRedirect(supabase, slug);
-
-  const { data: services, error: servicesError } = await supabase.rpc("get_public_services", {
-    p_business_id: business.id,
-  });
-  if (servicesError) throw new Error("PUBLIC_SERVICES_LOOKUP_FAILED");
-
-  // The plan stays server-side: the widget only learns whether the waitlist can
-  // be offered. A failed lookup fails closed (no waitlist), like the plan gate.
-  const admin = createAdminClient();
-  const [{ data: planRow }, hasAvailability] = await Promise.all([
-    admin.from("businesses").select("plan, booking_window_days, phone").eq("id", business.id).maybeSingle(),
-    // Faixas are owner-only under RLS; only this boolean reaches the page.
-    hasActiveAvailability(admin, business.id),
-  ]);
-  const offersWaitlist = isProPlan(planRow?.plan);
-  // The janela only caps the date picker (open when the lookup failed); the
-  // server still enforces the janela on every lookup and reserva.
-  const bookingWindowDays = planRow
-    ? getEffectiveBookingWindowDays(planRow.plan, planRow.booking_window_days)
-    : undefined;
-  const activeServices = services ?? [];
+  // One cached RPC shared with generateMetadata (#216). The plan stays in the
+  // database: only offersWaitlist and the effective janela reach the page. The
+  // janela only caps the date picker; the server still enforces it on every
+  // lookup and reserva.
+  const business = (await getPublicBookingPage(slug))
+    ?? await redirectToCurrentSlugOrNotFound(await createClient(), slug);
+  const activeServices = business.services;
+  const phone = business.phone ?? undefined;
 
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-muted/30">
@@ -88,23 +67,17 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
         </header>
 
         {activeServices.length === 0 ? (
-          <BookingUnavailable reason="no_services" phone={planRow?.phone} />
-        ) : !hasAvailability ? (
-          <BookingUnavailable reason="no_availability" phone={planRow?.phone} />
+          <BookingUnavailable reason="no_services" phone={phone} />
+        ) : !business.hasAvailability ? (
+          <BookingUnavailable reason="no_availability" phone={phone} />
         ) : (
           <BookingWidget
             businessId={business.id}
             slug={slug}
             timezone={business.timezone}
-            bookingWindowDays={bookingWindowDays}
-            offersWaitlist={offersWaitlist}
-            services={activeServices.map((s) => ({
-              id: s.id,
-              name: s.name,
-              description: s.description,
-              durationMinutes: s.duration_minutes,
-              priceCents: s.price_cents,
-            }))}
+            bookingWindowDays={business.bookingWindowDays}
+            offersWaitlist={business.offersWaitlist}
+            services={activeServices}
           />
         )}
 

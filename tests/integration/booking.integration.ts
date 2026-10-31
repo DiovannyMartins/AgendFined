@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
-import { adminClient, anonClientForUser, retryOnFk } from "./index";
+import { adminClient, anonClientForUser, retryOnFk, ACTIVE_TRIAL_ENDS_AT } from "./index";
 import { futureSlot } from "./future-slot";
 
 // These are integration tests against the real Supabase project (§19.2).
@@ -35,6 +35,7 @@ beforeAll(async () => {
       .upsert(
         {
           owner_id: ownerId,
+          trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
           name: "Biz Integracao",
           slug: `biz-integracao-${stamp}`,
           phone: "+5511987654321",

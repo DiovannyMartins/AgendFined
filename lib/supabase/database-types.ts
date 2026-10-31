@@ -315,6 +315,7 @@ export type Database = {
           search_indexing_enabled: boolean
           slot_interval_minutes: number
           slug: string
+          trial_ends_at: string | null
           updated_at: string
         }
         Insert: {
@@ -333,6 +334,7 @@ export type Database = {
           search_indexing_enabled?: boolean
           slot_interval_minutes?: number
           slug: string
+          trial_ends_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -351,6 +353,7 @@ export type Database = {
           search_indexing_enabled?: boolean
           slot_interval_minutes?: number
           slug?: string
+          trial_ends_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -766,6 +769,33 @@ export type Database = {
           code_hash?: string
           created_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      trial_grants: {
+        Row: {
+          business_id: string | null
+          email_hash: string | null
+          granted_at: string
+          id: string
+          phone_hash: string | null
+          source: string
+        }
+        Insert: {
+          business_id?: string | null
+          email_hash?: string | null
+          granted_at?: string
+          id?: string
+          phone_hash?: string | null
+          source: string
+        }
+        Update: {
+          business_id?: string | null
+          email_hash?: string | null
+          granted_at?: string
+          id?: string
+          phone_hash?: string | null
+          source?: string
         }
         Relationships: []
       }
@@ -1224,6 +1254,14 @@ export type Database = {
       current_session_mfa_verified: {
         Args: never
         Returns: boolean
+      }
+      business_has_access: {
+        Args: { p_business_id: string }
+        Returns: boolean
+      }
+      grant_business_trial: {
+        Args: { p_business_id: string; p_days?: number }
+        Returns: string
       }
     }
     Enums: {

@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
 import { randomBytes } from "node:crypto";
-import { adminClient, anonClient, retryOnFk } from "./index";
+import { adminClient, anonClient, retryOnFk, ACTIVE_TRIAL_ENDS_AT } from "./index";
 import { futureSlot } from "./future-slot";
 
 // #152: self-service exit from the lista de espera. The token itself is
@@ -60,6 +60,7 @@ beforeAll(async () => {
       .from("businesses")
       .insert({
         owner_id: ownerId,
+        trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
         name: "Agenda Lista de Espera",
         slug: `agenda-sair-espera-${stamp}`,
         phone: "+5511987654321",

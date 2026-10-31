@@ -67,10 +67,10 @@ values
   ('00000000-0000-4000-8000-0000000000a1', 'Dona A'),
   ('00000000-0000-4000-8000-0000000000b1', 'Dona B');
 
-insert into public.businesses (id, owner_id, name, slug, phone, timezone)
+insert into public.businesses (id, owner_id, name, slug, phone, timezone, trial_ends_at)
 values
-  ('00000000-0000-4000-8000-00000000a000', '00000000-0000-4000-8000-0000000000a1', 'Negócio A', 'phones-test-a', '1133334444', 'America/Sao_Paulo'),
-  ('00000000-0000-4000-8000-00000000b000', '00000000-0000-4000-8000-0000000000b1', 'Negócio B', 'phones-test-b', '1133334444', 'America/Sao_Paulo');
+  ('00000000-0000-4000-8000-00000000a000', '00000000-0000-4000-8000-0000000000a1', 'Negócio A', 'phones-test-a', '1133334444', 'America/Sao_Paulo', 'infinity'),
+  ('00000000-0000-4000-8000-00000000b000', '00000000-0000-4000-8000-0000000000b1', 'Negócio B', 'phones-test-b', '1133334444', 'America/Sao_Paulo', 'infinity');
 
 insert into public.services (id, business_id, name, duration_minutes, price_cents)
 values ('00000000-0000-4000-8000-00000000a5e1', '00000000-0000-4000-8000-00000000a000', 'Corte', 30, 5000);

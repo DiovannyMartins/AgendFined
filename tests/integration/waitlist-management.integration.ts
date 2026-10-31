@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 import { randomBytes } from "node:crypto";
-import { adminClient, anonClientForUser, retryOnFk } from "./index";
+import { adminClient, anonClientForUser, retryOnFk, ACTIVE_TRIAL_ENDS_AT } from "./index";
 import { futureSlot } from "./future-slot";
 import {
   buildWaitlistManagementResult,
@@ -37,6 +37,7 @@ async function createBusiness(ownerId: string, name: string, plan: "free" | "pro
       .from("businesses")
       .insert({
         owner_id: ownerId,
+        trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
         name,
         slug: `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${stamp}`,
         phone: "+5511987654321",

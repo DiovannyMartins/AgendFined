@@ -22,6 +22,11 @@ export function adminClient(): SupabaseClient<Database> {
   });
 }
 
+// A business inserted with the service role keeps an explicit trial_ends_at
+// and skips the trial registry (#261). Suites reuse telefones, so the ones that
+// book through the public RPCs set this to keep access on every run.
+export const ACTIVE_TRIAL_ENDS_AT = "2999-12-31T00:00:00Z";
+
 // Retry a business upsert/insert on the transient `businesses_owner_id_fkey` FK
 // race (23503) that can appear when integration files run against the shared
 // remote project. Production constraints are untouched.

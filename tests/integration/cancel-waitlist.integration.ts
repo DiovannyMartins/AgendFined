@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
 import { randomBytes } from "node:crypto";
-import { adminClient, anonClient, anonClientForUser, retryOnFk } from "./index";
+import { adminClient, anonClient, anonClientForUser, retryOnFk, ACTIVE_TRIAL_ENDS_AT } from "./index";
 import { futureSlot } from "./future-slot";
 
 // Integration tests against the real Supabase project (§19.2) for INC-3:
@@ -60,6 +60,7 @@ beforeAll(async () => {
       .from("businesses")
       .insert({
         owner_id: ownerId,
+        trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
         name: "Agenda Cancelamento",
         slug: `agenda-cancelamento-${stamp}`,
         phone: "+5511987654321",

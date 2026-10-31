@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
-import { adminClient, retryOnFk } from "./index";
+import { adminClient, retryOnFk, ACTIVE_TRIAL_ENDS_AT } from "./index";
 import { futureSlot } from "./future-slot";
 
 // Integration tests against the real Supabase project (§19.2). They verify the
@@ -54,6 +54,7 @@ beforeAll(async () => {
       .from("businesses")
       .insert({
         owner_id: ownerId,
+        trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
         name: "Agenda Perfil",
         slug: `agenda-perfil-${stamp}`,
         phone: "+5511987654321",
@@ -99,6 +100,7 @@ beforeAll(async () => {
       .from("businesses")
       .insert({
         owner_id: otherOwnerId,
+        trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
         name: "Outra Agenda",
         slug: `outra-agenda-${stamp}`,
         phone: "+5511976543210",

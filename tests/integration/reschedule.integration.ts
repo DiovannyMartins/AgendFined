@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { randomBytes } from "node:crypto";
-import { adminClient, anonClient, anonClientForUser, retryOnFk } from "./index";
+import { adminClient, anonClient, anonClientForUser, retryOnFk, ACTIVE_TRIAL_ENDS_AT } from "./index";
 import { futureSlot } from "./future-slot";
 
 // #194 / ADR 0010: remarcar moves the same reserva. reschedule_owner_booking is
@@ -35,6 +35,7 @@ async function createBusiness(owner: string, name: string): Promise<string> {
       .from("businesses")
       .insert({
         owner_id: owner,
+        trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
         name,
         slug: `${name}-${stamp}`,
         phone: "11987654321",

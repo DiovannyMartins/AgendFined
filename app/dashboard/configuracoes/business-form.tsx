@@ -94,6 +94,17 @@ export function BusinessForm({
     ? [{ value: currentSlotInterval, label: `${currentSlotInterval} min (atual)` }, ...SLOT_INTERVAL_SELECT_OPTIONS]
     : SLOT_INTERVAL_SELECT_OPTIONS;
 
+  const defaultValues: BusinessFormValues = {
+    name: String(initial?.name ?? ""),
+    slug,
+    phone: initial?.phone ? formatPhoneBR(initial.phone) : "",
+    slotIntervalMinutes: String(initial?.slotIntervalMinutes ?? 30),
+    minNoticeMinutes: Number(initial?.minNoticeMinutes ?? 120),
+    bookingWindowDays: Math.min(Number(initial?.bookingWindowDays ?? 60), bookingWindowLimitDays),
+    timezone: String(initial?.timezone ?? APP_TIMEZONE),
+    description: String(initial?.description ?? ""),
+  };
+
   const {
     register,
     handleSubmit,
@@ -103,17 +114,15 @@ export function BusinessForm({
     formState: { errors },
   } = useForm<BusinessFormValues>({
     resolver: zodResolver(businessFormSchema),
-    defaultValues: {
-      name: String(initial?.name ?? ""),
-      slug,
-      phone: initial?.phone ? formatPhoneBR(initial.phone) : "",
-      slotIntervalMinutes: String(initial?.slotIntervalMinutes ?? 30),
-      minNoticeMinutes: Number(initial?.minNoticeMinutes ?? 120),
-      bookingWindowDays: Math.min(Number(initial?.bookingWindowDays ?? 60), bookingWindowLimitDays),
-      timezone: String(initial?.timezone ?? APP_TIMEZONE),
-      description: String(initial?.description ?? ""),
-    },
+    defaultValues,
   });
+
+  // `register` only wires the field by ref, so the server HTML came out empty
+  // (and the selects on their first option) until hydration (#225). The same
+  // defaults go into the markup so the first paint already matches.
+  function registerWithDefault(field: BusinessField, options?: Parameters<typeof register>[1]) {
+    return { defaultValue: defaultValues[field] ?? "", ...register(field, options) };
+  }
 
   // The previous slug redirects to the new one and stays reserved for this
   // business (ADR 0007); confirmation links already sent follow it too (#124).
@@ -208,7 +217,7 @@ export function BusinessForm({
               <Input
                 id="name"
                 {...fieldErrorProps("name")}
-                {...register("name", {
+                {...registerWithDefault("name", {
                   onChange: (event) => {
                     if (creating && !slugEdited) setValue("slug", suggestSlug(event.target.value));
                   },
@@ -223,7 +232,7 @@ export function BusinessForm({
                 placeholder="minha-barbearia"
                 autoComplete="off"
                 {...fieldErrorProps("slug", "slug-hint")}
-                {...register("slug", { onChange: () => setSlugEdited(true) })}
+                {...registerWithDefault("slug", { onChange: () => setSlugEdited(true) })}
               />
               <p id="slug-hint" className="text-xs text-muted-foreground">
                 Apenas minúsculas, números e hífen. Seu link: agendfined.com.br/{nextSlug.toLowerCase() || "seu-slug"}
@@ -243,14 +252,14 @@ export function BusinessForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="phone">Telefone / WhatsApp</Label>
-              <Input id="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="(11) 98888-7777" {...fieldErrorProps("phone")} {...register("phone")} />
+              <Input id="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="(11) 98888-7777" {...fieldErrorProps("phone")} {...registerWithDefault("phone")} />
               {renderFieldError("phone")}
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="description">Descrição (opcional)</Label>
-            <Textarea id="description" rows={3} maxLength={500} {...fieldErrorProps("description")} {...register("description")} />
+            <Textarea id="description" rows={3} maxLength={500} {...fieldErrorProps("description")} {...registerWithDefault("description")} />
             {renderFieldError("description")}
           </div>
 
@@ -261,7 +270,7 @@ export function BusinessForm({
                 id="slotIntervalMinutes"
                 className="flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3"
                 {...fieldErrorProps("slotIntervalMinutes", "slotIntervalMinutes-hint")}
-                {...register("slotIntervalMinutes")}
+                {...registerWithDefault("slotIntervalMinutes")}
               >
                 {slotIntervalOptions.map((option) => (
                   <option key={option.value} value={String(option.value)}>{option.label}</option>
@@ -278,7 +287,7 @@ export function BusinessForm({
                 min={0}
                 max={10080}
                 {...fieldErrorProps("minNoticeMinutes")}
-                {...register("minNoticeMinutes", { valueAsNumber: true })}
+                {...registerWithDefault("minNoticeMinutes", { valueAsNumber: true })}
               />
               {renderFieldError("minNoticeMinutes")}
             </div>
@@ -290,7 +299,7 @@ export function BusinessForm({
                 min={1}
                 max={bookingWindowLimitDays}
                 {...fieldErrorProps("bookingWindowDays", "bookingWindowDays-hint")}
-                {...register("bookingWindowDays", { valueAsNumber: true })}
+                {...registerWithDefault("bookingWindowDays", { valueAsNumber: true })}
               />
               <p id="bookingWindowDays-hint" className="text-xs text-muted-foreground">
                 Seu plano permite reservas com até {bookingWindowLimitDays} dias de antecedência.
@@ -305,7 +314,7 @@ export function BusinessForm({
               id="timezone"
               className="flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3"
               {...fieldErrorProps("timezone", "timezone-hint")}
-              {...register("timezone")}
+              {...registerWithDefault("timezone")}
             >
               {timezoneOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>

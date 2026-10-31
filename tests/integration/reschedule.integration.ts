@@ -109,7 +109,6 @@ describe("reschedule_owner_booking (#194)", () => {
     expect(data).toMatchObject({
       id: booking.id,
       public_code: booking.public_code,
-      cancel_token_hash: tokenHash,
       status: "confirmed",
       duration_minutes_snapshot: 30,
       reminder_sent_at: null,
@@ -117,6 +116,13 @@ describe("reschedule_owner_booking (#194)", () => {
     expect(Date.parse(data!.start_at)).toBe(Date.parse(futureSlot(1, 15)));
     expect(Date.parse(data!.end_at)).toBe(Date.parse(futureSlot(1, 15, 30)));
     expect(data!.rescheduled_at).not.toBeNull();
+    // The RPC no longer returns the digest (#219); the row still keeps it.
+    const { data: stored } = await admin
+      .from("bookings")
+      .select("cancel_token_hash")
+      .eq("id", booking.id)
+      .single();
+    expect(stored!.cancel_token_hash).toBe(tokenHash);
 
     const { data: history } = await owner
       .from("booking_reschedules")

@@ -10,7 +10,8 @@ export type GoogleCalendarConnectionStatus = {
   businessTimezone: string;
   timezoneMismatch: boolean;
   lastSyncAt: string | null;
-  lastError: string | null;
+  // Only whether the last sync failed: the stored error text stays server-side.
+  syncFailed: boolean;
   // Google no longer authorizes the calendar; only reconnecting fixes it.
   needsReconnect: boolean;
 } | null;
@@ -31,7 +32,7 @@ export async function getGoogleCalendarConnectionStatus(businessId: string, busi
     businessTimezone,
     timezoneMismatch: Boolean(data.calendar_timezone && data.calendar_timezone !== businessTimezone),
     lastSyncAt: data.last_sync_at,
-    lastError: data.last_error,
+    syncFailed: Boolean(data.last_error),
     needsReconnect: data.last_error === GOOGLE_CALENDAR_REAUTH_REQUIRED,
   };
 }

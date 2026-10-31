@@ -6,6 +6,7 @@ import type { RepriceCheckoutsResult } from "@/lib/billing/reprice-checkouts";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enforceApiRateLimit, getClientIpFromHeaders } from "@/lib/booking/rate-limit";
 import { runGoogleCalendarSyncBatch } from "@/lib/google-calendar/sync";
+import { withNoStore } from "@/lib/http/no-store";
 
 export const runtime = "nodejs";
 
@@ -53,7 +54,7 @@ async function run(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) { return run(request); }
+export const POST = withNoStore(run);
 
 // Vercel Cron invokes functions with GET and supplies Authorization: Bearer <CRON_SECRET>.
-export async function GET(request: NextRequest) { return run(request); }
+export const GET = withNoStore(run);

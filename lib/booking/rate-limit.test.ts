@@ -13,6 +13,8 @@ import {
   enforceConsultRateLimit,
   enforceApiRateLimit,
   enforceAvailabilityRateLimit,
+  enforceAvailabilityIpRateLimit,
+  enforceAvailabilityBusinessRateLimit,
   enforceBillingCheckoutRateLimit,
   enforceOwnerEmailRateLimit,
   OWNER_EMAIL_RATE_LIMIT,
@@ -172,6 +174,37 @@ describe("enforceAvailabilityRateLimit", () => {
       rpc: vi.fn(async () => ({ data: null, error: { message: "boom" } })),
     } as unknown as SupabaseClient<Database>;
     await expect(enforceAvailabilityRateLimit(failing, "1.2.3.4", "biz-1")).rejects.toEqual({ message: "boom" });
+  });
+});
+
+// #219: the reschedule page charges the same two windows apart, the per-IP one
+// before its service-role lookup; together they count what the combined call does.
+describe("enforceAvailabilityIpRateLimit / enforceAvailabilityBusinessRateLimit", () => {
+  it("spends each availability window on its own, with the combined call's keys and limits", async () => {
+    const rpc = vi.fn(async () => ({ data: true, error: null }));
+    const client = { rpc } as unknown as SupabaseClient<Database>;
+    const [perIp, perIpBusiness] = buildAvailabilityRateKeys("1.2.3.4", "biz-1");
+
+    expect(await enforceAvailabilityIpRateLimit(client, "1.2.3.4")).toBe(true);
+    expect(await enforceAvailabilityBusinessRateLimit(client, "1.2.3.4", "biz-1")).toBe(true);
+    expect(rpc.mock.calls).toEqual([
+      ["check_booking_rate_limit", { p_key: perIp.key, p_limit: perIp.limit, p_window_seconds: perIp.windowSeconds }],
+      [
+        "check_booking_rate_limit",
+        { p_key: perIpBusiness.key, p_limit: perIpBusiness.limit, p_window_seconds: perIpBusiness.windowSeconds },
+      ],
+    ]);
+  });
+
+  it("refuses over the limit and throws when the counter fails", async () => {
+    const over = { rpc: vi.fn(async () => ({ data: false, error: null })) } as unknown as SupabaseClient<Database>;
+    expect(await enforceAvailabilityIpRateLimit(over, "1.2.3.4")).toBe(false);
+    expect(await enforceAvailabilityBusinessRateLimit(over, "1.2.3.4", "biz-1")).toBe(false);
+
+    const failing = {
+      rpc: vi.fn(async () => ({ data: null, error: { message: "boom" } })),
+    } as unknown as SupabaseClient<Database>;
+    await expect(enforceAvailabilityIpRateLimit(failing, "1.2.3.4")).rejects.toEqual({ message: "boom" });
   });
 });
 

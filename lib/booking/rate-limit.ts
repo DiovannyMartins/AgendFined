@@ -421,6 +421,35 @@ export async function enforceAvailabilityRateLimit(
   return data === true;
 }
 
+// The same two windows as enforceAvailabilityRateLimit, charged separately for
+// a caller that learns the negócio only from a privileged lookup: the per-IP
+// window gates the lookup itself, the per-negócio one follows it (#219).
+export async function enforceAvailabilityIpRateLimit(supabase: ServerClient, ip: string): Promise<boolean> {
+  const [{ key, limit, windowSeconds }] = buildAvailabilityRateKeys(ip, "");
+  const { data, error } = await supabase.rpc("check_booking_rate_limit", {
+    p_key: key,
+    p_limit: limit,
+    p_window_seconds: windowSeconds,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
+export async function enforceAvailabilityBusinessRateLimit(
+  supabase: ServerClient,
+  ip: string,
+  businessId: string,
+): Promise<boolean> {
+  const [, { key, limit, windowSeconds }] = buildAvailabilityRateKeys(ip, businessId);
+  const { data, error } = await supabase.rpc("check_booking_rate_limit", {
+    p_key: key,
+    p_limit: limit,
+    p_window_seconds: windowSeconds,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
 export function buildServiceSearchRateKeys(ip: string, businessId: string) {
   return [
     { key: `ip:${ip}|service-search`, ...PUBLIC_READ_RATE_LIMIT.serviceSearchPerIp },

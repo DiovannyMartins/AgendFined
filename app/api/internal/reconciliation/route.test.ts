@@ -36,6 +36,13 @@ describe("private reconciliation route", () => {
     expect(run).not.toHaveBeenCalled();
   });
 
+  // #219: no cache in front of the cron route may keep or replay an answer.
+  it("answers no-store on success and on refusal", async () => {
+    process.env.RECONCILIATION_CRON_SECRET = "internal-secret";
+    expect((await POST(request("POST", "Bearer internal-secret"))).headers.get("Cache-Control")).toBe("no-store");
+    expect((await GET(request("GET"))).headers.get("Cache-Control")).toBe("no-store");
+  });
+
   it("authorizes the Vercel Cron GET trigger with the same secret", async () => {
     process.env.RECONCILIATION_CRON_SECRET = "internal-secret";
     const response = await GET(request("GET", "Bearer internal-secret"));

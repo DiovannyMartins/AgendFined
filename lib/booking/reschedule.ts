@@ -15,7 +15,8 @@ import {
 } from "@/lib/booking/availability";
 import {
   allowPublicCapabilityEmail,
-  enforceAvailabilityRateLimit,
+  enforceAvailabilityBusinessRateLimit,
+  enforceAvailabilityIpRateLimit,
   enforceConsultRateLimit,
   enforcePublicRescheduleLimit,
   getClientIp,
@@ -174,15 +175,25 @@ export async function getPublicRescheduleSlots(
   if (!parsedCode.success || !isValidCancelToken(token)) return { available: [], error: "rejected" };
   if (!publicSlotSchema.shape.date.safeParse(date).success) return { available: [], error: "validation" };
 
+  // The privileged reads share the public page's availability budget. The
+  // per-IP window is charged before the digest lookup, so a flood never
+  // reaches service role; the per-negócio one needs the reserva's negócio
+  // (#219).
   const admin = createAdminClient();
+  const ip = await getClientIp();
+  let allowed: boolean;
+  try {
+    allowed = await enforceAvailabilityIpRateLimit(admin, ip);
+  } catch {
+    allowed = false;
+  }
+  if (!allowed) return { available: [], error: "rate_limited" };
+
   const context = await loadContext(admin, parsedCode.data, token);
   if (!context || !isReschedulable(context)) return { available: [], error: "rejected" };
 
-  // The digest lookup above is no oracle (256-bit capability); the privileged
-  // agenda reads below share the public page's availability budget.
-  let allowed: boolean;
   try {
-    allowed = await enforceAvailabilityRateLimit(admin, await getClientIp(), context.business.id);
+    allowed = await enforceAvailabilityBusinessRateLimit(admin, ip, context.business.id);
   } catch {
     allowed = false;
   }

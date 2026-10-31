@@ -278,9 +278,19 @@ describe("get_waitlist_for_slot (INC-3 seam)", () => {
 describe("waitlist RLS (§13.2)", () => {
   it("the owner can read their own business's waitlist", async () => {
     const owner = await anonClientForUser(EMAIL, PASSWORD);
-    const { data } = await owner.from("waitlist_entries").select("*").eq("business_id", businessId);
+    const { data } = await owner.from("waitlist_entries").select("id, status").eq("business_id", businessId);
     expect(Array.isArray(data)).toBe(true);
     expect(data!.length).toBeGreaterThan(0);
+  });
+
+  // #219: the digest is the cliente's capability to leave, not the owner's data.
+  it("the owner cannot read the cliente's token hash", async () => {
+    const owner = await anonClientForUser(EMAIL, PASSWORD);
+    for (const columns of ["cancel_token_hash", "*"]) {
+      const { data, error } = await owner.from("waitlist_entries").select(columns).eq("business_id", businessId);
+      expect(data).toBeNull();
+      expect(error).not.toBeNull();
+    }
   });
 
   it("anon cannot read the waitlist", async () => {

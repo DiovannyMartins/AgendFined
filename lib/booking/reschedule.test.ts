@@ -11,6 +11,7 @@ const { state, mocks } = vi.hoisted(() => ({
     rpcCalls: [] as { name: string; args: Record<string, unknown> }[],
     rpcResult: null as RpcResult | null,
     allowed: true,
+    businessAllowed: true,
     // Counters of check_booking_rate_limit, by key, as the RPC keeps them.
     counters: new Map<string, number>(),
   },
@@ -29,7 +30,8 @@ vi.mock("@/lib/booking/rate-limit", async (importActual) => ({
   ...(await importActual<typeof import("@/lib/booking/rate-limit")>()),
   getClientIp: async () => "203.0.113.7",
   enforceConsultRateLimit: async () => state.allowed,
-  enforceAvailabilityRateLimit: async () => state.allowed,
+  enforceAvailabilityIpRateLimit: async () => state.allowed,
+  enforceAvailabilityBusinessRateLimit: async () => state.businessAllowed,
 }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
@@ -131,6 +133,7 @@ beforeEach(() => {
   state.rpcCalls = [];
   state.rpcResult = null;
   state.allowed = true;
+  state.businessAllowed = true;
   state.counters = new Map();
 });
 
@@ -288,5 +291,20 @@ describe("getPublicRescheduleSlots (#194)", () => {
 
     state.allowed = false;
     expect((await getPublicRescheduleSlots(CODE, TOKEN, MONDAY)).error).toBe("rate_limited");
+  });
+
+  // #219: a flood past the per-IP window never reaches the service-role lookup.
+  it("cobra o limite por IP antes de consultar a reserva com service role", async () => {
+    state.allowed = false;
+
+    expect((await getPublicRescheduleSlots(CODE, TOKEN, MONDAY)).error).toBe("rate_limited");
+    expect(state.eqs).toEqual([]);
+  });
+
+  it("respeita o limite por negócio depois de achar a reserva, sem ler a agenda", async () => {
+    state.businessAllowed = false;
+
+    expect((await getPublicRescheduleSlots(CODE, TOKEN, MONDAY)).error).toBe("rate_limited");
+    expect(state.eqs.map(([column]) => column)).not.toContain("business_id");
   });
 });

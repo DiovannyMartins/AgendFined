@@ -31,6 +31,8 @@ describe("billing checkout return", () => {
 
     expect(syncCurrentSubscriptionAfterReturn).toHaveBeenCalledOnce();
     expect(response.headers.get("location")).toBe("http://beta.localhost:3000/dashboard/configuracoes");
+    // #219: the redirect follows a per-payer sync; no cache may replay it.
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
   });
 
   it("keeps the request origin when no APP_URL is configured", async () => {

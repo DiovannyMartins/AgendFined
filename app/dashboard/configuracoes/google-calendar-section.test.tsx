@@ -41,7 +41,7 @@ describe("GoogleCalendarSection sync failure", () => {
     businessTimezone: "America/Sao_Paulo",
     timezoneMismatch: false,
     lastSyncAt: null,
-    lastError: "GOOGLE_CALENDAR_TOKEN_REFRESH_FAILED",
+    syncFailed: true,
     needsReconnect: false,
   };
 
@@ -55,7 +55,7 @@ describe("GoogleCalendarSection sync failure", () => {
   it("asks only to reconnect when Google no longer authorizes the calendar", () => {
     render(
       <GoogleCalendarSection
-        connection={{ ...connection, lastError: "GOOGLE_CALENDAR_REAUTH_REQUIRED", needsReconnect: true }}
+        connection={{ ...connection, needsReconnect: true }}
         isPro
       />,
     );
@@ -88,7 +88,7 @@ describe("GoogleCalendarSection fuso mismatch", () => {
     businessTimezone: "America/Sao_Paulo",
     timezoneMismatch: true,
     lastSyncAt: null,
-    lastError: null,
+    syncFailed: false,
     needsReconnect: false,
   };
 

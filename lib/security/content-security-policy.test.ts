@@ -16,4 +16,14 @@ describe("Content Security Policy", () => {
     expect(buildContentSecurityPolicy("nonce", true)).toContain("'unsafe-eval'");
     expect(buildContentSecurityPolicy("nonce", false)).not.toContain("'unsafe-eval'");
   });
+
+  // #219: no Supabase client runs in the browser; every query goes through the server.
+  it("does not let the browser connect to Supabase", () => {
+    const connectDirective = buildContentSecurityPolicy("nonce", false)
+      .split("; ")
+      .find((directive) => directive.startsWith("connect-src"));
+
+    expect(connectDirective).toBeDefined();
+    expect(connectDirective).not.toContain("supabase");
+  });
 });

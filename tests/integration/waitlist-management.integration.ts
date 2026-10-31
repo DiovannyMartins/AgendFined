@@ -146,7 +146,10 @@ function ownerFetch(email: string, password: string): FetchWaitlistEntries {
   return async (businessId: string) => {
     const owner = await anonClientForUser(email, password);
     const [{ data: entries }, { data: services }] = await Promise.all([
-      owner.from("waitlist_entries").select("*").eq("business_id", businessId),
+      owner
+        .from("waitlist_entries")
+        .select("id, business_id, service_id, start_at, customer_name, customer_phone, customer_email, status, created_at")
+        .eq("business_id", businessId),
       owner.from("services").select("id, name").eq("business_id", businessId),
     ]);
     const names = new Map((services ?? []).map((s) => [s.id, s.name]));

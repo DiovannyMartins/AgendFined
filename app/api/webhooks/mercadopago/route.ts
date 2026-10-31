@@ -12,6 +12,7 @@ import { runMercadoPagoWebhook } from "@/lib/billing/webhook-server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enforceApiRateLimit, getClientIpFromHeaders } from "@/lib/booking/rate-limit";
 import { resolveSignedWebhookDataId } from "@/lib/billing/webhook-envelope";
+import { withNoStore } from "@/lib/http/no-store";
 
 const MAX_WEBHOOK_BODY_BYTES = 32 * 1024;
 
@@ -46,7 +47,7 @@ async function readJsonBody(request: Request): Promise<{ type?: string; data?: {
   return JSON.parse(new TextDecoder().decode(bytes)) as { type?: string; data?: { id?: string } };
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withNoStore(async (request: NextRequest) => {
   try {
     const allowed = await enforceApiRateLimit(createAdminClient(), getClientIpFromHeaders(request.headers), "webhook");
     if (!allowed) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
@@ -102,4 +103,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: result.code }, { status: 502 });
   }
   return NextResponse.json({ ok: true, applied: result.applied });
-}
+});

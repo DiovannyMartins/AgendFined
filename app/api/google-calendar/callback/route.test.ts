@@ -84,6 +84,23 @@ describe("Google Calendar OAuth callback", () => {
 
     expect(calendarStatus(response)).toBe("invalid_state");
     expect(tokenExchanges).toEqual([]);
+    // #219: a rejected callback does not leave a usable state behind either.
+    if (cookie) expect(response.headers.get("set-cookie")).toContain(`${STATE_COOKIE}=;`);
+  });
+
+  it("rejects a cookie without a state part", async () => {
+    const response = await GET(callback("?state=&code=auth-code", "business."));
+
+    expect(calendarStatus(response)).toBe("invalid_state");
+    expect(tokenExchanges).toEqual([]);
+  });
+
+  it("redirects to the configured origin, not the request's Host", async () => {
+    vi.stubEnv("APP_URL", "https://agendfined.example");
+
+    const response = await GET(callback("?state=forged-state&code=auth-code"));
+
+    expect(new URL(response.headers.get("location")!).origin).toBe("https://agendfined.example");
   });
 
   it("reports a cancelled consent when Google returns access_denied", async () => {

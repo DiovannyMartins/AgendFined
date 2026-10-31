@@ -24,12 +24,12 @@ export default async function MfaPage({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/login?${new URLSearchParams({ next: returnTo }).toString()}`);
-  const { data, error } = await supabase.auth.mfa.listFactors();
-  if (error) throw error;
   const { data: assurance, error: assuranceError } = await getVerifiedAssurance(supabase);
   if (assuranceError) throw assuranceError;
 
-  const factorId = data.totp.find((factor) => factor.status === "verified")?.id ?? null;
+  // getUser() already returned the factors; listFactors() would ask Auth again (#214).
+  const factorId =
+    user.factors?.find((factor) => factor.factor_type === "totp" && factor.status === "verified")?.id ?? null;
   const verified = assurance.currentLevel === "aal2";
   // Only the confirmed session sees how many códigos de recuperação are left (#169).
   let recoveryCodesLeft: number | null | undefined;

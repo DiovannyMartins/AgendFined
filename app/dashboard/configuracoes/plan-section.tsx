@@ -42,7 +42,7 @@ function graceMessage(notice: GraceNotice, activeUntil: string): string {
 export async function PlanSection({
   business,
 }: {
-  business: { id: string; plan: BillingPlan; timezone?: string };
+  business: { id: string; plan: BillingPlan; timezone?: string; currentSubscriptionId?: string | null };
 }) {
   const result = await getSubscription(business);
   const { plan, subscription } = result;

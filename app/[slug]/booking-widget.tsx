@@ -15,7 +15,8 @@ import { lastBookableDate, toLocalDate } from "@/lib/booking/availability";
 import { formatServicePrice } from "@/lib/format/currency";
 import { formatSlotWhen } from "@/lib/format/when";
 import { cn } from "@/lib/utils";
-import { trackAnalyticsEvent } from "@/lib/analytics";
+import { trackAnalyticsEventBeforeLeaving } from "@/lib/analytics";
+import { disableAnalyticsBeforeNavigation } from "@/lib/analytics/google-analytics";
 import { buildPrivateConfirmationPath } from "@/lib/bookings/private-confirmation";
 
 type CustomerField = "customerName" | "customerPhone" | "customerEmail" | "customerNote";
@@ -224,25 +225,30 @@ export function BookingWidget({
       });
     } catch {
       // The action threw (network drop, 500): the token may already be spent.
+      setSubmitting(false);
       setError(CONNECTION_ERROR_MESSAGE);
       resetTurnstile();
       return;
-    } finally {
-      setSubmitting(false);
     }
     if (result.ok && result.publicCode && result.cancelToken) {
-      // `with_email` measures in GA how many clientes keep the e-mail now that
-      // it is optional (#195).
-      trackAnalyticsEvent("booking_complete", {
-        method: "public_form",
-        with_email: result.confirmationEmail !== "none",
+      const confirmationPath = buildPrivateConfirmationPath(slug, result.publicCode, result.cancelToken, {
+        confirmationEmail: result.confirmationEmail,
       });
-      router.push(
-        buildPrivateConfirmationPath(slug, result.publicCode, result.cancelToken, {
-          confirmationEmail: result.confirmationEmail,
-        }),
+      // `with_email` measures in GA how many clientes keep the e-mail now that
+      // it is optional (#195). GA goes off before the navigation, so the event
+      // is sent first; the button stays busy until the page changes.
+      trackAnalyticsEventBeforeLeaving(
+        "booking_complete",
+        { method: "public_form", with_email: result.confirmationEmail !== "none" },
+        () => {
+          disableAnalyticsBeforeNavigation(confirmationPath);
+          router.push(confirmationPath);
+        },
       );
-    } else if (result.code === "slot_taken" && offersWaitlist) {
+      return;
+    }
+    setSubmitting(false);
+    if (result.code === "slot_taken" && offersWaitlist) {
       // INC-3: the slot was lost to another reservation — offer the waitlist.
       setError(result.message ?? "Esse horário não está mais disponível.");
       // The lost slot leaves the list; the offer keeps it in `lastAttempt`.

@@ -85,6 +85,41 @@ describe("BookingWidget", () => {
     },
   );
 
+  // GHSA-3h6j: GA goes off only after booking_complete is dispatched and before
+  // the capability URL reaches history.
+  it("sends booking_complete, then turns GA off, then goes to the confirmation", async () => {
+    vi.stubEnv("NEXT_PUBLIC_GA_MEASUREMENT_ID", "G-TEST000000");
+    const analyticsWindow = window as unknown as Record<string, unknown>;
+    analyticsWindow["ga-disable-G-TEST000000"] = false;
+    const gtag = vi.fn();
+    window.gtag = gtag;
+    push.mockClear();
+    mockedCreateBooking.mockResolvedValue({
+      ok: true,
+      publicCode: "65925DBB",
+      cancelToken: "A".repeat(43),
+      confirmationEmail: "sent",
+    });
+
+    try {
+      await fillAndSubmit("Maria Souza");
+      await waitFor(() => expect(gtag).toHaveBeenCalledWith("event", "booking_complete", expect.anything()));
+      expect(push).not.toHaveBeenCalled();
+      expect(analyticsWindow["ga-disable-G-TEST000000"]).toBe(false);
+
+      push.mockImplementation(() => {
+        expect(analyticsWindow["ga-disable-G-TEST000000"]).toBe(true);
+      });
+      gtag.mock.calls[0][2].event_callback();
+      expect(push).toHaveBeenCalledTimes(1);
+    } finally {
+      push.mockReset();
+      delete window.gtag;
+      delete analyticsWindow["ga-disable-G-TEST000000"];
+      vi.unstubAllEnvs();
+    }
+  });
+
   // #195: o e-mail é opcional; o formulário não trava sem ele.
   it("lets the cliente book without an e-mail", () => {
     render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);

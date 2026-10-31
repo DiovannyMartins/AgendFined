@@ -54,3 +54,26 @@ export async function anonClientForUser(email: string, password: string) {
   if (error) throw error;
   return client;
 }
+
+// Confirms the TOTP code the way verifyTotp does: the app registers the
+// challenge it created before verifying, and only then does the database
+// accept the session's aal2 (GHSA-vjcg).
+export async function verifyTotpThroughApp(
+  client: SupabaseClient<Database>,
+  admin: SupabaseClient<Database>,
+  factorId: string,
+  code: string,
+) {
+  const { data: claims, error: claimsError } = await client.auth.getClaims();
+  if (claimsError || !claims) throw claimsError ?? new Error("no claims");
+  const challenge = await client.auth.mfa.challenge({ factorId });
+  if (challenge.error || !challenge.data) throw challenge.error;
+  const granted = await admin.rpc("grant_mfa_challenge", {
+    p_user_id: claims.claims.sub,
+    p_session_id: String(claims.claims.session_id),
+    p_challenge_id: challenge.data.id,
+  });
+  if (granted.error) throw granted.error;
+  if (granted.data !== true) throw new Error("grant_mfa_challenge refused");
+  return client.auth.mfa.verify({ factorId, challengeId: challenge.data.id, code });
+}

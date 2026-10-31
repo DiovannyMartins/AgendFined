@@ -132,6 +132,10 @@ describe("códigos de recuperação do MFA (#169)", () => {
     const { data: factors, error: factorsError } = await admin.auth.admin.mfa.listFactors({ userId });
     if (factorsError) throw factorsError;
     for (const factor of factors.factors) {
+      // Without the app's grant the database refuses to drop a verified factor (GHSA-vjcg).
+      expect((await admin.auth.admin.mfa.deleteFactor({ id: factor.id, userId })).error).not.toBeNull();
+      const granted = await admin.rpc("grant_mfa_factor_removal", { p_user_id: userId, p_factor_id: factor.id });
+      expect(granted.error).toBeNull();
       const { error } = await admin.auth.admin.mfa.deleteFactor({ id: factor.id, userId });
       expect(error).toBeNull();
     }

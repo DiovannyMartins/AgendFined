@@ -2,6 +2,9 @@
 -- private.mfa_aal_allowed() returns false (never NULL) for a JWT without the
 -- aal claim, so the owner RPCs refuse it like the RLS policies do, while the
 -- opt-in MFA rules stay as they were (ADR 0009).
+-- Since 20261031060000_mfa_verified_by_app.sql (GHSA-vjcg, ADR 0012), an aal2
+-- of a dono with a verified factor counts only in a session that confirmed the
+-- code through the app (private.mfa_verified_sessions).
 -- Run against the local stack only (`npx supabase start`):
 --   docker exec -i supabase_db_projeto psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 < tests/sql/mfa-aal-gate.sql
 -- Everything runs in one transaction that is rolled back.
@@ -15,6 +18,12 @@ insert into auth.users (id, email) values
   ('00000000-0000-4000-8000-00000000b0b1', 'mfa-gate-b@example.test');
 insert into auth.mfa_factors (id, user_id, factor_type, status, created_at, updated_at) values
   ('00000000-0000-4000-8000-00000000a0f1', '00000000-0000-4000-8000-00000000a0a1', 'totp', 'verified', now(), now());
+-- Session e1 confirmed the code through the app; e2 straight against Supabase Auth.
+insert into auth.sessions (id, user_id, aal, created_at, updated_at) values
+  ('00000000-0000-4000-8000-00000000a0e1', '00000000-0000-4000-8000-00000000a0a1', 'aal2', now(), now()),
+  ('00000000-0000-4000-8000-00000000a0e2', '00000000-0000-4000-8000-00000000a0a1', 'aal2', now(), now());
+insert into private.mfa_verified_sessions (session_id, user_id) values
+  ('00000000-0000-4000-8000-00000000a0e1', '00000000-0000-4000-8000-00000000a0a1');
 insert into public.profiles (id, display_name) values
   ('00000000-0000-4000-8000-00000000a0a1', 'Dono A'),
   ('00000000-0000-4000-8000-00000000b0b1', 'Dono B');
@@ -102,11 +111,19 @@ begin
       -- Verified factor at aal1: refused.
       ('a', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal1"}', 'create_owner_booking', 'BUSINESS_NOT_FOUND'),
       ('a', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal1"}', 'notify_waitlist_entry', 'WAITLIST_NOT_OWNER'),
-      -- Verified factor at aal2: allowed.
-      ('a', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2"}', 'create_owner_booking', 'OK'),
-      ('a', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2"}', 'reschedule_owner_booking', 'OK'),
-      ('a', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2"}', 'notify_waitlist_entry', 'OK'),
-      ('a', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2"}', 'convert_waitlist_entry', 'OK'),
+      -- Verified factor at aal2, confirmed through the app: allowed.
+      ('a', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2","session_id":"00000000-0000-4000-8000-00000000a0e1"}', 'create_owner_booking', 'OK'),
+      ('a', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2","session_id":"00000000-0000-4000-8000-00000000a0e1"}', 'reschedule_owner_booking', 'OK'),
+      ('a', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2","session_id":"00000000-0000-4000-8000-00000000a0e1"}', 'notify_waitlist_entry', 'OK'),
+      ('a', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2","session_id":"00000000-0000-4000-8000-00000000a0e1"}', 'convert_waitlist_entry', 'OK'),
+      -- Verified factor at aal2 confirmed straight against Supabase Auth, or
+      -- without a session: refused (GHSA-vjcg).
+      ('a', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2","session_id":"00000000-0000-4000-8000-00000000a0e2"}', 'create_owner_booking', 'BUSINESS_NOT_FOUND'),
+      ('a', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2","session_id":"00000000-0000-4000-8000-00000000a0e2"}', 'reschedule_owner_booking', 'BUSINESS_NOT_FOUND'),
+      ('a', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2","session_id":"00000000-0000-4000-8000-00000000a0e2"}', 'notify_waitlist_entry', 'WAITLIST_NOT_OWNER'),
+      ('a', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2","session_id":"00000000-0000-4000-8000-00000000a0e2"}', 'convert_waitlist_entry', 'WAITLIST_NOT_OWNER'),
+      ('a', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2"}', 'create_owner_booking', 'BUSINESS_NOT_FOUND'),
+      ('a', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2"}', 'notify_waitlist_entry', 'WAITLIST_NOT_OWNER'),
       -- No factor at aal1 (opt-in): allowed.
       ('b', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000b0b1","aal":"aal1"}', 'create_owner_booking', 'OK'),
       ('b', '{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000b0b1","aal":"aal1"}', 'reschedule_owner_booking', 'OK'),
@@ -129,7 +146,9 @@ begin
       ('{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1"}', false),
       ('{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000b0b1"}', false),
       ('{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal1"}', false),
-      ('{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2"}', true),
+      ('{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2","session_id":"00000000-0000-4000-8000-00000000a0e1"}', true),
+      ('{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2","session_id":"00000000-0000-4000-8000-00000000a0e2"}', false),
+      ('{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000a0a1","aal":"aal2"}', false),
       ('{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000b0b1","aal":"aal1"}', true),
       ('{"role":"authenticated","sub":"00000000-0000-4000-8000-00000000b0b1","aal":"aal2"}', true)
     ) as t(claims, expected)

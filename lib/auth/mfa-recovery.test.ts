@@ -8,8 +8,11 @@ const auth = {
   getUser: vi.fn(),
   refreshSession: vi.fn(),
   getSession: vi.fn(),
+  getClaims: vi.fn(),
   mfa: {
     getAuthenticatorAssuranceLevel: vi.fn(),
+    challenge: vi.fn(),
+    verify: vi.fn(),
     listFactors: vi.fn(),
     unenroll: vi.fn(),
     enroll: vi.fn(),
@@ -20,7 +23,9 @@ const admin = {
   auth: { admin: { mfa: { listFactors: vi.fn(), deleteFactor: vi.fn() } } },
 };
 
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth }) }));
+// The session's own client answers whether its aal2 came through verifyTotp (GHSA-vjcg).
+const serverRpc = vi.fn();
+vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth, rpc: serverRpc }) }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => admin }));
 const { enforceMfaRateLimit } = vi.hoisted(() => ({ enforceMfaRateLimit: vi.fn(async () => true) }));
 vi.mock("@/lib/booking/rate-limit", () => ({
@@ -38,7 +43,7 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const { beginTotpEnrollment, generateMfaRecoveryCodes, redeemMfaRecoveryCode, removeTotp } = await import("./actions");
+const { beginTotpEnrollment, generateMfaRecoveryCodes, redeemMfaRecoveryCode, removeTotp, verifyTotp } = await import("./actions");
 const { hashRecoveryCode } = await import("./recovery-codes");
 
 function assurance(currentLevel: string, nextLevel: string) {
@@ -60,6 +65,10 @@ beforeEach(() => {
   });
   auth.mfa.unenroll.mockResolvedValue({ error: null });
   auth.refreshSession.mockResolvedValue({ data: {}, error: null });
+  auth.getClaims.mockResolvedValue({ data: { claims: { sub: USER.id, session_id: "session-1" } }, error: null });
+  auth.mfa.challenge.mockResolvedValue({ data: { id: "challenge-1" }, error: null });
+  auth.mfa.verify.mockResolvedValue({ data: {}, error: null });
+  serverRpc.mockResolvedValue({ data: true, error: null });
   admin.rpc.mockResolvedValue({ data: null, error: null });
   admin.auth.admin.mfa.listFactors.mockResolvedValue({
     data: { factors: [{ id: "factor-1", status: "verified" }, { id: "factor-2", status: "unverified" }] },
@@ -114,6 +123,11 @@ describe("redeemMfaRecoveryCode (#169)", () => {
     expect(admin.auth.admin.mfa.listFactors).toHaveBeenCalledWith({ userId: USER.id });
     expect(admin.auth.admin.mfa.deleteFactor).toHaveBeenCalledWith({ id: "factor-1", userId: USER.id });
     expect(admin.auth.admin.mfa.deleteFactor).toHaveBeenCalledWith({ id: "factor-2", userId: USER.id });
+    // The database refuses to drop a verified factor without this grant (GHSA-vjcg).
+    expect(rpcCalls("grant_mfa_factor_removal")).toEqual([
+      ["grant_mfa_factor_removal", { p_user_id: USER.id, p_factor_id: "factor-1" }],
+      ["grant_mfa_factor_removal", { p_user_id: USER.id, p_factor_id: "factor-2" }],
+    ]);
     // The session cookie still lists the removed factor until it is refreshed.
     expect(auth.refreshSession).toHaveBeenCalled();
     expect(rpcCalls("clear_mfa_recovery_codes")).toEqual([["clear_mfa_recovery_codes", { p_user_id: USER.id }]]);
@@ -181,7 +195,70 @@ describe("removeTotp (#169)", () => {
 
     await expect(removeTotp("factor-1")).resolves.toEqual({ ok: true, data: undefined });
 
+    expect(rpcCalls("grant_mfa_factor_removal")).toEqual([
+      ["grant_mfa_factor_removal", { p_user_id: USER.id, p_factor_id: "factor-1" }],
+    ]);
     expect(rpcCalls("clear_mfa_recovery_codes")).toEqual([["clear_mfa_recovery_codes", { p_user_id: USER.id }]]);
+  });
+
+  it("não remove sem o registro do app no banco", async () => {
+    assurance("aal2", "aal2");
+    admin.rpc.mockImplementation(async (fn: string) => ({
+      data: null, error: fn === "grant_mfa_factor_removal" ? { message: "boom" } : null,
+    }));
+
+    await expect(removeTotp("factor-1")).resolves.toMatchObject({ ok: false, code: "UNEXPECTED_ERROR" });
+    expect(auth.mfa.unenroll).not.toHaveBeenCalled();
+  });
+
+  it("recusa uma sessão aal2 que não confirmou o código pelo app", async () => {
+    assurance("aal2", "aal2");
+    serverRpc.mockResolvedValue({ data: false, error: null });
+
+    await expect(removeTotp("factor-1")).resolves.toMatchObject({ ok: false, code: "MFA_REQUIRED" });
+    expect(auth.mfa.unenroll).not.toHaveBeenCalled();
+  });
+});
+
+// GHSA-vjcg: o limite de tentativas só vale se o banco reconhecer apenas o
+// código confirmado por aqui.
+describe("verifyTotp", () => {
+  beforeEach(() => {
+    assurance("aal1", "aal2");
+    admin.rpc.mockImplementation(async (fn: string) => ({ data: fn === "grant_mfa_challenge" ? true : null, error: null }));
+  });
+
+  it("registra o desafio da sessão antes de verificar o código", async () => {
+    await expect(verifyTotp("factor-1", "123456")).resolves.toEqual({ ok: true, data: undefined });
+
+    expect(rpcCalls("grant_mfa_challenge")).toEqual([
+      ["grant_mfa_challenge", { p_user_id: USER.id, p_session_id: "session-1", p_challenge_id: "challenge-1" }],
+    ]);
+    expect(admin.rpc.mock.invocationCallOrder[0]).toBeLessThan(auth.mfa.verify.mock.invocationCallOrder[0]);
+    expect(auth.mfa.verify).toHaveBeenCalledWith({ factorId: "factor-1", challengeId: "challenge-1", code: "123456" });
+  });
+
+  it("não verifica logo depois de um código confirmado direto no Supabase Auth", async () => {
+    admin.rpc.mockResolvedValue({ data: false, error: null });
+
+    await expect(verifyTotp("factor-1", "123456")).resolves.toMatchObject({ ok: false, code: "RATE_LIMITED" });
+    expect(auth.mfa.verify).not.toHaveBeenCalled();
+    expect(auditSecurityEvent).toHaveBeenCalledWith("auth.mfa_out_of_band_blocked", USER.id);
+  });
+
+  it("falha fechado quando o banco não registra o desafio", async () => {
+    admin.rpc.mockResolvedValue({ data: null, error: { message: "unavailable" } });
+
+    await expect(verifyTotp("factor-1", "123456")).resolves.toMatchObject({ ok: false, code: "UNEXPECTED_ERROR" });
+    expect(auth.mfa.verify).not.toHaveBeenCalled();
+  });
+
+  it("não registra desafio quando o limite de tentativas já acabou", async () => {
+    enforceMfaRateLimit.mockResolvedValue(false);
+
+    await expect(verifyTotp("factor-1", "123456")).resolves.toMatchObject({ ok: false, code: "RATE_LIMITED" });
+    expect(auth.mfa.challenge).not.toHaveBeenCalled();
+    expect(admin.rpc).not.toHaveBeenCalled();
   });
 });
 

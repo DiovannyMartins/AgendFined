@@ -18,19 +18,25 @@ import type { WaitlistStatus } from "@/lib/waitlist/waitlist";
 
 type GetBusiness = () => Promise<WaitlistManagementBusiness | null>;
 
-// Default entries fetch: the owner's own rows, scoped by RLS. The service name is
+const PAST_ENTRIES_DAYS = 30;
+
+// Default entries fetch: the owner's own rows, scoped by RLS, for horários from
+// a month ago on (the whole history was cut at PostgREST's 1000 rows, #215). The service name is
 // resolved from the owner's own services so the dashboard can render the service
 // column without exposing another business's catalog. Throws on error so the core
 // maps it to `{ status: "error" }` (a failed read must never look like an empty
 // list).
 const fetchOwnerEntries: FetchWaitlistEntries = async (businessId) => {
   const supabase = await createClient();
+  const since = new Date(Date.now() - PAST_ENTRIES_DAYS * 86_400_000).toISOString();
   const [entriesRes, servicesRes] = await Promise.all([
     supabase
       .from("waitlist_entries")
-      .select("*")
+      .select("id, business_id, service_id, start_at, customer_name, customer_phone, customer_email, status, created_at")
       .eq("business_id", businessId)
-      .order("created_at", { ascending: true }),
+      .gte("start_at", since)
+      .order("created_at", { ascending: true })
+      .limit(500),
     supabase.from("services").select("id, name").eq("business_id", businessId),
   ]);
   if (entriesRes.error) throw new Error(entriesRes.error.message);

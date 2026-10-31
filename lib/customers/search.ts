@@ -3,13 +3,17 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBusiness } from "@/lib/business/queries";
-import { buildCustomerHistory, searchCustomerHistory } from "@/lib/customers/history";
+import {
+  buildCustomerHistory,
+  searchCustomerHistory,
+  type CustomerSummary,
+} from "@/lib/customers/history";
 import { enforceCustomerSearchRateLimit, getClientIp } from "@/lib/booking/rate-limit";
 import { z } from "zod";
 
 export async function semanticSearchCustomers(
   query: string,
-): Promise<{ ids: string[]; confidence: number } | null> {
+): Promise<{ customers: CustomerSummary[]; confidence: number } | null> {
   const parsedQuery = z.string().trim().min(1).max(100).safeParse(query);
   if (!parsedQuery.success) return null;
   const boundedQuery = parsedQuery.data;
@@ -51,8 +55,10 @@ export async function semanticSearchCustomers(
   const matches = searchCustomerHistory(history, boundedQuery);
   if (!matches) return null;
 
+  // The matches themselves, not ids: the Clientes list is paginated, so a
+  // match may not be on the page the dono is looking at (#215).
   return {
-    ids: matches.map(({ customer }) => customer.id),
+    customers: matches.map(({ customer, bookings }) => ({ ...customer, booking_count: bookings.length })),
     confidence: matches.length > 0 ? 1 : 0,
   };
 }

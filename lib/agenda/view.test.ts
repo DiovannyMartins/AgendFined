@@ -5,6 +5,8 @@ import {
   businessWeekday,
   dayGridTimes,
   agendaSearchString,
+  agendaWeek,
+  toAgendaBooking,
   filterAgenda,
   parseAgendaSearchParams,
   weekDateKeys,
@@ -104,7 +106,7 @@ describe("filterAgenda", () => {
   const b = (over: Partial<AgendaBooking> & { id: string }): AgendaBooking => ({
     id: over.id,
     start_at: over.start_at ?? "2026-09-02T16:00:00.000Z",
-    end_at: over.end_at ?? "2026-09-02T16:30:00.000Z",
+    has_email: false,
     status: over.status ?? "confirmed",
     service_name_snapshot: over.service_name_snapshot ?? "Corte",
     duration_minutes_snapshot: over.duration_minutes_snapshot ?? 30,
@@ -173,5 +175,72 @@ describe("parseAgendaSearchParams", () => {
     expect(query).toBe("?data=2026-10-19&status=no_show");
     expect(parseAgendaSearchParams(Object.fromEntries(new URLSearchParams(query)))).toEqual(filters);
     expect(agendaSearchString({ dateKey: null, status: null })).toBe("");
+  });
+});
+
+describe("toAgendaBooking (allowlist das props do AgendaView, #215)", () => {
+  // A full bookings row, with the columns that must never reach the browser.
+  const row = {
+    id: "b1",
+    business_id: "biz",
+    customer_id: "c1",
+    service_id: "s1",
+    start_at: "2026-09-20T13:00:00.000Z",
+    end_at: "2026-09-20T13:30:00.000Z",
+    status: "confirmed" as const,
+    service_name_snapshot: "Corte",
+    duration_minutes_snapshot: 30,
+    price_cents_snapshot: 4000,
+    customer_name_snapshot: "Ana",
+    customer_phone_snapshot: "+5511900000000",
+    customer_email_snapshot: " ana@example.com ",
+    public_code: "ABCDEFGH",
+    cancel_token_hash: "c".repeat(64),
+    reminder_claim_token: "token",
+    cancel_reason: null,
+    cancel_reason_category: null,
+    cancelled_by: null,
+    rescheduled_at: null,
+    customer_note: "Alergia a acetona",
+    customer_note_requires_follow_up: true,
+  };
+
+  it("passa só as chaves da allowlist, com has_email no lugar do e-mail", () => {
+    const booking = toAgendaBooking(row);
+
+    expect(Object.keys(booking).sort()).toEqual([
+      "cancel_reason",
+      "cancel_reason_category",
+      "cancelled_by",
+      "customer_name_snapshot",
+      "customer_note",
+      "customer_note_requires_follow_up",
+      "customer_phone_snapshot",
+      "duration_minutes_snapshot",
+      "has_email",
+      "id",
+      "public_code",
+      "rescheduled_at",
+      "service_name_snapshot",
+      "start_at",
+      "status",
+    ]);
+    expect(booking.has_email).toBe(true);
+    expect(JSON.stringify(booking)).not.toMatch(/ana@example\.com|cccc|token/);
+  });
+
+  it("um e-mail vazio não conta como e-mail", () => {
+    expect(toAgendaBooking({ ...row, customer_email_snapshot: "  " }).has_email).toBe(false);
+    expect(toAgendaBooking({ ...row, customer_email_snapshot: null }).has_email).toBe(false);
+  });
+});
+
+describe("agendaWeek", () => {
+  it("busca de segunda 00:00 a segunda seguinte 00:00 no fuso do negócio", () => {
+    expect(agendaWeek("2026-09-20", "America/Sao_Paulo")).toEqual({
+      days: ["2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18", "2026-09-19", "2026-09-20"],
+      from: "2026-09-14T03:00:00.000Z",
+      to: "2026-09-21T03:00:00.000Z",
+    });
   });
 });

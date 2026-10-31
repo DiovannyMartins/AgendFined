@@ -22,22 +22,18 @@ export default async function ServicosPage() {
 
   const list = services ?? [];
 
-  const { data: bookingRefs } = await supabase
-    .from("bookings")
-    .select("service_id, status, end_at")
-    .eq("business_id", business?.id ?? "");
+  // Counted in the database: fetching the reservas to count them was cut at
+  // PostgREST's 1000 rows (#215).
+  const { data: counts } = await supabase.rpc("service_booking_counts", {
+    p_business_id: business?.id ?? "",
+  });
 
-  const now = new Date().toISOString();
   const bookingCountByService = new Map<string, number>();
   const scheduledByService = new Map<string, number>();
-  for (const row of bookingRefs ?? []) {
-    if (!row.service_id) continue;
-    bookingCountByService.set(
-      row.service_id,
-      (bookingCountByService.get(row.service_id) ?? 0) + 1,
-    );
-    if (row.status === "confirmed" && row.end_at > now) {
-      scheduledByService.set(row.service_id, (scheduledByService.get(row.service_id) ?? 0) + 1);
+  for (const row of counts ?? []) {
+    bookingCountByService.set(row.service_id, Number(row.booking_count));
+    if (Number(row.scheduled_count) > 0) {
+      scheduledByService.set(row.service_id, Number(row.scheduled_count));
     }
   }
 

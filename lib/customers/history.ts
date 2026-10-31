@@ -22,6 +22,46 @@ export type CustomerBooking = {
   duration_minutes_snapshot: number;
 };
 
+// One row of the paginated Clientes list (#215): explicit keys, the reservas
+// counted by the database, the history itself loaded only when opened.
+export type CustomerSummary = CustomerRow & { booking_count: number };
+
+export const CUSTOMER_PAGE_SIZE = 50;
+
+// New objects with only the allowlisted keys: a `select("*")` row passed by
+// reference sent tokens, notes and snapshots to the browser (#215).
+export function toCustomerRow(row: CustomerRow): CustomerRow {
+  return { id: row.id, name: row.name, phone: row.phone, email: row.email };
+}
+
+export function toCustomerSummary(row: CustomerRow, bookingCount: number): CustomerSummary {
+  return { ...toCustomerRow(row), booking_count: bookingCount };
+}
+
+export function toCustomerBooking(row: CustomerBooking): CustomerBooking {
+  return {
+    id: row.id,
+    customer_id: row.customer_id,
+    start_at: row.start_at,
+    status: row.status,
+    service_name_snapshot: row.service_name_snapshot,
+    duration_minutes_snapshot: row.duration_minutes_snapshot,
+  };
+}
+
+// The Clientes search typed in the box, as a PostgREST `or` filter over name,
+// e-mail and phone digits. Characters that carry meaning in the filter syntax
+// (commas, parentheses, quotes, wildcards) are dropped, so input can't add
+// conditions. Null when nothing searchable is left.
+export function customerSearchFilter(query: string): string | null {
+  const text = query.normalize("NFC").replace(/[^\p{L}\p{N}@._+\s-]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 100);
+  if (!text) return null;
+  const conditions = [`name.ilike.*${text}*`, `email.ilike.*${text}*`];
+  const digits = text.replace(/\D/g, "");
+  if (digits.length >= 3) conditions.push(`phone.ilike.*${digits}*`);
+  return conditions.join(",");
+}
+
 export type CustomerHistory = {
   customer: CustomerRow;
   // Bookings sorted most-recent-first (callers render a timeline).
@@ -41,10 +81,10 @@ export function buildCustomerHistory(
   }
 
   return customers.map((customer) => {
-    const list = (byCustomer.get(customer.id) ?? []).slice().sort((a, b) =>
+    const list = (byCustomer.get(customer.id) ?? []).map(toCustomerBooking).sort((a, b) =>
       b.start_at.localeCompare(a.start_at),
     );
-    return { customer, bookings: list };
+    return { customer: toCustomerRow(customer), bookings: list };
   });
 }
 

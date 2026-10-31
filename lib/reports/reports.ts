@@ -94,28 +94,65 @@ export function filterBookingsByRange(
   return bookings.filter((b) => b.start_at >= from && b.start_at < to);
 }
 
+// One aggregated row per (status, service): what the `billing_report_groups`
+// RPC returns, so "Sempre" isn't cut at PostgREST's 1000 rows (#215).
+export type ReportGroup = {
+  status: BookingStatus;
+  service_name_snapshot: string;
+  booking_count: number;
+  revenue_cents: number;
+};
+
+// In-memory twin of the RPC's `group by status, service_name_snapshot`.
+export function groupReportBookings(bookings: ReportBooking[]): ReportGroup[] {
+  const groups = new Map<string, ReportGroup>();
+  for (const booking of bookings) {
+    const key = `${booking.status}\u0000${booking.service_name_snapshot}`;
+    const group = groups.get(key) ?? {
+      status: booking.status,
+      service_name_snapshot: booking.service_name_snapshot,
+      booking_count: 0,
+      revenue_cents: 0,
+    };
+    group.booking_count += 1;
+    group.revenue_cents += booking.price_cents_snapshot;
+    groups.set(key, group);
+  }
+  return [...groups.values()];
+}
+
 export function buildBillingReport(
   bookings: ReportBooking[],
   range: DateRange,
 ): BillingReport {
-  const rows = filterBookingsByRange(bookings, range.from, range.to);
+  return buildBillingReportFromGroups(
+    groupReportBookings(filterBookingsByRange(bookings, range.from, range.to)),
+    range,
+  );
+}
 
+// The report from groups already scoped to the period.
+export function buildBillingReportFromGroups(
+  groups: ReportGroup[],
+  range: DateRange,
+): BillingReport {
   const counts = { confirmed: 0, completed: 0, cancelled: 0, no_show: 0 };
   let revenueCents = 0;
   const byService = new Map<string, { count: number; revenueCents: number }>();
 
-  for (const booking of rows) {
-    counts[booking.status] += 1;
-    if (booking.status === "completed") {
-      revenueCents += booking.price_cents_snapshot;
-    }
+  for (const group of groups) {
+    const count = Number(group.booking_count);
+    const revenue = Number(group.revenue_cents);
+    counts[group.status] += count;
 
-    // Best-selling service counts only COMPLETED bookings; tie-break by revenue.
-    if (booking.status === "completed") {
-      const entry = byService.get(booking.service_name_snapshot) ?? { count: 0, revenueCents: 0 };
-      entry.count += 1;
-      entry.revenueCents += booking.price_cents_snapshot;
-      byService.set(booking.service_name_snapshot, entry);
+    // Only completed bookings are money, and the best-selling service counts
+    // only COMPLETED bookings; tie-break by revenue.
+    if (group.status === "completed") {
+      revenueCents += revenue;
+      const entry = byService.get(group.service_name_snapshot) ?? { count: 0, revenueCents: 0 };
+      entry.count += count;
+      entry.revenueCents += revenue;
+      byService.set(group.service_name_snapshot, entry);
     }
   }
 
@@ -130,7 +167,7 @@ export function buildBillingReport(
     }
   }
 
-  const total = rows.length;
+  const total = counts.confirmed + counts.completed + counts.cancelled + counts.no_show;
   return {
     range,
     totalBookings: total,
@@ -155,7 +192,7 @@ export function formatRate(rate: number): string {
 // at the read boundary. `buildBillingReportResult` is the pure decision core —
 // it checks the business plan first (fail-closed) and only fetches/computes the
 // report for Pro businesses, so a Free business can never see report data. The
-// bookings fetch is injected so the gate is unit-testable without a database.
+// groups fetch is injected so the gate is unit-testable without a database.
 // ---------------------------------------------------------------------------
 
 export type BillingReportResult =
@@ -166,20 +203,20 @@ export type BillingReportResult =
 
 export type ReportBusiness = GatedBusiness;
 
-export type FetchReportBookings = (
+export type FetchReportGroups = (
   businessId: string,
   range: DateRange,
-) => Promise<ReportBooking[]>;
+) => Promise<ReportGroup[]>;
 
 export async function buildBillingReportResult(
   business: ReportBusiness | null,
-  fetchBookings: FetchReportBookings,
+  fetchGroups: FetchReportGroups,
   rangeKey?: string,
 ): Promise<BillingReportResult> {
   const { key, range } = resolveRange(rangeKey);
-  const gated = await runProGated(business, (businessId) => fetchBookings(businessId, range));
+  const gated = await runProGated(business, (businessId) => fetchGroups(businessId, range));
   if (gated.status !== "ok") return gated;
 
-  const report = buildBillingReport(gated.data, range);
+  const report = buildBillingReportFromGroups(gated.data, range);
   return { status: "ok", key, range, report };
 }

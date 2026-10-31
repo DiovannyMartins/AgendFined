@@ -121,7 +121,7 @@ export function AgendaList({
                 })
               : null;
             const withoutEmailReminder =
-              automaticReminders && reminderHref !== null && !booking.customer_email_snapshot?.trim();
+              automaticReminders && reminderHref !== null && !booking.has_email;
             return (
               <div
                 key={booking.id}

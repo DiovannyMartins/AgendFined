@@ -17,14 +17,19 @@ import {
 
 type GetBusiness = () => Promise<GcalExportBusiness | null>;
 
-// Default bookings fetch: the owner's own rows, scoped by RLS. Throws so the
-// core maps it to `{ status: "error" }`.
+// Default bookings fetch: the owner's own rows, scoped by RLS. Only what the
+// feed can carry (confirmed, ahead), so the past never eats PostgREST's
+// 1000-row cap (#215). Throws so the core maps it to `{ status: "error" }`.
 const fetchOwnerBookings: FetchGcalBookings = async (businessId) => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("bookings")
     .select("id, status, start_at, end_at, service_name_snapshot, customer_name_snapshot, customer_phone_snapshot, customer_note")
-    .eq("business_id", businessId);
+    .eq("business_id", businessId)
+    .eq("status", "confirmed")
+    .gte("start_at", new Date().toISOString())
+    .order("start_at", { ascending: true })
+    .limit(1000);
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as GcalExportBooking[];
 };

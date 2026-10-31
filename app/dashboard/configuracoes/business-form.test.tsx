@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { renderToString } from "react-dom/server";
 import { BusinessForm } from "./business-form";
 import { updateBusiness } from "@/lib/business/actions";
 
@@ -267,5 +268,45 @@ describe("intervalo entre horários (#191)", () => {
 
     await waitFor(() => expect(updateBusiness).toHaveBeenCalledTimes(1));
     expect(vi.mocked(updateBusiness).mock.calls[0][1].get("slotIntervalMinutes")).toBe("25");
+  });
+});
+
+// #225: antes da hidratação, o HTML do servidor já mostra o que está salvo.
+describe("HTML do servidor (#225)", () => {
+  function serverHtml(props: Parameters<typeof BusinessForm>[0]) {
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(<BusinessForm {...props} />);
+    return container;
+  }
+
+  it("traz os valores salvos em cada campo", () => {
+    const html = serverHtml({
+      initial: {
+        ...initial,
+        slotIntervalMinutes: 45,
+        minNoticeMinutes: 60,
+        bookingWindowDays: 30,
+        timezone: "America/Manaus",
+        description: "Corte e barba",
+      },
+    });
+    const field = (id: string) => html.querySelector(`#${id}`)!;
+
+    expect(field("name").getAttribute("value")).toBe("Barbearia Demo");
+    expect(field("slug").getAttribute("value")).toBe("barbearia-demo");
+    expect(field("phone").getAttribute("value")).toBe("(11) 99999-9999");
+    expect(field("description").textContent).toBe("Corte e barba");
+    expect(field("minNoticeMinutes").getAttribute("value")).toBe("60");
+    expect(field("bookingWindowDays").getAttribute("value")).toBe("30");
+    expect(html.querySelector("#slotIntervalMinutes option[selected]")?.getAttribute("value")).toBe("45");
+    expect(html.querySelector("#timezone option[selected]")?.getAttribute("value")).toBe("America/Manaus");
+  });
+
+  it("no setup, traz os valores padrão", () => {
+    const html = serverHtml({ initial: null });
+
+    expect(html.querySelector("#slotIntervalMinutes option[selected]")?.getAttribute("value")).toBe("30");
+    expect(html.querySelector("#timezone option[selected]")?.getAttribute("value")).toBe("America/Sao_Paulo");
+    expect(html.querySelector("#minNoticeMinutes")?.getAttribute("value")).toBe("120");
   });
 });

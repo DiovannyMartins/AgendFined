@@ -1,4 +1,5 @@
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { adminClient, anonClient, anonClientForUser } from "./index";
 import { futureSlot } from "./future-slot";
 
@@ -360,6 +361,14 @@ describe("anon data exposure (§36)", () => {
       anon.from("waitlist_entries").select("id").limit(1),
       anon.from("subscriptions").select("id").limit(1),
       anon.from("billing_attempts").select("id").limit(1),
+      // #219: these have no anon grant; only default privileges keep them out.
+      anon.from("google_calendar_connections").select("id").limit(1),
+      anon.from("mfa_recovery_codes").select("user_id").limit(1),
+      anon.from("business_slug_history").select("slug").limit(1),
+      anon.from("booking_reschedules").select("id").limit(1),
+      anon.from("security_usage_daily").select("usage_date").limit(1),
+      // Not in the generated types: only service-role RPCs touch it.
+      (anon as unknown as SupabaseClient).from("billing_reconciliation_claims").select("resource_key").limit(1),
     ]);
 
     for (const result of results) {

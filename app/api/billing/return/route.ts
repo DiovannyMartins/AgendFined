@@ -3,8 +3,9 @@ import { syncCurrentSubscriptionAfterReturn } from "@/lib/billing/actions";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enforceApiRateLimit, getClientIpFromHeaders } from "@/lib/booking/rate-limit";
 import { trustedAppOrigin } from "@/lib/app-origin";
+import { withNoStore } from "@/lib/http/no-store";
 
-export async function GET(request: NextRequest) {
+export const GET = withNoStore(async (request: NextRequest) => {
   try {
     const allowed = await enforceApiRateLimit(createAdminClient(), getClientIpFromHeaders(request.headers), "billingReturn");
     if (!allowed) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
@@ -21,4 +22,4 @@ export async function GET(request: NextRequest) {
   // Back to the origin the checkout was opened from (APP_URL, like the
   // back_url), not the request's Host: another origin has another session.
   return NextResponse.redirect(new URL("/dashboard/configuracoes", trustedAppOrigin(request.nextUrl.origin)));
-}
+});

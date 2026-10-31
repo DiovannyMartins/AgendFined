@@ -43,8 +43,10 @@ function weakPasswordError(error: { code?: string }): ActionResult | null {
   };
 }
 
-// Supabase Auth verifies the Turnstile token itself when CAPTCHA protection is
-// enabled for the project; tokens are single-use, so the app never pre-verifies.
+// Supabase Auth verifies the Turnstile token itself: production enables CAPTCHA
+// in [remotes.production.auth.captcha] (supabase/config.toml), which also
+// covers direct GoTrue calls that skip these actions and their rate limits.
+// Tokens are single-use, so the app never pre-verifies.
 function captchaToken(formData: FormData): string | undefined {
   const token = String(formData.get("cfTurnstileToken") ?? "").trim();
   return token ? token.slice(0, 2048) : undefined;

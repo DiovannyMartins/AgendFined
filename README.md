@@ -149,6 +149,7 @@ Supabase, Mercado Pago, Resend e Vercel, e não envia secrets para o repositóri
 | `CRON_SECRET` | Somente Server | Segredo privado do scheduler para `/api/internal/reconciliation` |
 > A service role **nunca** deve aparecer no bundle do navegador, em variável `NEXT_PUBLIC_`, no repositório Git ou em logs públicos.
 > O Turnstile é *fail-closed*: sem ambas as chaves o widget não renderiza e o gate de anti-bot fica desativado.
+> Login, cadastro, recuperação e reenvio são protegidos pelo CAPTCHA do próprio Supabase Auth, ligado em produção pelo bloco `[remotes.production.auth.captcha]` de `supabase/config.toml` (o stack local fica sem CAPTCHA). Antes de `supabase config push`, exporte `SUPABASE_AUTH_CAPTCHA_SECRET` com o mesmo valor de `TURNSTILE_SECRET_KEY`; o diff do Auth não deve mostrar mudança em `secret`.
 
 ## Principais decisões técnicas
 

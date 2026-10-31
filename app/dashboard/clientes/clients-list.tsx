@@ -184,8 +184,8 @@ function CustomerCard({ customer, timezone }: { customer: CustomerSummary; timez
             </Badge>
           </button>
         }
-      >
-        <DialogContent className="max-w-lg">
+      />
+      <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{customer.name}</DialogTitle>
             <DialogDescription>
@@ -208,8 +208,7 @@ function CustomerCard({ customer, timezone }: { customer: CustomerSummary; timez
           ) : (
             <HistoryList bookings={bookings} timezone={timezone} />
           )}
-        </DialogContent>
-      </DialogTrigger>
+      </DialogContent>
     </Dialog>
   );
 }

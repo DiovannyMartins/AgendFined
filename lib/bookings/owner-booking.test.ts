@@ -88,6 +88,7 @@ beforeEach(() => {
   vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
   state.business = {
     id: "business-1",
+    owner_id: "owner-1",
     name: "Barbearia Demo",
     slug: "barbearia-demo",
     phone: "11987654321",
@@ -161,8 +162,23 @@ describe("createOwnerBooking (#193)", () => {
     expect(result.message).toContain("Não foi possível enviar o e-mail");
   });
 
+  it("acima do limite diário do endereço, cria a reserva sem enviar a ele e pede o WhatsApp", async () => {
+    const { limit } = OWNER_EMAIL_RATE_LIMIT.perRecipientDaily;
+    for (let sent = 0; sent < limit; sent += 1) {
+      await create(bookingForm({ customerEmail: "bruna@example.com" }));
+    }
+    expect(sendBookingConfirmationEmail).toHaveBeenCalledTimes(limit);
+
+    const sameAddress = await create(bookingForm({ customerEmail: "Bruna@Example.com" }));
+    expect(sendBookingConfirmationEmail).toHaveBeenCalledTimes(limit);
+    expect(sameAddress).toMatchObject({ ok: true, message: "Não foi possível enviar o e-mail. Envie o link da confirmação pelo WhatsApp." });
+
+    await create(bookingForm({ customerEmail: "outra@example.com" }));
+    expect(sendBookingConfirmationEmail).toHaveBeenCalledTimes(limit + 1);
+  });
+
   it("acima do orçamento de e-mails do negócio, cria a reserva sem enviar e pede o WhatsApp", async () => {
-    const { limit } = OWNER_EMAIL_RATE_LIMIT.perBusinessHourly;
+    const { limit } = OWNER_EMAIL_RATE_LIMIT.perOwnerHourly;
     for (let sent = 0; sent < limit; sent += 1) {
       await create(bookingForm({ customerEmail: `cliente${sent}@example.com` }));
     }

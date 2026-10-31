@@ -159,7 +159,7 @@ export async function rescheduleOwnerBooking(
     notifyByWhatsApp: true,
     message: "Reserva remarcada, mas o e-mail não saiu. Avise o novo horário pelo WhatsApp.",
   };
-  if (!await spendOwnerEmail(business.id, "reschedule")) return emailNotSent;
+  if (!await spendOwnerEmail(business, moved.customer_email_snapshot, "reschedule")) return emailNotSent;
 
   const emailResult = await sendBusinessRescheduledEmail({
     customerName: moved.customer_name_snapshot,

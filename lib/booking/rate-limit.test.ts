@@ -410,42 +410,66 @@ describe("enforceBillingCheckoutRateLimit", () => {
 });
 
 describe("enforceOwnerEmailRateLimit", () => {
-  it("counts the e-mails of the dono's actions in an hourly and a daily window of the negócio", async () => {
+  const sender = (ownerId: string, recipientEmail: string) => ({ businessId: "biz-1", ownerId, recipientEmail });
+
+  it("counts the e-mails of the dono's actions per conta and per cliente address", async () => {
     const rpc = vi.fn(async () => ({ data: true, error: null }));
     const client = { rpc } as unknown as SupabaseClient<Database>;
 
-    await expect(enforceOwnerEmailRateLimit(client, "biz-1", "booking_confirmation")).resolves.toBe(true);
+    await expect(
+      enforceOwnerEmailRateLimit(client, sender("owner-1", " Cliente@Example.com "), "booking_confirmation"),
+    ).resolves.toBe(true);
 
-    expect(rpc).toHaveBeenCalledWith("check_booking_rate_limit", {
-      p_key: "business:biz-1|owner_email|1h",
-      p_limit: OWNER_EMAIL_RATE_LIMIT.perBusinessHourly.limit,
-      p_window_seconds: 3_600,
-    });
-    expect(rpc).toHaveBeenCalledWith("check_booking_rate_limit", {
-      p_key: "business:biz-1|owner_email|24h",
-      p_limit: OWNER_EMAIL_RATE_LIMIT.perBusinessDaily.limit,
-      p_window_seconds: 86_400,
-    });
+    const keys = rpc.mock.calls.map((call) => (call as unknown as [string, { p_key: string; p_limit: number }])[1]);
+    expect(keys).toEqual([
+      { p_key: "owner:owner-1|owner_email|1h", p_limit: OWNER_EMAIL_RATE_LIMIT.perOwnerHourly.limit, p_window_seconds: 3_600 },
+      { p_key: "owner:owner-1|owner_email|24h", p_limit: OWNER_EMAIL_RATE_LIMIT.perOwnerDaily.limit, p_window_seconds: 86_400 },
+      {
+        p_key: expect.stringMatching(/^email:[0-9a-f]{32}\|owner_email$/),
+        p_limit: OWNER_EMAIL_RATE_LIMIT.perRecipientDaily.limit,
+        p_window_seconds: 86_400,
+      },
+    ]);
+    expect(JSON.stringify(keys)).not.toContain("cliente");
   });
 
-  it("shares one budget across the kinds of e-mail and refuses the one past the limit", async () => {
+  // The negócio can be deleted and created again under a new id; the conta
+  // stays, so the budget does too.
+  it("keeps the budget when the dono recreates the negócio", async () => {
     const { client } = windowClient();
-    const { limit } = OWNER_EMAIL_RATE_LIMIT.perBusinessHourly;
+    const { limit } = OWNER_EMAIL_RATE_LIMIT.perOwnerHourly;
     for (let sent = 0; sent < limit; sent += 1) {
       await expect(
-        enforceOwnerEmailRateLimit(client, "biz-1", sent % 2 ? "cancellation" : "reschedule"),
+        enforceOwnerEmailRateLimit(client, { businessId: "biz-1", ownerId: "owner-1", recipientEmail: `c${sent}@example.com` }, "reschedule"),
       ).resolves.toBe(true);
     }
 
-    await expect(enforceOwnerEmailRateLimit(client, "biz-1", "waitlist_slot_freed")).resolves.toBe(false);
-    await expect(enforceOwnerEmailRateLimit(client, "biz-2", "waitlist_slot_freed")).resolves.toBe(true);
+    await expect(
+      enforceOwnerEmailRateLimit(client, { businessId: "biz-2", ownerId: "owner-1", recipientEmail: "novo@example.com" }, "reschedule"),
+    ).resolves.toBe(false);
+    await expect(
+      enforceOwnerEmailRateLimit(client, { businessId: "biz-3", ownerId: "owner-2", recipientEmail: "novo@example.com" }, "reschedule"),
+    ).resolves.toBe(true);
+  });
+
+  it("caps the e-mails one address gets in a day, whatever the case", async () => {
+    const { client } = windowClient();
+    const { limit } = OWNER_EMAIL_RATE_LIMIT.perRecipientDaily;
+    for (let sent = 0; sent < limit; sent += 1) {
+      await expect(
+        enforceOwnerEmailRateLimit(client, sender("owner-1", "vitima@example.com"), sent % 2 ? "cancellation" : "reschedule"),
+      ).resolves.toBe(true);
+    }
+
+    await expect(enforceOwnerEmailRateLimit(client, sender("owner-1", "VITIMA@example.com"), "waitlist_slot_freed")).resolves.toBe(false);
+    await expect(enforceOwnerEmailRateLimit(client, sender("owner-1", "outra@example.com"), "waitlist_slot_freed")).resolves.toBe(true);
   });
 
   it("throws when the counter cannot be updated", async () => {
     const rpc = vi.fn(async () => ({ data: null, error: { message: "boom" } }));
     const client = { rpc } as unknown as SupabaseClient<Database>;
 
-    await expect(enforceOwnerEmailRateLimit(client, "biz-1", "booking_confirmation")).rejects.toBeTruthy();
+    await expect(enforceOwnerEmailRateLimit(client, sender("owner-1", "c@example.com"), "booking_confirmation")).rejects.toBeTruthy();
   });
 });
 

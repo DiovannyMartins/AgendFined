@@ -92,9 +92,15 @@ export const BILLING_CHECKOUT_RATE_LIMIT = {
 // above a busy agenda (a full day of reservas, remarcações and cancelamentos);
 // past it the action still goes through and the dono warns the cliente by
 // WhatsApp, as when the e-mail fails.
+//
+// The budget belongs to the dono's conta, not to the negócio: a negócio can be
+// deleted and created again under a new id, the conta cannot. perRecipientDaily
+// caps what one cliente address gets from the dono's actions in a day, sized
+// like the public writes' cap (RATE_LIMIT.perRecipientEmail).
 export const OWNER_EMAIL_RATE_LIMIT = {
-  perBusinessHourly: { limit: 40, windowSeconds: 60 * 60 },
-  perBusinessDaily: { limit: 200, windowSeconds: 24 * 60 * 60 },
+  perOwnerHourly: { limit: 40, windowSeconds: 60 * 60 },
+  perOwnerDaily: { limit: 200, windowSeconds: 24 * 60 * 60 },
+  perRecipientDaily: { limit: 10, windowSeconds: 24 * 60 * 60 },
 } as const;
 
 // Remarcação and cancelamento through the private link (ADR 0005, ADR 0010)
@@ -229,17 +235,21 @@ export async function enforceBillingCheckoutRateLimit(
   ]);
 }
 
-// Spends one e-mail of the negócio's budget; true while within it. Throws when
-// the counter fails, so the caller can skip the e-mail (fail closed). Call it
-// with the admin client: the RPC is service_role only.
+// Spends one e-mail of the dono's budget and one of the cliente address's
+// daily cap; true while within both. Throws when the counter fails, so the
+// caller can skip the e-mail (fail closed). Call it with the admin client: the
+// RPC is service_role only.
 export async function enforceOwnerEmailRateLimit(
   supabase: ServerClient,
-  businessId: string,
+  sender: { businessId: string; ownerId: string; recipientEmail: string },
   kind: OwnerEmailKind,
 ): Promise<boolean> {
+  const { businessId, ownerId, recipientEmail } = sender;
+  const recipient = hashIdentifier(recipientEmail.trim().toLowerCase());
   const allowed = await enforceWindows(supabase, [
-    { key: `business:${businessId}|owner_email|1h`, ...OWNER_EMAIL_RATE_LIMIT.perBusinessHourly },
-    { key: `business:${businessId}|owner_email|24h`, ...OWNER_EMAIL_RATE_LIMIT.perBusinessDaily },
+    { key: `owner:${ownerId}|owner_email|1h`, ...OWNER_EMAIL_RATE_LIMIT.perOwnerHourly },
+    { key: `owner:${ownerId}|owner_email|24h`, ...OWNER_EMAIL_RATE_LIMIT.perOwnerDaily },
+    { key: `email:${recipient}|owner_email`, ...OWNER_EMAIL_RATE_LIMIT.perRecipientDaily },
   ]);
   if (!allowed) console.warn("owner_email_rate_limited", { businessId, kind });
   return allowed;

@@ -143,7 +143,7 @@ export async function createOwnerBooking(
   }
 
   const emailNotSent = "Não foi possível enviar o e-mail. Envie o link da confirmação pelo WhatsApp.";
-  if (!await spendOwnerEmail(business.id, "booking_confirmation")) return { ...created, message: emailNotSent };
+  if (!await spendOwnerEmail(business, booking.customer_email_snapshot, "booking_confirmation")) return { ...created, message: emailNotSent };
 
   const emailResult = await sendBookingConfirmationEmail({
     customerName: booking.customer_name_snapshot,

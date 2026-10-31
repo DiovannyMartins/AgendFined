@@ -20,6 +20,7 @@ vi.mock("@/lib/email/waitlist-slot-freed", () => ({ sendWaitlistSlotFreedEmail }
 vi.mock("@/lib/business/queries", () => ({
   getCurrentBusiness: async () => ({
     id: "business-1",
+    owner_id: "owner-1",
     name: "Barbearia Demo",
     slug: "barbearia-demo",
     phone: "11987654321",
@@ -151,7 +152,7 @@ describe("notifyWaitlistEntry", () => {
   it("notifies without emailing past the negócio's e-mail budget", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     state.rpcResults.notify_waitlist_entry = { data: entry("bruna@example.com"), error: null };
-    rateLimitAdmin.counts.set("business:business-1|owner_email|1h", OWNER_EMAIL_RATE_LIMIT.perBusinessHourly.limit);
+    rateLimitAdmin.counts.set("owner:owner-1|owner_email|1h", OWNER_EMAIL_RATE_LIMIT.perOwnerHourly.limit);
 
     const result = await notifyWaitlistEntry({ ok: true }, entryForm());
 
@@ -217,7 +218,7 @@ describe("convertWaitlistEntry", () => {
   it("converts without emailing past the negócio's e-mail budget", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     state.rpcResults.convert_waitlist_entry = { data: convertedBooking("bruna@example.com"), error: null };
-    rateLimitAdmin.counts.set("business:business-1|owner_email|24h", OWNER_EMAIL_RATE_LIMIT.perBusinessDaily.limit);
+    rateLimitAdmin.counts.set("owner:owner-1|owner_email|24h", OWNER_EMAIL_RATE_LIMIT.perOwnerDaily.limit);
 
     const result = await convertWaitlistEntry({ ok: true }, entryForm());
 

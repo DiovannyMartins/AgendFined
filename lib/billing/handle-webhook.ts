@@ -54,6 +54,8 @@ export interface SubscriptionForWebhook {
   mpPreapprovalId: string;
   status: SubscriptionStatus;
   gracePeriodEnd: string | null;
+  // Set on the row's first authorization; see `wasEverAuthorized`.
+  firstAuthorizedAt?: string | null;
 }
 
 export interface AppliedSubscriptionSnapshot {
@@ -164,11 +166,12 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
   const businessId = sub.businessId;
 
   // Only the first authorization is checked: an assinatura already authorized
-  // at an older price keeps renewing at that price.
+  // at an older price keeps renewing at that price. A row closed before it was
+  // paid is still checked.
   let refusal: CheckoutTermsRefusal | null;
   try {
     refusal = await refuseUnacceptedCheckout(
-      { businessId, mpPreapprovalId: event.dataId, snapshot: preapproval, localStatus: sub.status },
+      { businessId, mpPreapprovalId: event.dataId, snapshot: preapproval, local: sub },
       deps,
     );
   } catch (err) {

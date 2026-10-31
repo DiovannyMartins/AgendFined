@@ -89,6 +89,31 @@ describe("syncReturnedSubscription", () => {
     expect(d.cancelPreapproval).toHaveBeenCalledWith("mp_1");
   });
 
+  it("não ativa um checkout pausado antes de ser pago e depois autorizado abaixo do preço atual", async () => {
+    const d = deps(
+      { ...pendingCheckout, status: "paused", firstAuthorizedAt: null },
+      { ...authorizedSnapshot, transactionAmount: 19, currencyId: "BRL", frequency: 1, frequencyType: "months" },
+    );
+
+    const result = await syncReturnedSubscription("biz_1", d);
+
+    expect(result).toEqual({ ok: true, status: "refused", refusal: "stale_price", effectivePlan: null });
+    expect(d.applySnapshot).not.toHaveBeenCalled();
+    expect(d.cancelPreapproval).toHaveBeenCalledWith("mp_1");
+  });
+
+  it("mantém no preço antigo a assinatura pausada depois de já ter sido paga", async () => {
+    const d = deps(
+      { ...pendingCheckout, status: "paused", firstAuthorizedAt: "2026-08-21T00:00:00.000Z" },
+      { ...authorizedSnapshot, transactionAmount: 19, currencyId: "BRL", frequency: 1, frequencyType: "months" },
+    );
+
+    const result = await syncReturnedSubscription("biz_1", d);
+
+    expect(result).toEqual({ ok: true, status: "authorized", effectivePlan: "pro" });
+    expect(d.cancelPreapproval).not.toHaveBeenCalled();
+  });
+
   it("não ativa quando o cancelamento do checkout recusado falha", async () => {
     const d = deps(
       pendingCheckout,

@@ -174,3 +174,32 @@ describe("checkout paid at an outdated price, payer back before the webhook", ()
     expect(await readSubscription()).toEqual({ status: "cancelled", grace_period_end: null });
   });
 });
+
+describe("checkout paused before it was paid, authorized later at an outdated price", () => {
+  const MP_PAUSED = `mp-terms-paused-${stamp}`;
+
+  it("the webhook still checks the terms: the negócio stays on Grátis and the checkout is cancelled", async () => {
+    const { data: subscription, error: subscriptionError } = await admin
+      .from("subscriptions")
+      .insert({ business_id: businessId, mp_preapproval_id: MP_PAUSED, plan: "pro", status: "pending" })
+      .select("id")
+      .single();
+    if (subscriptionError || !subscription) throw new Error(`subscription: ${subscriptionError?.message ?? "no id"}`);
+    const { error } = await admin
+      .from("businesses")
+      .update({ current_subscription_id: subscription.id })
+      .eq("id", businessId);
+    if (error) throw new Error(`set current: ${error.message}`);
+
+    providerStatus.set(MP_PAUSED, "paused");
+    expect(await notify(MP_PAUSED)).toEqual({ ok: true, applied: "closed" });
+
+    providerStatus.set(MP_PAUSED, "authorized");
+    const result = await notify(MP_PAUSED);
+
+    expect(result).toEqual({ ok: true, applied: "stale_price" });
+    expect(await readBusiness()).toEqual({ plan: "free" });
+    expect(reportStalePriceCharge).toHaveBeenCalledWith({ businessId, mpPreapprovalId: MP_PAUSED });
+    expect(cancelPreapproval).toHaveBeenCalledWith(MP_PAUSED);
+  });
+});

@@ -27,6 +27,7 @@ function mapSubscription(row: Database["public"]["Tables"]["subscriptions"]["Row
     mpPreapprovalId: row.mp_preapproval_id,
     status: row.status,
     gracePeriodEnd: row.grace_period_end,
+    firstAuthorizedAt: row.first_authorized_at,
   };
 }
 

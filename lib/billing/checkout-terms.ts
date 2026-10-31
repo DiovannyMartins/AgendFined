@@ -42,23 +42,38 @@ export function refuseCheckoutTerms(terms: CheckoutTerms, currentPriceCents: num
   return null;
 }
 
+// The local row of the checkout, as the gate needs it. `firstAuthorizedAt` is
+// set by the database on the row's first `authorized` write and never cleared.
+export interface CheckoutLocalState {
+  status: SubscriptionStatus;
+  firstAuthorizedAt?: string | null;
+}
+
+// Whether the local row was ever authorized. The status alone does not say: a
+// checkout closed `paused`/`cancelled` before it was paid, or inserted
+// `paused` by the reconciliation, never made the negócio PROFISSIONAL.
+export function wasEverAuthorized(local: CheckoutLocalState | null): boolean {
+  if (!local) return false;
+  return local.status === "authorized" || Boolean(local.firstAuthorizedAt);
+}
+
 // Refuses the first authorization of a checkout whose terms are not the plan's.
-// Only a checkout never authorized locally (`pending`, or not linked yet) is
-// checked: an assinatura already authorized at an older price keeps renewing at
-// that price. The charge is reported before the cancel, so a refund is never
-// lost to a failed cancel; a failed cancel throws, and the caller must not
-// apply the authorization.
+// Only a checkout never authorized locally (not linked yet, `pending`, or closed
+// before it was paid) is checked: an assinatura already authorized at an older
+// price keeps renewing at that price. The charge is reported before the cancel,
+// so a refund is never lost to a failed cancel; a failed cancel throws, and the
+// caller must not apply the authorization.
 export async function refuseUnacceptedCheckout(
   input: {
     businessId: string;
     mpPreapprovalId: string;
     snapshot: CheckoutTerms;
-    localStatus: SubscriptionStatus | null;
+    local: CheckoutLocalState | null;
   },
   deps: CheckoutTermsDeps,
 ): Promise<CheckoutTermsRefusal | null> {
   if (input.snapshot.status !== "authorized") return null;
-  if (input.localStatus !== null && input.localStatus !== "pending") return null;
+  if (wasEverAuthorized(input.local)) return null;
   const refusal = refuseCheckoutTerms(input.snapshot, deps.currentPriceCents);
   if (!refusal) return null;
 

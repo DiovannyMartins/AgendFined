@@ -120,6 +120,30 @@ describe("billing reconciliation of a checkout paid with terms the plan does not
     expect(d.reconcileAttempt).toHaveBeenCalledWith(expect.objectContaining({ id: "attempt_1" }), { ...stalePaid, status: "cancelled" }, expect.any(String));
   });
 
+  it("refuses a checkout the database inserted paused before it was ever paid", async () => {
+    const d = deps({
+      provider: { createPreapproval: vi.fn(), getPreapproval: vi.fn(async () => stalePaid), cancelPreapproval: vi.fn(async () => undefined), updatePreapprovalAmount: vi.fn() },
+      subscriptions: [{ id: "sub_1", businessId: "biz_1", mpPreapprovalId: "mp_1", status: "paused", gracePeriodEnd: null, firstAuthorizedAt: null }],
+    });
+
+    await reconcileBilling(d);
+
+    expect(d.reportStalePriceCharge).toHaveBeenCalledWith({ businessId: "biz_1", mpPreapprovalId: "mp_1" });
+    expect(d.reconcileAttempt).toHaveBeenCalledWith(expect.objectContaining({ id: "attempt_1" }), { ...stalePaid, status: "cancelled" }, expect.any(String));
+  });
+
+  it("keeps at an older price an assinatura paused after it was paid", async () => {
+    const d = deps({
+      provider: { createPreapproval: vi.fn(), getPreapproval: vi.fn(async () => stalePaid), cancelPreapproval: vi.fn(async () => undefined), updatePreapprovalAmount: vi.fn() },
+      subscriptions: [{ id: "sub_1", businessId: "biz_1", mpPreapprovalId: "mp_1", status: "paused", gracePeriodEnd: "2026-09-14T12:00:00.000Z", firstAuthorizedAt: "2026-08-07T12:00:00.000Z" }],
+    });
+
+    await reconcileBilling(d);
+
+    expect(d.reportStalePriceCharge).not.toHaveBeenCalled();
+    expect(d.reconcileAttempt).toHaveBeenCalledWith(expect.objectContaining({ id: "attempt_1" }), stalePaid, expect.any(String));
+  });
+
   it("leaves the attempt for the next run when the cancel fails", async () => {
     const d = deps({ provider: { createPreapproval: vi.fn(), getPreapproval: vi.fn(async () => stalePaid), cancelPreapproval: vi.fn(async () => { throw new Error("Mercado Pago preapproval cancel failed (500)"); }), updatePreapprovalAmount: vi.fn() } });
 

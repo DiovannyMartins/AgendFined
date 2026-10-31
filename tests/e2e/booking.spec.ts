@@ -74,6 +74,9 @@ test.beforeAll(async () => {
       slot_interval_minutes: 30,
       min_notice_minutes: 0,
       booking_window_days: 60,
+      // Service role keeps an explicit trial and skips the trial registry (#261),
+      // so a rerun with the same telefone still accepts bookings.
+      trial_ends_at: "2999-12-31T00:00:00Z",
     })
     .select("id")
     .single());

@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
-import { adminClient, anonClientForUser, retryOnFk } from "./index";
+import { adminClient, anonClientForUser, retryOnFk, ACTIVE_TRIAL_ENDS_AT } from "./index";
 import { futureSlot } from "./future-slot";
 import { buildCustomerHistory, filterCustomers } from "@/lib/customers/history";
 
@@ -40,6 +40,7 @@ beforeAll(async () => {
       .from("businesses")
       .insert({
         owner_id: ownerId,
+        trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
         name: "Agenda Clientes",
         slug: `agenda-clientes-${stamp}`,
         phone: "+5511987654321",

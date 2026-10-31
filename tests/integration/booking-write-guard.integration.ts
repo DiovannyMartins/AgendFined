@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { adminClient, anonClientForUser, retryOnFk } from "./index";
+import { adminClient, anonClientForUser, retryOnFk, ACTIVE_TRIAL_ENDS_AT } from "./index";
 import { futureSlot } from "./future-slot";
 
 // The owner's browser holds a publishable key and a session JWT, so it can call
@@ -60,6 +60,7 @@ beforeAll(async () => {
       .from("businesses")
       .insert({
         owner_id: ownerId,
+        trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
         name: "Biz Guard",
         slug: `biz-guard-${stamp}`,
         phone: "+5511977777777",

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { randomBytes } from "node:crypto";
-import { adminClient, anonClientForUser, retryOnFk } from "./index";
+import { adminClient, anonClientForUser, retryOnFk, ACTIVE_TRIAL_ENDS_AT } from "./index";
 import { futureSlot } from "./future-slot";
 
 // #219: the RPCs the dono calls return only the columns the dono can read with
@@ -96,6 +96,7 @@ beforeAll(async () => {
       .from("businesses")
       .insert({
         owner_id: ownerId,
+        trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
         name: "owner-rpc",
         slug: `owner-rpc-${stamp}`,
         phone: "11987654321",

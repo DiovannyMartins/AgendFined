@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { adminClient, anonClient, anonClientForUser } from "./index";
+import { adminClient, anonClient, anonClientForUser, ACTIVE_TRIAL_ENDS_AT } from "./index";
 import { futureSlot } from "./future-slot";
 
 // Security regression suite (§57). Runs against the real project. Requires
@@ -94,6 +94,7 @@ beforeAll(async () => {
       .upsert(
         {
           owner_id: ownerId,
+          trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
           name: `Biz ${idSuffix}`,
           slug,
           phone: "+5511977777777",

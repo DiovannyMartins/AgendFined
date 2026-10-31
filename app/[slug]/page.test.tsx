@@ -18,6 +18,7 @@ const { state, navigation } = vi.hoisted(() => ({
     previousSlugError: null as { message: string } | null,
     services: [] as Array<Record<string, unknown>>,
     hasAvailability: true,
+    rpcCalls: [] as string[],
   },
   navigation: {
     permanentRedirect: vi.fn((path: string) => {
@@ -33,27 +34,31 @@ vi.mock("next/navigation", () => navigation);
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
     rpc: async (name: string) => {
-      if (name === "get_public_business") {
-        return state.businessError
-          ? { data: null, error: state.businessError }
-          : { data: state.businesses, error: null };
+      state.rpcCalls.push(name);
+      if (name === "get_public_booking_page") {
+        if (state.businessError) return { data: null, error: state.businessError };
+        // Like the RPC: the phone only comes back when the page cannot take reservas.
+        const bookable = state.services.length > 0 && state.hasAvailability;
+        return {
+          data: state.businesses.map((b) => ({
+            ...b,
+            offers_waitlist: false,
+            booking_window_days: 90,
+            has_availability: state.hasAvailability,
+            phone: bookable ? null : "11988887777",
+            services: state.services,
+          })),
+          error: null,
+        };
       }
       if (name === "get_business_slug_redirect") {
         return state.previousSlugError
           ? { data: null, error: state.previousSlugError }
           : { data: state.previousSlugTarget, error: null };
       }
-      return { data: state.services, error: null };
+      return { data: null, error: { message: `unexpected rpc ${name}` } };
     },
   }),
-}));
-vi.mock("@/lib/supabase/admin", () => ({
-  createAdminClient: () => ({
-    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { plan: "BASICO", phone: "11988887777" } }) }) }) }),
-  }),
-}));
-vi.mock("@/lib/business/readiness", () => ({
-  hasActiveAvailability: async () => state.hasAvailability,
 }));
 vi.mock("./booking-widget", () => ({ BookingWidget: () => <form aria-label="Formulário de reserva" /> }));
 
@@ -73,6 +78,15 @@ describe("página pública do negócio", () => {
     state.previousSlugError = null;
     state.services = [corte];
     state.hasAvailability = true;
+    state.rpcCalls = [];
+  });
+
+  // #216: negócio, serviços, lista de espera, janela e disponibilidade vêm numa só RPC.
+  it("monta a página com uma única chamada ao banco", async () => {
+    await renderPage();
+
+    expect(screen.getByRole("form", { name: "Formulário de reserva" })).toBeInTheDocument();
+    expect(state.rpcCalls).toEqual(["get_public_booking_page"]);
   });
 
   it("mostra um estado vazio, sem formulário, quando não há serviços ativos", async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import { TimezoneNotice } from "@/components/timezone-notice";
 import { createBooking, joinWaitlist } from "@/lib/booking/actions";
-import { getSlotsForDate } from "@/lib/availability/actions";
+import { fetchSlots } from "@/lib/availability/slots-client";
 import { lastBookableDate, toLocalDate } from "@/lib/booking/availability";
 import { formatServicePrice } from "@/lib/format/currency";
 import { formatSlotWhen } from "@/lib/format/when";
@@ -133,13 +133,26 @@ export function BookingWidget({
     setTurnstileRound((round) => round + 1);
   }
 
+  // Only the latest lookup may answer: a new date, serviço or refresh aborts
+  // the one still in flight (#216).
+  const slotsRequest = useRef<AbortController | null>(null);
+  function nextSlotsRequest() {
+    slotsRequest.current?.abort();
+    slotsRequest.current = new AbortController();
+    return slotsRequest.current;
+  }
+
   function refreshSlots(forDate: string) {
-    getSlotsForDate(businessId, serviceId, forDate)
+    const { signal } = nextSlotsRequest();
+    fetchSlots(businessId, serviceId, forDate, signal)
       .then((r) => {
+        if (signal.aborted) return;
         setSlots(r.available ?? []);
         setAvailabilityError(r.error ? "Não foi possível atualizar os horários." : null);
       })
-      .catch(() => setAvailabilityError("Não foi possível atualizar os horários."));
+      .catch(() => {
+        if (!signal.aborted) setAvailabilityError("Não foi possível atualizar os horários.");
+      });
   }
 
   function resetWaitlist() {
@@ -150,10 +163,11 @@ export function BookingWidget({
 
   useEffect(() => {
     if (!serviceId || !date) return;
-    let cancelled = false;
+    const request = nextSlotsRequest();
+    const { signal } = request;
     startTransition(() => {
-      getSlotsForDate(businessId, serviceId, date).then((res) => {
-        if (cancelled) return;
+      fetchSlots(businessId, serviceId, date, signal).then((res) => {
+        if (signal.aborted) return;
         setSlots(res.available ?? []);
         setAvailabilityError(
           res.error === "db_error"
@@ -171,14 +185,14 @@ export function BookingWidget({
               : null,
         );
       }).catch(() => {
-        if (!cancelled) {
+        if (!signal.aborted) {
           setSlots([]);
           setAvailabilityError("Não foi possível carregar os horários. Tente novamente.");
         }
       });
     });
     return () => {
-      cancelled = true;
+      request.abort();
     };
   }, [serviceId, date, businessId]);
 

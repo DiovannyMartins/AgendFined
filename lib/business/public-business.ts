@@ -16,6 +16,16 @@ export async function getPublicBusinessOrRedirect(supabase: ServerClient, slug: 
   const business = businesses?.[0];
   if (business) return business;
 
+  return redirectToCurrentSlugOrNotFound(supabase, slug, subpath);
+}
+
+// The miss path shared by every public page: a previous slug redirects, any
+// other slug is a 404.
+export async function redirectToCurrentSlugOrNotFound(
+  supabase: ServerClient,
+  slug: string,
+  subpath = "",
+): Promise<never> {
   const { data: moved, error: movedError } = await supabase.rpc("get_business_slug_redirect", { p_slug: slug });
   const currentSlug = movedError ? undefined : moved?.[0]?.slug;
   if (currentSlug && currentSlug !== slug) permanentRedirect(`/${currentSlug}${subpath}`);

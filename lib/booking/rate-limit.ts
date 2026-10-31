@@ -409,7 +409,16 @@ export async function enforceAvailabilityRateLimit(
   ip: string,
   businessId: string,
 ): Promise<boolean> {
-  return enforceWindows(supabase, buildAvailabilityRateKeys(ip, businessId));
+  // Both windows in one round-trip (#216), with the same limits and order.
+  const { data, error } = await supabase.rpc("check_booking_rate_limits", {
+    p_windows: buildAvailabilityRateKeys(ip, businessId).map(({ key, limit, windowSeconds }) => ({
+      key,
+      limit,
+      window_seconds: windowSeconds,
+    })),
+  });
+  if (error) throw error;
+  return data === true;
 }
 
 export function buildServiceSearchRateKeys(ip: string, businessId: string) {

@@ -12,6 +12,14 @@ describe("security configuration contracts", () => {
     expect(authConfig).toContain('password_requirements = "lower_upper_letters_digits_symbols"');
   });
 
+  it("keeps Turnstile CAPTCHA on for the production Auth endpoints", () => {
+    const production = authConfig.slice(authConfig.indexOf("[remotes.production]"));
+    expect(production).toContain('project_id = "wgmmrpvrtgsxwdhtgfjy"');
+    expect(production).toMatch(
+      /\[remotes\.production\.auth\.captcha\]\s+enabled = true\s+provider = "turnstile"\s+secret = "env\(SUPABASE_AUTH_CAPTCHA_SECRET\)"/,
+    );
+  });
+
   it("keeps booking creation bound to the private cancellation capability", () => {
     expect(bookingInvariantMigration).toContain(
       "drop function if exists public.create_booking(uuid, uuid, timestamptz, text, text, text, text);",

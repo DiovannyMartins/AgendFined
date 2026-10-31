@@ -224,6 +224,8 @@ token_verifications = 30
 web3 = 30
 
 # Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
+# Local stacks run without Turnstile keys, so CAPTCHA stays off here; the
+# production project enables it in [remotes.production.auth.captcha] below.
 # [auth.captcha]
 # enabled = true
 # provider = "hcaptcha"
@@ -453,3 +455,17 @@ enabled = true
 # declarative_schema_path = "./schemas"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# Production (hosted) overrides, applied only by `supabase config push` to this
+# project. Supabase Auth checks the Turnstile token itself, so the direct
+# GoTrue endpoints (/token, /signup, /recover, /resend, /otp) stay behind the
+# CAPTCHA even when a caller skips the app's server actions. Keep this block so
+# a config push never turns CAPTCHA off. The secret is the same Turnstile
+# secret the app uses (TURNSTILE_SECRET_KEY); export it before pushing.
+[remotes.production]
+project_id = "wgmmrpvrtgsxwdhtgfjy"
+
+[remotes.production.auth.captcha]
+enabled = true
+provider = "turnstile"
+secret = "env(SUPABASE_AUTH_CAPTCHA_SECRET)"

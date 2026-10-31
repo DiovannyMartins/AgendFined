@@ -45,7 +45,7 @@ describe("getSubscription (ADR 0008)", () => {
     const result = await getSubscription({ id: "biz_1", plan: "free" }, { fetchSubscription });
 
     expect(result).toEqual({ plan: "free", subscription: null, graceSubscription: null });
-    expect(fetchSubscription).toHaveBeenCalledWith("biz_1");
+    expect(fetchSubscription).toHaveBeenCalledWith("biz_1", undefined);
   });
 
   it("returns the latest subscription row mapped to camelCase", async () => {

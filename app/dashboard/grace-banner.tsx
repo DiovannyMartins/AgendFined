@@ -14,8 +14,10 @@ import { cn } from "@/lib/utils";
 export async function GraceBanner({
   business,
 }: {
-  business: { id: string; plan: BillingPlan; timezone: string };
+  business: { id: string; plan: BillingPlan; timezone: string; currentSubscriptionId?: string | null };
 }) {
+  // A carência only exists on a PROFISSIONAL negócio; Grátis skips the read (#214).
+  if (business.plan !== "pro") return null;
   let notice: GraceNotice | null;
   try {
     notice = graceNotice(await getSubscription(business));

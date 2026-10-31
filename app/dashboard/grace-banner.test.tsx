@@ -74,4 +74,10 @@ describe("GraceBanner", () => {
     vi.mocked(getSubscription).mockRejectedValue(new Error("db down"));
     expect(await GraceBanner({ business: BUSINESS })).toBeNull();
   });
+
+  it("skips the assinatura read on the Grátis plan", async () => {
+    vi.mocked(getSubscription).mockClear();
+    expect(await GraceBanner({ business: { ...BUSINESS, plan: "free" } })).toBeNull();
+    expect(getSubscription).not.toHaveBeenCalled();
+  });
 });

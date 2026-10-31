@@ -74,7 +74,14 @@ export default async function ConfiguracoesPage({
         </AvailabilityChangeProvider>
       </section>
 
-      <PlanSection business={{ id: business.id, plan: business.plan, timezone: business.timezone }} />
+      <PlanSection
+        business={{
+          id: business.id,
+          plan: business.plan,
+          timezone: business.timezone,
+          currentSubscriptionId: business.current_subscription_id,
+        }}
+      />
 
       <GoogleCalendarSection connection={googleCalendar} isPro={isProPlan(business.plan)} callbackStatus={calendar} />
 

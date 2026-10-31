@@ -7,11 +7,17 @@
 // the returned `plan` is the business's, not the row's. The fetch is injectable
 // so the boundary can be exercised against a real user-scoped client in the
 // integration tests.
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { BillingPlan, BillingSubscription, SubscriptionStatus } from "./types";
 import { isGraceActive } from "./types";
 
-export type FetchSubscription = (businessId: string) => Promise<BillingSubscription | null>;
+// `currentSubscriptionId` is the negócio's `businesses.current_subscription_id`
+// when the caller already loaded it (#214); left undefined, it is read here.
+export type FetchSubscription = (
+  businessId: string,
+  currentSubscriptionId?: string | null,
+) => Promise<BillingSubscription | null>;
 export type FetchGraceSubscription = (businessId: string) => Promise<BillingSubscription | null>;
 
 export interface GetSubscriptionResult {
@@ -51,21 +57,25 @@ function mapRow(row: {
 // than one subscription row over time (re-subscription); the most recently
 // created one is the current. Shared by the dashboard read and by the upgrade
 // action's pending-guard.
-export const fetchCurrentSubscription: FetchSubscription = async (businessId) => {
+export const fetchCurrentSubscription: FetchSubscription = async (businessId, knownSubscriptionId) => {
   const supabase = await createClient();
-  const { data: business, error: businessError } = await supabase
-    .from("businesses")
-    .select("current_subscription_id")
-    .eq("id", businessId)
-    .maybeSingle();
-  if (businessError) throw new Error(businessError.message);
-  if (!business?.current_subscription_id) return null;
+  let currentSubscriptionId = knownSubscriptionId;
+  if (currentSubscriptionId === undefined) {
+    const { data: business, error: businessError } = await supabase
+      .from("businesses")
+      .select("current_subscription_id")
+      .eq("id", businessId)
+      .maybeSingle();
+    if (businessError) throw new Error(businessError.message);
+    currentSubscriptionId = business?.current_subscription_id ?? null;
+  }
+  if (!currentSubscriptionId) return null;
 
   const { data, error } = await supabase
     .from("subscriptions")
     .select("*")
     .eq("business_id", businessId)
-    .eq("id", business.current_subscription_id)
+    .eq("id", currentSubscriptionId)
     .maybeSingle();
   if (error) throw new Error(error.message);
   return data ? mapRow(data) : null;
@@ -90,16 +100,38 @@ export const fetchActiveGraceSubscription: FetchGraceSubscription = async (busin
   return data ? mapRow(data) : null;
 };
 
-export async function getSubscription(
-  business: { id: string; plan: BillingPlan },
-  deps?: {
-    fetchSubscription?: FetchSubscription;
-    fetchGraceSubscription?: FetchGraceSubscription;
-    now?: () => Date;
-  },
+type SubscriptionBusiness = { id: string; plan: BillingPlan; currentSubscriptionId?: string | null };
+type SubscriptionDeps = {
+  fetchSubscription?: FetchSubscription;
+  fetchGraceSubscription?: FetchGraceSubscription;
+  now?: () => Date;
+};
+
+// Keyed by primitives so the GraceBanner and the "Plano" section share one read
+// per request (#214).
+const getCachedSubscription = cache(
+  (id: string, plan: BillingPlan, currentSubscriptionId: string | null | undefined) =>
+    loadSubscription({ id, plan, currentSubscriptionId }),
+);
+
+export function getSubscription(
+  business: SubscriptionBusiness,
+  deps?: SubscriptionDeps,
 ): Promise<GetSubscriptionResult> {
+  if (deps) return loadSubscription(business, deps);
+  return getCachedSubscription(business.id, business.plan, business.currentSubscriptionId);
+}
+
+async function loadSubscription(
+  business: SubscriptionBusiness,
+  deps?: SubscriptionDeps,
+): Promise<GetSubscriptionResult> {
+  // No current row on the negócio: nothing to read in `subscriptions` (#214).
+  if (business.currentSubscriptionId === null) {
+    return { plan: business.plan, subscription: null, graceSubscription: null };
+  }
   const fetchSubscription = deps?.fetchSubscription ?? fetchCurrentSubscription;
-  const subscription = await fetchSubscription(business.id);
+  const subscription = await fetchSubscription(business.id, business.currentSubscriptionId);
 
   // The pending-during-grace case: the latest row is `pending` (new checkout)
   // while an older `paused`/`cancelled` row still holds an active grace. The UI

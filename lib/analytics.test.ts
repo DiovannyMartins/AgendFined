@@ -1,5 +1,37 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { trackAnalyticsEvent, trackAnalyticsEventBeforeLeaving } from "@/lib/analytics";
+import { installGtag, trackAnalyticsEvent, trackAnalyticsEventBeforeLeaving } from "@/lib/analytics";
+
+// gtag.js only reads Arguments objects from dataLayer; an Array push is ignored.
+function expectGtagCommand(entry: unknown, command: unknown[]) {
+  expect(Object.prototype.toString.call(entry)).toBe("[object Arguments]");
+  expect(Array.from(entry as ArrayLike<unknown>)).toEqual(command);
+}
+
+describe("installGtag", () => {
+  afterEach(() => {
+    delete window.gtag;
+    window.dataLayer = [];
+  });
+
+  it("queues commands the way gtag.js reads them", () => {
+    delete window.gtag;
+    // @ts-expect-error simulate a page where the snippet never ran
+    window.dataLayer = undefined;
+    installGtag();
+    const gtag = (window as Window).gtag;
+    expect(gtag).toBeTypeOf("function");
+    gtag?.("config", "G-TEST000000", { send_page_view: false });
+    expect(window.dataLayer).toHaveLength(1);
+    expectGtagCommand(window.dataLayer[0], ["config", "G-TEST000000", { send_page_view: false }]);
+  });
+
+  it("keeps a gtag that is already on the page", () => {
+    const gtag = vi.fn();
+    window.gtag = gtag;
+    installGtag();
+    expect(window.gtag).toBe(gtag);
+  });
+});
 
 describe("trackAnalyticsEvent", () => {
   afterEach(() => {
@@ -20,7 +52,8 @@ describe("trackAnalyticsEvent", () => {
     // @ts-expect-error simulate a page where the snippet never ran
     window.dataLayer = undefined;
     expect(() => trackAnalyticsEvent("sign_up")).not.toThrow();
-    expect(window.dataLayer).toEqual([["event", "sign_up", {}]]);
+    expect(window.dataLayer).toHaveLength(1);
+    expectGtagCommand(window.dataLayer[0], ["event", "sign_up", {}]);
   });
 
   it("only forwards the parameters it was given", () => {

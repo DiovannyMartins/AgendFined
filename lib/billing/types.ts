@@ -22,6 +22,8 @@ export interface BillingSubscription {
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
   gracePeriodEnd?: string | null;
+  // Set by the database on the row's first authorization, never cleared.
+  firstAuthorizedAt?: string | null;
 }
 
 // A `cancelled`/`paused` subscription is no longer being charged and sits in the

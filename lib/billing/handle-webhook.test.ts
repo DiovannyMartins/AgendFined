@@ -587,6 +587,45 @@ describe("handleWebhook stale-price checkouts", () => {
     expect(deps.cancelPreapproval).not.toHaveBeenCalled();
     expect(deps.reportStalePriceCharge).not.toHaveBeenCalled();
   });
+
+  it.each(["paused", "cancelled"] as const)(
+    "refuses a checkout closed %s before it was ever paid and later authorized below the current price",
+    async (status) => {
+      const neverPaid = { ...pendingSubscription("sub_1", "mp_1"), status, firstAuthorizedAt: null };
+      const deps = makeDeps({
+        findSubscription: vi.fn(async () => neverPaid),
+        findCurrentSubscription: vi.fn(async () => neverPaid),
+        getPreapproval: vi.fn(async () => makePreapproval("authorized", { transactionAmount: 19 })),
+      });
+
+      const result = await handleWebhook(deps);
+
+      expect(result).toEqual({ ok: true, applied: "stale_price" });
+      expect(deps.applySnapshot).not.toHaveBeenCalled();
+      expect(deps.cancelPreapproval).toHaveBeenCalledWith("mp_1");
+      expect(deps.reportStalePriceCharge).toHaveBeenCalledWith({ businessId: "biz_1", mpPreapprovalId: "mp_1" });
+    },
+  );
+
+  it("keeps renewing at an older price an assinatura paused after it was paid", async () => {
+    const paidThenPaused = {
+      ...authorizedSubscription,
+      status: "paused" as const,
+      gracePeriodEnd: "2026-09-14T12:00:00.000Z",
+      firstAuthorizedAt: "2026-08-07T12:00:00.000Z",
+    };
+    const deps = makeDeps({
+      findSubscription: vi.fn(async () => paidThenPaused),
+      findCurrentSubscription: vi.fn(async () => paidThenPaused),
+      getPreapproval: vi.fn(async () => makePreapproval("authorized", { transactionAmount: 19 })),
+    });
+
+    const result = await handleWebhook(deps);
+
+    expect(result).toEqual({ ok: true, applied: "authorized" });
+    expect(deps.cancelPreapproval).not.toHaveBeenCalled();
+    expect(deps.reportStalePriceCharge).not.toHaveBeenCalled();
+  });
 });
 
 describe("handleWebhook unexpected checkout terms", () => {

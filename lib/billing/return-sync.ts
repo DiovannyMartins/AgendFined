@@ -40,7 +40,7 @@ export async function syncReturnedSubscription(
   }
 
   const refusal = await refuseUnacceptedCheckout(
-    { businessId, mpPreapprovalId: current.mpPreapprovalId, snapshot, localStatus: current.status },
+    { businessId, mpPreapprovalId: current.mpPreapprovalId, snapshot, local: current },
     deps,
   );
   if (refusal) return { ok: true, status: "refused", refusal, effectivePlan: null };

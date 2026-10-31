@@ -498,6 +498,7 @@ export type Database = {
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
+          first_authorized_at: string | null
           grace_period_end: string | null
           id: string
           mp_preapproval_id: string
@@ -511,6 +512,7 @@ export type Database = {
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          first_authorized_at?: string | null
           grace_period_end?: string | null
           id?: string
           mp_preapproval_id: string
@@ -524,6 +526,7 @@ export type Database = {
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          first_authorized_at?: string | null
           grace_period_end?: string | null
           id?: string
           mp_preapproval_id?: string

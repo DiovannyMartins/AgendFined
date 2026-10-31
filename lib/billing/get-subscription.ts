@@ -41,6 +41,7 @@ function mapRow(row: {
   current_period_start: string | null;
   current_period_end: string | null;
   grace_period_end?: string | null;
+  first_authorized_at?: string | null;
 }): BillingSubscription {
   return {
     subscriptionId: row.id,
@@ -50,6 +51,7 @@ function mapRow(row: {
     currentPeriodStart: row.current_period_start,
     currentPeriodEnd: row.current_period_end,
     gracePeriodEnd: row.grace_period_end ?? null,
+    firstAuthorizedAt: row.first_authorized_at ?? null,
   };
 }
 

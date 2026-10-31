@@ -19,6 +19,7 @@ export interface ReconciliationSubscription {
   mpPreapprovalId: string;
   status: Preapproval["status"];
   gracePeriodEnd?: string | null;
+  firstAuthorizedAt?: string | null;
 }
 
 export interface ReconciliationBusiness {
@@ -177,7 +178,7 @@ export async function reconcileBilling(deps: BillingReconciliationDependencies):
       // A refused checkout is reconciled as the cancelled checkout it now is. A
       // failed cancel throws and leaves the attempt for the next run.
       const refusal = await refuseUnacceptedCheckout(
-        { businessId: attempt.businessId, mpPreapprovalId: providerId, snapshot, localStatus: local[0]?.status ?? null },
+        { businessId: attempt.businessId, mpPreapprovalId: providerId, snapshot, local: local[0] ?? null },
         { ...deps, cancelPreapproval: id => deps.provider.cancelPreapproval(id) },
       );
       if (refusal) snapshot = { ...snapshot, status: "cancelled" };

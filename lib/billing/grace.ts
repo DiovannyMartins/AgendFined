@@ -17,7 +17,9 @@ export function graceEnd(input: { now: Date; graceDays?: number; paidPeriodEnd?:
 // `paused`/`cancelled` row without one. A checkout still `pending` locally was
 // never paid and closes without a grace; a future grace already recorded is
 // kept; only a cancellation of an assinatura still authorized keeps the paid
-// month.
+// month. The carência opens once, when the paid assinatura stops: a row already
+// `paused`/`cancelled` keeps the grace it recorded even after it lapsed, so
+// re-reading the same stopped snapshot never reopens it (issue #242).
 export function snapshotGraceEnd(input: {
   now: Date;
   graceDays?: number;
@@ -29,7 +31,10 @@ export function snapshotGraceEnd(input: {
   if (input.snapshotStatus !== "paused" && input.snapshotStatus !== "cancelled") return null;
   if (input.localStatus === "pending") return null;
   const existing = input.existingGracePeriodEnd ? Date.parse(input.existingGracePeriodEnd) : Number.NaN;
-  if (Number.isFinite(existing) && existing > input.now.getTime()) return new Date(existing).toISOString();
+  const alreadyStopped = input.localStatus === "paused" || input.localStatus === "cancelled";
+  if (Number.isFinite(existing) && (alreadyStopped || existing > input.now.getTime())) {
+    return new Date(existing).toISOString();
+  }
   const paidPeriodEnd =
     input.snapshotStatus === "cancelled" && input.localStatus === "authorized" ? input.snapshotPeriodEnd : null;
   return graceEnd({ now: input.now, graceDays: input.graceDays, paidPeriodEnd });

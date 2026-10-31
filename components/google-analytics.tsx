@@ -2,19 +2,13 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { installGtag } from "@/lib/analytics";
 import {
   googleAnalyticsMeasurementId,
   isAnalyticsAllowedPath,
   sanitizedPageLocation,
   setAnalyticsDisabled,
 } from "@/lib/analytics/google-analytics";
-
-declare global {
-  interface Window {
-    dataLayer: unknown[][];
-    gtag?: (...args: unknown[]) => void;
-  }
-}
 
 const validMeasurementId = googleAnalyticsMeasurementId();
 
@@ -28,8 +22,8 @@ export function GoogleAnalytics({ nonce }: { nonce?: string }) {
     setAnalyticsDisabled(validMeasurementId, !allowed);
     if (!allowed) return;
 
-    window.dataLayer ||= [];
-    window.gtag ??= (...args: unknown[]) => window.dataLayer.push(args);
+    installGtag();
+    if (!window.gtag) return;
 
     if (!document.querySelector(`script[data-ga-id="${validMeasurementId}"]`)) {
       window.gtag("js", new Date());

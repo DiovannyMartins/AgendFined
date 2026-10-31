@@ -23,7 +23,7 @@ import {
 import { getEffectiveBookingWindowDays, type Plan } from "@/lib/plan/plan";
 import { sendCustomerRescheduledEmail } from "@/lib/email/booking-reschedule";
 import { notifyOwner } from "@/lib/bookings/owner-notification";
-import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
+import { runAfterResponse, syncGoogleCalendarBookingAfterResponse } from "@/lib/after-response";
 import { buildPublicConfirmationUrl } from "@/lib/bookings/public-booking-url";
 import { BOOKING_ALREADY_STARTED_MESSAGE } from "@/lib/bookings/public-status";
 import { resolveAppOrigin } from "@/lib/app-origin";
@@ -262,14 +262,7 @@ export async function reschedulePublicBooking(
   });
   if (error || !moved) return rpcErrorState(error);
 
-  try {
-    await syncGoogleCalendarBooking(moved.business_id, moved.id);
-  } catch (syncError) {
-    console.error("google_calendar_booking_sync_failed", {
-      bookingId: moved.id,
-      reason: syncError instanceof Error ? syncError.message : "unknown",
-    });
-  }
+  syncGoogleCalendarBookingAfterResponse(moved.business_id, moved.id);
 
   await notifyReschedule(admin, moved, context.booking.start_at);
   return { status: "done", startAt: moved.start_at };
@@ -300,36 +293,39 @@ async function notifyReschedule(
         ? snapshotEmail
         : null;
     const emailOwner = await allowPublicCapabilityEmail(admin, moved.business_id, "reschedule");
-    const [emailResult] = await Promise.all([
-      customerEmail
-        ? sendCustomerRescheduledEmail({
-            customerName: moved.customer_name_snapshot,
-            customerEmail,
-            businessName: business.name,
-            serviceName: moved.service_name_snapshot,
-            previousStartAt,
-            startAt: moved.start_at,
-            timezone: business.timezone,
-            publicCode: moved.public_code,
-            bookingUrl: buildPublicConfirmationUrl(resolveAppOrigin(), business.slug, moved.public_code),
-            businessPhone: business.phone,
-          })
-        : null,
-      emailOwner
-        ? notifyOwner(admin, "customer_rescheduled", {
-            bookingId: moved.id,
-            ownerId: business.owner_id,
-            businessName: business.name,
-            customerName: moved.customer_name_snapshot,
-            customerPhone: moved.customer_phone_snapshot,
-            serviceName: moved.service_name_snapshot,
-            startAt: moved.start_at,
-            timezone: business.timezone,
-            publicCode: moved.public_code,
-            previousStartAt,
-          })
-        : null,
-    ]);
+    // The dono's aviso goes after the response (#217); notifyOwner logs its
+    // own failures.
+    if (emailOwner) {
+      const ownerNotice = {
+        bookingId: moved.id,
+        ownerId: business.owner_id,
+        businessName: business.name,
+        customerName: moved.customer_name_snapshot,
+        customerPhone: moved.customer_phone_snapshot,
+        serviceName: moved.service_name_snapshot,
+        startAt: moved.start_at,
+        timezone: business.timezone,
+        publicCode: moved.public_code,
+        previousStartAt,
+      };
+      runAfterResponse("owner_notification_email_failed", { bookingId: moved.id }, () =>
+        notifyOwner(admin, "customer_rescheduled", ownerNotice),
+      );
+    }
+    const emailResult = customerEmail
+      ? await sendCustomerRescheduledEmail({
+          customerName: moved.customer_name_snapshot,
+          customerEmail,
+          businessName: business.name,
+          serviceName: moved.service_name_snapshot,
+          previousStartAt,
+          startAt: moved.start_at,
+          timezone: business.timezone,
+          publicCode: moved.public_code,
+          bookingUrl: buildPublicConfirmationUrl(resolveAppOrigin(), business.slug, moved.public_code),
+          businessPhone: business.phone,
+        })
+      : null;
     if (emailResult && !emailResult.sent) logFailure(emailResult.reason);
   } catch {
     logFailure("unexpected_error");

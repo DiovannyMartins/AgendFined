@@ -10,7 +10,7 @@ import { isOutsideAvailability, listOwnerFreeSlots, resolveOwnerStart } from "@/
 import { buildPublicConfirmationUrl } from "@/lib/bookings/public-booking-url";
 import { sendBusinessRescheduledEmail } from "@/lib/email/booking-reschedule";
 import { spendOwnerEmail } from "@/lib/email/owner-email-budget";
-import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
+import { syncGoogleCalendarBookingAfterResponse } from "@/lib/after-response";
 import { resolveAppOrigin } from "@/lib/app-origin";
 
 // Remarcação pelo dono (#194, ADR 0010): the same reserva moves to another
@@ -133,14 +133,7 @@ export async function rescheduleOwnerBooking(
   revalidatePath("/dashboard/clientes");
 
   // Same deterministic event id, so the event moves instead of being recreated.
-  try {
-    await syncGoogleCalendarBooking(business.id, moved.id);
-  } catch (syncError) {
-    console.error("google_calendar_booking_sync_failed", {
-      bookingId: moved.id,
-      reason: syncError instanceof Error ? syncError.message : "unknown",
-    });
-  }
+  syncGoogleCalendarBookingAfterResponse(business.id, moved.id);
 
   const done: OwnerRescheduleResult = {
     ok: true,

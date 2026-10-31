@@ -94,6 +94,7 @@ import { cancelPublicBooking, consultBooking, createBooking, joinWaitlist, leave
 import { enforceConsultRateLimit } from "@/lib/booking/rate-limit";
 import { classifyCancellationReason, classifyCustomerNote } from "@/lib/bookings/classification";
 import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
+import { flushAfterResponse } from "@/tests/mocks/after-response";
 
 describe("consultBooking", () => {
   it("reports malformed codes before requiring anti-bot verification", async () => {
@@ -253,11 +254,20 @@ describe("createBooking", () => {
       state.rpcResults = {};
     });
 
-    it("tells the dono about the reserva nova, alongside the cliente's confirmação", async () => {
+    // #217: the response awaits only the cliente's confirmação.
+    it("tells the dono and syncs Google after the response, without making the cliente wait", async () => {
+      vi.mocked(syncGoogleCalendarBooking).mockClear();
+
       const result = await createBooking(validInput);
 
       expect(result).toMatchObject({ ok: true, publicCode: "65925DBB" });
       expect(sendBookingConfirmationEmail).toHaveBeenCalledTimes(1);
+      expect(notifyOwner).not.toHaveBeenCalled();
+      expect(syncGoogleCalendarBooking).not.toHaveBeenCalled();
+
+      await flushAfterResponse();
+
+      expect(syncGoogleCalendarBooking).toHaveBeenCalledExactlyOnceWith("business-1", "booking-9");
       expect(notifyOwner).toHaveBeenCalledTimes(1);
       expect(notifyOwner).toHaveBeenCalledWith(expect.anything(), "new_booking", {
         bookingId: "booking-9",
@@ -283,6 +293,7 @@ describe("createBooking", () => {
       });
 
       await createBooking({ ...validInput, customerNote: "Uso cadeira de rodas" });
+      await flushAfterResponse();
 
       expect(notifyOwner).toHaveBeenCalledWith(
         expect.anything(),
@@ -328,6 +339,7 @@ describe("createBooking", () => {
       state.rpcCalls = [];
 
       const result = await createBooking({ ...validInput, customerEmail });
+      await flushAfterResponse();
 
       expect(result).toMatchObject({ ok: true, publicCode: "65925DBB", confirmationEmail: "none" });
       const call = state.rpcCalls.find((c) => c.name === "create_booking");
@@ -402,6 +414,7 @@ describe("createBooking", () => {
       const results = [];
 
       for (let booking = 0; booking < 11; booking++) results.push(await createBooking(validInput));
+      await flushAfterResponse();
 
       expect(sendBookingConfirmationEmail).toHaveBeenCalledTimes(10);
       expect(results.slice(0, 10).every((result) => result.confirmationEmail === "sent")).toBe(true);
@@ -830,7 +843,11 @@ describe("cancelPublicBooking", () => {
   it("tells the dono the cliente cancelled, without the token or the cancel reason", async () => {
     const result = await cancelPublicBooking({ status: "idle" }, cancelForm("Imprevisto no trabalho"));
 
+    // #217: the response does not wait for the dono's aviso nor for Google.
     expect(result).toEqual({ status: "done" });
+    expect(notifyOwner).not.toHaveBeenCalled();
+    expect(syncGoogleCalendarBooking).not.toHaveBeenCalled();
+    await flushAfterResponse();
     expect(notifyOwner).toHaveBeenCalledTimes(1);
     expect(notifyOwner).toHaveBeenCalledWith(expect.anything(), "customer_cancelled", {
       bookingId: "booking-1",
@@ -855,9 +872,24 @@ describe("cancelPublicBooking", () => {
     };
 
     await cancelPublicBooking({ status: "idle" }, cancelForm());
+    await flushAfterResponse();
 
     expect(sendCustomerCancelledEmail).not.toHaveBeenCalled();
     expect(notifyOwner).toHaveBeenCalledWith(expect.anything(), "customer_cancelled", expect.anything());
+  });
+
+  it("keeps the cancellation and logs it when the Google sync fails after the response", async () => {
+    vi.mocked(syncGoogleCalendarBooking).mockRejectedValueOnce(new Error("google down"));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await cancelPublicBooking({ status: "idle" }, cancelForm());
+    await flushAfterResponse();
+
+    expect(result).toEqual({ status: "done" });
+    expect(consoleError).toHaveBeenCalledWith("google_calendar_booking_sync_failed", {
+      bookingId: "booking-1",
+      reason: "google down",
+    });
   });
 
   it("tells the cliente to talk to the negócio when the reserva has already started", async () => {
@@ -919,6 +951,7 @@ describe("cancelPublicBooking", () => {
     vi.mocked(classifyCancellationReason).mockReturnValueOnce({ category: "schedule_conflict", confidence: 0.9 });
 
     await cancelPublicBooking({ status: "idle" }, cancelForm("Imprevisto no trabalho"));
+    await flushAfterResponse();
 
     expect(syncGoogleCalendarBooking).toHaveBeenCalledWith("business-1", "booking-1");
     expect(state.queries.filter((query) => query.table === "bookings")).toEqual([

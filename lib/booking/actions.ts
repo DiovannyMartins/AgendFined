@@ -50,7 +50,7 @@ import {
   classifyCustomerNote,
   classifyOperationalError,
 } from "@/lib/bookings/classification";
-import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
+import { runAfterResponse, syncGoogleCalendarBookingAfterResponse } from "@/lib/after-response";
 import { buildPrivateConfirmationUrl, type ConfirmationEmailStatus } from "@/lib/bookings/private-confirmation";
 import { buildPublicBookingUrl } from "@/lib/bookings/public-booking-url";
 import { BOOKING_ALREADY_STARTED_MESSAGE } from "@/lib/bookings/public-status";
@@ -245,13 +245,29 @@ export async function createBooking(input: {
     // is skipped: the page reports it as not sent and offers the private link.
     const emailAllowed = customerEmail ? await allowPublicWriteEmail(admin, customerEmail) : false;
     if (customerEmail && !emailAllowed) console.warn("booking_confirmation_email_skipped", { bookingId: data.id });
-    // The dono hears about the reserva in parallel with the cliente's
-    // confirmação; notifyOwner never throws (#146).
-    const [emailResult] = await Promise.all([
-      // Without an e-mail (#195) there is nothing to send and nothing failed:
-      // the confirmation page tells the cliente to keep the private link.
+    // The dono hears about the reserva after the response (#146, #217): only
+    // the cliente's confirmação is awaited, since the page reports it.
+    const ownerNotice = {
+      bookingId: data.id,
+      ownerId: business.owner_id,
+      businessName: business.name,
+      customerName: parsed.data.customerName,
+      customerPhone: parsed.data.customerPhone,
+      serviceName: service.name,
+      startAt: startAtIso,
+      timezone: business.timezone,
+      publicCode: data.public_code,
+      customerNote: parsed.data.customerNote || null,
+      customerNoteRequiresFollowUp: trustedNoteJudgment?.requiresManualFollowUp ?? false,
+    };
+    runAfterResponse("owner_notification_email_failed", { bookingId: data.id }, () =>
+      notifyOwner(admin, "new_booking", ownerNotice),
+    );
+    // Without an e-mail (#195) there is nothing to send and nothing failed:
+    // the confirmation page tells the cliente to keep the private link.
+    const emailResult =
       customerEmail && emailAllowed
-        ? sendBookingConfirmationEmail({
+        ? await sendBookingConfirmationEmail({
             customerName: parsed.data.customerName,
             customerEmail,
             businessName: business.name,
@@ -267,21 +283,7 @@ export async function createBooking(input: {
               cancelToken,
             ),
           })
-        : null,
-      notifyOwner(admin, "new_booking", {
-        bookingId: data.id,
-        ownerId: business.owner_id,
-        businessName: business.name,
-        customerName: parsed.data.customerName,
-        customerPhone: parsed.data.customerPhone,
-        serviceName: service.name,
-        startAt: startAtIso,
-        timezone: business.timezone,
-        publicCode: data.public_code,
-        customerNote: parsed.data.customerNote || null,
-        customerNoteRequiresFollowUp: trustedNoteJudgment?.requiresManualFollowUp ?? false,
-      }),
-    ]);
+        : null;
     if (emailResult?.sent) confirmationEmail = "sent";
     if (emailResult && !emailResult.sent) {
       console.error("booking_confirmation_email_failed", {
@@ -302,15 +304,7 @@ export async function createBooking(input: {
       .eq("business_id", business.id);
   }
 
-  // Calendar sync is best effort: a temporary Google outage must never make a
-  // valid public reservation fail. The periodic scheduler remains the safety net.
-  if (data?.id) {
-    try {
-      await syncGoogleCalendarBooking(business.id, data.id);
-    } catch (error) {
-      console.error("google_calendar_booking_sync_failed", { bookingId: data.id, reason: error instanceof Error ? error.message : "unknown" });
-    }
-  }
+  if (data?.id) syncGoogleCalendarBookingAfterResponse(business.id, data.id);
 
   return data?.public_code
     ? { ok: true, publicCode: data.public_code, cancelToken, confirmationEmail }
@@ -457,11 +451,7 @@ export async function cancelPublicBooking(
 
   // The RPC returns the row it just cancelled; it is the source of truth for
   // everything that follows, so bookings is never read again here.
-  try {
-    await syncGoogleCalendarBooking(cancelled.business_id, cancelled.id);
-  } catch (syncError) {
-    console.error("google_calendar_booking_sync_failed", { bookingId: cancelled.id, reason: syncError instanceof Error ? syncError.message : "unknown" });
-  }
+  syncGoogleCalendarBookingAfterResponse(cancelled.business_id, cancelled.id);
 
   await notifyCancellation(supabase, cancelled);
 
@@ -507,34 +497,35 @@ async function notifyCancellation(
         ? snapshotEmail
         : null;
     const emailOwner = await allowPublicCapabilityEmail(supabase, cancelled.business_id, "cancellation");
-    const [emailResult] = await Promise.all([
-      customerEmail
-        ? sendCustomerCancelledEmail({
-            customerName: cancelled.customer_name_snapshot,
-            customerEmail,
-            businessName: business.name,
-            serviceName: cancelled.service_name_snapshot,
-            startAt: cancelled.start_at,
-            timezone: business.timezone,
-            publicCode: cancelled.public_code,
-            rebookUrl: buildPublicBookingUrl(resolveAppOrigin(), business.slug),
-            businessPhone: business.phone,
-          })
-        : null,
-      emailOwner
-        ? notifyOwner(supabase, "customer_cancelled", {
-            bookingId: cancelled.id,
-            ownerId: business.owner_id,
-            businessName: business.name,
-            customerName: cancelled.customer_name_snapshot,
-            customerPhone: cancelled.customer_phone_snapshot,
-            serviceName: cancelled.service_name_snapshot,
-            startAt: cancelled.start_at,
-            timezone: business.timezone,
-            publicCode: cancelled.public_code,
-          })
-        : null,
-    ]);
+    if (emailOwner) {
+      const ownerNotice = {
+        bookingId: cancelled.id,
+        ownerId: business.owner_id,
+        businessName: business.name,
+        customerName: cancelled.customer_name_snapshot,
+        customerPhone: cancelled.customer_phone_snapshot,
+        serviceName: cancelled.service_name_snapshot,
+        startAt: cancelled.start_at,
+        timezone: business.timezone,
+        publicCode: cancelled.public_code,
+      };
+      runAfterResponse("owner_notification_email_failed", { bookingId: cancelled.id }, () =>
+        notifyOwner(supabase, "customer_cancelled", ownerNotice),
+      );
+    }
+    const emailResult = customerEmail
+      ? await sendCustomerCancelledEmail({
+          customerName: cancelled.customer_name_snapshot,
+          customerEmail,
+          businessName: business.name,
+          serviceName: cancelled.service_name_snapshot,
+          startAt: cancelled.start_at,
+          timezone: business.timezone,
+          publicCode: cancelled.public_code,
+          rebookUrl: buildPublicBookingUrl(resolveAppOrigin(), business.slug),
+          businessPhone: business.phone,
+        })
+      : null;
     if (emailResult && !emailResult.sent) logFailure(emailResult.reason);
   } catch {
     logFailure("unexpected_error");

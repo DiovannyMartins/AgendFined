@@ -11,7 +11,7 @@ import { generateCancelToken, hashCancelToken } from "@/lib/bookings/cancel";
 import { buildPrivateConfirmationUrl } from "@/lib/bookings/private-confirmation";
 import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
 import { spendOwnerEmail } from "@/lib/email/owner-email-budget";
-import { syncGoogleCalendarBooking } from "@/lib/google-calendar/sync";
+import { syncGoogleCalendarBookingAfterResponse } from "@/lib/after-response";
 import { resolveAppOrigin } from "@/lib/app-origin";
 
 // Reserva criada pelo dono no painel (#193), para o cliente que marcou por
@@ -126,15 +126,7 @@ export async function createOwnerBooking(
   revalidatePath("/dashboard/agenda");
   revalidatePath("/dashboard/clientes");
 
-  // Calendar sync is best effort, as for a public reserva.
-  try {
-    await syncGoogleCalendarBooking(business.id, booking.id);
-  } catch (syncError) {
-    console.error("google_calendar_booking_sync_failed", {
-      bookingId: booking.id,
-      reason: syncError instanceof Error ? syncError.message : "unknown",
-    });
-  }
+  syncGoogleCalendarBookingAfterResponse(business.id, booking.id);
 
   const confirmationUrl = buildPrivateConfirmationUrl(resolveAppOrigin(), business.slug, booking.public_code, cancelToken);
   const created: OwnerBookingResult = {

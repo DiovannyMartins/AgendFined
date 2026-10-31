@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { trackAnalyticsEvent } from "@/lib/analytics";
+import { trackAnalyticsEvent, trackAnalyticsEventBeforeLeaving } from "@/lib/analytics";
 
 describe("trackAnalyticsEvent", () => {
   afterEach(() => {
@@ -28,5 +28,48 @@ describe("trackAnalyticsEvent", () => {
     window.gtag = gtag;
     trackAnalyticsEvent("login");
     expect(gtag).toHaveBeenCalledWith("event", "login", {});
+  });
+});
+
+describe("trackAnalyticsEventBeforeLeaving", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    delete window.gtag;
+    window.dataLayer = [];
+  });
+
+  it("leaves once gtag.js reports the event dispatched", () => {
+    const gtag = vi.fn();
+    window.gtag = gtag;
+    const leave = vi.fn();
+    trackAnalyticsEventBeforeLeaving("booking_complete", { method: "public_form" }, leave);
+
+    expect(leave).not.toHaveBeenCalled();
+    const [, , params] = gtag.mock.calls[0];
+    expect(params).toMatchObject({ method: "public_form", event_timeout: 1000 });
+    params.event_callback();
+    params.event_callback();
+    expect(leave).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves after the timeout when gtag.js never answers (blocked script)", () => {
+    vi.useFakeTimers();
+    window.gtag = vi.fn();
+    const leave = vi.fn();
+    trackAnalyticsEventBeforeLeaving("booking_complete", {}, leave, 500);
+
+    vi.advanceTimersByTime(499);
+    expect(leave).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(leave).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves at once when GA is not on the page", () => {
+    vi.useFakeTimers();
+    const leave = vi.fn();
+    trackAnalyticsEventBeforeLeaving("booking_complete", {}, leave);
+    expect(leave).toHaveBeenCalledTimes(1);
+    vi.runAllTimers();
+    expect(leave).toHaveBeenCalledTimes(1);
   });
 });

@@ -2,7 +2,12 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { isAnalyticsAllowedPath, sanitizedPageLocation } from "@/lib/analytics/google-analytics";
+import {
+  googleAnalyticsMeasurementId,
+  isAnalyticsAllowedPath,
+  sanitizedPageLocation,
+  setAnalyticsDisabled,
+} from "@/lib/analytics/google-analytics";
 
 declare global {
   interface Window {
@@ -11,10 +16,7 @@ declare global {
   }
 }
 
-const measurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
-const validMeasurementId = measurementId && /^G-[A-Z0-9]+$/i.test(measurementId)
-  ? measurementId
-  : null;
+const validMeasurementId = googleAnalyticsMeasurementId();
 
 export function GoogleAnalytics({ nonce }: { nonce?: string }) {
   const pathname = usePathname();
@@ -22,9 +24,8 @@ export function GoogleAnalytics({ nonce }: { nonce?: string }) {
   useEffect(() => {
     if (!validMeasurementId) return;
 
-    const analyticsWindow = window as unknown as Record<string, unknown>;
     const allowed = isAnalyticsAllowedPath(pathname);
-    analyticsWindow[`ga-disable-${validMeasurementId}`] = !allowed;
+    setAnalyticsDisabled(validMeasurementId, !allowed);
     if (!allowed) return;
 
     window.dataLayer ||= [];

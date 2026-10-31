@@ -2,16 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { availabilitySchema, blockSchema, publicAvailabilitySchema } from "@/lib/validation/schemas";
+import { availabilitySchema, blockSchema } from "@/lib/validation/schemas";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { formatWhen } from "@/lib/format/when";
-import { getEffectiveBookingWindowDays } from "@/lib/plan/plan";
 import type { ActionResult } from "@/lib/business/actions";
-import { computeAvailableSlots, isWithinWindow, localDateTimeToUtc, localDayRangeUtc, overlaps, toUtcRange, weekdayOf } from "@/lib/booking/availability";
-import type { UtcRange } from "@/lib/booking/availability";
-import { enforceAvailabilityRateLimit, getClientIp } from "@/lib/booking/rate-limit";
+import { localDateTimeToUtc, overlaps } from "@/lib/booking/availability";
 import { weekdayName } from "@/lib/availability/weekdays";
 import {
   bookingLocalDate,
@@ -326,106 +322,4 @@ export async function deleteBlock(id: string): Promise<ActionResult> {
   if (!data?.length) return { ok: false, code: "NOT_FOUND", message: "Bloqueio não encontrado." };
   revalidatePath("/dashboard/bloqueios");
   return { ok: true, data: undefined };
-}
-
-export async function getSlotsForDate(
-  businessId: string,
-  serviceId: string,
-  date: string,
-): Promise<{ available: string[]; error?: string }> {
-  const parsed = publicAvailabilitySchema.safeParse({ businessId, serviceId, date });
-  if (!parsed.success) return { available: [], error: "validation" };
-
-  // Public booking flow reads blocks and bookings of any business; anonymous RLS
-  // would block that, so we use the server-only admin client for these reads.
-  const supabase = createAdminClient();
-  let allowed: boolean;
-  try {
-    allowed = await enforceAvailabilityRateLimit(supabase, await getClientIp(), businessId);
-  } catch {
-    // A failed limiter must fail closed: otherwise the privileged reads below
-    // become an unauthenticated high-volume database oracle.
-    return { available: [], error: "rate_limited" };
-  }
-  if (!allowed) return { available: [], error: "rate_limited" };
-
-  const { data: business, error: businessError } = await supabase
-    .from("businesses")
-    .select("id, is_active, slot_interval_minutes, min_notice_minutes, booking_window_days, plan, timezone")
-    .eq("id", businessId)
-    .maybeSingle();
-
-  // maybeSingle: a missing row is "not found", only a real failure is db_error.
-  if (businessError) return { available: [], error: "db_error" };
-  if (!business || !business.is_active) return { available: [], error: "not_found" };
-
-  const { data: service, error: serviceError } = await supabase
-    .from("services")
-    .select("duration_minutes")
-    .eq("id", serviceId)
-    .eq("business_id", businessId)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (serviceError) return { available: [], error: "db_error" };
-  if (!service) return { available: [], error: "service_not_found" };
-
-  const rules = {
-    slotIntervalMinutes: business.slot_interval_minutes,
-    minNoticeMinutes: business.min_notice_minutes,
-    bookingWindowDays: getEffectiveBookingWindowDays(business.plan, business.booking_window_days),
-    timezone: business.timezone,
-  };
-  if (!isWithinWindow(date, rules, new Date())) return { available: [], error: "booking_window" };
-
-  // §10.2: interpret "now" and the requested date in the business timezone.
-  const weekday = weekdayOf(date, business.timezone);
-
-  // Availability, blocks and occupied slots are resolved for the business only.
-  const { data: intervals, error: intervalsError } = await supabase
-    .from("availability")
-    .select("start_time, end_time")
-    .eq("business_id", businessId)
-    .eq("weekday", weekday)
-    .eq("is_active", true);
-
-  if (intervalsError) return { available: [], error: "db_error" };
-
-  const day = localDayRangeUtc(date, business.timezone);
-
-  const [{ data: blocks, error: blocksError }, { data: bookings, error: bookingsError }] = await Promise.all([
-    supabase
-      .from("availability_blocks")
-      .select("start_at, end_at")
-      .eq("business_id", businessId)
-      .lt("start_at", day.end)
-      .gt("end_at", day.start),
-    supabase
-      .from("bookings")
-      .select("start_at, end_at")
-      .eq("business_id", businessId)
-      .neq("status", "cancelled")
-      .lt("start_at", day.end)
-      .gt("end_at", day.start),
-  ]);
-
-  if (blocksError || bookingsError) return { available: [], error: "db_error" };
-
-  // Blocks/bookings are read in UTC; computeAvailableSlots resolves each local
-  // candidate to UTC before overlap checking (fixes midnight-crossing blocks).
-  const occupancies: UtcRange[] = (bookings ?? []).map((b) => toUtcRange(b.start_at, b.end_at));
-
-  const blockRanges: UtcRange[] = (blocks ?? []).map((b) => toUtcRange(b.start_at, b.end_at));
-
-  const available = computeAvailableSlots({
-    intervals: (intervals ?? []).map((i) => ({ startTime: i.start_time, endTime: i.end_time })),
-    rules,
-    durationMinutes: service.duration_minutes,
-    date,
-    now: new Date(),
-    blocks: blockRanges,
-    occupancies,
-  });
-
-  return { available };
 }

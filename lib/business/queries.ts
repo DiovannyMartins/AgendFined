@@ -1,12 +1,14 @@
+import { cache } from "react";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
 
-export async function getCurrentBusiness() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+// Cached per request (#214): the painel layout and its page both read the
+// negócio, and it must cost one `businesses` select.
+export const getCurrentBusiness = cache(async () => {
+  const user = await getCurrentUser();
   if (!user) return null;
 
+  const supabase = await createClient();
   const { data: business } = await supabase
     .from("businesses")
     .select("*")
@@ -14,15 +16,13 @@ export async function getCurrentBusiness() {
     .maybeSingle();
 
   return business;
-}
+});
 
-export async function getCurrentProfile() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export const getCurrentProfile = cache(async () => {
+  const user = await getCurrentUser();
   if (!user) return null;
 
+  const supabase = await createClient();
   const { data } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
   return data;
-}
+});

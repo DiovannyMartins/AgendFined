@@ -784,6 +784,10 @@ export type Database = {
         Args: { p_key: string; p_limit: number; p_window_seconds: number }
         Returns: boolean
       }
+      check_booking_rate_limits: {
+        Args: { p_windows: Json }
+        Returns: boolean
+      }
       peek_booking_rate_limit: {
         Args: { p_key: string; p_limit: number; p_window_seconds: number }
         Returns: boolean
@@ -1021,6 +1025,22 @@ export type Database = {
           id: string
           name: string
           search_indexing_enabled: boolean
+          slug: string
+          timezone: string
+        }[]
+      }
+      get_public_booking_page: {
+        Args: { p_slug: string }
+        Returns: {
+          booking_window_days: number
+          description: string | null
+          has_availability: boolean
+          id: string
+          name: string
+          offers_waitlist: boolean
+          phone: string | null
+          search_indexing_enabled: boolean
+          services: Json
           slug: string
           timezone: string
         }[]

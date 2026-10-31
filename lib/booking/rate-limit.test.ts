@@ -12,6 +12,7 @@ import {
   enforceConfirmationRateLimit,
   enforceConsultRateLimit,
   enforceApiRateLimit,
+  enforceAvailabilityRateLimit,
   enforceBillingCheckoutRateLimit,
   enforceOwnerEmailRateLimit,
   OWNER_EMAIL_RATE_LIMIT,
@@ -146,6 +147,34 @@ describe("public read rate-limit keys", () => {
 // The tight per-e-mail limit is per IP too: someone else's wrong passwords
 // must not lock the dono out from their own connection. A wider limit on the
 // e-mail alone still caps guesses spread across many IPs.
+// #216: the two availability windows go in one round-trip, same keys and limits.
+describe("enforceAvailabilityRateLimit", () => {
+  it("spends both windows, in order, in a single RPC", async () => {
+    const rpc = vi.fn(async () => ({ data: true, error: null }));
+    const client = { rpc } as unknown as SupabaseClient<Database>;
+
+    expect(await enforceAvailabilityRateLimit(client, "1.2.3.4", "biz-1")).toBe(true);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("check_booking_rate_limits", {
+      p_windows: buildAvailabilityRateKeys("1.2.3.4", "biz-1").map(({ key, limit, windowSeconds }) => ({
+        key,
+        limit,
+        window_seconds: windowSeconds,
+      })),
+    });
+  });
+
+  it("refuses when a window is over its limit and throws when the counter fails", async () => {
+    const over = { rpc: vi.fn(async () => ({ data: false, error: null })) } as unknown as SupabaseClient<Database>;
+    expect(await enforceAvailabilityRateLimit(over, "1.2.3.4", "biz-1")).toBe(false);
+
+    const failing = {
+      rpc: vi.fn(async () => ({ data: null, error: { message: "boom" } })),
+    } as unknown as SupabaseClient<Database>;
+    await expect(enforceAvailabilityRateLimit(failing, "1.2.3.4", "biz-1")).rejects.toEqual({ message: "boom" });
+  });
+});
+
 describe("auth rate-limit keys", () => {
   it.each(["login", "passwordReset"] as const)("limits %s per IP + e-mail and, more loosely, per e-mail", (action) => {
     const keys = buildAuthRateKeys("1.2.3.4", action, "dono@example.com");

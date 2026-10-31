@@ -296,6 +296,43 @@ describe("anon data exposure (§36)", () => {
     expect(inactive?.length ?? 0).toBe(0);
   });
 
+  // #216: the page RPC is an allowlist too; the plan never leaves the database.
+  it("anon reads the public page through one allowlisted RPC, without the plan", async () => {
+    const anon = anonClient();
+    const { data, error } = await anon.rpc("get_public_booking_page", { p_slug: `biz-a-${stamp}` });
+    expect(error).toBeNull();
+    const page = data?.[0];
+    expect(page?.id).toBe(businessA);
+    expect(Object.keys(page ?? {}).sort()).toEqual([
+      "booking_window_days",
+      "description",
+      "has_availability",
+      "id",
+      "name",
+      "offers_waitlist",
+      "phone",
+      "search_indexing_enabled",
+      "services",
+      "slug",
+      "timezone",
+    ]);
+    const services = (page?.services ?? []) as Array<Record<string, unknown>>;
+    expect(services.some((service) => service.id === activeServiceA)).toBe(true);
+    expect(services.some((service) => service.id === inactiveServiceA)).toBe(false);
+    for (const service of services) {
+      expect(Object.keys(service).sort()).toEqual(["description", "duration_minutes", "id", "name", "price_cents"]);
+    }
+    const { data: inactive } = await anon.rpc("get_public_booking_page", { p_slug: `biz-c-${stamp}` });
+    expect(inactive?.length ?? 0).toBe(0);
+  });
+
+  it("anon cannot spend limiter windows through the batched RPC", async () => {
+    const { error } = await anonClient().rpc("check_booking_rate_limits", {
+      p_windows: [{ key: `probe-${stamp}`, limit: 1, window_seconds: 60 }],
+    });
+    expect(error).not.toBeNull();
+  });
+
   it("anon cannot read services through PostgREST base tables", async () => {
     const anon = anonClient();
     const { data: svc, error: serviceError } = await anon.from("services").select("*").eq("id", inactiveServiceA);

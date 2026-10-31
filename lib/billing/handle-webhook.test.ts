@@ -269,6 +269,27 @@ describe("handleWebhook (issue #24) lifecycle", () => {
     }));
   });
 
+  it("keeps a lapsed grace on a re-delivered paused webhook instead of opening a new one (issue #242)", async () => {
+    const lapsedGrace = "2026-09-07T11:00:00.000Z";
+    const deps = makeDeps({
+      getPreapproval: vi.fn(async () => makePreapproval("paused")),
+      findSubscription: vi.fn(async () => ({
+        id: "sub_1",
+        businessId: "biz_1",
+        mpPreapprovalId: "mp_1",
+        status: "paused" as const,
+        plan: "pro" as const,
+        gracePeriodEnd: lapsedGrace,
+      })),
+    });
+    await handleWebhook(deps);
+
+    expect(deps.applySnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      status: "paused",
+      gracePeriodEnd: lapsedGrace,
+    }));
+  });
+
   it("passes a historical subscription snapshot to the atomic apply seam without local plan writes", async () => {
     const applySnapshot = vi.fn(async () => ({
       subscriptionId: "sub_old",

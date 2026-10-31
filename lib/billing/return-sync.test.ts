@@ -157,6 +157,21 @@ describe("syncReturnedSubscription carência (ADR 0008)", () => {
     );
   });
 
+  it("não reabre uma carência vencida ao reler uma assinatura já cancelada (issue #242)", async () => {
+    const lapsedGrace = "2026-10-26T11:59:00.000Z";
+    const d = deps(
+      { ...authorizedLocal, status: "cancelled", gracePeriodEnd: lapsedGrace },
+      { ...authorizedSnapshot, status: "cancelled", currentPeriodEnd: "2026-11-20T00:00:00.000Z" },
+      { now: () => NOW },
+    );
+
+    await syncReturnedSubscription("biz_1", d);
+
+    expect(d.applySnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "cancelled", gracePeriodEnd: lapsedGrace }),
+    );
+  });
+
   it("respeita a carência configurada", async () => {
     const d = deps(authorizedLocal, { ...authorizedSnapshot, status: "paused" }, { now: () => NOW, graceDays: 3 });
 

@@ -45,7 +45,7 @@ O compromisso confirmado de um cliente com um serviço em um horário. Nasce com
 _Avoid_: Agendamento, marcação, booking, appointment
 
 **Reserva pelo painel**:
-Reserva que o dono cria no painel (Reservas → Nova reserva) para o cliente que marcou por WhatsApp, telefone ou no balcão (#193). Usa `create_owner_booking`, só para o dono: o e-mail do cliente é opcional, não há consentimento nem limite por IP, e a antecedência e a janela configurada não valem. Continuam valendo o limite de janela do plano, o início no futuro, os bloqueios e a sobreposição. Com e-mail, o cliente recebe a confirmação; sem e-mail, o dono envia o link da confirmação privada pelo WhatsApp. Conta nos relatórios como qualquer reserva.
+Reserva que o dono cria no painel (Reservas → Nova reserva) para o cliente que marcou por WhatsApp, telefone ou no balcão (#193). Usa `create_owner_booking`, só para o dono: o e-mail do cliente é opcional, não há consentimento nem limite por IP, e a antecedência e a janela configurada não valem. Continuam valendo o limite de 365 dias da janela, o início no futuro, os bloqueios e a sobreposição. Com e-mail, o cliente recebe a confirmação; sem e-mail, o dono envia o link da confirmação privada pelo WhatsApp. Conta nos relatórios como qualquer reserva.
 _Avoid_: Reserva manual, reserva interna, agendamento do dono
 
 **Remarcação**:
@@ -61,7 +61,7 @@ O mínimo de tempo entre agora e o início da reserva (min_notice_minutes). Padr
 _Avoid_: Lead time, aviso prévio, notice
 
 **Janela (futura)**:
-Quantos dias à frente um cliente pode reservar (booking_window_days). Padrão: 60 dias. O plano Grátis permite até 90 dias e o PRO até 365; a janela efetiva respeita o menor entre o valor configurado e o limite do plano.
+Quantos dias à frente um cliente pode reservar (booking_window_days). Padrão: 60 dias. O Plano AgendFined permite até 365 dias; a janela efetiva respeita o menor entre o valor configurado e esse limite.
 _Avoid_: Prazo, alcance, horizonte, window
 
 **Snapshot (da reserva)**:
@@ -81,11 +81,11 @@ Um dos dez códigos de uso único (10 símbolos Crockford base32, exibidos como 
 _Avoid_: Código de backup, código reserva, senha de emergência
 
 **Lembrete pelo WhatsApp**:
-Mensagem que o dono manda do próprio WhatsApp, pela agenda ("Lembrar pelo WhatsApp"), a um cliente com reserva confirmada que ainda não começou (#195, ADR 0011). A agenda só abre a conversa com o texto pronto; nada é enviado nem registrado pelo AgendFined. Não é um recurso profissional, ao contrário do lembrete automático, que continua só por e-mail.
+Mensagem que o dono manda do próprio WhatsApp, pela agenda ("Lembrar pelo WhatsApp"), a um cliente com reserva confirmada que ainda não começou (#195, ADR 0011). A agenda só abre a conversa com o texto pronto; nada é enviado nem registrado pelo AgendFined. Não se confunde com o lembrete automático, que o AgendFined envia só por e-mail.
 _Avoid_: Notificação, disparo, lembrete automático
 
 **Evento da reserva**:
-O `.ics` de um único evento que o cliente baixa na tela de confirmação, na consulta por código e pelos e-mails de confirmação e de remarcação ("Adicionar à minha agenda"), ou o mesmo evento aberto no Google Agenda (#196). Leva só o que a confirmação já mostra ao cliente: serviço, início e fim em UTC, nome e telefone do negócio, código público e link público do negócio; nunca o token de cancelamento. O `UID` é o código público, então baixar de novo atualiza o mesmo evento. Só existe para reserva confirmada que ainda não começou e não é um recurso profissional, ao contrário da exportação da agenda do dono.
+O `.ics` de um único evento que o cliente baixa na tela de confirmação, na consulta por código e pelos e-mails de confirmação e de remarcação ("Adicionar à minha agenda"), ou o mesmo evento aberto no Google Agenda (#196). Leva só o que a confirmação já mostra ao cliente: serviço, início e fim em UTC, nome e telefone do negócio, código público e link público do negócio; nunca o token de cancelamento. O `UID` é o código público, então baixar de novo atualiza o mesmo evento. Só existe para reserva confirmada que ainda não começou e não se confunde com a exportação da agenda do dono.
 _Avoid_: Exportação, convite, sincronização
 
 **Lista de espera**:
@@ -102,22 +102,18 @@ _Avoid_: Fuso da aplicação, fuso único, região, hora local
 
 ## Planos
 
-**Plano**:
-A camada de produto que determina quais recursos um negócio pode usar. No AgendFined, um negócio está sempre em um de dois planos: Grátis ou PROFISSIONAL.
-_Avoid_: Pacote, tier, versão, nível
+**Plano AgendFined**:
+O único plano do produto, pago (R$ 19,90/mês). Dá acesso a tudo: página pública, painel, serviços, disponibilidade, bloqueios, gestão de reservas, clientes e histórico, relatórios, lembretes automáticos, lista de espera, exportação para Google Calendar/.ics e uma janela futura de até 365 dias. Um negócio tem acesso ao plano durante o teste grátis ou com uma assinatura em dia; sem nenhum dos dois, fica suspenso. Substituiu os antigos planos Grátis e PROFISSIONAL (#261, ADR 0013).
+_Avoid_: Plano Grátis, PROFISSIONAL, Pro, premium, plano pago, recurso profissional
 
-**Grátis**:
-O plano sem custo mensal. Contém o núcleo do agendamento: página pública, dashboard, serviços ilimitados, clientes e histórico, bloqueios, gestão de reservas e cancelamento self-service. Permite configurar uma janela futura de até 90 dias.
-_Avoid_: Free, gratuito, plano básico
-
-**PROFISSIONAL**:
-O plano pago (R$ 19,90/mês) que destrava os recursos profissionais: relatórios, lembretes automáticos, gestão da lista de espera, exportação para Google Calendar/.ics e uma janela futura de até 365 dias.
-_Avoid_: Pro, premium, avançado, plano pago
+**Teste grátis**:
+Os primeiros 30 dias corridos do negócio, a partir da criação, com acesso completo ao Plano AgendFined, sem cartão. Cada pessoa tem um teste só: um telefone de negócio ou um e-mail de dono que já usou o teste não ganha outro, mesmo depois de excluir a conta, a não ser que o suporte libere. Acaba no instante marcado, sem carência. Assinar durante o teste não encurta o teste: a primeira cobrança acontece no fim dele.
+_Avoid_: Trial, período de avaliação, degustação, plano grátis
 
 **Assinatura**:
-O contrato recorrente mensal que mantém um negócio no plano PROFISSIONAL. Enquanto ativa, os recursos profissionais estão liberados; quando interrompida (após a carência), o negócio volta ao Grátis. A carência dura 7 dias depois de uma falha de pagamento; no cancelamento, vai até o fim do mês já pago e nunca é menor que 7 dias (ADR 0008).
+O contrato recorrente mensal do Plano AgendFined. Enquanto em dia, o negócio tem acesso; quando interrompida, o acesso continua durante a carência e, depois dela, o negócio fica suspenso. A carência dura 7 dias depois de uma falha de pagamento; no cancelamento, vai até o fim do mês já pago e nunca é menor que 7 dias (ADR 0008).
 _Avoid_: Billing, pagamento, cobrança, subscription
 
-**Recurso profissional**:
-Funcionalidade disponível apenas no plano PROFISSIONAL (relatórios, lembretes automáticos, gestão da lista de espera e exportação da agenda do dono para Google Calendar/.ics; o evento da reserva do cliente não conta). Nos demais planos, o recurso fica inacessível.
-_Avoid_: Recurso pago, benefício, upgrade
+**Suspenso**:
+Estado do negócio sem teste grátis vigente e sem assinatura em dia. Nada é apagado e o slug continua reservado. A página pública continua no mesmo endereço, mas avisa que o agendamento está indisponível e não aceita reservas nem lista de espera. As reservas existentes continuam valendo e podem ser canceladas pelo cliente e pelo dono. No painel, o dono só consulta, cancela reservas, assina e gerencia a conta (inclusive excluí-la). Lembretes automáticos, avisos da lista de espera e sincronização com o Google Calendar param. Assinar devolve o acesso.
+_Avoid_: Bloqueado, inativo, desativado, rebaixado, expirado

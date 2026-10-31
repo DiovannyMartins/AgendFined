@@ -70,6 +70,7 @@ type FakeBooking = {
   customer_name_snapshot: string;
   customer_phone_snapshot: string;
   customer_note: string | null;
+  updated_at: string;
 };
 
 type GoogleCall = { method: string; path: string; body: unknown };
@@ -84,6 +85,7 @@ function booking(id: string, status: string, overrides: Partial<FakeBooking> = {
     customer_name_snapshot: "Ana",
     customer_phone_snapshot: "51998765432",
     customer_note: null,
+    updated_at: "2026-10-30T12:00:00+00:00",
     ...overrides,
   };
 }
@@ -91,10 +93,12 @@ function booking(id: string, status: string, overrides: Partial<FakeBooking> = {
 function installGoogleCalendarFakes(options: {
   bookings?: FakeBooking[];
   tokenExpiresAt?: string;
-  google?: (call: GoogleCall) => Response | undefined;
+  google?: (call: GoogleCall) => Response | undefined | Promise<Response | undefined>;
   tokenEndpoint?: () => Response;
 } = {}) {
   const googleCalls: GoogleCall[] = [];
+  // Versão de cada reserva já enviada ao Google, como em google_calendar_booking_syncs.
+  const syncedVersions = new Map<string, string>();
   const tokenRequests: URLSearchParams[] = [];
   const connectionUpdates: Record<string, unknown>[] = [];
   const bookings = options.bookings ?? [];
@@ -109,7 +113,7 @@ function installGoogleCalendarFakes(options: {
     if (url.hostname === "www.googleapis.com") {
       const call = { method, path: url.pathname, body: init?.body ? JSON.parse(String(init.body)) : null };
       googleCalls.push(call);
-      const custom = options.google?.(call);
+      const custom = await options.google?.(call);
       if (custom) return custom;
       if (method === "GET") return Response.json({ timeZone: "America/Sao_Paulo" });
       if (method === "DELETE") return new Response(null, { status: 204 });
@@ -129,15 +133,28 @@ function installGoogleCalendarFakes(options: {
         calendar_timezone: "America/Sao_Paulo",
       });
     }
+    if (url.pathname.endsWith("/google_calendar_booking_syncs") && method === "POST") {
+      for (const row of JSON.parse(String(init?.body)) as { booking_id: string; booking_updated_at: string }[]) {
+        syncedVersions.set(row.booking_id, row.booking_updated_at);
+      }
+      return new Response(null, { status: 201 });
+    }
     if (url.pathname.endsWith("/bookings")) {
       const id = url.searchParams.get("id")?.replace(/^eq\./, "");
       const status = url.searchParams.get("status")?.replace(/^eq\./, "");
-      return Response.json(bookings.filter(row => (!id || row.id === id) && (!status || row.status === status)));
+      return Response.json(bookings
+        .filter(row => (!id || row.id === id) && (!status || row.status === status))
+        .map(row => ({
+          ...row,
+          google_calendar_booking_syncs: syncedVersions.has(row.id)
+            ? [{ connection_id: "connection", booking_updated_at: syncedVersions.get(row.id) }]
+            : [],
+        })));
     }
     throw new Error(`Unexpected request: ${url.pathname}`);
   }));
 
-  return { googleCalls, tokenRequests, connectionUpdates };
+  return { googleCalls, tokenRequests, connectionUpdates, syncedVersions };
 }
 
 describe("Google Calendar sync of a booking", () => {
@@ -220,6 +237,114 @@ describe("Google Calendar sync of a booking", () => {
     const eventCalls = fakes.googleCalls.filter(call => call.path.includes("/events"));
     expect(eventCalls.map(call => call.method)).toEqual(["PUT", "DELETE"]);
     expect(fakes.connectionUpdates.at(-1)).toMatchObject({ last_error: null });
+  });
+});
+
+function delayedGoogle(delayMs: number) {
+  const state = { inFlight: 0, maxInFlight: 0 };
+  const handler = async (call: GoogleCall) => {
+    if (call.method !== "PUT" && call.method !== "DELETE") return undefined;
+    state.inFlight += 1;
+    state.maxInFlight = Math.max(state.maxInFlight, state.inFlight);
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+    state.inFlight -= 1;
+    return undefined;
+  };
+  return { state, handler };
+}
+
+describe("Google Calendar incremental sync", () => {
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://database.example");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-only-key");
+    vi.stubEnv("GOOGLE_CALENDAR_CLIENT_ID", "client-id");
+    vi.stubEnv("GOOGLE_CALENDAR_CLIENT_SECRET", "client-secret");
+    vi.stubEnv("GOOGLE_CALENDAR_REDIRECT_URI", "https://agenda.example/api/google-calendar/callback");
+    vi.stubEnv("GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY", Buffer.alloc(32, 1).toString("base64"));
+  });
+
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  it("does not call Google on a second run without changes", async () => {
+    const fakes = installGoogleCalendarFakes({
+      bookings: [booking("upcoming", "confirmed"), booking("cancelled", "cancelled")],
+      tokenExpiresAt: new Date(Date.now() - 1_000).toISOString(),
+    });
+    expect(await syncGoogleCalendarForBusiness("business", { mode: "incremental" })).toEqual({ synced: 1, deleted: 1 });
+    fakes.googleCalls.length = 0;
+    fakes.tokenRequests.length = 0;
+
+    expect(await syncGoogleCalendarForBusiness("business", { mode: "incremental" })).toEqual({ synced: 0, deleted: 0 });
+
+    expect(fakes.googleCalls).toEqual([]);
+    expect(fakes.tokenRequests).toEqual([]);
+    expect(fakes.connectionUpdates.at(-1)).toMatchObject({ last_error: null });
+  });
+
+  it("resends only the booking that changed since it was last sent", async () => {
+    const bookings = [booking("kept", "confirmed"), booking("moved", "confirmed")];
+    const fakes = installGoogleCalendarFakes({ bookings });
+    await syncGoogleCalendarForBusiness("business", { mode: "incremental" });
+    fakes.googleCalls.length = 0;
+    bookings[1].updated_at = "2026-10-31T09:00:00+00:00";
+
+    expect(await syncGoogleCalendarForBusiness("business", { mode: "incremental" })).toEqual({ synced: 1, deleted: 0 });
+
+    const eventCalls = fakes.googleCalls.filter(call => call.path.includes("/events"));
+    expect(eventCalls).toHaveLength(1);
+    expect(eventCalls[0].body).toMatchObject({ extendedProperties: { private: { agendfinedBookingId: "moved" } } });
+    expect(fakes.syncedVersions.get("moved")).toBe("2026-10-31T09:00:00+00:00");
+  });
+
+  it("does not resend a booking already sent on its own", async () => {
+    const fakes = installGoogleCalendarFakes({ bookings: [booking("booking", "confirmed")] });
+    await syncGoogleCalendarBooking("business", "booking");
+    fakes.googleCalls.length = 0;
+
+    await syncGoogleCalendarForBusiness("business", { mode: "incremental" });
+
+    expect(fakes.googleCalls).toEqual([]);
+  });
+
+  it("resends every booking on a full sync, as the manual sync does", async () => {
+    const fakes = installGoogleCalendarFakes({
+      bookings: [booking("upcoming", "confirmed"), booking("cancelled", "cancelled")],
+    });
+    await syncGoogleCalendarForBusiness("business", { mode: "incremental" });
+    fakes.googleCalls.length = 0;
+
+    expect(await syncGoogleCalendarForBusiness("business")).toEqual({ synced: 1, deleted: 1 });
+
+    expect(fakes.googleCalls.filter(call => call.path.includes("/events")).map(call => call.method)).toEqual(["PUT", "DELETE"]);
+  });
+
+  it("keeps at most five Google calls in flight", async () => {
+    const google = delayedGoogle(5);
+    const bookings = Array.from({ length: 12 }, (_, index) => booking(`booking-${index}`, index % 3 ? "confirmed" : "cancelled"));
+    installGoogleCalendarFakes({ bookings, google: google.handler });
+
+    expect(await syncGoogleCalendarForBusiness("business")).toEqual({ synced: 8, deleted: 4 });
+
+    expect(google.state.maxInFlight).toBe(5);
+  });
+
+  it("keeps the bookings that reached Google when another one fails, and retries only the failed one", async () => {
+    let rejectFailing = true;
+    const fakes = installGoogleCalendarFakes({
+      bookings: [booking("first", "confirmed"), booking("failing", "confirmed"), booking("third", "confirmed")],
+      google: call => rejectFailing && call.method === "PUT" && call.body && JSON.stringify(call.body).includes("\"failing\"")
+        ? Response.json({ error: "forbidden" }, { status: 403 })
+        : undefined,
+    });
+
+    await expect(syncGoogleCalendarForBusiness("business", { mode: "incremental" })).rejects.toThrow("GOOGLE_CALENDAR_EVENT_UPDATE_FAILED");
+    expect([...fakes.syncedVersions.keys()].sort()).toEqual(["first", "third"]);
+    expect(fakes.connectionUpdates.at(-1)).toEqual({ last_error: "GOOGLE_CALENDAR_EVENT_UPDATE_FAILED" });
+
+    rejectFailing = false;
+    fakes.googleCalls.length = 0;
+    expect(await syncGoogleCalendarForBusiness("business", { mode: "incremental" })).toEqual({ synced: 1, deleted: 0 });
+    expect(fakes.googleCalls.filter(call => call.path.includes("/events"))).toHaveLength(1);
   });
 });
 
@@ -346,6 +471,68 @@ describe("Google Calendar batch sync", () => {
   it("skips a connection waiting for the owner to reconnect instead of failing every run", async () => {
     expect(await runGoogleCalendarSyncBatch()).toEqual({ connections: 0, synced: 0, deleted: 0, failed: 0 });
     expect(renewals).toBe(0);
+  });
+});
+
+describe("Google Calendar batch concurrency", () => {
+  const businesses = Array.from({ length: 8 }, (_, index) => `business-${index}`);
+  let google: ReturnType<typeof delayedGoogle>;
+  let eventCalls: number;
+
+  beforeEach(() => {
+    google = delayedGoogle(5);
+    eventCalls = 0;
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://database.example");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-only-key");
+    vi.stubEnv("GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY", Buffer.alloc(32, 1).toString("base64"));
+    const syncedVersions = new Map<string, string>();
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+      const method = (init?.method ?? "GET").toUpperCase();
+      const businessId = url.searchParams.get("business_id")?.replace(/^eq\./, "") ?? url.searchParams.get("id")?.replace(/^eq\./, "");
+      if (url.hostname === "www.googleapis.com") {
+        if (method === "GET") return Response.json({ timeZone: "America/Sao_Paulo" });
+        eventCalls += 1;
+        await google.handler({ method, path: url.pathname, body: null });
+        return Response.json({ id: "event" });
+      }
+      if (url.pathname.endsWith("/google_calendar_connections")) {
+        if (method === "PATCH") return new Response(null, { status: 204 });
+        if (url.searchParams.has("order")) return Response.json(businesses.map(business_id => ({ business_id })));
+        return Response.json({
+          id: `${businessId}-connection`, business_id: businessId, google_email: "dono@example.com", calendar_id: "primary",
+          access_token_ciphertext: encryptGoogleToken("stored-access-token"),
+          refresh_token_ciphertext: encryptGoogleToken("stored-refresh-token"),
+          token_expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+          calendar_timezone: "America/Sao_Paulo",
+        });
+      }
+      if (url.pathname.endsWith("/businesses")) return Response.json({ plan: "pro", timezone: "America/Sao_Paulo" });
+      if (url.pathname.endsWith("/google_calendar_booking_syncs")) {
+        for (const row of JSON.parse(String(init?.body)) as { booking_id: string; booking_updated_at: string }[]) {
+          syncedVersions.set(row.booking_id, row.booking_updated_at);
+        }
+        return new Response(null, { status: 201 });
+      }
+      if (url.pathname.endsWith("/bookings")) {
+        if (url.searchParams.get("status") !== "eq.confirmed") return Response.json([]);
+        const row = booking(`${businessId}-booking`, "confirmed");
+        const version = syncedVersions.get(row.id);
+        return Response.json([{ ...row, google_calendar_booking_syncs: version ? [{ booking_updated_at: version }] : [] }]);
+      }
+      throw new Error(`Unexpected request: ${url.pathname}`);
+    }));
+  });
+
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  it("syncs at most five businesses at a time and only sends what changed", async () => {
+    expect(await runGoogleCalendarSyncBatch()).toEqual({ connections: 8, synced: 8, deleted: 0, failed: 0 });
+    expect(google.state.maxInFlight).toBe(5);
+
+    eventCalls = 0;
+    expect(await runGoogleCalendarSyncBatch()).toEqual({ connections: 8, synced: 0, deleted: 0, failed: 0 });
+    expect(eventCalls).toBe(0);
   });
 });
 

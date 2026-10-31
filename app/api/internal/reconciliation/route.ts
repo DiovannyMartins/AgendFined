@@ -9,6 +9,9 @@ import { runGoogleCalendarSyncBatch } from "@/lib/google-calendar/sync";
 import { withNoStore } from "@/lib/http/no-store";
 
 export const runtime = "nodejs";
+// pg_net waits 60 s for this route (docs/operacao-producao.md); the function
+// gets the same budget instead of the platform default.
+export const maxDuration = 60;
 
 function authorized(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET ?? process.env.RECONCILIATION_CRON_SECRET;

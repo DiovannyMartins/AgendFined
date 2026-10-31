@@ -602,6 +602,42 @@ export type Database = {
           },
         ]
       }
+      google_calendar_booking_syncs: {
+        Row: {
+          booking_id: string
+          booking_updated_at: string
+          connection_id: string
+          synced_at: string
+        }
+        Insert: {
+          booking_id: string
+          booking_updated_at: string
+          connection_id: string
+          synced_at?: string
+        }
+        Update: {
+          booking_id?: string
+          booking_updated_at?: string
+          connection_id?: string
+          synced_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_calendar_booking_syncs_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_calendar_booking_syncs_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "google_calendar_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_calendar_connections: {
         Row: {
           access_token_ciphertext: string

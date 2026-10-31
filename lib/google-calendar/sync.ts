@@ -15,6 +15,12 @@ import { formatPhoneBR } from "@/lib/format/phone";
 const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 const REFRESH_MARGIN_MS = 60_000;
 const SYNC_LOOKBACK_MS = 60 * 60 * 1000;
+// Bounds the Google calls of one business and the businesses of one cron run
+// (#220), so a run fits the 60 s of pg_net without bursting Google's quota.
+const GOOGLE_CONCURRENCY = 5;
+const BUSINESS_CONCURRENCY = 5;
+const BOOKING_COLUMNS = "id,start_at,end_at,status,service_name_snapshot,customer_name_snapshot,customer_phone_snapshot,customer_note,updated_at";
+const SYNCED_VERSION = "google_calendar_booking_syncs(booking_updated_at)";
 
 type BookingForCalendar = {
   id: string;
@@ -25,7 +31,15 @@ type BookingForCalendar = {
   customer_name_snapshot: string;
   customer_phone_snapshot: string;
   customer_note: string | null;
+  updated_at: string;
 };
+
+type SyncedVersion = { google_calendar_booking_syncs: { booking_updated_at: string }[] };
+
+// "full" resends every booking (manual sync and a new connection); the cron
+// uses "incremental" and only sends bookings whose updated_at changed since
+// they last reached this calendar.
+export type GoogleCalendarSyncMode = "full" | "incremental";
 
 type Connection = {
   id: string;
@@ -171,6 +185,41 @@ async function recordSyncError(connectionId: string, error: unknown): Promise<vo
   await createAdminClient().from("google_calendar_connections").update({ last_error: message }).eq("id", connectionId);
 }
 
+// Records the version of each booking now in the calendar, so the next
+// incremental run skips it until the booking changes again.
+async function recordSyncedVersions(connectionId: string, bookings: Pick<BookingForCalendar, "id" | "updated_at">[]): Promise<void> {
+  if (bookings.length === 0) return;
+  const syncedAt = new Date().toISOString();
+  const { error } = await createAdminClient().from("google_calendar_booking_syncs").upsert(
+    bookings.map(booking => ({ connection_id: connectionId, booking_id: booking.id, booking_updated_at: booking.updated_at, synced_at: syncedAt })),
+    { onConflict: "connection_id,booking_id" },
+  );
+  if (error) throw new Error("GOOGLE_CALENDAR_SYNC_VERSION_SAVE_FAILED");
+}
+
+function changedSinceLastSync(booking: Pick<BookingForCalendar, "updated_at"> & SyncedVersion): boolean {
+  return booking.google_calendar_booking_syncs[0]?.booking_updated_at !== booking.updated_at;
+}
+
+// Runs every item with at most `limit` in flight. A failure does not stop the
+// others, so the bookings that reached Google still get their version recorded.
+async function settleWithConcurrency<T, R>(items: readonly T[], limit: number, run: (item: T) => Promise<R>): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = new Array(items.length);
+  let next = 0;
+  async function worker(): Promise<void> {
+    while (next < items.length) {
+      const index = next++;
+      try {
+        results[index] = { status: "fulfilled", value: await run(items[index]) };
+      } catch (reason) {
+        results[index] = { status: "rejected", reason };
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 export async function syncGoogleCalendarBooking(businessId: string, bookingId: string): Promise<void> {
   const connection = await loadConnection(businessId);
   if (!connection) return;
@@ -178,7 +227,7 @@ export async function syncGoogleCalendarBooking(businessId: string, bookingId: s
   try {
     const { data: booking, error } = await admin
       .from("bookings")
-      .select("id,start_at,end_at,status,service_name_snapshot,customer_name_snapshot,customer_phone_snapshot,customer_note")
+      .select(BOOKING_COLUMNS)
       .eq("id", bookingId)
       .eq("business_id", businessId)
       .maybeSingle();
@@ -187,59 +236,94 @@ export async function syncGoogleCalendarBooking(businessId: string, bookingId: s
     const action = calendarActionFor(booking);
     if (action === "keep") return;
     const accessToken = await accessTokenFor(connection);
-    if (!booking || action === "delete") {
+    if (!booking) {
       await deleteEvent(accessToken, connection.calendar_id, bookingId);
       return;
     }
-    await upsertEvent(accessToken, connection.calendar_id, booking, connection.business_timezone);
+    if (action === "delete") await deleteEvent(accessToken, connection.calendar_id, bookingId);
+    else await upsertEvent(accessToken, connection.calendar_id, booking, connection.business_timezone);
+    await recordSyncedVersions(connection.id, [booking]);
   } catch (error) {
     await recordSyncError(connection.id, error);
     throw error;
   }
 }
 
-export async function syncGoogleCalendarForBusiness(businessId: string): Promise<{ synced: number; deleted: number }> {
+export async function syncGoogleCalendarForBusiness(
+  businessId: string,
+  { mode = "full" }: { mode?: GoogleCalendarSyncMode } = {},
+): Promise<{ synced: number; deleted: number }> {
   const connection = await loadConnection(businessId);
   if (!connection) return { synced: 0, deleted: 0 };
   const admin = createAdminClient();
   try {
-    const accessToken = await accessTokenFor(connection);
-    const calendarTimezone = await readCalendarTimezone(accessToken, connection.calendar_id);
-    if (calendarTimezone && calendarTimezone !== connection.calendar_timezone) {
-      const { error: timezoneError } = await admin
-        .from("google_calendar_connections")
-        .update({ calendar_timezone: calendarTimezone })
-        .eq("id", connection.id);
-      if (timezoneError) throw new Error("GOOGLE_CALENDAR_TIMEZONE_SAVE_FAILED");
-      connection.calendar_timezone = calendarTimezone;
-    }
+    const since = new Date(Date.now() - SYNC_LOOKBACK_MS).toISOString();
     const [{ data: upcoming, error: upcomingError }, { data: cancelled, error: cancelledError }] = await Promise.all([
-      admin.from("bookings").select("id,start_at,end_at,status,service_name_snapshot,customer_name_snapshot,customer_phone_snapshot,customer_note")
-        .eq("business_id", businessId).eq("status", "confirmed").gte("end_at", new Date(Date.now() - SYNC_LOOKBACK_MS).toISOString()).order("start_at").limit(250),
-      admin.from("bookings").select("id,status,end_at").eq("business_id", businessId).eq("status", "cancelled").gte("end_at", new Date(Date.now() - SYNC_LOOKBACK_MS).toISOString()).limit(250),
+      admin.from("bookings").select(`${BOOKING_COLUMNS},${SYNCED_VERSION}`)
+        .eq("business_id", businessId).eq("status", "confirmed").gte("end_at", since)
+        .eq("google_calendar_booking_syncs.connection_id", connection.id).order("start_at").limit(250),
+      admin.from("bookings").select(`id,status,end_at,updated_at,${SYNCED_VERSION}`)
+        .eq("business_id", businessId).eq("status", "cancelled").gte("end_at", since)
+        .eq("google_calendar_booking_syncs.connection_id", connection.id).limit(250),
     ]);
     if (upcomingError || cancelledError) throw new Error("GOOGLE_CALENDAR_BOOKINGS_LOAD_FAILED");
 
-    let synced = 0;
-    for (const booking of (upcoming ?? []) as BookingForCalendar[]) {
-      if (calendarActionFor(booking) !== "upsert") continue;
-      await upsertEvent(accessToken, connection.calendar_id, booking, connection.business_timezone);
-      synced += 1;
-    }
+    const pending = (booking: Pick<BookingForCalendar, "updated_at"> & SyncedVersion) => mode === "full" || changedSinceLastSync(booking);
+    const toUpsert = ((upcoming ?? []) as (BookingForCalendar & SyncedVersion)[])
+      .filter(booking => calendarActionFor(booking) === "upsert" && pending(booking));
+    const toDelete = (cancelled ?? []).filter(booking => calendarActionFor(booking) === "delete" && pending(booking));
 
-    let deleted = 0;
-    for (const booking of cancelled ?? []) {
-      if (calendarActionFor(booking) !== "delete") continue;
-      if (await deleteEvent(accessToken, connection.calendar_id, booking.id)) deleted += 1;
+    // An incremental run with nothing changed neither renews the token nor
+    // calls Google.
+    let result = { synced: 0, deleted: 0 };
+    if (mode === "full" || toUpsert.length > 0 || toDelete.length > 0) {
+      result = await sendToGoogle(connection, toUpsert, toDelete);
     }
 
     const { error: updateError } = await admin.from("google_calendar_connections").update({ last_sync_at: new Date().toISOString(), last_error: null }).eq("id", connection.id);
     if (updateError) throw new Error("GOOGLE_CALENDAR_SYNC_STATUS_SAVE_FAILED");
-    return { synced, deleted };
+    return result;
   } catch (error) {
     await recordSyncError(connection.id, error);
     throw error;
   }
+}
+
+async function sendToGoogle(
+  connection: Connection,
+  toUpsert: BookingForCalendar[],
+  toDelete: Pick<BookingForCalendar, "id" | "updated_at">[],
+): Promise<{ synced: number; deleted: number }> {
+  const accessToken = await accessTokenFor(connection);
+  const calendarTimezone = await readCalendarTimezone(accessToken, connection.calendar_id);
+  if (calendarTimezone && calendarTimezone !== connection.calendar_timezone) {
+    const { error: timezoneError } = await createAdminClient()
+      .from("google_calendar_connections")
+      .update({ calendar_timezone: calendarTimezone })
+      .eq("id", connection.id);
+    if (timezoneError) throw new Error("GOOGLE_CALENDAR_TIMEZONE_SAVE_FAILED");
+    connection.calendar_timezone = calendarTimezone;
+  }
+
+  const tasks = [
+    ...toUpsert.map(booking => ({ booking, send: async () => {
+      await upsertEvent(accessToken, connection.calendar_id, booking, connection.business_timezone);
+      return "synced" as const;
+    } })),
+    ...toDelete.map(booking => ({ booking, send: async () => (
+      await deleteEvent(accessToken, connection.calendar_id, booking.id) ? "deleted" as const : "absent" as const
+    ) })),
+  ];
+  const results = await settleWithConcurrency(tasks, GOOGLE_CONCURRENCY, task => task.send());
+
+  await recordSyncedVersions(connection.id, tasks.filter((_, index) => results[index].status === "fulfilled").map(task => task.booking));
+  const failure = results.find(result => result.status === "rejected");
+  if (failure) throw failure.reason;
+  const outcomes = results.map(result => (result as PromiseFulfilledResult<"synced" | "deleted" | "absent">).value);
+  return {
+    synced: outcomes.filter(outcome => outcome === "synced").length,
+    deleted: outcomes.filter(outcome => outcome === "deleted").length,
+  };
 }
 
 export async function runGoogleCalendarSyncBatch(): Promise<{ connections: number; synced: number; deleted: number; failed: number }> {
@@ -252,17 +336,18 @@ export async function runGoogleCalendarSyncBatch(): Promise<{ connections: numbe
     .or(`last_error.is.null,last_error.neq.${GOOGLE_CALENDAR_REAUTH_REQUIRED}`)
     .order("updated_at", { ascending: true }).limit(25);
   if (error) throw new Error("GOOGLE_CALENDAR_CONNECTIONS_LOAD_FAILED");
+  const results = await settleWithConcurrency(connections ?? [], BUSINESS_CONCURRENCY, connection =>
+    syncGoogleCalendarForBusiness(connection.business_id, { mode: "incremental" }));
   let synced = 0;
   let deleted = 0;
   let failed = 0;
-  for (const connection of connections ?? []) {
-    try {
-      const result = await syncGoogleCalendarForBusiness(connection.business_id);
-      synced += result.synced;
-      deleted += result.deleted;
-    } catch {
+  for (const result of results) {
+    if (result.status === "rejected") {
       failed += 1;
+      continue;
     }
+    synced += result.value.synced;
+    deleted += result.value.deleted;
   }
   return { connections: connections?.length ?? 0, synced, deleted, failed };
 }

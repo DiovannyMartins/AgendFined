@@ -29,6 +29,7 @@ vi.mock("@/lib/email/booking-cancellation", () => ({ sendBusinessCancelledEmail 
 vi.mock("@/lib/business/queries", () => ({
   getCurrentBusiness: async () => ({
     id: "business-1",
+    owner_id: "owner-1",
     name: "Barbearia Demo",
     slug: "barbearia-demo",
     timezone: "America/Fortaleza",
@@ -213,8 +214,8 @@ describe("updateBookingStatus", () => {
   it("cancels without emailing past the negócio's e-mail budget and asks for WhatsApp", async () => {
     vi.setSystemTime(new Date("2026-10-17T12:00:00.000Z"));
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    const { limit } = OWNER_EMAIL_RATE_LIMIT.perBusinessHourly;
-    rateLimitAdmin.counts.set("business:business-1|owner_email|1h", limit);
+    const { limit } = OWNER_EMAIL_RATE_LIMIT.perOwnerHourly;
+    rateLimitAdmin.counts.set("owner:owner-1|owner_email|1h", limit);
 
     const result = await updateBookingStatus({ ok: true }, statusForm("cancelled"));
 

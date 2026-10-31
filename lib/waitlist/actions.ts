@@ -88,7 +88,7 @@ export async function notifyWaitlistEntry(
 
   const { business } = gate;
   const emailNotSent = "Não foi possível enviar o e-mail. Avise o cliente pelo telefone ou WhatsApp.";
-  if (!await spendOwnerEmail(business.id, "waitlist_slot_freed")) return { ok: true, message: emailNotSent };
+  if (!await spendOwnerEmail(business, entry.customer_email, "waitlist_slot_freed")) return { ok: true, message: emailNotSent };
   // The owner's own catálogo, read under RLS like the dashboard list.
   const { data: service } = await supabase
     .from("services")
@@ -174,7 +174,7 @@ export async function convertWaitlistEntry(
   }
 
   const emailNotSent = "Não foi possível enviar o e-mail. Envie ao cliente o link da confirmação privada.";
-  if (!await spendOwnerEmail(business.id, "waitlist_conversion")) return { ...converted, message: emailNotSent };
+  if (!await spendOwnerEmail(business, data.customer_email_snapshot, "waitlist_conversion")) return { ...converted, message: emailNotSent };
 
   const emailResult = await sendBookingConfirmationEmail({
     customerName: data.customer_name_snapshot,

@@ -88,6 +88,7 @@ beforeEach(() => {
   vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
   state.business = {
     id: "business-1",
+    owner_id: "owner-1",
     name: "Barbearia Demo",
     slug: "barbearia-demo",
     phone: "11987654321",
@@ -154,8 +155,8 @@ describe("rescheduleOwnerBooking (#194)", () => {
   });
 
   it("acima do orçamento de e-mails do negócio, remarca sem enviar e pede o WhatsApp", async () => {
-    const { limit } = OWNER_EMAIL_RATE_LIMIT.perBusinessHourly;
-    rateLimitAdmin.counts.set("business:business-1|owner_email|1h", limit);
+    const { limit } = OWNER_EMAIL_RATE_LIMIT.perOwnerHourly;
+    rateLimitAdmin.counts.set("owner:owner-1|owner_email|1h", limit);
 
     const result = await reschedule(form());
 

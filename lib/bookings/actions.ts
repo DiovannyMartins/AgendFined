@@ -73,7 +73,7 @@ export async function updateBookingStatus(
   // undoes the cancellation, it is only logged. Past the negócio's e-mail
   // budget the e-mail is skipped and the dono warns the cliente by WhatsApp.
   const emailSkipped = nextStatus === "cancelled" && !!booking.customer_email_snapshot
-    && !await spendOwnerEmail(business.id, "cancellation");
+    && !await spendOwnerEmail(business, booking.customer_email_snapshot, "cancellation");
   if (nextStatus === "cancelled" && booking.customer_email_snapshot && !emailSkipped) {
     const emailResult = await sendBusinessCancelledEmail({
       customerName: booking.customer_name_snapshot,

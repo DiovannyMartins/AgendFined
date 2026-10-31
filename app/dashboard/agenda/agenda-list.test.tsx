@@ -9,7 +9,7 @@ function booking(overrides: Partial<AgendaBooking> = {}): AgendaBooking {
   return {
     id: "b1",
     start_at: "2026-10-20T13:00:00.000Z",
-    end_at: "2026-10-20T14:00:00.000Z",
+    has_email: false,
     status: "confirmed",
     service_name_snapshot: "Manicure",
     duration_minutes_snapshot: 60,
@@ -130,13 +130,13 @@ describe("AgendaList", () => {
 
     it("avisa, no PROFISSIONAL, que o cliente sem e-mail não recebe o lembrete automático", () => {
       const { rerender } = render(
-        <AgendaList bookings={[booking({ customer_email_snapshot: null })]} timezone="America/Sao_Paulo" automaticReminders />,
+        <AgendaList bookings={[booking({ has_email: false })]} timezone="America/Sao_Paulo" automaticReminders />,
       );
       expect(screen.getByText("Sem e-mail: não recebe o lembrete automático.")).toBeInTheDocument();
 
       rerender(
         <AgendaList
-          bookings={[booking({ customer_email_snapshot: "ana@example.com" })]}
+          bookings={[booking({ has_email: true })]}
           timezone="America/Sao_Paulo"
           automaticReminders
         />,
@@ -144,7 +144,7 @@ describe("AgendaList", () => {
       expect(screen.queryByText(/não recebe o lembrete automático/)).not.toBeInTheDocument();
 
       // No Grátis ninguém recebe lembrete automático, então o aviso não diz nada.
-      rerender(<AgendaList bookings={[booking({ customer_email_snapshot: null })]} timezone="America/Sao_Paulo" />);
+      rerender(<AgendaList bookings={[booking({ has_email: false })]} timezone="America/Sao_Paulo" />);
       expect(screen.queryByText(/não recebe o lembrete automático/)).not.toBeInTheDocument();
     });
   });

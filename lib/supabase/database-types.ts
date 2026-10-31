@@ -735,6 +735,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      billing_report_groups: {
+        Args: { p_business_id: string; p_from: string; p_to: string }
+        Returns: {
+          booking_count: number
+          revenue_cents: number
+          service_name_snapshot: string
+          status: Database["public"]["Enums"]["booking_status"]
+        }[]
+      }
       cancel_booking_by_public_code: {
         Args: { p_cancel_reason?: string; p_cancel_token_hash: string; p_code: string }
         Returns: {
@@ -1160,6 +1169,21 @@ export type Database = {
       delete_service_if_unused: {
         Args: { p_business_id: string; p_now?: string; p_service_id: string }
         Returns: string
+      }
+      customer_booking_counts: {
+        Args: { p_business_id: string; p_customer_ids: string[] }
+        Returns: {
+          booking_count: number
+          customer_id: string
+        }[]
+      }
+      service_booking_counts: {
+        Args: { p_business_id: string }
+        Returns: {
+          booking_count: number
+          scheduled_count: number
+          service_id: string
+        }[]
       }
       set_booking_reminders_sent: {
         Args: { p_booking_ids: string[]; p_claim_tokens: string[] }

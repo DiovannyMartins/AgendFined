@@ -6,15 +6,23 @@ import { BlockForm, BlockRow } from "./block-form";
 
 export const metadata: Metadata = { title: "Bloqueios — AgendFined" };
 
+const PAST_BLOCKS_DAYS = 90;
+
 export default async function BloqueiosPage() {
   const business = await getCurrentBusiness();
   const supabase = await createClient();
+  const now = new Date();
+  // Every bloqueio still ahead plus a slice of the encerrados, never the whole
+  // history (#215).
+  const pastCutoff = new Date(now.getTime() - PAST_BLOCKS_DAYS * 86_400_000).toISOString();
   const { data: blocks } = await supabase
     .from("availability_blocks")
-    .select("*")
+    .select("id, start_at, end_at, reason")
     .eq("business_id", business?.id ?? "")
-    .order("start_at", { ascending: true });
-  const { current, past } = splitBlocksByTime(blocks ?? [], new Date());
+    .gte("end_at", pastCutoff)
+    .order("start_at", { ascending: true })
+    .limit(500);
+  const { current, past } = splitBlocksByTime(blocks ?? [], now);
   const renderRow = (block: (typeof current)[number]) => (
     <BlockRow
       key={block.id}
@@ -41,7 +49,7 @@ export default async function BloqueiosPage() {
 
       {past.length > 0 && (
         <section className="mt-8 space-y-2">
-          <h2 className="text-sm font-medium text-muted-foreground">Encerrados</h2>
+          <h2 className="text-sm font-medium text-muted-foreground">Encerrados nos últimos {PAST_BLOCKS_DAYS} dias</h2>
           {past.map(renderRow)}
         </section>
       )}

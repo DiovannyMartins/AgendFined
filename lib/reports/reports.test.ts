@@ -6,7 +6,8 @@ import {
   filterBookingsByRange,
   formatRate,
   resolveRange,
-  type FetchReportBookings,
+  groupReportBookings,
+  type FetchReportGroups,
   type ReportBooking,
   type ReportBusiness,
 } from "@/lib/reports/reports";
@@ -128,7 +129,7 @@ describe("buildBillingReportResult (Pro gate, ADR 0008)", () => {
   const freeBusiness: ReportBusiness = { id: "biz-free", plan: "free" };
   const nullPlanBusiness: ReportBusiness = { id: "biz-null", plan: null };
 
-  const fetch: FetchReportBookings = async () => bookings;
+  const fetch: FetchReportGroups = async () => groupReportBookings(bookings);
 
   it("returns no_business when there is no business", async () => {
     expect(await buildBillingReportResult(null, fetch)).toEqual({ status: "no_business" });
@@ -158,7 +159,7 @@ describe("buildBillingReportResult (Pro gate, ADR 0008)", () => {
   });
 
   it("returns error when the bookings fetch throws", async () => {
-    const failing: FetchReportBookings = async () => {
+    const failing: FetchReportGroups = async () => {
       throw new Error("boom");
     };
     expect(await buildBillingReportResult(proBusiness, failing)).toEqual({ status: "error" });

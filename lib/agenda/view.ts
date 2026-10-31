@@ -4,19 +4,20 @@
 // the same instant can land on a different date.
 import type { BookingStatus } from "@/lib/bookings/transitions";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
+import { localDayRangeUtc } from "@/lib/booking/availability";
 
+// What the agenda sends to the browser: an allowlist, built by
+// `toAgendaBooking` (#215). The e-mail itself never leaves the server.
 export interface AgendaBooking {
   id: string;
   start_at: string;
-  end_at: string;
   status: BookingStatus;
   service_name_snapshot: string;
   duration_minutes_snapshot: number;
   customer_name_snapshot: string;
   customer_phone_snapshot: string;
-  // Without it the cliente gets no lembrete por e-mail (#195).
-  customer_email_snapshot?: string | null;
-  // Present on the full DB rows the agenda list renders; absent on filtered views.
+  // Without an e-mail the cliente gets no lembrete por e-mail (#195).
+  has_email: boolean;
   public_code?: string;
   cancel_reason?: string | null;
   cancel_reason_category?: string | null;
@@ -26,6 +27,71 @@ export interface AgendaBooking {
   customer_note?: string | null;
   customer_note_category?: string | null;
   customer_note_requires_follow_up?: boolean;
+}
+
+// Columns the agenda page reads; `toAgendaBooking` turns a row into the props.
+export const AGENDA_BOOKING_COLUMNS =
+  "id, start_at, status, service_name_snapshot, duration_minutes_snapshot, customer_name_snapshot, customer_phone_snapshot, customer_email_snapshot, public_code, cancel_reason, cancel_reason_category, cancelled_by, rescheduled_at, customer_note, customer_note_requires_follow_up";
+
+export type AgendaBookingRow = {
+  id: string;
+  start_at: string;
+  status: BookingStatus;
+  service_name_snapshot: string;
+  duration_minutes_snapshot: number;
+  customer_name_snapshot: string;
+  customer_phone_snapshot: string;
+  customer_email_snapshot: string | null;
+  public_code: string;
+  cancel_reason: string | null;
+  cancel_reason_category: string | null;
+  cancelled_by: string | null;
+  rescheduled_at: string | null;
+  customer_note: string | null;
+  customer_note_requires_follow_up: boolean;
+};
+
+// A new object with only the allowlisted keys, never the row by reference.
+export function toAgendaBooking(row: AgendaBookingRow): AgendaBooking {
+  return {
+    id: row.id,
+    start_at: row.start_at,
+    status: row.status,
+    service_name_snapshot: row.service_name_snapshot,
+    duration_minutes_snapshot: row.duration_minutes_snapshot,
+    customer_name_snapshot: row.customer_name_snapshot,
+    customer_phone_snapshot: row.customer_phone_snapshot,
+    has_email: Boolean(row.customer_email_snapshot?.trim()),
+    public_code: row.public_code,
+    cancel_reason: row.cancel_reason,
+    cancel_reason_category: row.cancel_reason_category,
+    cancelled_by: row.cancelled_by,
+    rescheduled_at: row.rescheduled_at,
+    customer_note: row.customer_note,
+    customer_note_requires_follow_up: row.customer_note_requires_follow_up,
+  };
+}
+
+// The Monday–Sunday week containing `dateKey` and the UTC interval [from, to)
+// the agenda fetches for it: only the week on screen, never the history (#215).
+export function agendaWeek(dateKey: string, timezone: string = APP_TIMEZONE): {
+  days: string[];
+  from: string;
+  to: string;
+} {
+  const days = weekDateKeys(dateKey);
+  return {
+    days,
+    from: localDayRangeUtc(days[0], timezone).start,
+    to: localDayRangeUtc(days[6], timezone).end,
+  };
+}
+
+// The same calendar date shifted by `delta` days.
+export function shiftDateKey(key: string, delta: number): string {
+  const [y, m, d] = key.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + delta));
+  return utcDateKey(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate());
 }
 
 export interface AgendaFilters {

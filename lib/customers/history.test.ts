@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCustomerHistory,
+  customerSearchFilter,
+  toCustomerSummary,
   filterCustomers,
   searchCustomerHistory,
   type CustomerRow,
@@ -85,5 +87,60 @@ describe("searchCustomerHistory", () => {
   it("a query without usable words is not searched (null)", () => {
     expect(searchCustomerHistory(history, "a")).toBeNull();
     expect(searchCustomerHistory(history, "   ")).toBeNull();
+  });
+});
+
+describe("allowlist das props do ClientsList (#215)", () => {
+  const row = {
+    id: "c1",
+    business_id: "biz",
+    name: "Eli",
+    phone: "+5511900000001",
+    email: "eli@ex.com",
+    notes: "nota interna",
+    created_at: "2026-01-01T00:00:00Z",
+  };
+
+  it("toCustomerSummary passa só as chaves da allowlist", () => {
+    const summary = toCustomerSummary(row, 1200);
+    expect(Object.keys(summary).sort()).toEqual(["booking_count", "email", "id", "name", "phone"]);
+    expect(summary.booking_count).toBe(1200);
+  });
+
+  it("buildCustomerHistory cria objetos novos, sem tokens das reservas", () => {
+    const booking = {
+      id: "b1",
+      customer_id: "c1",
+      start_at: "2026-09-01T10:00:00Z",
+      status: "completed" as const,
+      service_name_snapshot: "Corte",
+      duration_minutes_snapshot: 30,
+      cancel_token_hash: "c".repeat(64),
+      reminder_claim_token: "token",
+    };
+    const [entry] = buildCustomerHistory([row], [booking]);
+
+    expect(entry.customer).not.toBe(row);
+    expect(Object.keys(entry.customer).sort()).toEqual(["email", "id", "name", "phone"]);
+    expect(Object.keys(entry.bookings[0]).sort()).toEqual([
+      "customer_id",
+      "duration_minutes_snapshot",
+      "id",
+      "service_name_snapshot",
+      "start_at",
+      "status",
+    ]);
+  });
+});
+
+describe("customerSearchFilter", () => {
+  it("busca nome, e-mail e os dígitos do telefone", () => {
+    expect(customerSearchFilter("  (11) 98888 ")).toBe("name.ilike.*11 98888*,email.ilike.*11 98888*,phone.ilike.*1198888*");
+    expect(customerSearchFilter("Ana")).toBe("name.ilike.*Ana*,email.ilike.*Ana*");
+  });
+
+  it("descarta a sintaxe de filtro do PostgREST", () => {
+    expect(customerSearchFilter("a,id.eq.1)")).toBe("name.ilike.*a id.eq.1*,email.ilike.*a id.eq.1*");
+    expect(customerSearchFilter("*%(),\"")).toBeNull();
   });
 });

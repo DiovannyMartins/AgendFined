@@ -6,10 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
 import { CalendarDays, CalendarClock, CalendarPlus, Download } from "lucide-react";
-import { toLocalDate } from "@/lib/booking/availability";
-import { filterAgenda, parseAgendaSearchParams } from "@/lib/agenda/view";
-import { getGcalExport } from "@/lib/gcal/get-export";
-import { isUpcomingConfirmed } from "@/lib/gcal/export";
+import { localDayRangeUtc, toLocalDate } from "@/lib/booking/availability";
+import { parseAgendaSearchParams } from "@/lib/agenda/view";
+import { fetchAgendaWeek } from "@/lib/agenda/get-week";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
 import { isProPlan } from "@/lib/plan/plan";
 import { AgendaView } from "./agenda-view";
@@ -25,34 +24,38 @@ export default async function AgendaPage({
   const business = await getCurrentBusiness();
   if (!business) redirect("/dashboard/setup");
 
-  const supabase = await createClient();
-  const { data: bookings } = await supabase
-      .from("bookings")
-      .select("id, start_at, end_at, status, service_name_snapshot, duration_minutes_snapshot, customer_name_snapshot, customer_phone_snapshot, customer_email_snapshot, public_code, cancel_reason, cancel_reason_category, cancelled_by, rescheduled_at, customer_note, customer_note_requires_follow_up")
-      .eq("business_id", business.id)
-      .order("start_at", { ascending: true });
-
-  const list = bookings ?? [];
   const now = new Date();
-
-  // Only what is still ahead today: a concluída, no-show or past reserva is
-  // not an atendimento to prepare for (#149).
+  const nowIso = now.toISOString();
   const todayKey = toLocalDate(now, business.timezone);
-  const todayBookings = filterAgenda(list, {
-    tz: business.timezone,
-    filters: { dateKey: todayKey },
-  }).filter((b) => isUpcomingConfirmed(b, now));
+  const day = initialFilters.dateKey ?? todayKey;
+  // Only the week on screen comes from the database (#215): the whole history
+  // was cut at PostgREST's 1000 rows, oldest first, hiding the future ones.
+  const today = localDayRangeUtc(todayKey, business.timezone);
 
-  const upcoming = list.filter((b) => isUpcomingConfirmed(b, now));
+  const supabase = await createClient();
+  const upcomingConfirmed = () =>
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", business.id)
+      .eq("status", "confirmed")
+      .gte("start_at", nowIso);
+  const [week, { count: todayCount }, { count: upcomingCount }, { count: anyCount }] =
+    await Promise.all([
+      fetchAgendaWeek(supabase, business.id, day, business.timezone),
+      // Only what is still ahead today: a concluída, no-show or past reserva
+      // is not an atendimento to prepare for (#149).
+      upcomingConfirmed().lt("start_at", today.end),
+      upcomingConfirmed(),
+      supabase
+        .from("bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("business_id", business.id),
+    ]);
 
-  // Owner calendar export (INC-3 / US25, Pro feature): the business's future
-  // active reservations as an importable .ics feed, gated behind the
-  // PROFISSIONAL plan. The page already loaded the owner's bookings, so we feed
-  // them to the gate boundary instead of re-fetching.
-  const exportResult = await getGcalExport({
-    getBusiness: async () => business,
-    fetchBookings: async () => list,
-  });
+  const todayBookings = todayCount ?? 0;
+  const upcoming = upcomingCount ?? 0;
+  const isPro = isProPlan(business.plan);
 
   return (
     <div className="space-y-6">
@@ -62,11 +65,13 @@ export default async function AgendaPage({
           <p className="mt-2 text-sm text-muted-foreground">Acompanhe e gerencie seus atendimentos.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {exportResult.status === "ok" && exportResult.count > 0 && (
-            // A plain styled link: wrapping a <Button> in <a> nests a button in a
-            // link and trips Base UI's native-button check.
+          {/* Owner calendar export (INC-3 / US25, Pro): built on demand by the
+              route, never embedded in this page (#215). A plain styled link:
+              wrapping a <Button> in <a> nests a button in a link and trips
+              Base UI's native-button check. */}
+          {isPro && upcoming > 0 && (
             <a
-              href={`data:text/calendar;charset=utf-8,${encodeURIComponent(exportResult.icsFeed)}`}
+              href="/dashboard/agenda/exportar"
               download="agendfined-agenda.ics"
               className={buttonVariants({ size: "sm", variant: "outline" })}
             >
@@ -90,11 +95,11 @@ export default async function AgendaPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-semibold">{todayBookings.length}</p>
+            <p className="text-3xl font-semibold">{todayBookings}</p>
             <p className="text-sm text-muted-foreground">
-              {todayBookings.length === 0
+              {todayBookings === 0
                 ? "Nenhum atendimento por vir hoje"
-                : todayBookings.length === 1
+                : todayBookings === 1
                   ? "atendimento por vir hoje"
                   : "atendimentos por vir hoje"}
             </p>
@@ -107,24 +112,28 @@ export default async function AgendaPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-semibold">{upcoming.length}</p>
+            <p className="text-3xl font-semibold">{upcoming}</p>
             <p className="text-sm text-muted-foreground">confirmadas à frente</p>
           </CardContent>
         </Card>
       </div>
 
       <AgendaView
-        bookings={list}
+        // A new week is a new fetch: remount so the day/status state restarts
+        // from the URL the server just rendered.
+        key={week.days[0]}
+        bookings={week.bookings}
         timezone={business.timezone}
         businessName={business.name}
-        automaticReminders={isProPlan(business.plan)}
-        initialDate={initialFilters.dateKey}
+        automaticReminders={isPro}
+        initialDate={day}
         initialStatus={initialFilters.status}
+        hasAnyBooking={(anyCount ?? 0) > 0}
       />
 
       {/* After the list, and compact: on a phone the reservations must stay
           above the fold. */}
-      {exportResult.status === "upgrade_required" && (
+      {!isPro && (
         <UpgradePrompt
           compact
           title="Exportação de agenda é um recurso PROFISSIONAL"

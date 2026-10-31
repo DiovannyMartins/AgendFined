@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { agendaSearchString, filterAgenda, type AgendaBooking } from "@/lib/agenda/view";
+import {
+  agendaSearchString,
+  bookingLocalDate,
+  filterAgenda,
+  shiftDateKey,
+  weekDateKeys,
+  type AgendaBooking,
+} from "@/lib/agenda/view";
 import type { BookingStatus } from "@/lib/bookings/transitions";
 import { STATUS_LABEL } from "@/lib/bookings/status";
 import { toLocalDate } from "@/lib/booking/availability";
@@ -24,11 +32,7 @@ const STATUS_ITEMS: Record<string, string> = {
   ...Object.fromEntries(Object.entries(STATUS_LABEL).map(([value, { label }]) => [value, label])),
 };
 
-function shiftDays(key: string, delta: number): string {
-  const [y, m, d] = key.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d + delta));
-  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
-}
+const WEEKDAY_SHORT = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
 function prioritizeConfirmed(bookings: AgendaBooking[]): AgendaBooking[] {
   return [...bookings].sort((a, b) => {
@@ -37,6 +41,10 @@ function prioritizeConfirmed(bookings: AgendaBooking[]): AgendaBooking[] {
   });
 }
 
+// The agenda shows one week at a time (#215): `bookings` are only that week's
+// reservas, fetched by the server for the week of `initialDate` (today by
+// default). Picking another day of the same week is instant; leaving the week
+// navigates, so the server fetches the new one.
 export function AgendaView({
   bookings,
   timezone,
@@ -44,6 +52,7 @@ export function AgendaView({
   automaticReminders = false,
   initialDate = null,
   initialStatus = null,
+  hasAnyBooking = true,
 }: {
   bookings: AgendaBooking[];
   timezone?: string;
@@ -52,52 +61,54 @@ export function AgendaView({
   automaticReminders?: boolean;
   initialDate?: string | null;
   initialStatus?: BookingStatus | null;
+  // False for a business with no reserva at all, to show the first-steps hint.
+  hasAnyBooking?: boolean;
 }) {
-  // The date is an optional filter. `null` means "all dates", so the list
-  // ("Todas as reservas") shows every reservation until a date is picked.
-  const [dateFilter, setDateFilter] = useState<string | null>(initialDate);
+  const router = useRouter();
+  const businessTimezone = timezone ?? APP_TIMEZONE;
+  const todayKey = toLocalDate(new Date(), businessTimezone);
+  const [day, setDay] = useState<string>(initialDate ?? todayKey);
   const [status, setStatus] = useState<StatusFilter>(initialStatus ?? "");
+  const week = useMemo(() => weekDateKeys(day), [day]);
 
   // Mirror the filters in the URL so a reload (or a shared link) keeps them.
   useEffect(() => {
     const { pathname, search, hash } = window.location;
-    const query = agendaSearchString({ dateKey: dateFilter, status: status || null });
+    const query = agendaSearchString({ dateKey: day, status: status || null });
     if (query !== search) {
       window.history.replaceState(window.history.state, "", `${pathname}${query}${hash}`);
     }
-  }, [dateFilter, status]);
+  }, [day, status]);
 
-  const businessTimezone = timezone ?? APP_TIMEZONE;
-  const todayKey = toLocalDate(new Date(), businessTimezone);
-  // The day/week grids always need a concrete anchor; fall back to today when
-  // the date filter is off.
-  const anchorDate = dateFilter ?? todayKey;
+  function goTo(target: string) {
+    if (weekDateKeys(target)[0] === week[0]) {
+      setDay(target);
+      return;
+    }
+    router.push(`/dashboard/agenda${agendaSearchString({ dateKey: target, status: status || null })}`);
+  }
 
-  // Status applies in every view; the date is an optional filter that narrows
-  // the list when set. Confirmed reservations stay at the top because they
-  // still require an operational action from the business.
-  const filtered = useMemo(
-    () =>
-      prioritizeConfirmed(
-        filterAgenda(bookings, {
-          tz: businessTimezone,
-          filters: {
-            status: status || null,
-          },
-        }),
-      ),
+  // Status applies to the whole week (the day strip counts); the list shows the
+  // selected day. Confirmed reservations stay at the top because they still
+  // require an operational action from the business.
+  const byStatus = useMemo(
+    () => filterAgenda(bookings, { tz: businessTimezone, filters: { status: status || null } }),
     [bookings, status, businessTimezone],
   );
 
-  const listBookings = useMemo(
-    () =>
-      dateFilter
-        ? filterAgenda(filtered, { tz: businessTimezone, filters: { dateKey: dateFilter } })
-        : filtered,
-    [filtered, dateFilter, businessTimezone],
-  );
+  const countByDay = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const booking of byStatus) {
+      const key = bookingLocalDate(booking.start_at, businessTimezone);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
+  }, [byStatus, businessTimezone]);
 
-  const dateStep = 1;
+  const listBookings = useMemo(
+    () => prioritizeConfirmed(filterAgenda(byStatus, { tz: businessTimezone, filters: { dateKey: day } })),
+    [byStatus, day, businessTimezone],
+  );
 
   return (
     <div className="mt-8 space-y-5">
@@ -113,15 +124,17 @@ export function AgendaView({
             <Button
               size="sm"
               variant="outline"
-              aria-label="Anterior"
-              onClick={() => setDateFilter(shiftDays(anchorDate, -dateStep))}
+              aria-label="Semana anterior"
+              onClick={() => goTo(shiftDateKey(day, -7))}
             >
               <ChevronLeft className="size-4" />
             </Button>
             <Input
               type="date"
-              value={dateFilter ?? ""}
-              onChange={(e) => setDateFilter(e.target.value || null)}
+              value={day}
+              onChange={(e) => {
+                if (e.target.value) goTo(e.target.value);
+              }}
               className="w-full min-w-0 sm:w-40"
               style={{ colorScheme: "dark" }}
               aria-label="Data"
@@ -129,8 +142,8 @@ export function AgendaView({
             <Button
               size="sm"
               variant="outline"
-              aria-label="Próxima"
-              onClick={() => setDateFilter(shiftDays(anchorDate, dateStep))}
+              aria-label="Próxima semana"
+              onClick={() => goTo(shiftDateKey(day, 7))}
             >
               <ChevronRight className="size-4" />
             </Button>
@@ -139,18 +152,10 @@ export function AgendaView({
             size="sm"
             variant="outline"
             className="border-border bg-card/40"
-            aria-pressed={dateFilter === todayKey}
-            onClick={() => setDateFilter(todayKey)}
+            aria-pressed={day === todayKey}
+            onClick={() => goTo(todayKey)}
           >
             Hoje
-          </Button>
-          <Button
-            size="sm"
-            variant={dateFilter ? "outline" : "default"}
-            aria-pressed={dateFilter === null}
-            onClick={() => setDateFilter(null)}
-          >
-            Todas as datas
           </Button>
         </div>
 
@@ -171,13 +176,35 @@ export function AgendaView({
         </div>
       </div>
 
+      <div role="group" aria-label="Dias da semana" className="grid grid-cols-7 gap-1">
+        {week.map((key, index) => {
+          const count = countByDay.get(key) ?? 0;
+          const selected = key === day;
+          return (
+            <Button
+              key={key}
+              size="sm"
+              variant={selected ? "default" : "outline"}
+              aria-pressed={selected}
+              aria-label={`${WEEKDAY_SHORT[index]} ${key.slice(8)}/${key.slice(5, 7)}: ${count} ${count === 1 ? "reserva" : "reservas"}`}
+              className="h-auto flex-col gap-0 px-1 py-1.5"
+              onClick={() => setDay(key)}
+            >
+              <span className="text-xs">{WEEKDAY_SHORT[index]}</span>
+              <span className="font-semibold">{key.slice(8)}</span>
+              <span className="text-[10px] opacity-80">{count}</span>
+            </Button>
+          );
+        })}
+      </div>
+
       <div className="mt-4">
         <AgendaList
           bookings={listBookings}
           timezone={businessTimezone}
           businessName={businessName}
           automaticReminders={automaticReminders}
-          filterActive={dateFilter !== null || status !== ""}
+          filterActive={hasAnyBooking}
         />
       </div>
     </div>

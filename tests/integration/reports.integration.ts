@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 import { adminClient, anonClientForUser, retryOnFk } from "./index";
-import { buildBillingReport, type FetchReportBookings, type ReportBooking } from "@/lib/reports/reports";
+import { buildBillingReport, type FetchReportGroups, type ReportBooking } from "@/lib/reports/reports";
 import { getBillingReport } from "@/lib/reports/get-report";
 
 // Integration tests against the real Supabase project. INC-2 (Pro reports): the
@@ -268,10 +268,10 @@ describe("INC-2 relatórios: gate de plano (free negado, pro liberado)", () => {
       .single();
     expect(freeBiz?.plan).toBe("free");
 
-    const fetchSpy = vi.fn<FetchReportBookings>(async () => []);
+    const fetchSpy = vi.fn<FetchReportGroups>(async () => []);
     const result = await getBillingReport("all", {
       getBusiness: async () => ({ id: businessId, plan: "free" }),
-      fetchBookings: fetchSpy,
+      fetchGroups: fetchSpy,
     });
     expect(result).toEqual({ status: "upgrade_required" });
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -288,15 +288,14 @@ describe("INC-2 relatórios: gate de plano (free negado, pro liberado)", () => {
     const proOwner = await anonClientForUser(PRO_EMAIL, PASSWORD);
     const result = await getBillingReport("all", {
       getBusiness: async () => ({ id: proBusinessId, plan: "pro" }),
-      fetchBookings: async (businessId, range) => {
-        const { data, error } = await proOwner
-          .from("bookings")
-          .select("id, status, start_at, price_cents_snapshot, service_name_snapshot")
-          .eq("business_id", businessId)
-          .gte("start_at", range.from)
-          .lt("start_at", range.to);
+      fetchGroups: async (businessId, range) => {
+        const { data, error } = await proOwner.rpc("billing_report_groups", {
+          p_business_id: businessId,
+          p_from: range.from,
+          p_to: range.to,
+        });
         if (error) throw new Error(error.message);
-        return (data ?? []) as unknown as ReportBooking[];
+        return data ?? [];
       },
     });
     expect(result.status).toBe("ok");

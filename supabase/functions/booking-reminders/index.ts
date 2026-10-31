@@ -15,14 +15,14 @@
 // (Next aliases + tsconfig). The decision/formatting logic below is a hand-kept
 // mirror of that pure seam; keep every constant and rule in sync with it.
 //
-// The `isDue` re-check below uses a SECOND clock (the edge's, not the DB's) as a
+// The `isDue` re-check in send.ts uses a SECOND clock (the edge's, not the DB's) as a
 // defense-in-depth guard: the DB tick selects candidates with its own `now()`,
 // but a candidate can pass into a cancelled/past state while the HTTP request is
 // in flight. Unmarked failures are retried by the next tick.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isAuthorizedCronRequest } from "./auth.ts";
-import { buildReminderEmail } from "./email.ts";
+import { sendDueReminders } from "./send.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -33,7 +33,6 @@ const RESEND_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") ?? "";
 // without it the link points at production.
 const APP_URL = Deno.env.get("APP_URL") || "https://agendfined.com.br";
 
-const REMINDER_LEAD_MS = 24 * 60 * 60 * 1000;
 const REMINDER_BATCH_LIMIT = 50;
 
 type Candidate = {
@@ -72,11 +71,6 @@ function isCandidate(value: unknown): value is Candidate {
   );
 }
 
-function isDue(startAt: string, now: Date): boolean {
-  const diff = new Date(startAt).getTime() - now.getTime();
-  return diff > 0 && diff <= REMINDER_LEAD_MS;
-}
-
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -102,16 +96,11 @@ Deno.serve(async (req) => {
     return json({ error: "invalid_payload" }, 400);
   }
 
-  const now = new Date();
-  const sentIds: string[] = [];
-
-  for (const candidate of candidates) {
-    if (!candidate.customer_email_snapshot || !isDue(candidate.start_at, now)) continue;
-    // E-mail not wired: leave the booking unmarked so nothing is lost until it is.
-    if (!RESEND_API_KEY || !RESEND_FROM_EMAIL) continue;
-
-    const email = buildReminderEmail(candidate, APP_URL);
-    try {
+  // E-mail not wired: leave every booking unmarked so nothing is lost until it is.
+  const sentIds = !RESEND_API_KEY || !RESEND_FROM_EMAIL ? [] : await sendDueReminders(candidates, {
+    now: new Date(),
+    appUrl: APP_URL,
+    deliver: async (email) => {
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
@@ -126,11 +115,9 @@ Deno.serve(async (req) => {
           html: email.html,
         }),
       });
-      if (res.ok) sentIds.push(candidate.id);
-    } catch {
-      // Network failure: skip; the next tick retries.
-    }
-  }
+      return res.ok;
+    },
+  });
 
   if (sentIds.length > 0) {
     if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {

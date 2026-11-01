@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { runBoundedReconciliation } from "@/lib/billing/reconciliation-runner";
 import { runPendingCheckoutRepricing } from "@/lib/billing/reprice-checkouts-runner";
 import type { RepriceCheckoutsResult } from "@/lib/billing/reprice-checkouts";
+import { runPlanCutoverNotices, type PlanCutoverNoticesResult } from "@/lib/billing/plan-cutover-notices";
 import { runTrialReminders, type TrialRemindersResult } from "@/lib/billing/trial-reminders";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enforceApiRateLimit, getClientIpFromHeaders } from "@/lib/booking/rate-limit";
@@ -49,15 +50,22 @@ async function run(request: NextRequest) {
     } catch {
       console.error(JSON.stringify({ event: "google_calendar_sync_batch_failed" }));
     }
-    // Avisos de fim do teste grátis (#261); a failed one comes back on a later
-    // run. The deadline leaves room for one last e-mail (10 s) in maxDuration.
+    // E-mail da virada and avisos de fim do teste grátis (#261); a failed one
+    // comes back on a later run. The deadline leaves room for one last e-mail
+    // (10 s) in maxDuration.
+    let planCutoverNotices: PlanCutoverNoticesResult | null = null;
+    try {
+      planCutoverNotices = await runPlanCutoverNotices({ deadline: startedAt + 45_000 });
+    } catch {
+      console.error(JSON.stringify({ event: "plan_cutover_notices_batch_failed" }));
+    }
     let trialReminders: TrialRemindersResult | null = null;
     try {
       trialReminders = await runTrialReminders({ deadline: startedAt + 45_000 });
     } catch {
       console.error(JSON.stringify({ event: "trial_reminders_batch_failed" }));
     }
-    const body = { ok: true, reportCount: reports.length, repricing, calendarSync, trialReminders, durationMs: Date.now() - startedAt };
+    const body = { ok: true, reportCount: reports.length, repricing, calendarSync, planCutoverNotices, trialReminders, durationMs: Date.now() - startedAt };
     console.info(JSON.stringify({ event: "reconciliation_http_finished", ...body }));
     return NextResponse.json(body);
   } catch {

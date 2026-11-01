@@ -88,15 +88,6 @@ describe("PlanSection (ADR 0013)", () => {
     expect(screen.getByRole("button", { name: "Assinar" })).toBeInTheDocument();
   });
 
-  it("does not show a teste for a negócio older than the plano único (infinity)", async () => {
-    render(await PlanSection({ business: business({ trialEndsAt: "infinity" }) }));
-
-    expect(screen.queryByText("Teste grátis", { exact: true })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Invalid Date/)).not.toBeInTheDocument();
-    expect(screen.getByText("Sem assinatura", { exact: true })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Assinar" })).toBeInTheDocument();
-  });
-
   it("shows a suspended negócio, what it keeps and the button to subscribe", async () => {
     render(
       await PlanSection({
@@ -140,7 +131,7 @@ describe("PlanSection (ADR 0013)", () => {
       graceSubscription: null,
     });
 
-    render(await PlanSection({ business: business({ currentSubscriptionId: "sub_1", trialEndsAt: "infinity" }) }));
+    render(await PlanSection({ business: business({ currentSubscriptionId: "sub_1" }) }));
 
     expect(screen.getByText("Checkout não concluído", { exact: true })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Concluir pagamento" })).toBeInTheDocument();

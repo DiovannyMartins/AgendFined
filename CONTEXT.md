@@ -107,7 +107,7 @@ O único plano do produto, pago (R$ 19,90/mês). Dá acesso a tudo: página púb
 _Avoid_: Plano Grátis, PROFISSIONAL, Pro, premium, plano pago, recurso profissional
 
 **Teste grátis**:
-Os primeiros 30 dias corridos do negócio, a partir da criação, com acesso completo ao Plano AgendFined, sem cartão. Cada pessoa tem um teste só: um telefone de negócio ou um e-mail de dono que já usou o teste não ganha outro, mesmo depois de excluir a conta, a não ser que o suporte libere. Acaba no instante marcado, sem carência. Assinar durante o teste não encurta o teste: a primeira cobrança acontece no fim dele.
+Os primeiros 30 dias corridos do negócio, a partir da criação, com acesso completo ao Plano AgendFined, sem cartão. Cada pessoa tem um teste só: um telefone de negócio ou um e-mail de dono que já usou o teste não ganha outro, mesmo depois de excluir a conta, a não ser que o suporte libere. Acaba no instante marcado, sem carência. Assinar durante o teste não encurta o teste: a primeira cobrança acontece no fim dele. Os negócios que estavam no antigo Grátis ganharam o teste na virada (#261), a partir da data da virada e não da criação.
 _Avoid_: Trial, período de avaliação, degustação, plano grátis
 
 **Assinatura**:

@@ -1,8 +1,8 @@
 // The teste grátis as the painel shows it (ADR 0013). `businesses.trial_ends_at`
-// arrives from PostgREST as a string: null means "sem teste" and, until the
-// virada (#261, fase 7), "infinity" marks a negócio older than the plano único.
-// `new Date("infinity")` is an Invalid Date, so the value is parsed here, once,
-// and anything that is not a finite instant is "no trial to show".
+// arrives from PostgREST as a string, and null means "sem teste". The banco only
+// keeps finite instants (businesses_trial_ends_at_finite, #261 fase 7); the
+// value is still parsed here, once, and anything that is not a finite instant
+// is "no trial to show", never an Invalid Date.
 
 const DAY_MS = 86_400_000;
 

@@ -16,8 +16,8 @@ export type AccessBannerBusiness = {
 
 // Painel-wide state of the negócio in the Plano AgendFined (ADR 0013): the
 // suspension, with what still works, or the days left of the teste grátis.
-// Nothing for a negócio with an assinatura ativa, nor for one older than the
-// plano único ("infinity" until the virada) or without a teste.
+// Nothing for a negócio with an assinatura ativa, nor for one with access
+// without a teste (carência).
 export async function AccessBanner({ business }: { business: AccessBannerBusiness }) {
   if (!business.hasAccess) {
     // Born without a teste because its telefone or e-mail already had one,

@@ -26,7 +26,7 @@ describe("retryPendingUpgrade with billing_attempts", () => {
   });
 
   it("charges the new checkout now outside a teste", async () => {
-    const d = deps({ business: { id: "biz_1", trialEndsAt: "infinity" } });
+    const d = deps({ business: { id: "biz_1", trialEndsAt: null } });
     await retryPendingUpgrade(d);
     expect(d.provider.createPreapproval).toHaveBeenCalledWith(expect.objectContaining({ startDate: null }));
   });

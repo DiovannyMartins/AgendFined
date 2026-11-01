@@ -57,8 +57,7 @@ export async function PlanSection({
   const status = subscription?.status ?? null;
   const notice = graceNotice(result, now);
   const authorized = status === "authorized";
-  // A finite teste still running. "infinity" (a negócio older than the plano
-  // único, until the virada) and null are not a teste to show.
+  // A teste still running; null is no teste to show.
   const trialEnd = parseTrialEndsAt(business.trialEndsAt);
   const inTrial = !authorized && !!trialEnd && trialEnd.getTime() > now.getTime();
   const suspended = !business.hasAccess;

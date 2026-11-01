@@ -8,9 +8,7 @@ describe("parseTrialEndsAt (ADR 0013)", () => {
     expect(parseTrialEndsAt("2026-11-30T12:00:00+00:00")?.toISOString()).toBe("2026-11-30T12:00:00.000Z");
   });
 
-  it("treats infinity, null and garbage as no teste, never an Invalid Date", () => {
-    expect(parseTrialEndsAt("infinity")).toBeNull();
-    expect(parseTrialEndsAt("-infinity")).toBeNull();
+  it("treats null and garbage as no teste, never an Invalid Date", () => {
     expect(parseTrialEndsAt(null)).toBeNull();
     expect(parseTrialEndsAt(undefined)).toBeNull();
     expect(parseTrialEndsAt("amanhã")).toBeNull();
@@ -29,8 +27,7 @@ describe("trialDaysLeft", () => {
     expect(trialDaysLeft("2026-10-30T12:00:00+00:00", NOW)).toBeNull();
   });
 
-  it("is null for infinity and for no teste", () => {
-    expect(trialDaysLeft("infinity", NOW)).toBeNull();
+  it("is null for no teste", () => {
     expect(trialDaysLeft(null, NOW)).toBeNull();
   });
 });

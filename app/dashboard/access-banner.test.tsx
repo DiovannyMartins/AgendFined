@@ -40,8 +40,8 @@ describe("AccessBanner (ADR 0013)", () => {
     expect(screen.getByRole("status").className).toContain("amber");
   });
 
-  it("shows nothing for infinity, for no teste or for an ended teste", async () => {
-    for (const trialEndsAt of ["infinity", null, "2026-10-30T12:00:00+00:00"]) {
+  it("shows nothing for no teste or for an ended teste", async () => {
+    for (const trialEndsAt of [null, "2026-10-30T12:00:00+00:00"]) {
       await renderBanner({ trialEndsAt });
     }
     expect(screen.queryByRole("status")).not.toBeInTheDocument();

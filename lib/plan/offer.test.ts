@@ -31,8 +31,7 @@ describe("planOfferState", () => {
     );
   });
 
-  it("negócio anterior ao plano único ou em carência tem acesso sem teste com fim", () => {
-    expect(planOfferState({ hasAccess: true, trialEndsAt: "infinity", subscriptionStatus: null }, NOW)).toBe("active");
+  it("negócio em carência tem acesso sem teste com fim", () => {
     expect(planOfferState({ hasAccess: true, trialEndsAt: null, subscriptionStatus: "cancelled" }, NOW)).toBe("active");
   });
 });

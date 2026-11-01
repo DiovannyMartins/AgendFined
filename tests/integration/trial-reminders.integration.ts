@@ -209,17 +209,16 @@ describe("quem não recebe", () => {
   const NOW = "2027-07-09T12:00:00Z";
   const TRIAL_ENDS_AT = "2027-07-10T15:00:00Z";
 
-  it("assinante, carência vigente, teste 'infinity' e negócio sem teste", async () => {
+  it("assinante, carência vigente e negócio sem teste", async () => {
     const authorized = await createBusiness(TRIAL_ENDS_AT);
     await addSubscription(authorized, "authorized", null);
     const inGrace = await createBusiness(TRIAL_ENDS_AT);
     await addSubscription(inGrace, "paused", "2027-08-01T00:00:00Z");
     const graceOver = await createBusiness(TRIAL_ENDS_AT);
     await addSubscription(graceOver, "cancelled", "2027-07-01T00:00:00Z");
-    const legacy = await createBusiness("infinity");
     const noTrial = await createBusiness(null);
 
-    const rows = await claim(NOW, [authorized, inGrace, graceOver, legacy, noTrial]);
+    const rows = await claim(NOW, [authorized, inGrace, graceOver, noTrial]);
     expect(rows.map((row) => row.business_id)).toEqual([graceOver]);
   });
 });

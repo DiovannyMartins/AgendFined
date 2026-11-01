@@ -1,14 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const { run, reprice, trialReminders } = vi.hoisted(() => ({
+const { run, reprice, trialReminders, planCutoverNotices } = vi.hoisted(() => ({
   run: vi.fn(async () => []),
   reprice: vi.fn(async () => ({ checked: 2, repriced: 1, cancelled: 0, failed: 0 })),
   trialReminders: vi.fn(async () => ({ claimed: 2, sent: 2, failed: 0 })),
+  planCutoverNotices: vi.fn(async () => ({ claimed: 1, sent: 1, failed: 0 })),
 }));
 vi.mock("@/lib/billing/reconciliation-runner", () => ({ runBoundedReconciliation: run }));
 vi.mock("@/lib/billing/reprice-checkouts-runner", () => ({ runPendingCheckoutRepricing: reprice }));
 vi.mock("@/lib/billing/trial-reminders", () => ({ runTrialReminders: trialReminders }));
+vi.mock("@/lib/billing/plan-cutover-notices", () => ({ runPlanCutoverNotices: planCutoverNotices }));
 vi.mock("@/lib/google-calendar/sync", () => ({ runGoogleCalendarSyncBatch: vi.fn(async () => null) }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
 vi.mock("@/lib/booking/rate-limit", () => ({
@@ -98,6 +100,19 @@ describe("private reconciliation route", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body).toEqual(expect.objectContaining({ ok: true, trialReminders: null }));
+    expect(JSON.stringify(body)).not.toContain("private details");
+  });
+
+  it("sends the e-mails da virada and still answers ok when they fail", async () => {
+    process.env.RECONCILIATION_CRON_SECRET = "internal-secret";
+    let response = await POST(request("POST", "Bearer internal-secret"));
+    expect(await response.json()).toEqual(expect.objectContaining({ planCutoverNotices: { claimed: 1, sent: 1, failed: 0 } }));
+
+    planCutoverNotices.mockRejectedValueOnce(new Error("private details"));
+    response = await POST(request("POST", "Bearer internal-secret"));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toEqual(expect.objectContaining({ ok: true, planCutoverNotices: null, trialReminders: { claimed: 2, sent: 2, failed: 0 } }));
     expect(JSON.stringify(body)).not.toContain("private details");
   });
 });

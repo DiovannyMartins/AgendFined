@@ -14,9 +14,7 @@ Quem assina durante o teste não perde os dias restantes: o checkout cria a prea
 
 O Mercado Pago transforma um `start_date` futuro em dias grátis (`auto_recurring.free_trial`) contados em dias de calendário no fuso dele (UTC−4), e recusa um `start_date` no passado. Na prática (sandbox, novembro de 2026): a primeira cobrança cai na data do fim do teste, no horário em que o checkout foi criado, com até um dia de diferença para `trial_ends_at`; um teste que acaba no mesmo dia do checkout é cobrado na hora; e o reajuste de preço (`PUT` com `transaction_amount`) preserva `start_date` e `next_payment_date`. Para não mandar uma data já passada, o app só envia `start_date` quando faltam mais de 10 minutos para o fim do teste (`lib/billing/first-charge.ts`).
 
-Os negócios anteriores ao plano único têm `trial_ends_at = 'infinity'` até a virada. Para o checkout, isso não é um teste com fim: quem assina antes da virada é cobrado na hora, como antes do plano único. A virada troca esses valores (veja abaixo).
-
-Na virada, todo negócio no Grátis, inclusive quem já assinou e cancelou, ganha `trial_ends_at = virada + 30 dias` e entra no registro de testes concedidos. Negócios com assinatura ativa ou em carência não mudam. Os donos afetados recebem um e-mail sobre o fim do Grátis, o teste, o preço e os novos Termos.
+Na virada, todo negócio no Grátis, inclusive quem já assinou e cancelou, ganha `trial_ends_at = virada + 30 dias` e entra no registro de testes concedidos (`source = 'migration'`). Negócios com assinatura atual `authorized` ou em carência ficam sem teste (`trial_ends_at = null`): o acesso deles vem da assinatura. Os donos que ganharam o teste recebem um e-mail sobre o fim do Grátis, o teste, o preço e os novos Termos, uma vez só (`plan_cutover_notices`, mesmo padrão de idempotência dos avisos de fim do teste). Entre a criação de `trial_ends_at` e a virada, os negócios anteriores ao plano único ficaram com `'infinity'`, que mantinha o acesso de antes; depois da virada o banco só aceita `null` ou uma data finita (`businesses_trial_ends_at_finite`).
 
 ## Alternativas consideradas
 

@@ -16,12 +16,6 @@ describe("firstChargeDate", () => {
     expect(firstChargeDate("2026-10-31T12:00:00.000Z", NOW)).toBeNull();
   });
 
-  // Until the virada (#261, fase 7) a negócio older than the plano único has
-  // `trial_ends_at = 'infinity'`: it is not a teste with an end to charge on.
-  it("is now (null) for a legacy negócio ('infinity')", () => {
-    expect(firstChargeDate("infinity", NOW)).toBeNull();
-  });
-
   // Mercado Pago refuses a start_date in the past; one only minutes ahead could
   // be past by the time the request arrives.
   it("is now (null) when the teste ends within the minimum lead", () => {

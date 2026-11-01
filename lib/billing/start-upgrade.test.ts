@@ -131,7 +131,6 @@ describe("startUpgrade first charge", () => {
   it.each([
     ["without a teste", null],
     ["after the teste ended", "2026-10-31T12:00:00+00:00"],
-    ["for a legacy negócio ('infinity')", "infinity"],
   ])("charges now %s", async (_label, trialEndsAt) => {
     const deps = makeDeps({ business: { id: "biz_1", trialEndsAt } });
     await startUpgrade(deps);

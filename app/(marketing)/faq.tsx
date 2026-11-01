@@ -10,6 +10,14 @@ const faqs = [
     a: "Você configura serviços e horários de atendimento. Seus clientes escolhem a data e o horário na sua página pública e a reserva aparece imediatamente no seu painel.",
   },
   {
+    q: "Quanto custa?",
+    a: "O AgendFined tem um plano só, o Plano AgendFined, com tudo incluído por R$ 19,90/mês. Toda conta nova começa com 30 dias de teste grátis, sem cartão. Se você assinar durante o teste, não perde os dias que faltam: a primeira cobrança acontece na data do fim do teste. Cancele quando quiser.",
+  },
+  {
+    q: "E se o teste acabar e eu não assinar?",
+    a: "O negócio fica suspenso, mas nada é apagado: serviços, clientes e reservas continuam no painel. A página pública deixa de aceitar novas reservas e as reservas já marcadas continuam valendo. Assine quando quiser para reativar.",
+  },
+  {
     q: "Posso cancelar um horário?",
     a: "Sim. Você cancela, conclui ou marca ausência pelo dashboard. Mudanças de status liberam o horário para novas reservas.",
   },

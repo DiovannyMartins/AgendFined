@@ -7,7 +7,7 @@
 // no owner session.
 import type { Database } from "@/lib/supabase/database-types";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getProPriceCents } from "@/lib/plan/catalog";
+import { getPlanPriceCents } from "@/lib/plan/catalog";
 import { createMercadoPagoProvider } from "./mercado-pago";
 import { notifyPaymentFailed } from "./payment-failed-notification";
 import {
@@ -104,7 +104,7 @@ export function createWebhookPersistence() {
 // to be refunded by hand in Mercado Pago.
 export function createCheckoutTermsReporting() {
   return {
-    currentPriceCents: getProPriceCents(),
+    currentPriceCents: getPlanPriceCents(),
     reportStalePriceCharge: (input: { businessId: string; mpPreapprovalId: string }) =>
       console.error(JSON.stringify({ event: "billing_stale_price_charge", ...input })),
     reportUnexpectedTermsCharge: (input: { businessId: string; mpPreapprovalId: string }) =>

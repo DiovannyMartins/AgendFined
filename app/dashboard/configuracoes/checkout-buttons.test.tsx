@@ -22,12 +22,12 @@ describe("checkout buttons", () => {
     vi.clearAllMocks();
   });
 
-  it("navega o Fazer upgrade na mesma aba", async () => {
+  it("navega o Assinar na mesma aba", async () => {
     mockedStartUpgrade.mockResolvedValue({ ok: true, initPoint: "https://mp.example/upgrade" });
     const open = vi.spyOn(window, "open");
 
     render(<UpgradeButton />);
-    fireEvent.click(screen.getByRole("button", { name: "Fazer upgrade" }));
+    fireEvent.click(screen.getByRole("button", { name: "Assinar" }));
 
     await waitFor(() => {
       expect(mockedStartUpgrade).toHaveBeenCalledOnce();

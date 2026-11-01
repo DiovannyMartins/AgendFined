@@ -128,7 +128,7 @@ describe("AgendaList", () => {
       expect(screen.queryByRole("link", { name: "Lembrar pelo WhatsApp" })).not.toBeInTheDocument();
     });
 
-    it("avisa, no PROFISSIONAL, que o cliente sem e-mail não recebe o lembrete automático", () => {
+    it("avisa, com lembretes automáticos ligados, que o cliente sem e-mail não recebe o lembrete automático", () => {
       const { rerender } = render(
         <AgendaList bookings={[booking({ has_email: false })]} timezone="America/Sao_Paulo" automaticReminders />,
       );
@@ -143,7 +143,7 @@ describe("AgendaList", () => {
       );
       expect(screen.queryByText(/não recebe o lembrete automático/)).not.toBeInTheDocument();
 
-      // No Grátis ninguém recebe lembrete automático, então o aviso não diz nada.
+      // Sem lembretes automáticos (negócio suspenso) ninguém recebe, então o aviso não diz nada.
       rerender(<AgendaList bookings={[booking({ has_email: false })]} timezone="America/Sao_Paulo" />);
       expect(screen.queryByText(/não recebe o lembrete automático/)).not.toBeInTheDocument();
     });

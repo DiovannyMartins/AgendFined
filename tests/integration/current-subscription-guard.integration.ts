@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { adminClient, anonClientForUser, retryOnFk, ACTIVE_TRIAL_ENDS_AT } from "./index";
 
 // `businesses.current_subscription_id` decides which assinatura makes the
-// negócio PROFISSIONAL when Mercado Pago authorizes it
+// negócio subscribed when Mercado Pago authorizes it
 // (`apply_subscription_snapshot`). Only the billing flows (service role) may
 // move it. The owner's browser holds a session JWT and can call PostgREST
 // directly, so the database must refuse an owner write on its own.

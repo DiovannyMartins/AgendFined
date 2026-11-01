@@ -3,7 +3,7 @@
 // run takes the pending subscriptions checked longest ago, so abandoned
 // checkouts already at the current price do not hold the batch forever.
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getProPriceCents } from "@/lib/plan/catalog";
+import { getPlanPriceCents } from "@/lib/plan/catalog";
 import { createMercadoPagoProvider } from "./mercado-pago";
 import type { BillingProvider } from "./provider";
 import { repricePendingCheckouts, type RepriceCheckoutsResult } from "./reprice-checkouts";
@@ -50,7 +50,7 @@ export async function runPendingCheckoutRepricing(
           source: "checkout_repricing",
         }),
       ),
-    currentPriceCents: options.currentPriceCents ?? getProPriceCents(),
+    currentPriceCents: options.currentPriceCents ?? getPlanPriceCents(),
     // The reason is the Mercado Pago status and message, never the token.
     reportFailure: (input) => console.error(JSON.stringify({ event: "checkout_repricing_item_failed", ...input })),
   });

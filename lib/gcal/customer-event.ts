@@ -1,7 +1,7 @@
 // The cliente's own copy of a reserva for their phone's calendar (#196): one
 // event, downloadable as .ics from the confirmation or opened in Google
-// Calendar. Unlike the owner's agenda export (lib/gcal/export), this is not a
-// recurso profissional: it carries only what the confirmation screen already
+// Calendar. Unlike the owner's agenda export (lib/gcal/export), it belongs to
+// the cliente: it carries only what the confirmation screen already
 // shows the cliente (serviço, horário, negócio and its phone, the código
 // público), never the token de cancelamento nor a link that holds it. The UID
 // is the código público, so downloading again updates the same event.

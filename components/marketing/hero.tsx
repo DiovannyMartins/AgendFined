@@ -50,7 +50,7 @@ export function Hero({ children }: { children?: React.ReactNode }) {
               className="group relative inline-flex items-center gap-4 overflow-hidden rounded-full bg-white py-2 pl-6 pr-2 text-lg font-medium text-[#111] shadow-[0_0_0_rgba(255,255,255,0)] transition-shadow hover:shadow-[0_0_28px_rgba(255,255,255,0.25)]"
             >
               <span className="pointer-events-none absolute inset-y-0 -left-1/2 w-1/3 -skew-x-12 bg-white/70 opacity-0 blur-md transition-all duration-700 group-hover:left-[115%] group-hover:opacity-100" />
-              Começar grátis
+              Começar teste grátis
               <span className="relative flex size-10 items-center justify-center rounded-full bg-[#202020] text-white transition-colors group-hover:bg-[#3b3b3b]">
                 <ArrowRight className="size-5" />
               </span>

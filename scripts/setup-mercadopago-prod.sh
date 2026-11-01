@@ -185,7 +185,7 @@ finish() {
 
 TOTAL_STAGES=6
 
-banner "Mercado Pago — assinatura PROFISSIONAL (produção)"
+banner "Mercado Pago — assinatura do Plano AgendFined (produção)"
 
 # Production values land in the working env file (reference) AND must be pasted
 # into the Vercel project environment variables (Stage 4).
@@ -262,6 +262,6 @@ note "Teste GET (esperado 405, rota só aceita POST):"
 note "  curl -i https://agendfined.com.br/api/webhooks/mercadopago"
 note "Teste POST sem assinatura (esperado 503/401, fail-closed):"
 note "  curl -i -X POST https://agendfined.com.br/api/webhooks/mercadopago?data.id=x -H 'Content-Type: application/json' -d '{\"type\":\"preapproval\",\"data\":{\"id\":\"x\"}}'"
-note "Depois, faça o upgrade real no dashboard (Plano → Fazer upgrade) para validar o ciclo completo."
+note "Depois, assine de verdade pelo dashboard (Configurações → Plano → Assinar) para validar o ciclo completo."
 
 finish

@@ -5,7 +5,7 @@
 // token is TEST-* in sandbox (dev) and APP_USR-* in production; the API base
 // stays the same. `apiBaseUrl` is injectable so the unit tests can point at a
 // stub server or stub `fetch` without a real network call.
-import { getProPriceCents } from "@/lib/plan/catalog";
+import { getPlanPriceCents } from "@/lib/plan/catalog";
 import type {
   BillingProvider,
   CreatePreapprovalInput,
@@ -29,7 +29,7 @@ export class MercadoPagoAmbiguousError extends Error {
 }
 
 // The recurring terms of the Plano AgendFined, the only plan sold (ADR 0013).
-const SUBSCRIPTION_TERMS = { amount: getProPriceCents() / 100, label: "Plano AgendFined" };
+const SUBSCRIPTION_TERMS = { amount: getPlanPriceCents() / 100, label: "Plano AgendFined" };
 
 export interface MercadoPagoConfig {
   accessToken: string;

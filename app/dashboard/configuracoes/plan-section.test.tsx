@@ -12,7 +12,7 @@ vi.mock("@/lib/billing/get-subscription", () => ({
 }));
 
 vi.mock("./upgrade-button", () => ({
-  UpgradeButton: ({ label = "Fazer upgrade" }: { label?: string }) => (
+  UpgradeButton: ({ label = "Assinar" }: { label?: string }) => (
     <button type="button">{label}</button>
   ),
 }));

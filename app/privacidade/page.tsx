@@ -9,7 +9,7 @@ export default function PrivacidadePage() {
   return (
     <article className="space-y-6">
       <h1 className="text-3xl font-semibold">Política de Privacidade</h1>
-      <p className="text-sm text-muted-foreground">Última atualização: 24 de outubro de 2026</p>
+      <p className="text-sm text-muted-foreground">Última atualização: 1º de novembro de 2026</p>
 
       <section className="space-y-3">
         <h2 className="text-xl font-medium">1. Quem somos e quais dados coletamos</h2>
@@ -33,6 +33,16 @@ export default function PrivacidadePage() {
           As bases legais podem incluir execução de contrato, obrigação legal, exercício regular de
           direitos e legítimo interesse. Quando houver consentimento, ele será específico e poderá ser revogado.
         </p>
+        <p>
+          Para que cada pessoa receba um único teste grátis, registramos, quando um teste é
+          concedido, o telefone do negócio e o e-mail do dono em forma de hash (um resumo
+          criptográfico de mão única), sem guardar esses dados em texto, junto com a data da
+          concessão. Antes do hash, o telefone é normalizado e o e-mail é convertido para minúsculas
+          (em contas Gmail, também sem pontos e sem o trecho após “+”). O registro serve só para
+          verificar se um telefone ou e-mail já recebeu um teste, com base no legítimo interesse de
+          prevenir abuso da oferta, e é mantido mesmo depois da exclusão da conta, enquanto o teste
+          grátis for oferecido. Ele não é compartilhado nem usado para outra finalidade.
+        </p>
       </section>
 
       <section className="space-y-3">
@@ -50,7 +60,7 @@ export default function PrivacidadePage() {
       <section className="space-y-3">
         <h2 className="text-xl font-medium">4. Integração com o Google Calendar</h2>
         <p>
-          A integração é opcional, faz parte do plano PROFISSIONAL e só é ativada quando o dono do
+          A integração é opcional, faz parte do Plano AgendFined e só é ativada quando o dono do
           negócio clica em “Conectar Google Calendar” e autoriza o acesso na própria conta do Google.
           O AgendFined pede ao Google o endereço de e-mail da conta, para mostrar qual conta está
           conectada, e a permissão “Ver e editar eventos em todas as suas agendas”, usada para criar,

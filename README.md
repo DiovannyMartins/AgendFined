@@ -36,7 +36,7 @@ Plataforma SaaS de agendamento online para profissionais e pequenos negócios. O
 - **Fuso por negócio**: datas armazenadas em UTC e exibidas no fuso configurado pelo negócio (padrão America/Sao_Paulo).
 - **Anti-bot**: gate de Cloudflare Turnstile no fluxo público de reserva.
 - **Histórico estável**: snapshots de serviço (nome, preço, duração) preservam o histórico da reserva.
-- **Plano PROFISSIONAL (R$ 19,90/mês, Mercado Pago)**: relatórios, lembretes automáticos, gestão da lista de espera e exportação da agenda (Google Calendar/.ics). O plano Grátis contém o núcleo completo de agendamento.
+- **Plano AgendFined (R$ 19,90/mês, Mercado Pago)**: plano único com tudo incluído (relatórios, lembretes automáticos, gestão da lista de espera, exportação da agenda e janela de até 365 dias). Toda conta começa com 30 dias de teste grátis, sem cartão; sem teste nem assinatura, o negócio fica suspenso, sem perder dados (ADR 0013).
 
 > Especificação de produto e implementação: `documento-projeto.md` (fonte de verdade do MVP).
 

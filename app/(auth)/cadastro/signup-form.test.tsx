@@ -15,7 +15,7 @@ async function createAccount() {
   fireEvent.change(screen.getByLabelText("Como quer ser chamado?"), { target: { value: "Ana" } });
   fireEvent.change(screen.getByLabelText("E-mail"), { target: { value: "ana@example.com" } });
   fireEvent.change(screen.getByLabelText("Senha"), { target: { value: "Senha-forte-1" } });
-  fireEvent.click(await screen.findByRole("button", { name: "Começar grátis" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Começar teste grátis" }));
   await screen.findByText("Conta criada com sucesso!");
 }
 

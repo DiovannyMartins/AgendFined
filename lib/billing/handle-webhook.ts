@@ -105,7 +105,7 @@ export interface HandleWebhookDeps {
   // assinatura. Its recurrence is cancelled; the charge already taken needs a
   // manual refund, so it is reported.
   reportDoubleCharge: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
-  // The Plano AgendFined price now (`getProPriceCents`). A checkout paid below it
+  // The Plano AgendFined price now (`getPlanPriceCents`). A checkout paid below it
   // was created before a price change; it is cancelled instead of activated and
   // the charge is reported for a manual refund.
   currentPriceCents: number;

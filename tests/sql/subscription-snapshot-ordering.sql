@@ -21,8 +21,8 @@ begin
   insert into public.profiles (id, display_name) values (v_owner, 'Dono ' || p_tag);
   insert into public.businesses (id, owner_id, name, slug, phone, timezone)
   values (v_business, v_owner, 'Negocio ' || p_tag, 'ordering-' || p_tag, '11988887777', 'America/Sao_Paulo');
-  insert into public.subscriptions (business_id, mp_preapproval_id, status, plan)
-  values (v_business, 'mp-ordering-' || p_tag, 'pending', 'pro')
+  insert into public.subscriptions (business_id, mp_preapproval_id, status)
+  values (v_business, 'mp-ordering-' || p_tag, 'pending')
   returning id into v_sub;
   update public.businesses set current_subscription_id = v_sub where id = v_business;
   perform public.apply_subscription_snapshot(

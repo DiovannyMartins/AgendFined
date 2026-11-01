@@ -8,7 +8,7 @@ export { startUpgrade } from "./start-upgrade";
 export type { BillingAttempt, StartUpgradeDeps, StartUpgradeResult } from "./start-upgrade";
 export { retryPendingUpgrade } from "./retry-upgrade";
 export type { RetryUpgradeDeps, RetryUpgradeResult } from "./retry-upgrade";
-export type { BillingPlan, BillingSubscription, SubscriptionStatus } from "./types";
+export type { BillingSubscription, SubscriptionStatus } from "./types";
 export { isGraceActive, isSubscriptionInGrace } from "./types";
 export type {
   BillingProvider,

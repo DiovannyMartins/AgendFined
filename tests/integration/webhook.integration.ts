@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
-import { adminClient, retryOnFk } from "./index";
+import { adminClient, retryOnFk, SUSPENDED_TRIAL_ENDS_AT } from "./index";
 import { handleWebhook } from "@/lib/billing/handle-webhook";
 import { createWebhookPersistence } from "@/lib/billing/webhook-server";
 import type { PreapprovalResource } from "@/lib/billing/handle-webhook";
@@ -9,16 +9,19 @@ import type { PreapprovalResource } from "@/lib/billing/handle-webhook";
 // (`handleWebhook`) is driven with the real persistence (`createWebhookPersistence`,
 // service-role writes) and a stubbed `getPreapproval`, so the lifecycle is
 // exercised end-to-end in the database without hitting the Mercado Pago API:
-//   * `authorized` marks the business Pro and authorizes the subscription;
-//   * `paused`/`cancelled` start a 7-day grace, keeping the business Pro;
-//   * once the grace expires, `downgrade_expired_subscriptions` drops the
-//     business back to Free (data preserved).
+//   * `authorized` authorizes the subscription, which gives the negócio access;
+//   * `paused`/`cancelled` start a 7-day grace, keeping the access;
+//   * once the grace expires the negócio is suspended at once, without a cron
+//     (ADR 0013; data preserved).
+// The negócio's teste grátis is over, so only the assinatura gives access.
 // RUN: npm run test:integration.
 const stamp = Date.now().toString().slice(-8);
 const EMAIL = `webhook.${stamp}@agendfined.dev`;
 const PASSWORD = process.env.INTEGRATION_TEST_PASSWORD ?? `Test-${stamp}-aA1!`;
 const MP_ID = `mp-wh-${stamp}`;
-const NOW = new Date("2026-09-07T12:00:00.000Z");
+// business_has_access() compares the carência with the database's now().
+const NOW = new Date(Math.floor(Date.now() / 1000) * 1000);
+const GRACE_END = new Date(NOW.getTime() + 7 * 86_400_000).toISOString();
 
 let admin: ReturnType<typeof adminClient>;
 let ownerId = "";
@@ -51,9 +54,10 @@ async function run(event: { type: string; dataId: string }, status: PreapprovalR
   });
 }
 
-async function readBusinessPlan(): Promise<string | null> {
-  const { data } = await admin.from("businesses").select("plan").eq("id", businessId).single();
-  return data?.plan ?? null;
+async function readAccess(): Promise<boolean> {
+  const { data, error } = await admin.rpc("business_has_access", { p_business_id: businessId });
+  if (error) throw new Error(`business_has_access: ${error.message}`);
+  return data === true;
 }
 
 async function readSubscription(): Promise<{ status: string; grace_period_end: string | null } | null> {
@@ -82,6 +86,7 @@ beforeAll(async () => {
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
         booking_window_days: 60,
+        trial_ends_at: SUSPENDED_TRIAL_ENDS_AT,
       })
       .select("*")
       .single();
@@ -94,7 +99,6 @@ beforeAll(async () => {
     .insert({
     business_id: businessId,
     mp_preapproval_id: MP_ID,
-    plan: "pro",
     status: "pending",
     })
     .select("id")
@@ -118,29 +122,29 @@ afterAll(async () => {
 });
 
 describe("issue #24 webhook lifecycle", () => {
-  it("authorized marks the business pro and authorizes the subscription", async () => {
+  it("authorized gives the negócio access and authorizes the subscription", async () => {
     const result = await run({ type: "subscription_preapproval", dataId: MP_ID }, "authorized");
 
     expect(result).toEqual({ ok: true, applied: "authorized" });
-    expect(await readBusinessPlan()).toBe("pro");
+    expect(await readAccess()).toBe(true);
     const sub = await readSubscription();
     expect(sub?.status).toBe("authorized");
     expect(sub?.grace_period_end).toBeNull();
   });
 
-  it("paused starts a 7-day grace and keeps the business pro", async () => {
+  it("paused starts a 7-day grace and keeps the access", async () => {
     const result = await run({ type: "preapproval", dataId: MP_ID }, "paused");
 
     expect(result).toEqual({ ok: true, applied: "grace" });
-    expect(await readBusinessPlan()).toBe("pro");
+    expect(await readAccess()).toBe(true);
     const sub = await readSubscription();
     expect(sub).not.toBeNull();
     expect(sub!.status).toBe("paused");
     // Postgres returns timestamptz as `+00:00`; compare the same instant.
-    expect(new Date(sub!.grace_period_end!).toISOString()).toBe("2026-09-14T12:00:00.000Z");
+    expect(new Date(sub!.grace_period_end!).toISOString()).toBe(GRACE_END);
   });
 
-  it("downgrades the business to free once the grace period expires (data preserved)", async () => {
+  it("suspends the negócio as soon as the grace period expires, without a cron (data preserved)", async () => {
     // A far-past date guarantees `grace_period_end < now()` even under clock
     // skew between the test runner and the database.
     await admin
@@ -148,42 +152,36 @@ describe("issue #24 webhook lifecycle", () => {
       .update({ grace_period_end: new Date("2000-01-01T00:00:00.000Z").toISOString() })
       .eq("mp_preapproval_id", MP_ID);
 
-    const { data: count, error } = await admin.rpc("downgrade_expired_subscriptions");
-    expect(error).toBeNull();
-    expect(count).toBeGreaterThan(0);
-    expect(await readBusinessPlan()).toBe("free");
+    expect(await readAccess()).toBe(false);
   });
 
-  it("re-subscribing after a downgrade restores pro and clears the grace", async () => {
+  it("re-subscribing after the suspension restores the access and clears the grace", async () => {
     const result = await run({ type: "preapproval", dataId: MP_ID }, "authorized");
 
     expect(result).toEqual({ ok: true, applied: "authorized" });
-    expect(await readBusinessPlan()).toBe("pro");
+    expect(await readAccess()).toBe(true);
     const sub = await readSubscription();
     expect(sub?.status).toBe("authorized");
     expect(sub?.grace_period_end).toBeNull();
   });
 
-  it("cancelled also starts a grace period while keeping pro", async () => {
+  it("cancelled also starts a grace period while keeping the access", async () => {
     const result = await run({ type: "preapproval", dataId: MP_ID }, "cancelled");
 
     expect(result).toEqual({ ok: true, applied: "grace" });
-    expect(await readBusinessPlan()).toBe("pro");
+    expect(await readAccess()).toBe(true);
     const sub = await readSubscription();
     expect(sub).not.toBeNull();
     expect(sub!.status).toBe("cancelled");
-    expect(new Date(sub!.grace_period_end!).toISOString()).toBe("2026-09-14T12:00:00.000Z");
+    expect(new Date(sub!.grace_period_end!).toISOString()).toBe(GRACE_END);
   });
 
-  it("downgrades a pro business whose current row is pending and the grace has lapsed", async () => {
-    // After a cancelled grace the business is still pro. Insert a NEWER `pending`
-    // row (an abandoned re-subscribe) so it becomes the current row, then expire
-    // the old cancelled row's grace. The robust downgrade must still drop the
-    // business: the current row is not `authorized` and no grace is active.
+  it("suspends a negócio with a newer pending row once the current grace has lapsed", async () => {
+    // A NEWER `pending` row (an abandoned re-subscribe) does not keep the access:
+    // the current row is cancelled and its grace is over (#228).
     await admin.from("subscriptions").insert({
       business_id: businessId,
       mp_preapproval_id: `mp-wh-pending-${stamp}`,
-      plan: "pro",
       status: "pending",
     });
     await admin
@@ -191,9 +189,6 @@ describe("issue #24 webhook lifecycle", () => {
       .update({ grace_period_end: new Date("2000-01-01T00:00:00.000Z").toISOString() })
       .eq("mp_preapproval_id", MP_ID);
 
-    const { data: count, error } = await admin.rpc("downgrade_expired_subscriptions");
-    expect(error).toBeNull();
-    expect(count).toBeGreaterThan(0);
-    expect(await readBusinessPlan()).toBe("free");
+    expect(await readAccess()).toBe(false);
   });
 });

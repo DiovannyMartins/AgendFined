@@ -6,7 +6,6 @@ import { PlanSection } from "./plan-section";
 
 vi.mock("@/lib/billing/get-subscription", () => ({
   getSubscription: vi.fn(async () => ({
-    plan: "free",
     subscription: null,
     graceSubscription: null,
   })),
@@ -38,7 +37,6 @@ function subscription(overrides: Partial<BillingSubscription>): BillingSubscript
   return {
     mpPreapprovalId: "mp_1",
     status: "authorized",
-    plan: "pro",
     currentPeriodStart: null,
     currentPeriodEnd: null,
     gracePeriodEnd: null,
@@ -51,7 +49,6 @@ type SectionBusiness = Parameters<typeof PlanSection>[0]["business"];
 function business(overrides: Partial<SectionBusiness> = {}): SectionBusiness {
   return {
     id: "biz_1",
-    plan: "free",
     timezone: "America/Sao_Paulo",
     hasAccess: true,
     trialEndsAt: null,
@@ -68,7 +65,6 @@ describe("PlanSection (ADR 0013)", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(NOW);
     vi.mocked(getSubscription).mockResolvedValue({
-      plan: "free",
       subscription: null,
       graceSubscription: null,
     });
@@ -126,12 +122,11 @@ describe("PlanSection (ADR 0013)", () => {
 
   it("keeps the active assinatura controls without a subscribe offer", async () => {
     vi.mocked(getSubscription).mockResolvedValue({
-      plan: "pro",
       subscription: subscription({}),
       graceSubscription: null,
     });
 
-    render(await PlanSection({ business: business({ plan: "pro", currentSubscriptionId: "sub_1" }) }));
+    render(await PlanSection({ business: business({ currentSubscriptionId: "sub_1" }) }));
 
     expect(screen.getByText("Ativo", { exact: true })).toBeInTheDocument();
     expect(screen.getByText("Assinatura ativa", { exact: true })).toBeInTheDocument();
@@ -141,7 +136,6 @@ describe("PlanSection (ADR 0013)", () => {
 
   it("resumes a pending checkout instead of opening another one", async () => {
     vi.mocked(getSubscription).mockResolvedValue({
-      plan: "free",
       subscription: subscription({ mpPreapprovalId: "mp_pending", status: "pending" }),
       graceSubscription: null,
     });
@@ -155,12 +149,11 @@ describe("PlanSection (ADR 0013)", () => {
 
   it("tells a failed payment apart from a cancellation and asks for a new payment method", async () => {
     vi.mocked(getSubscription).mockResolvedValue({
-      plan: "pro",
       subscription: subscription({ status: "paused", gracePeriodEnd: "2026-10-27T15:00:00.000Z" }),
       graceSubscription: null,
     });
 
-    render(await PlanSection({ business: business({ plan: "pro", currentSubscriptionId: "sub_1" }) }));
+    render(await PlanSection({ business: business({ currentSubscriptionId: "sub_1" }) }));
 
     expect(
       screen.getByText(
@@ -173,12 +166,11 @@ describe("PlanSection (ADR 0013)", () => {
 
   it("says until when a cancelled assinatura keeps the access and that the negócio is suspended after", async () => {
     vi.mocked(getSubscription).mockResolvedValue({
-      plan: "pro",
       subscription: subscription({ status: "cancelled", gracePeriodEnd: "2026-11-21T15:00:00.000Z" }),
       graceSubscription: null,
     });
 
-    render(await PlanSection({ business: business({ plan: "pro", currentSubscriptionId: "sub_1" }) }));
+    render(await PlanSection({ business: business({ currentSubscriptionId: "sub_1" }) }));
 
     expect(
       screen.getByText("Seu acesso continua até 21/11/2026. Depois, o negócio fica suspenso, sem perder dados."),
@@ -188,12 +180,11 @@ describe("PlanSection (ADR 0013)", () => {
 
   it("keeps the grace date while a new checkout is still unpaid", async () => {
     vi.mocked(getSubscription).mockResolvedValue({
-      plan: "pro",
       subscription: subscription({ mpPreapprovalId: "mp_new", status: "pending" }),
       graceSubscription: subscription({ status: "paused", gracePeriodEnd: "2026-10-27T15:00:00.000Z" }),
     });
 
-    render(await PlanSection({ business: business({ plan: "pro", currentSubscriptionId: "sub_1" }) }));
+    render(await PlanSection({ business: business({ currentSubscriptionId: "sub_1" }) }));
 
     expect(
       screen.getByText(
@@ -205,12 +196,11 @@ describe("PlanSection (ADR 0013)", () => {
 
   it("shows the next charge of an active assinatura and previews it in the cancel dialog", async () => {
     vi.mocked(getSubscription).mockResolvedValue({
-      plan: "pro",
       subscription: subscription({ currentPeriodEnd: "2026-11-21T15:00:00.000Z" }),
       graceSubscription: null,
     });
 
-    render(await PlanSection({ business: business({ plan: "pro", currentSubscriptionId: "sub_1" }) }));
+    render(await PlanSection({ business: business({ currentSubscriptionId: "sub_1" }) }));
 
     expect(screen.getByText("21/11/2026")).toBeInTheDocument();
     expect(screen.getByText(/Próxima cobrança em/)).toBeInTheDocument();
@@ -221,12 +211,11 @@ describe("PlanSection (ADR 0013)", () => {
 
   it("promises only the 7-day minimum in the cancel dialog without a known next charge", async () => {
     vi.mocked(getSubscription).mockResolvedValue({
-      plan: "pro",
       subscription: subscription({}),
       graceSubscription: null,
     });
 
-    render(await PlanSection({ business: business({ plan: "pro", currentSubscriptionId: "sub_1" }) }));
+    render(await PlanSection({ business: business({ currentSubscriptionId: "sub_1" }) }));
 
     expect(screen.queryByText(/Próxima cobrança em/)).not.toBeInTheDocument();
     const cancel = screen.getByRole("button", { name: "Cancelar assinatura" });

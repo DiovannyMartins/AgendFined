@@ -1,15 +1,12 @@
 // Server-side retrieval of the business's current subscription (ADR 0008). It
 // resolves the latest `subscriptions` row for a business (RLS scopes it to the
-// owner) and returns it alongside the plan that is the seat of the gate. The
-// seat of the gate is `businesses.plan` (free | pro), which is what the
-// dashboard displays and what `assertProPlan` checks; the subscription row's own
-// `plan` column is always `pro` (a subscription represents the paid plan), so
-// the returned `plan` is the business's, not the row's. The fetch is injectable
+// owner). Access itself is `business_has_access()` (ADR 0013); this read only
+// explains the assinatura and its carência to the painel. The fetch is injectable
 // so the boundary can be exercised against a real user-scoped client in the
 // integration tests.
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import type { BillingPlan, BillingSubscription, SubscriptionStatus } from "./types";
+import type { BillingSubscription, SubscriptionStatus } from "./types";
 import { isGraceActive } from "./types";
 
 // `currentSubscriptionId` is the negócio's `businesses.current_subscription_id`
@@ -21,23 +18,19 @@ export type FetchSubscription = (
 export type FetchGraceSubscription = (businessId: string) => Promise<BillingSubscription | null>;
 
 export interface GetSubscriptionResult {
-  plan: BillingPlan;
   subscription: BillingSubscription | null;
   // Older `paused`/`cancelled` row whose grace is still active. Only populated
-  // when the current row is `pending` on a Pro business (re-subscribe during
-  // the grace window, US16): the current row hides the grace, but the gate
-  // (`businesses.plan`) still grants Pro until it lapses. Null otherwise.
+  // when the current row is `pending` (re-subscribe during the grace window,
+  // US16): the current row hides the grace, but `business_has_access()` still
+  // grants access until it lapses. Null otherwise.
   graceSubscription: BillingSubscription | null;
 }
 
-// Maps a `subscriptions` DB row to the provider-agnostic shape. A subscription
-// row always represents the paid (Pro) plan, so the row's `plan` is carried
-// through as-is (it is `pro`).
+// Maps a `subscriptions` DB row to the provider-agnostic shape.
 function mapRow(row: {
   id: string;
   mp_preapproval_id: string;
   status: SubscriptionStatus;
-  plan: BillingPlan;
   current_period_start: string | null;
   current_period_end: string | null;
   grace_period_end?: string | null;
@@ -47,7 +40,6 @@ function mapRow(row: {
     subscriptionId: row.id,
     mpPreapprovalId: row.mp_preapproval_id,
     status: row.status,
-    plan: row.plan,
     currentPeriodStart: row.current_period_start,
     currentPeriodEnd: row.current_period_end,
     gracePeriodEnd: row.grace_period_end ?? null,
@@ -84,8 +76,8 @@ export const fetchCurrentSubscription: FetchSubscription = async (businessId, kn
 };
 
 // Newest `paused`/`cancelled` row with a grace still in the future (owner RLS).
-// Used only to explain the pending-during-grace state; the downgrade RPC
-// remains the authority for expiring the grace.
+// Used only to explain the pending-during-grace state; `business_has_access()`
+// remains the authority for the grace.
 export const fetchActiveGraceSubscription: FetchGraceSubscription = async (businessId) => {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -102,7 +94,7 @@ export const fetchActiveGraceSubscription: FetchGraceSubscription = async (busin
   return data ? mapRow(data) : null;
 };
 
-type SubscriptionBusiness = { id: string; plan: BillingPlan; currentSubscriptionId?: string | null };
+type SubscriptionBusiness = { id: string; currentSubscriptionId?: string | null };
 type SubscriptionDeps = {
   fetchSubscription?: FetchSubscription;
   fetchGraceSubscription?: FetchGraceSubscription;
@@ -112,8 +104,7 @@ type SubscriptionDeps = {
 // Keyed by primitives so the GraceBanner and the "Plano" section share one read
 // per request (#214).
 const getCachedSubscription = cache(
-  (id: string, plan: BillingPlan, currentSubscriptionId: string | null | undefined) =>
-    loadSubscription({ id, plan, currentSubscriptionId }),
+  (id: string, currentSubscriptionId: string | null | undefined) => loadSubscription({ id, currentSubscriptionId }),
 );
 
 export function getSubscription(
@@ -121,7 +112,7 @@ export function getSubscription(
   deps?: SubscriptionDeps,
 ): Promise<GetSubscriptionResult> {
   if (deps) return loadSubscription(business, deps);
-  return getCachedSubscription(business.id, business.plan, business.currentSubscriptionId);
+  return getCachedSubscription(business.id, business.currentSubscriptionId);
 }
 
 async function loadSubscription(
@@ -130,16 +121,16 @@ async function loadSubscription(
 ): Promise<GetSubscriptionResult> {
   // No current row on the negócio: nothing to read in `subscriptions` (#214).
   if (business.currentSubscriptionId === null) {
-    return { plan: business.plan, subscription: null, graceSubscription: null };
+    return { subscription: null, graceSubscription: null };
   }
   const fetchSubscription = deps?.fetchSubscription ?? fetchCurrentSubscription;
   const subscription = await fetchSubscription(business.id, business.currentSubscriptionId);
 
   // The pending-during-grace case: the latest row is `pending` (new checkout)
   // while an older `paused`/`cancelled` row still holds an active grace. The UI
-  // needs that older row to explain why a "pending" business still has Pro.
+  // needs that older row to explain why a "pending" negócio still has access.
   let graceSubscription: BillingSubscription | null = null;
-  if (subscription?.status === "pending" && business.plan === "pro") {
+  if (subscription?.status === "pending") {
     const fetchGrace = deps?.fetchGraceSubscription ?? fetchActiveGraceSubscription;
     try {
       const grace = await fetchGrace(business.id);
@@ -151,5 +142,5 @@ async function loadSubscription(
       graceSubscription = null;
     }
   }
-  return { plan: business.plan, subscription, graceSubscription };
+  return { subscription, graceSubscription };
 }

@@ -23,7 +23,7 @@ export async function runBoundedReconciliation() {
   if (businessIds.length === 0) return [];
 
   const [{ data: businesses, error: businessesError }, { data: byBusiness, error: byBusinessError }, { data: byProvider, error: byProviderError }] = await Promise.all([
-    admin.from("businesses").select("id,current_subscription_id,plan").in("id", businessIds),
+    admin.from("businesses").select("id,current_subscription_id").in("id", businessIds),
     admin.from("subscriptions").select("id,business_id,mp_preapproval_id,status,grace_period_end,first_authorized_at").in("business_id", businessIds),
     providerIds.length > 0
       ? admin.from("subscriptions").select("id,business_id,mp_preapproval_id,status,grace_period_end,first_authorized_at").in("mp_preapproval_id", providerIds)
@@ -38,7 +38,7 @@ export async function runBoundedReconciliation() {
     provider,
     attempts: (attempts ?? []).map(row => ({ id: row.id, businessId: row.business_id, status: row.status, providerPreapprovalId: row.provider_preapproval_id, expectedSubscriptionId: row.expected_subscription_id, updatedAt: row.updated_at })) as ReconciliationAttempt[],
     subscriptions: (subscriptions ?? []).map(row => ({ id: row.id, businessId: row.business_id, mpPreapprovalId: row.mp_preapproval_id, status: row.status, gracePeriodEnd: row.grace_period_end, firstAuthorizedAt: row.first_authorized_at })) as ReconciliationSubscription[],
-    businesses: (businesses ?? []).map(row => ({ id: row.id, currentSubscriptionId: row.current_subscription_id, plan: row.plan })) as ReconciliationBusiness[],
+    businesses: (businesses ?? []).map(row => ({ id: row.id, currentSubscriptionId: row.current_subscription_id })) as ReconciliationBusiness[],
     claim: async (resourceKey, token) => {
       const { data, error } = await admin.rpc("claim_billing_reconciliation", { p_resource_key: resourceKey, p_claim_token: token, p_lease_seconds: 300 });
       if (error) throw new Error("RECONCILIATION_CLAIM_FAILED");

@@ -8,11 +8,11 @@ Agora, no **cancelamento** de uma assinatura paga, a carência vai até `max(fim
 
 O cancelamento pelo painel lê a preapproval antes de cancelar e não usa o `current_period_end` local. O provider lia esse campo de `auto_recurring.end_date`, que o Mercado Pago não manda em assinatura sem prazo final, então as linhas antigas o têm nulo. Se a leitura falhar, nada é cancelado e o dono pode tentar de novo. Cancelar com só 7 dias seria repetir o erro em silêncio.
 
-O retorno do checkout (`/api/billing/return`) pode ler a preapproval antes do webhook. Ele calcula a carência do mesmo jeito (`snapshotGraceEnd`), para nenhum `paused`/`cancelled` ficar sem carência e ser rebaixado pelo cron antes do webhook chegar. Cada retrato do Mercado Pago leva o `last_modified` do provedor, guardado em `subscriptions.provider_modified_at`. `apply_subscription_snapshot` ignora, sem erro, um retrato mais antigo que o guardado, para um `authorized` lido antes de uma pausa não limpar a carência depois dela. Sem `last_modified`, o retrato é aplicado como antes.
+O retorno do checkout (`/api/billing/return`) pode ler a preapproval antes do webhook. Ele calcula a carência do mesmo jeito (`snapshotGraceEnd`), para nenhum `paused`/`cancelled` ficar sem carência e o negócio ser suspenso antes do webhook chegar. Cada retrato do Mercado Pago leva o `last_modified` do provedor, guardado em `subscriptions.provider_modified_at`. `apply_subscription_snapshot` ignora, sem erro, um retrato mais antigo que o guardado, para um `authorized` lido antes de uma pausa não limpar a carência depois dela. Sem `last_modified`, o retrato é aplicado como antes.
 
 ## Fim do Grátis e teste grátis (ADR 0013)
 
-A duração da carência não muda com o fim do Grátis; muda só o destino. Ao fim da carência o negócio fica **suspenso**: `business_has_access()` deixa de ser verdadeira assim que `grace_period_end` passa, sem esperar cron. O fim do teste grátis não tem carência.
+A duração da carência não muda com o fim do Grátis; muda só o destino. Ao fim da carência o negócio fica **suspenso**: `business_has_access()` deixa de ser verdadeira assim que `grace_period_end` passa, sem esperar cron. Por isso o cron `subscription-grace-downgrade` e a função `downgrade_expired_subscriptions` saíram do banco junto com `businesses.plan` (issue #261, fase 4). O fim do teste grátis não tem carência.
 
 Quem assina durante o teste recebe uma preapproval com `auto_recurring.start_date = trial_ends_at`. Ela fica `authorized` sem nenhum pagamento até essa data, e o `next_payment_date` é o fim do teste. Se o dono cancela antes da primeira cobrança, a regra do cancelamento vale como para qualquer assinatura `authorized`: a carência vai até `max(next_payment_date, agora + 7 dias)`. No pior caso, quem cancela perto do fim do teste ganha até 7 dias de acesso além dele sem ter pago nada. Isso é aceito: tratar a assinatura ainda não paga como caso à parte exigiria distinguir `authorized` pago de não pago em todos os caminhos acima, por no máximo uma semana de acesso.
 
@@ -29,6 +29,7 @@ Quem assina durante o teste recebe uma preapproval com `auto_recurring.start_dat
 - `lib/billing/handle-webhook.ts` — `paused`/`cancelled` vindos do Mercado Pago
 - `lib/billing/return-sync.ts` — retorno do checkout antes do webhook
 - `supabase/migrations/20261027020000_subscription_snapshot_ordering.sql` — cerca de ordem dos retratos
+- `supabase/migrations/20261101000000_remove_business_plan.sql` — fim do rebaixamento por cron e de `businesses.plan`
 - `lib/billing/mercado-pago.ts` — `currentPeriodEnd` a partir de `next_payment_date`
 - `app/termos/page.tsx` — seção 5
 - [0013 — Plano único, teste grátis de 30 dias e negócio suspenso](0013-plano-unico-teste-gratis-e-suspensao.md)

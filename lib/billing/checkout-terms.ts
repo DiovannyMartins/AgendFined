@@ -1,4 +1,4 @@
-// The terms a first authorization must carry to make a negócio PROFISSIONAL.
+// The terms a first authorization must carry to give a negócio access.
 // A checkout keeps the terms it was created with, so one created before a price
 // change, or with terms the plan does not sell, can still be paid. The webhook,
 // the checkout return and the reconciliation all apply a first authorization,
@@ -17,14 +17,14 @@ export interface CheckoutTerms {
 }
 
 export interface CheckoutTermsDeps {
-  // The PROFISSIONAL price now (`getProPriceCents`).
+  // The Plano AgendFined price now (`getProPriceCents`).
   currentPriceCents: number;
   reportStalePriceCharge: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
   reportUnexpectedTermsCharge: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
   cancelPreapproval: (mpPreapprovalId: string) => Promise<void>;
 }
 
-// Whether a checkout's recurring terms differ from what the PROFISSIONAL plan
+// Whether a checkout's recurring terms differ from what the Plano AgendFined
 // sells: a charge below the current price (created before a price change), or
 // a currency or frequency other than BRL monthly. A term the provider omits is
 // not held against the checkout.
@@ -51,13 +51,15 @@ export interface CheckoutLocalState {
 
 // Whether the local row was ever authorized. The status alone does not say: a
 // checkout closed `paused`/`cancelled` before it was paid, or inserted
-// `paused` by the reconciliation, never made the negócio PROFISSIONAL.
+// `paused` by the reconciliation, never gave the negócio access.
 export function wasEverAuthorized(local: CheckoutLocalState | null): boolean {
   if (!local) return false;
   return local.status === "authorized" || Boolean(local.firstAuthorizedAt);
 }
 
 // Refuses the first authorization of a checkout whose terms are not the plan's.
+// The start_date of a checkout created during the teste grátis is not a term:
+// only the amount, the currency and the frequency are compared.
 // Only a checkout never authorized locally (not linked yet, `pending`, or closed
 // before it was paid) is checked: an assinatura already authorized at an older
 // price keeps renewing at that price. The charge is reported before the cancel,

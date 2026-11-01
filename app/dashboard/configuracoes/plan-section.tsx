@@ -5,7 +5,7 @@ import { graceEnd } from "@/lib/billing/grace";
 import { graceNotice, type GraceNotice } from "@/lib/billing/grace-notice";
 import { AGENDFINED_PLAN_INFO } from "@/lib/plan/catalog";
 import { parseTrialEndsAt } from "@/lib/plan/trial";
-import type { BillingPlan, SubscriptionStatus } from "@/lib/billing/types";
+import type { SubscriptionStatus } from "@/lib/billing/types";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { formatDate } from "@/lib/format/when";
 import { RetryUpgradeButton } from "./retry-upgrade-button";
@@ -43,7 +43,6 @@ export async function PlanSection({
 }: {
   business: {
     id: string;
-    plan: BillingPlan;
     timezone?: string;
     currentSubscriptionId?: string | null;
     hasAccess: boolean;

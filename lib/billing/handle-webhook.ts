@@ -1,8 +1,10 @@
 // Mercado Pago webhook lifecycle seam (issue #24). Maps a `preapproval`
 // notification (delivered with `type: "subscription_preapproval"`, and accepted
-// here as `preapproval` for older/legacy accounts) onto the plan state,
-// following ADR 0008:
-//   * `authorized`  -> the business becomes Pro; the subscription is authorized.
+// here as `preapproval` for older/legacy accounts) onto the assinatura state,
+// following ADR 0008 and ADR 0013:
+//   * `authorized`  -> the subscription is authorized, which gives the negócio
+//     access (`business_has_access()`). During the teste grátis it is
+//     authorized before any payment, until its start_date.
 //     The negócio's other pending checkouts (left payable by a retry) are
 //     cancelled. A paid superseded checkout becomes the current subscription
 //     while the current one is unpaid; when the current one is already paid,
@@ -12,14 +14,14 @@
 //   * `paused`/`cancelled` (incl. a failed recurring payment, which Mercado Pago
 //     surfaces as `paused`) -> start a 7-day grace period. Cancelling a paid
 //     assinatura keeps the month already paid when it ends later (issue #142).
-//     The business stays Pro during the grace; the downgrade happens after it expires (the
-//     `downgrade_expired_subscriptions` RPC, scheduled via pg_cron). A checkout
-//     that was never paid closes without a grace.
-//   * `pending` -> just record the subscription status; never touches the plan.
-// The persistence (find/create subscription, set plan, update subscription) is
-// injected so the decision core is unit-testable without a database, and the
-// plan is never set from the provider's word alone — `authorized` is the only
-// path that makes a business Pro, and a missing/invalid status fails closed.
+//     The negócio keeps its access during the grace and is suspended as soon
+//     as it passes, without a cron. A checkout that was never authorized
+//     closes without a grace.
+//   * `pending` -> just record the subscription status.
+// The persistence (find/create subscription, update subscription) is
+// injected so the decision core is unit-testable without a database, and
+// access is never granted from the provider's word alone — `authorized` is
+// the only path to it, and a missing/invalid status fails closed.
 import type { SubscriptionStatus } from "./types";
 import { refuseUnacceptedCheckout, type CheckoutTermsRefusal } from "./checkout-terms";
 import { snapshotGraceEnd } from "./grace";
@@ -69,7 +71,6 @@ export interface AppliedSubscriptionSnapshot {
   // written and the result describes the stored state.
   applied: boolean;
   isCurrent: boolean;
-  effectivePlan: "free" | "pro";
   effectiveGracePeriodEnd: string | null;
 }
 
@@ -104,12 +105,12 @@ export interface HandleWebhookDeps {
   // assinatura. Its recurrence is cancelled; the charge already taken needs a
   // manual refund, so it is reported.
   reportDoubleCharge: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
-  // The PROFISSIONAL price now (`getProPriceCents`). A checkout paid below it
+  // The Plano AgendFined price now (`getProPriceCents`). A checkout paid below it
   // was created before a price change; it is cancelled instead of activated and
   // the charge is reported for a manual refund.
   currentPriceCents: number;
   reportStalePriceCharge: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
-  // A checkout whose currency or frequency is not what the PROFISSIONAL plan
+  // A checkout whose currency or frequency is not what the Plano AgendFined
   // sells (BRL, monthly) is refused the same way.
   reportUnexpectedTermsCharge: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
   // Tells the dono that a failed charge opened the carência (issue #151). Best
@@ -184,7 +185,7 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
   if (refusal) return { ok: true, applied: refusal };
 
   const now = deps.now?.() ?? new Date();
-  // A checkout still `pending` locally never made the negócio PROFISSIONAL, so
+  // A checkout still `pending` locally never gave the negócio access, so
   // closing it (e.g. a superseded checkout cancelled below) keeps no grace.
   const closedUnpaid =
     sub.status === "pending" && (preapproval.status === "paused" || preapproval.status === "cancelled");
@@ -252,7 +253,6 @@ export async function handleWebhook(deps: HandleWebhookDeps): Promise<HandleWebh
     appliedSnapshot.previousStatus === "authorized" &&
     noticeGraceEnd &&
     appliedSnapshot.isCurrent &&
-    appliedSnapshot.effectivePlan === "pro" &&
     deps.notifyPaymentFailed
   ) {
     try {

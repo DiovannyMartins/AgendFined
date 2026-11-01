@@ -2,9 +2,9 @@ import { escapeHtml, sendEmail, type SendResult } from "@/lib/email/resend";
 import { EMAIL_LOGO_HTML } from "@/lib/email/brand-logo";
 
 // Sent to the dono when the Mercado Pago could not charge the assinatura and
-// paused it (issue #151). The negócio keeps the PROFISSIONAL during the
-// carência; without this e-mail the dono would only learn about it after the
-// downgrade. It carries the date the carência ends and a link to the "Plano"
+// paused it (issue #151). The negócio keeps its access during the carência;
+// without this e-mail the dono would only learn about it after the suspension
+// (ADR 0013). It carries the date the carência ends and a link to the "Plano"
 // section, where the payment method is updated.
 type PaymentFailedEmail = {
   ownerEmail: string;
@@ -40,9 +40,9 @@ function buildPaymentFailedHtml(input: PaymentFailedEmail): string {
             </tr>
             <tr>
               <td style="padding:36px 32px 32px;">
-                <p style="margin:0 0 12px;color:#b0b0b0;font-size:13px;line-height:20px;">ASSINATURA PROFISSIONAL</p>
+                <p style="margin:0 0 12px;color:#b0b0b0;font-size:13px;line-height:20px;">ASSINATURA DO PLANO AGENDFINED</p>
                 <h1 style="margin:0;color:#eeeeee;font-size:28px;font-weight:700;line-height:36px;letter-spacing:-0.6px;">${SUBJECT}.</h1>
-                <p style="margin:16px 0 0;color:#b0b0b0;font-size:16px;line-height:25px;">O Mercado Pago recusou a cobrança do PROFISSIONAL de ${businessName}. Atualize a forma de pagamento até <strong style="color:#eeeeee;">${activeUntil}</strong> para manter o PROFISSIONAL. Depois dessa data, o negócio volta ao Grátis, sem perder dados.</p>
+                <p style="margin:16px 0 0;color:#b0b0b0;font-size:16px;line-height:25px;">O Mercado Pago recusou a cobrança do Plano AgendFined de ${businessName}. Atualize a forma de pagamento até <strong style="color:#eeeeee;">${activeUntil}</strong> para manter o acesso. Depois dessa data, o negócio fica suspenso, sem perder dados.</p>
 
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:26px;border-collapse:collapse;">
                   <tr>
@@ -70,7 +70,7 @@ export function sendPaymentFailedEmail(input: PaymentFailedEmail): Promise<SendR
   const text = [
     `${SUBJECT}.`,
     "",
-    `O Mercado Pago recusou a cobrança do PROFISSIONAL de ${input.businessName}. Atualize a forma de pagamento até ${input.activeUntil} para manter o PROFISSIONAL. Depois dessa data, o negócio volta ao Grátis, sem perder dados.`,
+    `O Mercado Pago recusou a cobrança do Plano AgendFined de ${input.businessName}. Atualize a forma de pagamento até ${input.activeUntil} para manter o acesso. Depois dessa data, o negócio fica suspenso, sem perder dados.`,
     "",
     `Atualizar forma de pagamento: ${input.planUrl}`,
   ].join("\n");

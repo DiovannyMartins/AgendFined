@@ -22,8 +22,8 @@ begin
   insert into public.profiles (id, display_name) values (v_owner, 'Dono ' || p_tag);
   insert into public.businesses (id, owner_id, name, slug, phone, timezone)
   values (v_business, v_owner, 'Negocio ' || p_tag, 'first-auth-' || p_tag, '11988887777', 'America/Sao_Paulo');
-  insert into public.subscriptions (business_id, mp_preapproval_id, status, plan)
-  values (v_business, 'mp-first-auth-' || p_tag, 'pending', 'pro')
+  insert into public.subscriptions (business_id, mp_preapproval_id, status)
+  values (v_business, 'mp-first-auth-' || p_tag, 'pending')
   returning id into v_sub;
   update public.businesses set current_subscription_id = v_sub where id = v_business;
   return query select v_business, v_sub;
@@ -77,8 +77,8 @@ begin
 
   -- An insert that is not authorized cannot claim one.
   select * into v from pg_temp.new_checkout('forged');
-  insert into public.subscriptions (business_id, mp_preapproval_id, status, plan, first_authorized_at)
-  values (v.business_id, 'mp-first-auth-forged-2', 'paused', 'pro', now());
+  insert into public.subscriptions (business_id, mp_preapproval_id, status, first_authorized_at)
+  values (v.business_id, 'mp-first-auth-forged-2', 'paused', now());
   if (select first_authorized_at from public.subscriptions where mp_preapproval_id = 'mp-first-auth-forged-2') is not null then
     raise exception 'forged insert: expected first_authorized_at null';
   end if;

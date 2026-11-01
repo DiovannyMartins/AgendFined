@@ -4,11 +4,11 @@
 // grace period, mirroring the webhook lifecycle for a `cancelled` preapproval.
 // The grace keeps the month already paid (the preapproval's next charge date,
 // read before cancelling) and never less than 7 days (issue #142).
-// The business stays Pro during the grace; the `downgrade_expired_subscriptions`
-// cron drops it to Free once the grace passes (data preserved). The provider and
+// The negócio keeps its access during the grace and is suspended once it passes
+// (`business_has_access()`, ADR 0013; data preserved). The provider and
 // persistence are injectable so this seam is unit-testable without Mercado Pago
 // or a database.
-import type { BillingPlan, SubscriptionStatus } from "./types";
+import type { SubscriptionStatus } from "./types";
 import type { BillingProvider } from "./provider";
 import type { FetchSubscription } from "./get-subscription";
 import { graceEnd } from "./grace";
@@ -16,7 +16,7 @@ import { graceEnd } from "./grace";
 export type CancelSubscriptionResult = { ok: true } | { ok: false; code: string; message: string };
 
 export interface CancelSubscriptionDeps {
-  business: { id: string; plan: BillingPlan };
+  business: { id: string };
   provider: BillingProvider;
   fetchSubscription: FetchSubscription;
   updateSubscription: (

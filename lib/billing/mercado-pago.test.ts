@@ -27,7 +27,6 @@ describe("createMercadoPagoProvider", () => {
 
     const provider = createMercadoPagoProvider({ accessToken: "APP_USR-123" });
     const result = await provider.createPreapproval({
-      plan: "pro",
       externalReference: "biz_1",
       backUrl: "https://app.example/dashboard/configuracoes",
       payerEmail: "owner@example.com",
@@ -41,7 +40,7 @@ describe("createMercadoPagoProvider", () => {
     expect(init.method).toBe("POST");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer APP_USR-123");
     const body = JSON.parse(String(init.body));
-    expect(body.reason).toBe("Assinatura PROFISSIONAL - AgendFined (R$ 19,90/mês)");
+    expect(body.reason).toBe("Assinatura Plano AgendFined (R$ 19,90/mês)");
     expect(body.auto_recurring).toEqual({
       frequency: 1,
       frequency_type: "months",
@@ -66,7 +65,7 @@ describe("createMercadoPagoProvider", () => {
 
     const provider = createMercadoPagoProvider({ accessToken: "TEST-123" });
     await expect(
-      provider.createPreapproval({ plan: "pro", externalReference: "biz_1", backUrl: "https://app.example" }),
+      provider.createPreapproval({ externalReference: "biz_1", backUrl: "https://app.example" }),
     ).resolves.toEqual({
       preapprovalId: "mp_test_123",
       initPoint: "https://sandbox.mercadopago.com.br/subscriptions/checkout?preapproval_id=mp_test_123",
@@ -78,7 +77,6 @@ describe("createMercadoPagoProvider", () => {
 
     const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });
     await provider.createPreapproval({
-      plan: "pro",
       externalReference: "biz_1",
       backUrl: "https://app.example",
     });
@@ -92,7 +90,6 @@ describe("createMercadoPagoProvider", () => {
 
     const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });
     await provider.createPreapproval({
-      plan: "pro",
       externalReference: "biz_1",
       backUrl: "https://app.example",
     });
@@ -101,15 +98,34 @@ describe("createMercadoPagoProvider", () => {
     expect(JSON.parse(String(init.body))).not.toHaveProperty("payer_email");
   });
 
-  it("rejects the free plan (no subscription is sold for it)", async () => {
-    const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });
-    await expect(
-      provider.createPreapproval({
-        plan: "free",
-        externalReference: "biz_1",
-        backUrl: "https://app.example",
-      }),
-    ).rejects.toThrow("does not sell a subscription for the free plan");
+  it("starts the recurring charge at startDate when given (teste grátis, ADR 0013)", async () => {
+    const fetchMock = stubFetch(async () => jsonResponse({ id: "mp_1", init_point: "https://mp.example/x" }));
+
+    const provider = createMercadoPagoProvider({ accessToken: "APP_USR-1" });
+    await provider.createPreapproval({
+      externalReference: "biz_1",
+      backUrl: "https://app.example",
+      startDate: "2026-11-20T15:30:00.000Z",
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).auto_recurring).toEqual({
+      frequency: 1,
+      frequency_type: "months",
+      transaction_amount: 19.9,
+      currency_id: "BRL",
+      start_date: "2026-11-20T15:30:00.000Z",
+    });
+  });
+
+  it("omits start_date (charge now) when startDate is null", async () => {
+    const fetchMock = stubFetch(async () => jsonResponse({ id: "mp_1", init_point: "https://mp.example/x" }));
+
+    const provider = createMercadoPagoProvider({ accessToken: "APP_USR-1" });
+    await provider.createPreapproval({ externalReference: "biz_1", backUrl: "https://app.example", startDate: null });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).auto_recurring).not.toHaveProperty("start_date");
   });
 
   it("throws when Mercado Pago returns a non-ok status", async () => {
@@ -118,7 +134,6 @@ describe("createMercadoPagoProvider", () => {
     const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });
     await expect(
       provider.createPreapproval({
-        plan: "pro",
         externalReference: "biz_1",
         backUrl: "https://app.example",
       }),
@@ -131,7 +146,6 @@ describe("createMercadoPagoProvider", () => {
     const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });
     await expect(
       provider.createPreapproval({
-        plan: "pro",
         externalReference: "biz_1",
         backUrl: "https://app.example",
       }),
@@ -229,7 +243,10 @@ describe("createMercadoPagoProvider", () => {
     );
   });
 
-  it("updates the checkout amount of a preapproval", async () => {
+  // Mercado Pago keeps start_date (and its free days) across this PUT (sandbox,
+  // 01/11/2026), so the reprice sends nothing else and never moves the first
+  // charge of an assinatura created during the teste grátis.
+  it("updates only the checkout amount of a preapproval, never its start_date", async () => {
     const fetchMock = stubFetch(async () => jsonResponse({ id: "mp_1" }));
 
     const provider = createMercadoPagoProvider({ accessToken: "TEST-1" });

@@ -46,7 +46,7 @@ async function createFixtures({ validCurrentSubscription = false } = {}) {
     name: `harness-${ids.business}`,
     slug: `harness-${ids.business}`,
   });
-  await psql("insert into public.subscriptions (id, business_id, mp_preapproval_id, status, plan) values (:'subscription', :'business', :'provider', 'pending', 'pro');", {
+  await psql("insert into public.subscriptions (id, business_id, mp_preapproval_id, status) values (:'subscription', :'business', :'provider', 'pending');", {
     subscription: ids.subscription,
     business: ids.business,
     provider: `harness-provider-${ids.subscription}`,
@@ -99,7 +99,7 @@ async function concurrentReconciliationClaim(ids) {
 async function snapshotState(ids) {
   return psql(`select json_build_object(
     'attempt', (select json_build_object('id', a.id, 'status', a.status, 'claim_token', c.claim_token, 'claim_expires_at', c.claimed_until, 'resolved_at', a.resolved_at, 'provider_preapproval_id', a.provider_preapproval_id) from public.billing_attempts a left join public.billing_reconciliation_claims c on c.resource_key = 'billing-attempt/' || a.id::text where a.id = :'attempt'),
-    'business', (select json_build_object('plan', plan, 'current_subscription_id', current_subscription_id) from public.businesses where id = :'business'),
+    'business', (select json_build_object('current_subscription_id', current_subscription_id) from public.businesses where id = :'business'),
     'subscription', (select json_build_object('id', id, 'mp_preapproval_id', mp_preapproval_id, 'status', status, 'grace_period_end', grace_period_end, 'business_id', business_id) from public.subscriptions where id = :'subscription')
   );`, ids);
 }

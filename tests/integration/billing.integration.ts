@@ -83,8 +83,7 @@ function ownerFetch(client: Awaited<ReturnType<typeof anonClientForUser>>) {
     if (!data) return null;
     return {
       mpPreapprovalId: data.mp_preapproval_id,
-      status: data.status,
-      plan: data.plan,
+      status: data.status,
       currentPeriodStart: data.current_period_start,
       currentPeriodEnd: data.current_period_end,
     };
@@ -92,13 +91,12 @@ function ownerFetch(client: Awaited<ReturnType<typeof anonClientForUser>>) {
 }
 
 describe("issue #23 billing: assinatura + RLS", () => {
-  it("a fresh business has the free plan and no subscription", async () => {
+  it("a fresh business has no subscription", async () => {
     const owner = await anonClientForUser(EMAIL, PASSWORD);
     const result = await getSubscription(
-      { id: businessId, plan: "free" },
+      { id: businessId },
       { fetchSubscription: ownerFetch(owner) },
     );
-    expect(result.plan).toBe("free");
     expect(result.subscription).toBeNull();
   });
 
@@ -106,7 +104,6 @@ describe("issue #23 billing: assinatura + RLS", () => {
     await admin.from("subscriptions").insert({
       business_id: businessId,
       mp_preapproval_id: `mp-base-${stamp}`,
-      plan: "pro",
       status: "pending",
     });
 
@@ -195,7 +192,7 @@ describe("issue #23 billing: assinatura + RLS", () => {
     };
 
     const result = await startUpgrade({
-      business: { id: businessId, plan: "free" },
+      business: { id: businessId, trialEndsAt: null },
       provider,
       claimAttempt,
       startAttempt,
@@ -211,8 +208,9 @@ describe("issue #23 billing: assinatura + RLS", () => {
     });
 
     expect(result).toEqual({ ok: true, initPoint: "https://sandbox.mercadopago.com/checkout" });
+    // Outside a teste grátis the charge starts now (ADR 0013).
     expect(provider.createPreapproval).toHaveBeenCalledWith(
-      expect.objectContaining({ plan: "pro" }),
+      expect.objectContaining({ startDate: null }),
     );
 
     const preapprovalInput = vi.mocked(provider.createPreapproval).mock.calls[0][0];

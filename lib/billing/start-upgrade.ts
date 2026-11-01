@@ -1,14 +1,16 @@
 // The upgrade seam (ADR 0008). `startUpgrade` creates a Mercado Pago preapproval
-// for the PROFISSIONAL plan through the `BillingProvider` interface
+// for the Plano AgendFined through the `BillingProvider` interface
 // and persists a `pending` subscription row, then returns the checkout
 // `init_point` for the caller to redirect to. The provider, the
 // subscription-save and the (optional) subscription read are injectable, so this
-// seam is testable without Mercado Pago or a database. The plan only becomes
-// `pro` once the preapproval is `authorized` (webhook lifecycle, issue #24) —
-// this function never touches `businesses.plan`.
+// seam is testable without Mercado Pago or a database. The assinatura only
+// grants access once the preapproval is `authorized` (webhook lifecycle, issue
+// #24; `business_has_access()`, ADR 0013). During the teste grátis the first
+// charge waits for the end of the teste (`firstChargeDate`).
 
-import { isSubscriptionInGrace, type BillingPlan, type BillingSubscription } from "./types";
+import type { BillingSubscription } from "./types";
 import type { BillingProvider } from "./provider";
+import { firstChargeDate } from "./first-charge";
 import type { FetchSubscription } from "./get-subscription";
 import { MercadoPagoAmbiguousError } from "./mercado-pago";
 import { refuseCheckoutOverLimits, type CheckoutLimits } from "./checkout-limits";
@@ -28,7 +30,8 @@ export type StartUpgradeResult =
   | { ok: false; code: string; message: string };
 
 export interface StartUpgradeDeps {
-  business: { id: string; plan: BillingPlan };
+  // `trialEndsAt` is `businesses.trial_ends_at` as PostgREST returns it.
+  business: { id: string; trialEndsAt: string | null };
   provider: BillingProvider;
   claimAttempt: (input: {
     businessId: string;
@@ -61,6 +64,7 @@ export interface StartUpgradeDeps {
   // A checkout created but never linked could not be cancelled; it needs a
   // manual cancel in Mercado Pago.
   reportOrphanCheckout: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
+  now?: () => Date;
 }
 
 // Cancels a checkout whose link is never handed out because the link step
@@ -96,12 +100,11 @@ export async function startUpgrade(deps: StartUpgradeDeps): Promise<StartUpgrade
     existing = await fetchSubscription(business.id);
   }
 
-  // Re-subscription during the grace window (US16): a business whose CURRENT
-  // subscription is `cancelled`/`paused` is no longer being charged, so it may
-  // start a fresh preapproval even while `businesses.plan` is still `pro`. Every
-  // other Pro state (authorized, pending, or no row) may not start another.
-  if (business.plan === "pro" && !isSubscriptionInGrace(existing?.status)) {
-    return { ok: false, code: "ALREADY_PRO", message: "Você já tem uma assinatura ativa do Plano AgendFined." };
+  // Only an `authorized` current assinatura is being charged. A `cancelled` or
+  // `paused` one, even in the carência (US16), may be replaced by a new
+  // checkout; a `pending` one is refused below.
+  if (existing?.status === "authorized") {
+    return { ok: false, code: "ALREADY_SUBSCRIBED", message: "Você já tem uma assinatura ativa do Plano AgendFined." };
   }
 
   if (existing?.status === "pending") {
@@ -164,11 +167,11 @@ export async function startUpgrade(deps: StartUpgradeDeps): Promise<StartUpgrade
   let created;
   try {
     created = await provider.createPreapproval({
-      plan: "pro",
       externalReference: attempt.id,
       payerEmail,
       backUrl,
       notificationUrl,
+      startDate: firstChargeDate(business.trialEndsAt, deps.now?.() ?? new Date()),
     });
   } catch (err) {
     const ambiguous = err instanceof MercadoPagoAmbiguousError;

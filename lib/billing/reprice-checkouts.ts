@@ -1,7 +1,9 @@
 // A checkout keeps the price it was created with. After a price change, an
-// unpaid checkout would still sell PROFISSIONAL at the old price, so this
+// unpaid checkout would still sell the Plano AgendFined at the old price, so this
 // routine (run by the reconciliation cron) brings every pending checkout up to
-// the current price at Mercado Pago. Dependencies are injected so it is
+// the current price at Mercado Pago. The PUT changes only the amount: the
+// start_date of a checkout created during the teste grátis is kept by Mercado
+// Pago. Dependencies are injected so it is
 // unit-testable without the provider or a database.
 import type { Preapproval } from "./provider";
 import { MercadoPagoAmbiguousError } from "./mercado-pago";

@@ -1,11 +1,10 @@
 // Mercado Pago provider implementation (ADR 0008). Behind the `BillingProvider`
 // seam; nothing outside `lib/billing/` imports this directly. Creates a
-// recurring preapproval using the server-only configured plan price.
-// and returns its `init_point`. The access
+// recurring preapproval for the Plano AgendFined at the server-only configured
+// price and returns its `init_point`. The access
 // token is TEST-* in sandbox (dev) and APP_USR-* in production; the API base
 // stays the same. `apiBaseUrl` is injectable so the unit tests can point at a
 // stub server or stub `fetch` without a real network call.
-import type { BillingPlan } from "./types";
 import { getProPriceCents } from "@/lib/plan/catalog";
 import type {
   BillingProvider,
@@ -29,12 +28,8 @@ export class MercadoPagoAmbiguousError extends Error {
   }
 }
 
-// The recurring subscription terms per plan. Only the PROFISSIONAL plan
-// is sold as a subscription; a `free` plan has no preapproval, so it is rejected.
-const SUBSCRIPTION_TERMS: Record<BillingPlan, { amount: number; label: string } | null> = {
-  free: null,
-  pro: { amount: getProPriceCents() / 100, label: "PROFISSIONAL" },
-};
+// The recurring terms of the Plano AgendFined, the only plan sold (ADR 0013).
+const SUBSCRIPTION_TERMS = { amount: getProPriceCents() / 100, label: "Plano AgendFined" };
 
 export interface MercadoPagoConfig {
   accessToken: string;
@@ -96,11 +91,7 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
 
   return {
     async createPreapproval(input: CreatePreapprovalInput): Promise<CreatePreapprovalResult> {
-      const terms = SUBSCRIPTION_TERMS[input.plan];
-      if (!terms) {
-        throw new Error(`Mercado Pago does not sell a subscription for the ${input.plan} plan`);
-      }
-
+      const terms = SUBSCRIPTION_TERMS;
       let res: Response;
       try {
         res = await fetch(`${apiBaseUrl}/preapproval`, {
@@ -110,12 +101,15 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
             "Content-Type": "application/json; charset=utf-8",
           },
           body: JSON.stringify({
-            reason: `Assinatura ${terms.label} - AgendFined (R$ ${terms.amount.toFixed(2).replace(".", ",")}/mês)`,
+            reason: `Assinatura ${terms.label} (R$ ${terms.amount.toFixed(2).replace(".", ",")}/mês)`,
             auto_recurring: {
               frequency: 1,
               frequency_type: "months",
               transaction_amount: terms.amount,
               currency_id: "BRL",
+              // Mercado Pago turns a future start_date into free days: the first
+              // charge waits for the end of the teste grátis (first-charge.ts).
+              ...(input.startDate ? { start_date: input.startDate } : {}),
             },
             // The checkout collects the payment method after this request.
             // Mercado Pago requires an explicit pending status for a
@@ -208,7 +202,8 @@ export function createMercadoPagoProvider(config: MercadoPagoConfig): BillingPro
         currentPeriodStart: body.auto_recurring?.start_date ?? null,
         // The paid period ends on the next charge. `auto_recurring.end_date` is
         // the end of the whole assinatura and is absent when it has no final
-        // date, which is how the PROFISSIONAL is sold (issue #142).
+        // date, which is how the Plano AgendFined is sold (issue #142). During the
+        // teste grátis it is the first charge, at the end of the teste.
         currentPeriodEnd: body.next_payment_date ?? null,
         transactionAmount:
           typeof body.auto_recurring?.transaction_amount === "number" ? body.auto_recurring.transaction_amount : null,

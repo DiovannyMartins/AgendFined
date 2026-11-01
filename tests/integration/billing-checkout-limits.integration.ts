@@ -79,7 +79,6 @@ describe("countPendingCheckouts", () => {
       (["pending", "pending", "cancelled", "authorized"] as const).map((status, index) => ({
         business_id: businessId,
         mp_preapproval_id: `mp-limits-${stamp}-${index}`,
-        plan: "pro" as const,
         status,
       })),
     );

@@ -27,9 +27,9 @@ insert into private.mfa_verified_sessions (session_id, user_id) values
 insert into public.profiles (id, display_name) values
   ('00000000-0000-4000-8000-00000000a0a1', 'Dono A'),
   ('00000000-0000-4000-8000-00000000b0b1', 'Dono B');
-insert into public.businesses (id, owner_id, name, slug, phone, timezone, min_notice_minutes, plan, trial_ends_at) values
-  ('00000000-0000-4000-8000-00000000a0b1', '00000000-0000-4000-8000-00000000a0a1', 'Negócio A', 'mfa-gate-negocio-a', '11999990001', 'America/Sao_Paulo', 0, 'pro', 'infinity'),
-  ('00000000-0000-4000-8000-00000000b0b2', '00000000-0000-4000-8000-00000000b0b1', 'Negócio B', 'mfa-gate-negocio-b', '11999990002', 'America/Sao_Paulo', 0, 'pro', 'infinity');
+insert into public.businesses (id, owner_id, name, slug, phone, timezone, min_notice_minutes, trial_ends_at) values
+  ('00000000-0000-4000-8000-00000000a0b1', '00000000-0000-4000-8000-00000000a0a1', 'Negócio A', 'mfa-gate-negocio-a', '11999990001', 'America/Sao_Paulo', 0, 'infinity'),
+  ('00000000-0000-4000-8000-00000000b0b2', '00000000-0000-4000-8000-00000000b0b1', 'Negócio B', 'mfa-gate-negocio-b', '11999990002', 'America/Sao_Paulo', 0, 'infinity');
 insert into public.services (id, business_id, name, duration_minutes) values
   ('00000000-0000-4000-8000-00000000a0c1', '00000000-0000-4000-8000-00000000a0b1', 'Corte A', 30),
   ('00000000-0000-4000-8000-00000000b0c2', '00000000-0000-4000-8000-00000000b0b2', 'Corte B', 30);

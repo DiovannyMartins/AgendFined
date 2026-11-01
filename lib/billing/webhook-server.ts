@@ -4,8 +4,7 @@
 // `getPreapproval` to the Mercado Pago provider, so the route handler stays thin
 // and the integration tests can drive the same persistence with a stubbed
 // `getPreapproval`. All writes bypass RLS via the service role — the webhook has
-// no owner session, and the plan trigger (`protect_business_plan`) permits the
-// service context (no `auth.uid()`).
+// no owner session.
 import type { Database } from "@/lib/supabase/database-types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getProPriceCents } from "@/lib/plan/catalog";
@@ -93,14 +92,13 @@ export function createWebhookPersistence() {
         previousStatus: row.previous_status,
         applied: row.applied,
         isCurrent: row.is_current,
-        effectivePlan: row.effective_plan,
         effectiveGracePeriodEnd: row.effective_grace_period_end,
       };
     },
   };
 }
 
-// The refusal of a first authorization whose terms the plan does not sell, shared
+// The refusal of a first authorization whose terms the Plano AgendFined does not sell, shared
 // by the webhook, the checkout return and the reconciliation. Surfaces in the
 // Vercel logs next to the reconciliation reports; the charge already taken has
 // to be refunded by hand in Mercado Pago.

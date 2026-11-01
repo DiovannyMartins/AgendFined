@@ -8,7 +8,6 @@ const pendingCheckout: BillingSubscription = {
   subscriptionId: "sub_1",
   mpPreapprovalId: "mp_1",
   status: "pending",
-  plan: "pro",
   currentPeriodStart: null,
   currentPeriodEnd: null,
   gracePeriodEnd: null,
@@ -37,7 +36,6 @@ function deps(current: BillingSubscription, snapshot: Preapproval, overrides: Pa
       previousStatus: current.status,
       applied: true,
       isCurrent: true,
-      effectivePlan: input.status === "authorized" ? ("pro" as const) : ("free" as const),
       effectiveGracePeriodEnd: null,
     })),
     cancelPreapproval: vi.fn(async () => undefined),
@@ -54,7 +52,7 @@ describe("syncReturnedSubscription", () => {
 
     const result = await syncReturnedSubscription("biz_1", d);
 
-    expect(result).toEqual({ ok: true, status: "authorized", effectivePlan: "pro" });
+    expect(result).toEqual({ ok: true, status: "authorized" });
     expect(d.applySnapshot).toHaveBeenCalledWith({
       businessId: "biz_1",
       subscriptionId: "sub_1",
@@ -72,7 +70,7 @@ describe("syncReturnedSubscription", () => {
 
     const result = await syncReturnedSubscription("biz_1", d);
 
-    expect(result).toEqual({ ok: true, status: "refused", refusal: "stale_price", effectivePlan: null });
+    expect(result).toEqual({ ok: true, status: "refused", refusal: "stale_price" });
     expect(d.applySnapshot).not.toHaveBeenCalled();
     expect(d.reportStalePriceCharge).toHaveBeenCalledWith({ businessId: "biz_1", mpPreapprovalId: "mp_1" });
     expect(d.cancelPreapproval).toHaveBeenCalledWith("mp_1");
@@ -83,7 +81,7 @@ describe("syncReturnedSubscription", () => {
 
     const result = await syncReturnedSubscription("biz_1", d);
 
-    expect(result).toEqual({ ok: true, status: "refused", refusal: "unexpected_terms", effectivePlan: null });
+    expect(result).toEqual({ ok: true, status: "refused", refusal: "unexpected_terms" });
     expect(d.applySnapshot).not.toHaveBeenCalled();
     expect(d.reportUnexpectedTermsCharge).toHaveBeenCalledWith({ businessId: "biz_1", mpPreapprovalId: "mp_1" });
     expect(d.cancelPreapproval).toHaveBeenCalledWith("mp_1");
@@ -97,7 +95,7 @@ describe("syncReturnedSubscription", () => {
 
     const result = await syncReturnedSubscription("biz_1", d);
 
-    expect(result).toEqual({ ok: true, status: "refused", refusal: "stale_price", effectivePlan: null });
+    expect(result).toEqual({ ok: true, status: "refused", refusal: "stale_price" });
     expect(d.applySnapshot).not.toHaveBeenCalled();
     expect(d.cancelPreapproval).toHaveBeenCalledWith("mp_1");
   });
@@ -110,7 +108,7 @@ describe("syncReturnedSubscription", () => {
 
     const result = await syncReturnedSubscription("biz_1", d);
 
-    expect(result).toEqual({ ok: true, status: "authorized", effectivePlan: "pro" });
+    expect(result).toEqual({ ok: true, status: "authorized" });
     expect(d.cancelPreapproval).not.toHaveBeenCalled();
   });
 
@@ -134,7 +132,7 @@ describe("syncReturnedSubscription", () => {
 
     const result = await syncReturnedSubscription("biz_1", d);
 
-    expect(result).toEqual({ ok: true, status: "authorized", effectivePlan: "pro" });
+    expect(result).toEqual({ ok: true, status: "authorized" });
     expect(d.cancelPreapproval).not.toHaveBeenCalled();
     expect(d.reportStalePriceCharge).not.toHaveBeenCalled();
   });
@@ -232,11 +230,10 @@ describe("syncReturnedSubscription carência (ADR 0008)", () => {
         previousStatus: "cancelled",
         applied: false,
         isCurrent: true,
-        effectivePlan: "pro",
         effectiveGracePeriodEnd: "2026-11-20T00:00:00.000Z",
       })),
     });
 
-    await expect(syncReturnedSubscription("biz_1", d)).resolves.toEqual({ ok: true, status: "cancelled", effectivePlan: "pro" });
+    await expect(syncReturnedSubscription("biz_1", d)).resolves.toEqual({ ok: true, status: "cancelled" });
   });
 });

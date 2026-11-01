@@ -26,7 +26,6 @@ function makeDeps(overrides: Partial<HandleWebhookDeps> = {}) {
       businessId: "biz_1",
       mpPreapprovalId: "mp_1",
       status: "pending" as const,
-      plan: "free" as const,
       gracePeriodEnd: null,
     })),
     applySnapshot: vi.fn(async (input) => ({
@@ -36,7 +35,6 @@ function makeDeps(overrides: Partial<HandleWebhookDeps> = {}) {
       previousStatus: "pending" as const,
       applied: true,
       isCurrent: true,
-      effectivePlan: input.status === "authorized" ? "pro" as const : "free" as const,
       effectiveGracePeriodEnd: input.gracePeriodEnd,
     })),
     findCurrentSubscription: vi.fn(async () => pendingSubscription("sub_1", "mp_1")),
@@ -119,7 +117,7 @@ describe("handleWebhook (issue #24) lifecycle", () => {
     }));
   });
 
-  it("cancelled keeps the PROFISSIONAL until the end of the paid month (issue #142)", async () => {
+  it("cancelled keeps the access until the end of the paid month (issue #142)", async () => {
     const deps = makeDeps({
       findSubscription: vi.fn(async () => authorizedSubscription),
       getPreapproval: vi.fn(async () => makePreapproval("cancelled", { currentPeriodEnd: "2026-10-07T12:00:00.000Z" })),
@@ -256,7 +254,6 @@ describe("handleWebhook (issue #24) lifecycle", () => {
         businessId: "biz_1",
         mpPreapprovalId: "mp_1",
         status: "paused" as const,
-        plan: "free" as const,
         gracePeriodEnd: futureGrace,
       })),
     });
@@ -278,7 +275,6 @@ describe("handleWebhook (issue #24) lifecycle", () => {
         businessId: "biz_1",
         mpPreapprovalId: "mp_1",
         status: "paused" as const,
-        plan: "pro" as const,
         gracePeriodEnd: lapsedGrace,
       })),
     });
@@ -298,7 +294,6 @@ describe("handleWebhook (issue #24) lifecycle", () => {
       previousStatus: "cancelled" as const,
       applied: true,
       isCurrent: false,
-      effectivePlan: "free" as const,
       effectiveGracePeriodEnd: null,
     }));
     const deps = makeDeps({
@@ -346,7 +341,6 @@ describe("handleWebhook (issue #24) lifecycle", () => {
       previousStatus: "pending" as const,
       applied: true,
       isCurrent: true,
-      effectivePlan: "pro" as const,
       effectiveGracePeriodEnd: null,
     }));
     const deps = makeDeps({ applySnapshot });
@@ -360,15 +354,14 @@ describe("handleWebhook (issue #24) lifecycle", () => {
   });
 });
 
-// The real RPC answers with the negócio's plan, still PROFISSIONAL in the carência.
-const applyKeepingPro: HandleWebhookDeps["applySnapshot"] = async (input) => ({
+// The real RPC answers with the current row and its carência.
+const applyInCarencia: HandleWebhookDeps["applySnapshot"] = async (input) => ({
   subscriptionId: input.subscriptionId,
   businessId: input.businessId,
   subscriptionStatus: input.status,
   previousStatus: "authorized",
   applied: true,
   isCurrent: true,
-  effectivePlan: "pro",
   effectiveGracePeriodEnd: input.gracePeriodEnd,
 });
 
@@ -378,7 +371,7 @@ describe("handleWebhook failed payment e-mail (issue #151)", () => {
     const deps = makeDeps({
       findSubscription: vi.fn(async () => authorizedSubscription),
       getPreapproval: vi.fn(async () => makePreapproval("paused")),
-      applySnapshot: vi.fn(applyKeepingPro),
+      applySnapshot: vi.fn(applyInCarencia),
       notifyPaymentFailed,
     });
 
@@ -391,7 +384,7 @@ describe("handleWebhook failed payment e-mail (issue #151)", () => {
     const deps = makeDeps({
       findSubscription: vi.fn(async () => ({ ...authorizedSubscription, status: "paused" as const, gracePeriodEnd: "2026-09-14T12:00:00.000Z" })),
       getPreapproval: vi.fn(async () => makePreapproval("paused")),
-      applySnapshot: vi.fn(async (input) => ({ ...(await applyKeepingPro(input)), previousStatus: "paused" as const })),
+      applySnapshot: vi.fn(async (input) => ({ ...(await applyInCarencia(input)), previousStatus: "paused" as const })),
       notifyPaymentFailed,
     });
 
@@ -407,7 +400,7 @@ describe("handleWebhook failed payment e-mail (issue #151)", () => {
     const deps = makeDeps({
       findSubscription: vi.fn(async () => authorizedSubscription),
       getPreapproval: vi.fn(async () => makePreapproval("paused")),
-      applySnapshot: vi.fn(async (input) => ({ ...(await applyKeepingPro(input)), previousStatus: previous.shift()! })),
+      applySnapshot: vi.fn(async (input) => ({ ...(await applyInCarencia(input)), previousStatus: previous.shift()! })),
       notifyPaymentFailed,
     });
 
@@ -420,7 +413,7 @@ describe("handleWebhook failed payment e-mail (issue #151)", () => {
     await handleWebhook(makeDeps({
       findSubscription: vi.fn(async () => authorizedSubscription),
       getPreapproval: vi.fn(async () => makePreapproval("cancelled")),
-      applySnapshot: vi.fn(applyKeepingPro),
+      applySnapshot: vi.fn(applyInCarencia),
       notifyPaymentFailed,
     }));
     await handleWebhook(makeDeps({
@@ -435,7 +428,7 @@ describe("handleWebhook failed payment e-mail (issue #151)", () => {
     const deps = makeDeps({
       findSubscription: vi.fn(async () => authorizedSubscription),
       getPreapproval: vi.fn(async () => makePreapproval("paused")),
-      applySnapshot: vi.fn(applyKeepingPro),
+      applySnapshot: vi.fn(applyInCarencia),
       notifyPaymentFailed: vi.fn(async () => {
         throw new Error("resend down");
       }),
@@ -510,7 +503,6 @@ describe("handleWebhook superseded checkouts", () => {
         previousStatus: "pending" as const,
         applied: true,
         isCurrent: false,
-        effectivePlan: "pro" as const,
         effectiveGracePeriodEnd: null,
       })),
     });
@@ -666,7 +658,7 @@ describe("handleWebhook snapshot ordering", () => {
       findSubscription: vi.fn(async () => authorizedSubscription),
       getPreapproval: vi.fn(async () => makePreapproval("paused", { lastModified: "2026-09-01T00:00:00.000Z" })),
       applySnapshot: vi.fn(async (input) => ({
-        ...(await applyKeepingPro(input)),
+        ...(await applyInCarencia(input)),
         subscriptionStatus: "authorized" as const,
         applied: false,
         effectiveGracePeriodEnd: null,

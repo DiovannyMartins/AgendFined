@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { adminClient, retryOnFk } from "./index";
+import { adminClient, retryOnFk, SUSPENDED_TRIAL_ENDS_AT } from "./index";
 import { handleWebhook, type PreapprovalResource } from "@/lib/billing/handle-webhook";
 import { createWebhookPersistence } from "@/lib/billing/webhook-server";
 import { syncReturnedSubscription } from "@/lib/billing/return-sync";
@@ -67,7 +67,6 @@ async function fetchCurrentSubscription(id: string): Promise<BillingSubscription
     subscriptionId: data.id,
     mpPreapprovalId: data.mp_preapproval_id,
     status: data.status,
-    plan: data.plan,
     currentPeriodStart: data.current_period_start,
     currentPeriodEnd: data.current_period_end,
     gracePeriodEnd: data.grace_period_end,
@@ -85,9 +84,10 @@ function notify(mpPreapprovalId: string) {
   });
 }
 
-async function readBusiness() {
-  const { data, error } = await admin.from("businesses").select("plan").eq("id", businessId).single();
-  if (error) throw new Error(`business read: ${error.message}`);
+// The negócio's teste grátis is over: a refused checkout must not give access.
+async function readAccess() {
+  const { data, error } = await admin.rpc("business_has_access", { p_business_id: businessId });
+  if (error) throw new Error(`business_has_access: ${error.message}`);
   return data;
 }
 
@@ -123,6 +123,7 @@ beforeAll(async () => {
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
         booking_window_days: 60,
+        trial_ends_at: SUSPENDED_TRIAL_ENDS_AT,
       })
       .select("id")
       .single();
@@ -132,7 +133,7 @@ beforeAll(async () => {
 
   const { data: subscription, error: subscriptionError } = await admin
     .from("subscriptions")
-    .insert({ business_id: businessId, mp_preapproval_id: MP_STALE, plan: "pro", status: "pending" })
+    .insert({ business_id: businessId, mp_preapproval_id: MP_STALE, status: "pending" })
     .select("id")
     .single();
   if (subscriptionError || !subscription) throw new Error(`subscription: ${subscriptionError?.message ?? "no id"}`);
@@ -149,7 +150,7 @@ afterAll(async () => {
 });
 
 describe("checkout paid at an outdated price, payer back before the webhook", () => {
-  it("the return keeps the negócio on Grátis, reports the charge and cancels the checkout", async () => {
+  it("the return keeps the negócio suspended, reports the charge and cancels the checkout", async () => {
     providerStatus.set(MP_STALE, "authorized");
 
     const result = await syncReturnedSubscription(businessId, {
@@ -159,8 +160,8 @@ describe("checkout paid at an outdated price, payer back before the webhook", ()
       ...checkoutTerms,
     });
 
-    expect(result).toEqual({ ok: true, status: "refused", refusal: "stale_price", effectivePlan: null });
-    expect(await readBusiness()).toEqual({ plan: "free" });
+    expect(result).toEqual({ ok: true, status: "refused", refusal: "stale_price" });
+    expect(await readAccess()).toBe(false);
     expect(await readSubscription()).toEqual({ status: "pending", grace_period_end: null });
     expect(reportStalePriceCharge).toHaveBeenCalledWith({ businessId, mpPreapprovalId: MP_STALE });
     expect(cancelPreapproval).toHaveBeenCalledWith(MP_STALE);
@@ -170,7 +171,7 @@ describe("checkout paid at an outdated price, payer back before the webhook", ()
     const result = await notify(MP_STALE);
 
     expect(result).toEqual({ ok: true, applied: "closed" });
-    expect(await readBusiness()).toEqual({ plan: "free" });
+    expect(await readAccess()).toBe(false);
     expect(await readSubscription()).toEqual({ status: "cancelled", grace_period_end: null });
   });
 });
@@ -178,10 +179,10 @@ describe("checkout paid at an outdated price, payer back before the webhook", ()
 describe("checkout paused before it was paid, authorized later at an outdated price", () => {
   const MP_PAUSED = `mp-terms-paused-${stamp}`;
 
-  it("the webhook still checks the terms: the negócio stays on Grátis and the checkout is cancelled", async () => {
+  it("the webhook still checks the terms: the negócio stays suspended and the checkout is cancelled", async () => {
     const { data: subscription, error: subscriptionError } = await admin
       .from("subscriptions")
-      .insert({ business_id: businessId, mp_preapproval_id: MP_PAUSED, plan: "pro", status: "pending" })
+      .insert({ business_id: businessId, mp_preapproval_id: MP_PAUSED, status: "pending" })
       .select("id")
       .single();
     if (subscriptionError || !subscription) throw new Error(`subscription: ${subscriptionError?.message ?? "no id"}`);
@@ -198,7 +199,7 @@ describe("checkout paused before it was paid, authorized later at an outdated pr
     const result = await notify(MP_PAUSED);
 
     expect(result).toEqual({ ok: true, applied: "stale_price" });
-    expect(await readBusiness()).toEqual({ plan: "free" });
+    expect(await readAccess()).toBe(false);
     expect(reportStalePriceCharge).toHaveBeenCalledWith({ businessId, mpPreapprovalId: MP_PAUSED });
     expect(cancelPreapproval).toHaveBeenCalledWith(MP_PAUSED);
   });

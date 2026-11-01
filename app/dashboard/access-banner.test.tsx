@@ -4,13 +4,13 @@ import { getSubscription } from "@/lib/billing/get-subscription";
 import { AccessBanner, type AccessBannerBusiness } from "./access-banner";
 
 vi.mock("@/lib/billing/get-subscription", () => ({
-  getSubscription: vi.fn(async () => ({ plan: "free", subscription: null, graceSubscription: null })),
+  getSubscription: vi.fn(async () => ({ subscription: null, graceSubscription: null })),
 }));
 
 const NOW = new Date("2026-10-31T12:00:00.000Z");
 
 function business(overrides: Partial<AccessBannerBusiness> = {}): AccessBannerBusiness {
-  return { id: "biz", plan: "free", currentSubscriptionId: null, hasAccess: true, trialEndsAt: null, ...overrides };
+  return { id: "biz", currentSubscriptionId: null, hasAccess: true, trialEndsAt: null, ...overrides };
 }
 
 async function renderBanner(overrides: Partial<AccessBannerBusiness> = {}) {
@@ -50,11 +50,9 @@ describe("AccessBanner (ADR 0013)", () => {
 
   it("shows nothing to whoever subscribed during the teste", async () => {
     vi.mocked(getSubscription).mockResolvedValueOnce({
-      plan: "pro",
       subscription: {
         mpPreapprovalId: "mp",
         status: "authorized",
-        plan: "pro",
         currentPeriodStart: null,
         currentPeriodEnd: null,
       },

@@ -9,6 +9,9 @@ type Email = {
   subject: string;
   text: string;
   html: string;
+  // A stable key for an e-mail a later run may send again (a cron that stopped
+  // before recording the send): the provider drops the repeat.
+  idempotencyKey?: string;
 };
 
 const HTML_ENTITIES: Record<string, string> = {
@@ -46,7 +49,7 @@ export async function sendEmail(email: Email): Promise<SendResult> {
       "Content-Type": "application/json",
       // A timed-out attempt may still have been delivered; the same key makes
       // the provider drop the repeat instead of sending the e-mail twice.
-      "Idempotency-Key": crypto.randomUUID(),
+      "Idempotency-Key": email.idempotencyKey ?? crypto.randomUUID(),
     },
     body: JSON.stringify({
       from,

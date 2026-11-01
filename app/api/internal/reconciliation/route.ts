@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { runBoundedReconciliation } from "@/lib/billing/reconciliation-runner";
 import { runPendingCheckoutRepricing } from "@/lib/billing/reprice-checkouts-runner";
 import type { RepriceCheckoutsResult } from "@/lib/billing/reprice-checkouts";
+import { runTrialReminders, type TrialRemindersResult } from "@/lib/billing/trial-reminders";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enforceApiRateLimit, getClientIpFromHeaders } from "@/lib/booking/rate-limit";
 import { runGoogleCalendarSyncBatch } from "@/lib/google-calendar/sync";
@@ -48,7 +49,15 @@ async function run(request: NextRequest) {
     } catch {
       console.error(JSON.stringify({ event: "google_calendar_sync_batch_failed" }));
     }
-    const body = { ok: true, reportCount: reports.length, repricing, calendarSync, durationMs: Date.now() - startedAt };
+    // Avisos de fim do teste grátis (#261); a failed one comes back on a later
+    // run. The deadline leaves room for one last e-mail (10 s) in maxDuration.
+    let trialReminders: TrialRemindersResult | null = null;
+    try {
+      trialReminders = await runTrialReminders({ deadline: startedAt + 45_000 });
+    } catch {
+      console.error(JSON.stringify({ event: "trial_reminders_batch_failed" }));
+    }
+    const body = { ok: true, reportCount: reports.length, repricing, calendarSync, trialReminders, durationMs: Date.now() - startedAt };
     console.info(JSON.stringify({ event: "reconciliation_http_finished", ...body }));
     return NextResponse.json(body);
   } catch {

@@ -101,4 +101,15 @@ describe("sendEmail", () => {
     expect(keys[0]).toBeTruthy();
     expect(keys[1]).toBe(keys[0]);
   });
+
+  it("uses the caller's idempotency key, so a later retry of the same e-mail is dropped by the provider", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = sendEmail({ ...email, idempotencyKey: "trial-reminder-1" });
+    await vi.runAllTimersAsync();
+    await result;
+
+    expect(new Headers(fetchMock.mock.calls[0][1].headers).get("Idempotency-Key")).toBe("trial-reminder-1");
+  });
 });

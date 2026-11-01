@@ -837,6 +837,47 @@ export type Database = {
           },
         ]
       }
+      plan_cutover_notices: {
+        Row: {
+          attempts: number
+          business_id: string
+          claim_token: string | null
+          claimed_at: string | null
+          created_at: string
+          id: string
+          sent_at: string | null
+          trial_ends_at: string
+        }
+        Insert: {
+          attempts?: number
+          business_id: string
+          claim_token?: string | null
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          sent_at?: string | null
+          trial_ends_at: string
+        }
+        Update: {
+          attempts?: number
+          business_id?: string
+          claim_token?: string | null
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          sent_at?: string | null
+          trial_ends_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_cutover_notices_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: true
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1314,6 +1355,22 @@ export type Database = {
         }[]
       }
       mark_trial_reminder_sent: {
+        Args: { p_claim_token: string; p_send_id: string }
+        Returns: boolean
+      }
+      claim_plan_cutover_notices: {
+        Args: { p_lease_seconds?: number; p_limit?: number }
+        Returns: {
+          business_id: string
+          business_name: string
+          business_timezone: string
+          claim_token: string
+          owner_email: string | null
+          send_id: string
+          trial_ends_at: string
+        }[]
+      }
+      mark_plan_cutover_notice_sent: {
         Args: { p_claim_token: string; p_send_id: string }
         Returns: boolean
       }

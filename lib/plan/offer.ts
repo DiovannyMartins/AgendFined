@@ -13,8 +13,8 @@ export type PlanOffer =
   | { kind: "checkout"; label: string; note: string };
 
 // The state of a signed-in dono's negócio. Access comes from
-// `business_has_access()`; "active" is access without a teste that ends (a
-// negócio older than the plano único, until the virada, or one in carência).
+// `business_has_access()`; "active" is access without a running teste and
+// without an assinatura `authorized`: a negócio in carência (ADR 0008).
 export function planOfferState(
   business: { hasAccess: boolean; trialEndsAt: string | null; subscriptionStatus: SubscriptionStatus | null },
   now: Date = new Date(),

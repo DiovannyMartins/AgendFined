@@ -215,11 +215,9 @@ describe("subscribing during the teste grátis (FR-011)", () => {
     expect((await subscribe(businessId, `mp-trial-suspenso-${stamp}`)).startDate).toBeNull();
   });
 
-  // Until the virada (fase 7) a negócio older than the plano único has
-  // trial_ends_at = 'infinity': it is charged now, as before the plano único.
-  it("charges now a legacy negócio ('infinity')", async () => {
-    const businessId = await createNegocio("legado", "infinity");
-    expect(await readTrialEndsAt(businessId)).toBe("infinity");
-    expect((await subscribe(businessId, `mp-trial-legado-${stamp}`)).startDate).toBeNull();
+  // After the virada (fase 7) no negócio keeps trial_ends_at = 'infinity' and
+  // the banco refuses it, so a teste always has an end to charge on.
+  it("refuses a teste without an end ('infinity')", async () => {
+    await expect(createNegocio("legado", "infinity")).rejects.toThrow(/businesses_trial_ends_at_finite/);
   });
 });

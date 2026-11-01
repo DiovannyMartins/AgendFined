@@ -8,10 +8,6 @@
 // is charged right away, and the first charge falls on the day the teste ends,
 // at the time of day the checkout was created. The few minutes of lead keep a
 // teste about to end from reaching Mercado Pago as a past date.
-//
-// A negócio older than the plano único has `trial_ends_at = 'infinity'` until
-// the virada (#261, fase 7). It is not a teste with an end to charge on, so it
-// is charged now, as before the plano único.
 import { parseTrialEndsAt } from "@/lib/plan/trial";
 
 export const MIN_START_DATE_LEAD_MS = 10 * 60_000;

@@ -69,7 +69,7 @@ export async function startUpgrade(): Promise<StartUpgradeResult> {
   const notificationUrl = process.env.MERCADO_PAGO_NOTIFICATION_URL;
 
   return buildStartUpgrade({
-    business: { id: business.id, plan: business.plan },
+    business: { id: business.id, trialEndsAt: business.trial_ends_at },
     checkoutLimits: checkoutLimitsFor(business.id),
     provider,
     claimAttempt: async (input) => {
@@ -174,7 +174,7 @@ export async function retryUpgrade(): Promise<RetryUpgradeResult> {
   const notificationUrl = process.env.MERCADO_PAGO_NOTIFICATION_URL;
 
   return buildRetryPendingUpgrade({
-    business: { id: business.id },
+    business: { id: business.id, trialEndsAt: business.trial_ends_at },
     checkoutLimits: checkoutLimitsFor(business.id),
     provider,
     fetchSubscription: fetchCurrentSubscription,
@@ -227,7 +227,7 @@ export async function retryUpgrade(): Promise<RetryUpgradeResult> {
 
 // Mercado Pago redirects here after checkout. The webhook remains the normal
 // lifecycle path; this authenticated read-after-write closes the return race
-// so the dashboard can show PROFISSIONAL immediately after an authorized
+// so the dashboard can show the assinatura immediately after an authorized
 // checkout without ever trusting a browser-supplied success flag.
 export async function syncCurrentSubscriptionAfterReturn(): Promise<void> {
   const business = await getCurrentBusiness();
@@ -247,8 +247,8 @@ export async function syncCurrentSubscriptionAfterReturn(): Promise<void> {
 
 // Server action called by the "Cancelar assinatura" button. Cancels the active
 // Mercado Pago preapproval (so the owner stops being charged) and records the
-// `cancelled` status with a grace period; the downgrade cron drops the business
-// to Free once the grace passes. Reads `MERCADO_PAGO_ACCESS_TOKEN`; when unset it
+// `cancelled` status with a grace period; the negócio is suspended once the
+// grace passes (ADR 0013). Reads `MERCADO_PAGO_ACCESS_TOKEN`; when unset it
 // fails closed.
 export async function cancelSubscription(): Promise<CancelSubscriptionResult> {
   const business = await getCurrentBusiness();
@@ -269,7 +269,7 @@ export async function cancelSubscription(): Promise<CancelSubscriptionResult> {
   const admin = createAdminClient();
 
   return buildCancelSubscription({
-    business: { id: business.id, plan: business.plan },
+    business: { id: business.id },
     provider,
     fetchSubscription: fetchCurrentSubscription,
     updateSubscription: async (mpPreapprovalId, update) => {

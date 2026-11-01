@@ -34,7 +34,9 @@ describe("sendPaymentFailedEmail", () => {
     const body = request();
     expect(body.to).toEqual(["dono@example.com"]);
     expect(body.subject).toBe("Não conseguimos cobrar a sua assinatura");
-    expect(body.text).toContain("Atualize a forma de pagamento até 27/10/2026 para manter o PROFISSIONAL.");
+    expect(body.text).toContain("O Mercado Pago recusou a cobrança do Plano AgendFined de");
+    expect(body.text).toContain("Atualize a forma de pagamento até 27/10/2026 para manter o acesso. Depois dessa data, o negócio fica suspenso, sem perder dados.");
+    expect(body.text).not.toMatch(/PROFISSIONAL|Grátis/);
     expect(body.text).toContain("https://agenda.example/dashboard/configuracoes#plano");
     expect(body.html).toContain("Barbearia &lt;Demo&gt;");
     expect(body.html).not.toContain("<Demo>");

@@ -11,7 +11,7 @@ const attempt = (overrides: Partial<ReconciliationAttempt> = {}): Reconciliation
 function deps(overrides: Partial<BillingReconciliationDependencies> = {}): BillingReconciliationDependencies {
   return {
     provider: { createPreapproval: vi.fn(), getPreapproval: vi.fn(async () => snapshot), cancelPreapproval: vi.fn(), updatePreapprovalAmount: vi.fn() },
-    attempts: [attempt()], subscriptions: [], businesses: [{ id: "biz_1", currentSubscriptionId: null, plan: "free" }],
+    attempts: [attempt()], subscriptions: [], businesses: [{ id: "biz_1", currentSubscriptionId: null }],
     claim: vi.fn(async () => true), release: vi.fn(async () => undefined),
     markAttempt: vi.fn(async () => undefined), reconcileAttempt: vi.fn(async () => undefined),
     applySnapshot: vi.fn(async () => undefined), report: vi.fn(async () => undefined),

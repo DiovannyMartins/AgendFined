@@ -39,7 +39,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 <AccessBanner
                   business={{
                     id: business.id,
-                    plan: business.plan,
                     currentSubscriptionId: business.current_subscription_id,
                     hasAccess: business.has_access,
                     trialEndsAt: business.trial_ends_at,
@@ -48,7 +47,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 <GraceBanner
                   business={{
                     id: business.id,
-                    plan: business.plan,
                     timezone: business.timezone,
                     currentSubscriptionId: business.current_subscription_id,
                   }}

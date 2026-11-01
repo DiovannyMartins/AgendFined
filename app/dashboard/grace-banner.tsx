@@ -3,7 +3,6 @@ import { AlertTriangle } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { getSubscription } from "@/lib/billing/get-subscription";
 import { graceNotice, type GraceNotice } from "@/lib/billing/grace-notice";
-import type { BillingPlan } from "@/lib/billing/types";
 import { formatDate } from "@/lib/format/when";
 import { cn } from "@/lib/utils";
 
@@ -14,11 +13,11 @@ import { cn } from "@/lib/utils";
 export async function GraceBanner({
   business,
 }: {
-  business: { id: string; plan: BillingPlan; timezone: string; currentSubscriptionId?: string | null };
+  business: { id: string; timezone: string; currentSubscriptionId?: string | null };
 }) {
-  // A carência only exists on a subscribed negócio (plan = pro until #261, fase 4);
-  // the others skip the read (#214).
-  if (business.plan !== "pro") return null;
+  // A carência only exists on a negócio with an assinatura; the others skip
+  // the read (#214).
+  if (business.currentSubscriptionId === null) return null;
   let notice: GraceNotice | null;
   try {
     notice = graceNotice(await getSubscription(business));

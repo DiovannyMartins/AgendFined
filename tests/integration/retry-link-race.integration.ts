@@ -83,7 +83,6 @@ function retryPersistence(): Omit<RetryUpgradeDeps, "business" | "provider" | "b
         subscriptionId: data.id,
         mpPreapprovalId: data.mp_preapproval_id,
         status: data.status,
-        plan: data.plan,
         currentPeriodStart: data.current_period_start,
         currentPeriodEnd: data.current_period_end,
       };
@@ -128,7 +127,7 @@ function retryPersistence(): Omit<RetryUpgradeDeps, "business" | "provider" | "b
   };
 }
 
-// A Grátis negócio with its own owner (each owner has exactly one negócio).
+// A negócio without an assinatura, with its own owner (each owner has exactly one negócio).
 async function createNegocio(label: string): Promise<string> {
   const { data: created, error: userError } = await admin.auth.admin.createUser({
     email: `retry-race-${label}.${stamp}@agendfined.dev`,
@@ -162,7 +161,7 @@ async function createNegocio(label: string): Promise<string> {
 async function insertPendingSubscription(businessId: string, mpPreapprovalId: string): Promise<string> {
   const { data, error } = await admin
     .from("subscriptions")
-    .insert({ business_id: businessId, mp_preapproval_id: mpPreapprovalId, plan: "pro", status: "pending" })
+    .insert({ business_id: businessId, mp_preapproval_id: mpPreapprovalId, status: "pending" })
     .select("id")
     .single();
   if (error || !data) throw new Error(`subscription: ${error?.message ?? "no id"}`);
@@ -180,7 +179,7 @@ async function setCurrent(businessId: string, subscriptionId: string) {
 async function readBusiness(businessId: string) {
   const { data, error } = await admin
     .from("businesses")
-    .select("plan, current_subscription_id")
+    .select("current_subscription_id")
     .eq("id", businessId)
     .single();
   if (error) throw new Error(`business read: ${error.message}`);
@@ -238,7 +237,7 @@ describe("retry racing a paid superseded checkout", () => {
     };
 
     const result = await retryPendingUpgrade({
-      business: { id: businessId },
+      business: { id: businessId, trialEndsAt: null },
       provider,
       ...retryPersistence(),
       backUrl: "https://app.example/api/billing/return",
@@ -248,7 +247,7 @@ describe("retry racing a paid superseded checkout", () => {
     expect(webhook).toEqual({ ok: true, applied: "authorized" });
     expect(result).toEqual({ ok: false, code: "RETRY_SUBSCRIPTION_CONFLICT", message: expect.any(String) });
     expect(provider.cancelPreapproval).toHaveBeenCalledWith(MP_RETRY);
-    expect(await readBusiness(businessId)).toEqual({ plan: "pro", current_subscription_id: oldSubscriptionId });
+    expect(await readBusiness(businessId)).toEqual({ current_subscription_id: oldSubscriptionId });
     expect(await readAttempt(idempotencyKey)).toEqual({ status: "failed", provider_preapproval_id: MP_RETRY });
   });
 });
@@ -276,7 +275,7 @@ describe("retry racing a payment of the checkout it replaces", () => {
     };
 
     const result = await retryPendingUpgrade({
-      business: { id: businessId },
+      business: { id: businessId, trialEndsAt: null },
       provider,
       ...retryPersistence(),
       backUrl: "https://app.example/api/billing/return",
@@ -286,7 +285,7 @@ describe("retry racing a payment of the checkout it replaces", () => {
     expect(webhook).toEqual({ ok: true, applied: "authorized" });
     expect(result).toEqual({ ok: false, code: "RETRY_SUBSCRIPTION_CONFLICT", message: expect.any(String) });
     expect(provider.cancelPreapproval).toHaveBeenCalledWith(MP_RETRY);
-    expect(await readBusiness(businessId)).toEqual({ plan: "pro", current_subscription_id: currentSubscriptionId });
+    expect(await readBusiness(businessId)).toEqual({ current_subscription_id: currentSubscriptionId });
     expect(await readAttempt(idempotencyKey)).toEqual({ status: "failed", provider_preapproval_id: MP_RETRY });
   });
 });

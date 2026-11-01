@@ -5,9 +5,9 @@ import { refuseUnacceptedCheckout, type CheckoutTermsDeps, type CheckoutTermsRef
 import { snapshotGraceEnd } from "./grace";
 
 export type ReturnSyncResult =
-  | { ok: true; status: Preapproval["status"]; effectivePlan: "free" | "pro" }
-  | { ok: true; status: "refused"; refusal: CheckoutTermsRefusal; effectivePlan: null }
-  | { ok: true; status: "none"; effectivePlan: null }
+  | { ok: true; status: Preapproval["status"] }
+  | { ok: true; status: "refused"; refusal: CheckoutTermsRefusal }
+  | { ok: true; status: "none" }
   | { ok: false; code: "SUBSCRIPTION_ID_MISSING" };
 
 export interface ReturnSyncDeps extends CheckoutTermsDeps {
@@ -20,10 +20,10 @@ export interface ReturnSyncDeps extends CheckoutTermsDeps {
 
 /**
  * Re-checks the provider after checkout returns. The provider remains the
- * source of truth: only its `authorized` snapshot can make the database plan
- * Pro. Webhooks still handle the normal lifecycle; this closes the small race
+ * source of truth: only its `authorized` snapshot gives the negócio access
+ * (`business_has_access()`). Webhooks still handle the normal lifecycle; this closes the small race
  * where the payer returns before the webhook reaches the app. A first
- * authorization with terms the plan does not sell is refused here as the
+ * authorization with terms the Plano AgendFined does not sell is refused here as the
  * webhook would: applying it would make the webhook skip the check.
  */
 export async function syncReturnedSubscription(
@@ -31,7 +31,7 @@ export async function syncReturnedSubscription(
   deps: ReturnSyncDeps,
 ): Promise<ReturnSyncResult> {
   const current = await deps.fetchSubscription(businessId);
-  if (!current) return { ok: true, status: "none", effectivePlan: null };
+  if (!current) return { ok: true, status: "none" };
   if (!current.subscriptionId) return { ok: false, code: "SUBSCRIPTION_ID_MISSING" };
 
   const snapshot = await deps.getPreapproval(current.mpPreapprovalId);
@@ -43,7 +43,7 @@ export async function syncReturnedSubscription(
     { businessId, mpPreapprovalId: current.mpPreapprovalId, snapshot, local: current },
     deps,
   );
-  if (refusal) return { ok: true, status: "refused", refusal, effectivePlan: null };
+  if (refusal) return { ok: true, status: "refused", refusal };
 
   const input: ApplySubscriptionSnapshotInput = {
     businessId,
@@ -53,8 +53,8 @@ export async function syncReturnedSubscription(
     currentPeriodStart: snapshot.currentPeriodStart,
     currentPeriodEnd: snapshot.currentPeriodEnd,
     // Computed as the webhook does: this GET can reach the database first, and
-    // a `paused`/`cancelled` row without a carência would let the downgrade
-    // cron drop the negócio before the webhook arrives.
+    // a `paused`/`cancelled` row without a carência would suspend the negócio
+    // before the webhook arrives.
     gracePeriodEnd: snapshotGraceEnd({
       now: deps.now?.() ?? new Date(),
       graceDays: deps.graceDays,
@@ -69,9 +69,5 @@ export async function syncReturnedSubscription(
 
   // A snapshot older than the stored one is refused by the database; the
   // stored state is what the negócio has.
-  return {
-    ok: true,
-    status: applied.subscriptionStatus,
-    effectivePlan: applied.effectivePlan,
-  };
+  return { ok: true, status: applied.subscriptionStatus };
 }

@@ -1,5 +1,6 @@
 -- Regression test for #150: every critical pg_cron job exists on a freshly
--- migrated database, with a valid cron expression, active.
+-- migrated database, with a valid cron expression, active. The carência no
+-- longer needs one (#261, fase 4): its end suspends the negócio by itself.
 -- Run against the local stack only (`npx supabase start`):
 --   docker exec -i supabase_db_projeto psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 < tests/sql/cron-jobs.sql
 -- Read-only; runs in one transaction that is rolled back.
@@ -14,7 +15,6 @@ declare
 begin
   for c in
     select * from (values
-      ('subscription-grace-downgrade', 'public.downgrade_expired_subscriptions()'),
       ('booking-reminders', 'public.process_booking_reminders()'),
       ('billing-reconciliation', 'public.process_billing_reconciliation()')
     ) as t(jobname, call)

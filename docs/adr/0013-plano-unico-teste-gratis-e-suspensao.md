@@ -10,7 +10,11 @@ Sem teste vigente e sem assinatura em dia, o negócio fica **suspenso**. Nada é
 
 O acesso é calculado no banco, na hora da consulta, por `business_has_access(business_id)`: verdadeira quando há assinatura em dia (inclusive em carência, ADR 0008) **ou** `now() < trial_ends_at`. As RPCs públicas de reserva e de lista de espera, as policies de RLS das operações do dono e o gate server-side (`assertAccess`, no lugar de `assertProPlan`) usam essa função, então a recusa vale no banco mesmo para quem chama a RPC direto. O teste acaba no instante exato de `trial_ends_at`, sem carência e sem depender de cron. Os crons só deixam de agir sobre negócios sem acesso; eles nunca concedem nem retiram acesso.
 
-Quem assina durante o teste não perde os dias restantes: o checkout cria a preapproval com `auto_recurring.start_date = trial_ends_at`, e a primeira cobrança acontece no fim do teste. Até lá a assinatura fica `authorized` sem pagamento. Fora do teste, a cobrança começa na hora.
+Quem assina durante o teste não perde os dias restantes: o checkout cria a preapproval com `auto_recurring.start_date = trial_ends_at`, e a primeira cobrança acontece no fim do teste. Até lá a assinatura fica `authorized` sem pagamento. Fora do teste, a cobrança começa na hora. O mesmo vale para gerar um novo link de um checkout pendente: o `start_date` é recalculado a partir do teste no momento do novo link.
+
+O Mercado Pago transforma um `start_date` futuro em dias grátis (`auto_recurring.free_trial`) contados em dias de calendário no fuso dele (UTC−4), e recusa um `start_date` no passado. Na prática (sandbox, novembro de 2026): a primeira cobrança cai na data do fim do teste, no horário em que o checkout foi criado, com até um dia de diferença para `trial_ends_at`; um teste que acaba no mesmo dia do checkout é cobrado na hora; e o reajuste de preço (`PUT` com `transaction_amount`) preserva `start_date` e `next_payment_date`. Para não mandar uma data já passada, o app só envia `start_date` quando faltam mais de 10 minutos para o fim do teste (`lib/billing/first-charge.ts`).
+
+Os negócios anteriores ao plano único têm `trial_ends_at = 'infinity'` até a virada. Para o checkout, isso não é um teste com fim: quem assina antes da virada é cobrado na hora, como antes do plano único. A virada troca esses valores (veja abaixo).
 
 Na virada, todo negócio no Grátis, inclusive quem já assinou e cancelou, ganha `trial_ends_at = virada + 30 dias` e entra no registro de testes concedidos. Negócios com assinatura ativa ou em carência não mudam. Os donos afetados recebem um e-mail sobre o fim do Grátis, o teste, o preço e os novos Termos.
 
@@ -26,7 +30,7 @@ Na virada, todo negócio no Grátis, inclusive quem já assinou e cancelou, ganh
 - O telefone do negócio não é verificado e pode ser trocado em Configurações; o e-mail é confirmado no cadastro. A barreira, portanto, pesa mais no e-mail: quem cria uma conta nova com outro e-mail e outro telefone ganha outro teste. Isso é aceito; exigir cartão ou CPF fica fora do escopo.
 - Uma assinatura criada durante o teste está `authorized` sem ter sido paga. Se o dono cancela antes da primeira cobrança, a carência do ADR 0008 vale como para qualquer assinatura `authorized`: `max(next_payment_date, agora + 7 dias)`. No pior caso, o negócio ganha até 7 dias de acesso além do fim do teste.
 - O reajuste de checkout (`reprice-checkouts`) e a validação de termos (`checkout-terms`) precisam aceitar o `start_date` de uma assinatura criada durante o teste, sem descartá-lo nem recusar a autorização.
-- O fim da carência leva o negócio a suspenso, não ao Grátis. O enum `business_plan` e a coluna `businesses.plan` saem do banco.
+- O fim da carência leva o negócio a suspenso, não ao Grátis. O enum `business_plan`, as colunas `businesses.plan` e `subscriptions.plan`, o trigger `protect_business_plan` e o cron de rebaixamento saem do banco. "Já assinante" passa a ser a assinatura atual `authorized`.
 - Não há exclusão automática de negócios suspensos por inatividade nesta versão; eles guardam dados e slug indefinidamente.
 
 ## Fontes
@@ -36,5 +40,6 @@ Na virada, todo negócio no Grátis, inclusive quem já assinou e cancelou, ganh
 - [0006 — Leituras e escritas públicas por RPCs com allowlist](0006-rpcs-publicas-com-allowlist.md)
 - `lib/plan/plan.ts`, `lib/plan/gate.ts` — gate atual (`assertProPlan`), a substituir por `assertAccess`
 - `lib/billing/mercado-pago.ts`, `lib/billing/checkout-terms.ts`, `lib/billing/reprice-checkouts.ts` — checkout e reajuste
+- `lib/billing/first-charge.ts` — quando a primeira cobrança acontece
 - `lib/validation/schemas.ts` (`brazilianPhoneSchema`) — normalização do telefone
 - `app/termos/page.tsx` — seção 5

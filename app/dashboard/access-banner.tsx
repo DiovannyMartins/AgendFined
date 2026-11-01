@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Clock, Lock } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { getSubscription } from "@/lib/billing/get-subscription";
-import type { BillingPlan } from "@/lib/billing/types";
 import { TRIAL_HIGHLIGHT_DAYS, trialBannerMessage, trialDaysLeft } from "@/lib/plan/trial";
 import { cn } from "@/lib/utils";
 
@@ -10,7 +9,6 @@ const PLAN_HREF = "/dashboard/configuracoes#plano";
 
 export type AccessBannerBusiness = {
   id: string;
-  plan: BillingPlan;
   currentSubscriptionId?: string | null;
   hasAccess: boolean;
   trialEndsAt: string | null;

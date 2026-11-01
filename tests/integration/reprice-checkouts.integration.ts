@@ -36,7 +36,7 @@ const cancelPreapproval = vi.fn(async () => undefined);
 async function insertSubscription(mpPreapprovalId: string, status: "pending" | "authorized" | "cancelled") {
   const { error } = await admin
     .from("subscriptions")
-    .insert({ business_id: businessId, mp_preapproval_id: mpPreapprovalId, plan: "pro", status });
+    .insert({ business_id: businessId, mp_preapproval_id: mpPreapprovalId, status });
   if (error) throw new Error(`subscription: ${error.message}`);
 }
 

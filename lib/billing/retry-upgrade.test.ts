@@ -3,11 +3,11 @@ import { retryPendingUpgrade, type RetryUpgradeDeps } from "./retry-upgrade";
 import { MercadoPagoAmbiguousError } from "./mercado-pago";
 import type { BillingProvider } from "./provider";
 
-const existing = { subscriptionId: "sub_old", mpPreapprovalId: "mp_old", status: "pending" as const, plan: "pro" as const, currentPeriodStart: null, currentPeriodEnd: null };
+const existing = { subscriptionId: "sub_old", mpPreapprovalId: "mp_old", status: "pending" as const, currentPeriodStart: null, currentPeriodEnd: null };
 function provider(): BillingProvider { return { createPreapproval: vi.fn(async () => ({ preapprovalId: "mp_new", initPoint: "https://mp.example/new" })), getPreapproval: vi.fn(), cancelPreapproval: vi.fn(async () => undefined), updatePreapprovalAmount: vi.fn() }; }
 function deps(overrides: Partial<RetryUpgradeDeps> = {}): RetryUpgradeDeps {
   return {
-    business: { id: "biz_1" }, provider: provider(), fetchSubscription: vi.fn(async () => existing),
+    business: { id: "biz_1", trialEndsAt: null }, provider: provider(), now: () => new Date("2026-11-01T12:00:00.000Z"), fetchSubscription: vi.fn(async () => existing),
     claimAttempt: vi.fn(async () => ({ id: "attempt_retry", businessId: "biz_1", kind: "retry" as const, status: "reserved" as const, idempotencyKey: "key", providerPreapprovalId: null })),
     startRetry: vi.fn(async () => ({ id: "attempt_retry", businessId: "biz_1", kind: "retry" as const, status: "creating" as const, idempotencyKey: "key", providerPreapprovalId: null })),
     finishAttempt: vi.fn(async () => ({ id: "attempt_retry", businessId: "biz_1", kind: "retry" as const, status: "unknown" as const, idempotencyKey: "key", providerPreapprovalId: "mp_new" })),
@@ -19,6 +19,18 @@ function deps(overrides: Partial<RetryUpgradeDeps> = {}): RetryUpgradeDeps {
 }
 
 describe("retryPendingUpgrade with billing_attempts", () => {
+  it("starts the new checkout's charge at the end of a teste grátis still running", async () => {
+    const d = deps({ business: { id: "biz_1", trialEndsAt: "2026-11-20T15:30:00.000Z" } });
+    await retryPendingUpgrade(d);
+    expect(d.provider.createPreapproval).toHaveBeenCalledWith(expect.objectContaining({ startDate: "2026-11-20T15:30:00.000Z" }));
+  });
+
+  it("charges the new checkout now outside a teste", async () => {
+    const d = deps({ business: { id: "biz_1", trialEndsAt: "infinity" } });
+    await retryPendingUpgrade(d);
+    expect(d.provider.createPreapproval).toHaveBeenCalledWith(expect.objectContaining({ startDate: null }));
+  });
+
   it("claims, CAS-validates, creates, and links without cancelling before payment", async () => {
     const d = deps(); const result = await retryPendingUpgrade(d);
     expect(result).toEqual({ ok: true, initPoint: "https://mp.example/new" });

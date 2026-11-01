@@ -3,7 +3,8 @@ import { startUpgrade, type StartUpgradeDeps } from "./start-upgrade";
 import { MercadoPagoAmbiguousError } from "./mercado-pago";
 import type { BillingProvider, CreatePreapprovalResult } from "./provider";
 
-const BUSINESS = { id: "biz_1", plan: "free" as const };
+const NOW = new Date("2026-11-01T12:00:00.000Z");
+const BUSINESS = { id: "biz_1", trialEndsAt: null };
 
 function makeProvider(result: CreatePreapprovalResult): BillingProvider {
   return { createPreapproval: vi.fn(async () => result), getPreapproval: vi.fn(), cancelPreapproval: vi.fn(), updatePreapprovalAmount: vi.fn() };
@@ -35,6 +36,7 @@ function makeDeps(overrides: Partial<StartUpgradeDeps> = {}): StartUpgradeDeps {
     idempotencyKey: "key_1",
     checkoutLimits: { countPendingCheckouts: vi.fn(async () => 0), consumeCheckout: vi.fn(async () => true) },
     reportOrphanCheckout: vi.fn(),
+    now: () => NOW,
     ...overrides,
   };
 }
@@ -96,18 +98,44 @@ describe("startUpgrade with billing_attempts", () => {
     expect(deps.finishAttempt).toHaveBeenCalledWith({ attemptId: "attempt_1", status: "unknown", providerPreapprovalId: "mp_123" });
   });
 
-  it("preserves the existing Pro/pending product rule", async () => {
-    const provider = makeProvider({ preapprovalId: "mp_ignored", initPoint: "https://mp.example/ignored" });
-    const result = await startUpgrade({
-      business: { id: "biz_1", plan: "pro" }, provider,
-      claimAttempt: vi.fn(), startAttempt: vi.fn(), finishAttempt: vi.fn(), linkAttempt: vi.fn(),
-      fetchSubscription: vi.fn(async () => ({ mpPreapprovalId: "mp_pending", status: "pending" as const, plan: "pro" as const, currentPeriodStart: null, currentPeriodEnd: null })),
-      backUrl: "https://app.example",
-      checkoutLimits: { countPendingCheckouts: vi.fn(async () => 0), consumeCheckout: vi.fn(async () => true) },
-      reportOrphanCheckout: vi.fn(),
-    });
-    expect(result).toEqual({ ok: false, code: "ALREADY_PRO", message: expect.any(String) });
-    expect(provider.createPreapproval).not.toHaveBeenCalled();
+  it("refuses a negócio whose current assinatura is authorized", async () => {
+    const deps = makeDeps({ fetchSubscription: vi.fn(async () => ({ subscriptionId: "sub_1", mpPreapprovalId: "mp_1", status: "authorized" as const, currentPeriodStart: null, currentPeriodEnd: null })) });
+    const result = await startUpgrade(deps);
+    expect(result).toEqual({ ok: false, code: "ALREADY_SUBSCRIBED", message: "Você já tem uma assinatura ativa do Plano AgendFined." });
+    expect(deps.provider.createPreapproval).not.toHaveBeenCalled();
+  });
+
+  it("refuses a second checkout while one is pending", async () => {
+    const deps = makeDeps({ fetchSubscription: vi.fn(async () => ({ subscriptionId: "sub_1", mpPreapprovalId: "mp_1", status: "pending" as const, currentPeriodStart: null, currentPeriodEnd: null })) });
+    const result = await startUpgrade(deps);
+    expect(result).toEqual({ ok: false, code: "UPGRADE_PENDING", message: expect.any(String) });
+    expect(deps.provider.createPreapproval).not.toHaveBeenCalled();
+  });
+
+  it.each(["paused", "cancelled"] as const)("lets a negócio whose assinatura is %s subscribe again", async (status) => {
+    const deps = makeDeps({ fetchSubscription: vi.fn(async () => ({ ...({ subscriptionId: "sub_1", mpPreapprovalId: "mp_1", status: "authorized" as const, currentPeriodStart: null, currentPeriodEnd: null }), status })) });
+    await expect(startUpgrade(deps)).resolves.toEqual({ ok: true, initPoint: "https://mp.example/checkout" });
+  });
+});
+
+// ADR 0013, FR-011: subscribing during the teste grátis keeps the days left.
+describe("startUpgrade first charge", () => {
+  it("starts the charge at the end of a teste grátis still running", async () => {
+    const deps = makeDeps({ business: { id: "biz_1", trialEndsAt: "2026-11-20T15:30:00+00:00" } });
+    await startUpgrade(deps);
+    expect(deps.provider.createPreapproval).toHaveBeenCalledWith(
+      expect.objectContaining({ externalReference: "attempt_1", startDate: "2026-11-20T15:30:00.000Z" }),
+    );
+  });
+
+  it.each([
+    ["without a teste", null],
+    ["after the teste ended", "2026-10-31T12:00:00+00:00"],
+    ["for a legacy negócio ('infinity')", "infinity"],
+  ])("charges now %s", async (_label, trialEndsAt) => {
+    const deps = makeDeps({ business: { id: "biz_1", trialEndsAt } });
+    await startUpgrade(deps);
+    expect(deps.provider.createPreapproval).toHaveBeenCalledWith(expect.objectContaining({ startDate: null }));
   });
 });
 

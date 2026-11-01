@@ -103,7 +103,6 @@ beforeAll(async () => {
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
         booking_window_days: 60,
-        plan: "pro",
       })
       .select("id")
       .single();

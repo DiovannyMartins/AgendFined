@@ -29,7 +29,7 @@ async function createOwner(email: string, name: string): Promise<string> {
 async function createSubscription(mpPreapprovalId: string): Promise<string> {
   const { data, error } = await admin
     .from("subscriptions")
-    .insert({ business_id: businessId, mp_preapproval_id: mpPreapprovalId, plan: "pro", status: "pending" })
+    .insert({ business_id: businessId, mp_preapproval_id: mpPreapprovalId, status: "pending" })
     .select("id")
     .single();
   if (error || !data) throw new Error(`subscription: ${error?.message ?? "no id"}`);

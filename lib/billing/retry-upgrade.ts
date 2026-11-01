@@ -12,11 +12,14 @@ import { MercadoPagoAmbiguousError } from "./mercado-pago";
 import { cancelUnlinkedCheckout, type BillingAttempt } from "./start-upgrade";
 import type { FetchSubscription } from "./get-subscription";
 import { refuseCheckoutOverLimits, type CheckoutLimits } from "./checkout-limits";
+import { firstChargeDate } from "./first-charge";
 
 export type RetryUpgradeResult = { ok: true; initPoint: string } | { ok: false; code: string; message: string };
 
 export interface RetryUpgradeDeps {
-  business: { id: string };
+  // `trialEndsAt` is `businesses.trial_ends_at` as PostgREST returns it.
+  business: { id: string; trialEndsAt: string | null };
+  now?: () => Date;
   provider: BillingProvider;
   fetchSubscription: FetchSubscription;
   claimAttempt: (input: {
@@ -112,11 +115,12 @@ export async function retryPendingUpgrade(deps: RetryUpgradeDeps): Promise<Retry
   let created;
   try {
     created = await deps.provider.createPreapproval({
-      plan: "pro",
       externalReference: attempt.id,
       payerEmail: deps.payerEmail,
       backUrl: deps.backUrl,
       notificationUrl: deps.notificationUrl,
+      // Read now, not from the abandoned checkout: the teste may have ended.
+      startDate: firstChargeDate(deps.business.trialEndsAt, deps.now?.() ?? new Date()),
     });
   } catch (err) {
     const ambiguous = err instanceof MercadoPagoAmbiguousError;

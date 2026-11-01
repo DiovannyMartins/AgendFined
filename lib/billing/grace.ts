@@ -1,7 +1,9 @@
-// End of the grace (carência) when a PROFISSIONAL assinatura stops (ADR 0008).
+// End of the grace (carência) when an assinatura stops (ADR 0008).
 // Every grace lasts at least `graceDays` (7 by default). A cancellation of a
 // paid assinatura also keeps the month already paid: the grace runs until the
-// next charge date when that is later (issue #142). A failed payment
+// next charge date when that is later (issue #142). An assinatura created during
+// the teste grátis is authorized before its first charge, whose date is the end
+// of the teste: cancelling it keeps the access until then (ADR 0013). A failed payment
 // (`paused`) passes no paid period, so it keeps only the minimum.
 export const DEFAULT_GRACE_DAYS = 7;
 const MS_PER_DAY = 86_400_000;

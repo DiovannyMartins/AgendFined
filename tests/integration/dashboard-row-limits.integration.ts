@@ -44,7 +44,7 @@ function bookingRow(customerId: string, startAt: string, status: "completed" | "
   };
 }
 
-async function createOwner(email: string, name: string, slug: string, plan: "pro" | "free") {
+async function createOwner(email: string, name: string, slug: string) {
   const { data: created } = await admin.auth.admin.createUser({ email, password: PASSWORD, email_confirm: true });
   const id = created?.user?.id ?? "";
   await admin.from("profiles").upsert({ id, display_name: name }, { onConflict: "id" });
@@ -60,7 +60,6 @@ async function createOwner(email: string, name: string, slug: string, plan: "pro
         min_notice_minutes: 0,
         booking_window_days: 60,
         timezone: TIMEZONE,
-        plan,
         trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
       })
       .select("id")
@@ -74,10 +73,10 @@ async function createOwner(email: string, name: string, slug: string, plan: "pro
 beforeAll(async () => {
   admin = adminClient();
 
-  const owner = await createOwner(EMAIL, "Agenda Cheia", `agenda-cheia-${stamp}`, "pro");
+  const owner = await createOwner(EMAIL, "Agenda Cheia", `agenda-cheia-${stamp}`);
   ownerId = owner.id;
   businessId = owner.bizId;
-  outsiderId = (await createOwner(OUTSIDER_EMAIL, "Alheia", `alheia-limite-${stamp}`, "pro")).id;
+  outsiderId = (await createOwner(OUTSIDER_EMAIL, "Alheia", `alheia-limite-${stamp}`)).id;
 
   const { data: svc } = await admin
     .from("services")

@@ -22,7 +22,7 @@ function preapproval(currentPeriodEnd: string | null): Preapproval {
 
 function makeDeps(overrides: Partial<CancelSubscriptionDeps> = {}): CancelSubscriptionDeps {
   return {
-    business: { id: "biz_1", plan: "pro" },
+    business: { id: "biz_1" },
     provider: {
       createPreapproval: vi.fn(),
       getPreapproval: vi.fn(async () => preapproval(null)),
@@ -32,7 +32,6 @@ function makeDeps(overrides: Partial<CancelSubscriptionDeps> = {}): CancelSubscr
     fetchSubscription: vi.fn(async () => ({
       mpPreapprovalId: "mp_1",
       status: "authorized" as const,
-      plan: "pro" as const,
       currentPeriodStart: null,
       currentPeriodEnd: null,
     })),
@@ -55,7 +54,7 @@ describe("cancelSubscription (US16)", () => {
     });
   });
 
-  it("keeps the PROFISSIONAL until the end of the paid month (issue #142)", async () => {
+  it("keeps the access until the end of the paid month (issue #142)", async () => {
     const deps = makeDeps();
     vi.mocked(deps.provider.getPreapproval).mockResolvedValue(preapproval("2026-10-07T12:00:00.000Z"));
 
@@ -66,6 +65,23 @@ describe("cancelSubscription (US16)", () => {
     expect(deps.updateSubscription).toHaveBeenCalledWith("mp_1", {
       status: "cancelled",
       gracePeriodEnd: "2026-10-07T12:00:00.000Z",
+    });
+  });
+
+  // ADR 0013: subscribed during the teste grátis, nothing paid yet. Mercado Pago
+  // reports the first charge (the end of the teste) as next_payment_date.
+  it("keeps the access until the first charge date when cancelled during the teste grátis", async () => {
+    const deps = makeDeps();
+    vi.mocked(deps.provider.getPreapproval).mockResolvedValue({
+      ...preapproval("2026-09-27T15:30:00.000Z"),
+      currentPeriodStart: "2026-09-27T15:30:00.000Z",
+    });
+
+    await cancelSubscription(deps);
+
+    expect(deps.updateSubscription).toHaveBeenCalledWith("mp_1", {
+      status: "cancelled",
+      gracePeriodEnd: "2026-09-27T15:30:00.000Z",
     });
   });
 
@@ -109,7 +125,6 @@ describe("cancelSubscription (US16)", () => {
       fetchSubscription: vi.fn(async () => ({
         mpPreapprovalId: "mp_1",
         status: "pending" as const,
-        plan: "pro" as const,
         currentPeriodStart: null,
         currentPeriodEnd: null,
       })),

@@ -20,7 +20,7 @@ vi.mock("react", async (importOriginal) => ({
   },
 }));
 
-const BUSINESS = { id: "biz-1", plan: "free", current_subscription_id: null };
+const BUSINESS = { id: "biz-1", current_subscription_id: null };
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
@@ -68,11 +68,10 @@ describe("painel request cache", () => {
     const business = await getCurrentBusiness();
     const result = await getSubscription({
       id: business!.id,
-      plan: "free",
       currentSubscriptionId: business!.current_subscription_id,
     });
 
-    expect(result).toEqual({ plan: "free", subscription: null, graceSubscription: null });
+    expect(result).toEqual({ subscription: null, graceSubscription: null });
     expect(calls.tables).toEqual(["businesses"]);
   });
 });

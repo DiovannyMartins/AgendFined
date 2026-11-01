@@ -3,12 +3,9 @@
 // Mercado Pago implementation behind it. The rest of the billing module and the
 // plan gate depend only on this interface, never on Mercado Pago, so swapping
 // providers (or stubbing in tests) requires no change to callers.
-import type { BillingPlan } from "./types";
-
+// The provider sells the Plano AgendFined, the only plan (ADR 0013), at the
+// configured price.
 export interface CreatePreapprovalInput {
-  // The plan being subscribed to; the provider derives the price and the
-  // subscription terms from it. Only the pro plan is currently offered.
-  plan: BillingPlan;
   // A caller-owned identifier carried through to the provider (business id).
   externalReference: string;
   payerEmail?: string;
@@ -20,6 +17,9 @@ export interface CreatePreapprovalInput {
   // subscriptions, so the URL must ALSO be configured in "Your integrations"
   // (topic `subscription_preapproval`). Keep this in sync with that panel URL.
   notificationUrl?: string;
+  // When the first charge happens (ISO instant, `firstChargeDate`): the end of
+  // the teste grátis. Null or absent charges now.
+  startDate?: string | null;
 }
 
 export interface CreatePreapprovalResult {
@@ -29,7 +29,7 @@ export interface CreatePreapprovalResult {
 
 // The current state of a Mercado Pago preapproval (subscription), as returned by
 // `GET /preapproval/{id}`. The webhook lifecycle (issue #24) reads this to map
-// the provider's status onto the plan state. `externalReference` is the caller's
+// the provider's status onto the assinatura state. `externalReference` is the caller's
 // `external_reference`, i.e. the business id.
 export interface Preapproval {
   id: string;
@@ -54,7 +54,7 @@ export interface BillingProvider {
   // the checkout link (`init_point`) the user is redirected to.
   createPreapproval(input: CreatePreapprovalInput): Promise<CreatePreapprovalResult>;
   // Fetches a preapproval by id so the webhook handler can read its current
-  // status and map it onto the plan lifecycle.
+  // status and map it onto the assinatura lifecycle.
   getPreapproval(id: string, options?: { timeoutMs?: number }): Promise<Preapproval>;
   // Changes the recurring charge of a preapproval, e.g. to bring a checkout
   // created before a price change up to the current price.

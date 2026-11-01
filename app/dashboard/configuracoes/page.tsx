@@ -85,7 +85,6 @@ export default async function ConfiguracoesPage({
       <PlanSection
         business={{
           id: business.id,
-          plan: business.plan,
           timezone: business.timezone,
           currentSubscriptionId: business.current_subscription_id,
           hasAccess: !suspended,

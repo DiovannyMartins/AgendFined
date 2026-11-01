@@ -25,7 +25,6 @@ export interface ReconciliationSubscription {
 export interface ReconciliationBusiness {
   id: string;
   currentSubscriptionId: string | null;
-  plan: "free" | "pro";
 }
 
 export interface ReconciliationReport {
@@ -42,7 +41,7 @@ export interface ReconciliationReport {
   detail: string;
 }
 
-// A first authorization with terms the plan does not sell is refused like the
+// A first authorization with terms the Plano AgendFined does not sell is refused like the
 // webhook refuses it; the checkout is cancelled through `provider`.
 export interface BillingReconciliationDependencies extends Omit<CheckoutTermsDeps, "cancelPreapproval"> {
   provider: BillingProvider & {

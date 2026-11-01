@@ -311,7 +311,6 @@ export type Database = {
           name: string
           owner_id: string
           phone: string
-          plan: Database["public"]["Enums"]["business_plan"]
           search_indexing_enabled: boolean
           slot_interval_minutes: number
           slug: string
@@ -330,7 +329,6 @@ export type Database = {
           name: string
           owner_id: string
           phone: string
-          plan?: Database["public"]["Enums"]["business_plan"]
           search_indexing_enabled?: boolean
           slot_interval_minutes?: number
           slug: string
@@ -349,7 +347,6 @@ export type Database = {
           name?: string
           owner_id?: string
           phone?: string
-          plan?: Database["public"]["Enums"]["business_plan"]
           search_indexing_enabled?: boolean
           slot_interval_minutes?: number
           slug?: string
@@ -505,7 +502,6 @@ export type Database = {
           grace_period_end: string | null
           id: string
           mp_preapproval_id: string
-          plan: Database["public"]["Enums"]["business_plan"]
           provider_modified_at: string | null
           status: Database["public"]["Enums"]["subscription_status"]
           updated_at: string
@@ -519,7 +515,6 @@ export type Database = {
           grace_period_end?: string | null
           id?: string
           mp_preapproval_id: string
-          plan?: Database["public"]["Enums"]["business_plan"]
           provider_modified_at?: string | null
           status?: Database["public"]["Enums"]["subscription_status"]
           updated_at?: string
@@ -533,7 +528,6 @@ export type Database = {
           grace_period_end?: string | null
           id?: string
           mp_preapproval_id?: string
-          plan?: Database["public"]["Enums"]["business_plan"]
           provider_modified_at?: string | null
           status?: Database["public"]["Enums"]["subscription_status"]
           updated_at?: string
@@ -928,7 +922,6 @@ export type Database = {
           "cancel_token_hash" | "reminder_claim_token"
         >
       }
-      downgrade_expired_subscriptions: { Args: never; Returns: number }
       reschedule_booking_by_public_code: {
         Args: { p_cancel_token_hash: string; p_code: string; p_start_at: string }
         Returns: Database["public"]["Tables"]["bookings"]["Row"]
@@ -972,7 +965,6 @@ export type Database = {
           applied: boolean
           business_id: string
           effective_grace_period_end: string | null
-          effective_plan: Database["public"]["Enums"]["business_plan"]
           is_current: boolean
           previous_status: Database["public"]["Enums"]["subscription_status"]
           subscription_id: string
@@ -1268,7 +1260,6 @@ export type Database = {
       booking_status: "confirmed" | "completed" | "cancelled" | "no_show"
       billing_attempt_kind: "initial" | "retry"
       billing_attempt_status: "reserved" | "creating" | "unknown" | "linked" | "failed" | "ambiguous"
-      business_plan: "free" | "pro"
       subscription_status: "pending" | "authorized" | "paused" | "cancelled"
     }
     CompositeTypes: {
@@ -1400,7 +1391,6 @@ export const Constants = {
       booking_status: ["confirmed", "completed", "cancelled", "no_show"],
       billing_attempt_kind: ["initial", "retry"],
       billing_attempt_status: ["reserved", "creating", "unknown", "linked", "failed", "ambiguous"],
-      business_plan: ["free", "pro"],
       subscription_status: ["pending", "authorized", "paused", "cancelled"],
     },
   },

@@ -84,7 +84,6 @@ function upgradePersistence(): Omit<StartUpgradeDeps, "business" | "provider" | 
         subscriptionId: data.id,
         mpPreapprovalId: data.mp_preapproval_id,
         status: data.status,
-        plan: data.plan,
         currentPeriodStart: data.current_period_start,
         currentPeriodEnd: data.current_period_end,
         gracePeriodEnd: data.grace_period_end,
@@ -127,7 +126,7 @@ function upgradePersistence(): Omit<StartUpgradeDeps, "business" | "provider" | 
   };
 }
 
-// A Grátis negócio with its own owner (each owner has exactly one negócio).
+// A negócio without an assinatura, with its own owner (each owner has exactly one negócio).
 async function createNegocio(label: string): Promise<string> {
   const { data: created, error: userError } = await admin.auth.admin.createUser({
     email: `initial-race-${label}.${stamp}@agendfined.dev`,
@@ -165,7 +164,7 @@ async function insertSubscription(
 ): Promise<string> {
   const { data, error } = await admin
     .from("subscriptions")
-    .insert({ business_id: businessId, mp_preapproval_id: mpPreapprovalId, plan: "pro", ...fields })
+    .insert({ business_id: businessId, mp_preapproval_id: mpPreapprovalId, ...fields })
     .select("id")
     .single();
   if (error || !data) throw new Error(`subscription: ${error?.message ?? "no id"}`);
@@ -183,7 +182,7 @@ async function setCurrent(businessId: string, subscriptionId: string) {
 async function readBusiness(businessId: string) {
   const { data, error } = await admin
     .from("businesses")
-    .select("plan, current_subscription_id")
+    .select("current_subscription_id")
     .eq("id", businessId)
     .single();
   if (error) throw new Error(`business read: ${error.message}`);
@@ -296,7 +295,7 @@ describe("initial upgrade racing a paid superseded checkout", () => {
     };
 
     const result = await startUpgrade({
-      business: { id: businessId, plan: "free" },
+      business: { id: businessId, trialEndsAt: null },
       provider,
       ...upgradePersistence(),
       backUrl: "https://app.example/api/billing/return",
@@ -306,7 +305,7 @@ describe("initial upgrade racing a paid superseded checkout", () => {
     expect(webhook).toEqual({ ok: true, applied: "authorized" });
     expect(result).toEqual({ ok: false, code: "UPGRADE_SUBSCRIPTION_CONFLICT", message: expect.any(String) });
     expect(provider.cancelPreapproval).toHaveBeenCalledWith(MP_NEW);
-    expect(await readBusiness(businessId)).toEqual({ plan: "pro", current_subscription_id: oldSubscriptionId });
+    expect(await readBusiness(businessId)).toEqual({ current_subscription_id: oldSubscriptionId });
     expect(await readAttempt(idempotencyKey)).toEqual({ status: "failed", provider_preapproval_id: MP_NEW });
   });
 });
@@ -320,8 +319,6 @@ async function createNegocioInCarencia(label: string, mpPreapprovalId: string) {
     grace_period_end: new Date(Date.now() + 7 * 86_400_000).toISOString(),
   });
   await setCurrent(businessId, currentSubscriptionId);
-  const { error } = await admin.from("businesses").update({ plan: "pro" }).eq("id", businessId);
-  if (error) throw new Error(`plan: ${error.message}`);
   return { businessId, currentSubscriptionId };
 }
 
@@ -345,7 +342,7 @@ describe("re-subscription in carência racing a recovered payment", () => {
     };
 
     const result = await startUpgrade({
-      business: { id: businessId, plan: "pro" },
+      business: { id: businessId, trialEndsAt: null },
       provider,
       ...upgradePersistence(),
       backUrl: "https://app.example/api/billing/return",
@@ -355,7 +352,7 @@ describe("re-subscription in carência racing a recovered payment", () => {
     expect(webhook).toEqual({ ok: true, applied: "authorized" });
     expect(result).toEqual({ ok: false, code: "UPGRADE_SUBSCRIPTION_CONFLICT", message: expect.any(String) });
     expect(provider.cancelPreapproval).toHaveBeenCalledWith(MP_NEW);
-    expect(await readBusiness(businessId)).toEqual({ plan: "pro", current_subscription_id: currentSubscriptionId });
+    expect(await readBusiness(businessId)).toEqual({ current_subscription_id: currentSubscriptionId });
     expect(await readAttempt(idempotencyKey)).toEqual({ status: "failed", provider_preapproval_id: MP_NEW });
   });
 });
@@ -374,11 +371,9 @@ describe("reconciling an initial upgrade whose checkout response was lost", () =
         grace_period_end: new Date(Date.now() + 7 * 86_400_000).toISOString(),
       }),
     );
-    const { error: planError } = await admin.from("businesses").update({ plan: "pro" }).eq("id", businessId);
-    if (planError) throw new Error(`plan: ${planError.message}`);
 
     const result = await startUpgrade({
-      business: { id: businessId, plan: "pro" },
+      business: { id: businessId, trialEndsAt: null },
       provider: ambiguousProvider(),
       ...upgradePersistence(),
       backUrl: "https://app.example/api/billing/return",
@@ -389,11 +384,11 @@ describe("reconciling an initial upgrade whose checkout response was lost", () =
     const { error } = await reconcile(await attemptId(idempotencyKey), MP_NEW, "pending");
 
     expect(error).toBeNull();
-    expect(await readBusiness(businessId)).toEqual({ plan: "pro", current_subscription_id: await subscriptionId(MP_NEW) });
+    expect(await readBusiness(businessId)).toEqual({ current_subscription_id: await subscriptionId(MP_NEW) });
     expect(await readAttempt(idempotencyKey)).toEqual({ status: "linked", provider_preapproval_id: MP_NEW });
   });
 
-  // A Grátis negócio whose closed checkout is current, with an older one still
+  // A negócio without an assinatura whose closed checkout is current, with an older one still
   // payable; the upgrade's checkout response is lost and the payer then pays
   // the old link, so the webhook makes it the current assinatura.
   async function loseUpgradeThenPayOldLink(label: string, idempotencyKey: string) {
@@ -403,7 +398,7 @@ describe("reconciling an initial upgrade whose checkout response was lost", () =
     await setCurrent(businessId, await insertSubscription(businessId, `mp-initial-${label}-closed-${stamp}`, { status: "cancelled" }));
 
     const result = await startUpgrade({
-      business: { id: businessId, plan: "free" },
+      business: { id: businessId, trialEndsAt: null },
       provider: ambiguousProvider(),
       ...upgradePersistence(),
       backUrl: "https://app.example/api/billing/return",
@@ -423,7 +418,7 @@ describe("reconciling an initial upgrade whose checkout response was lost", () =
     const { error } = await reconcile(await attemptId(idempotencyKey), MP_NEW, "pending");
 
     expect(error).toBeNull();
-    expect(await readBusiness(businessId)).toEqual({ plan: "pro", current_subscription_id: oldSubscriptionId });
+    expect(await readBusiness(businessId)).toEqual({ current_subscription_id: oldSubscriptionId });
     expect(await readAttempt(idempotencyKey)).toEqual({ status: "failed", provider_preapproval_id: MP_NEW });
   });
 
@@ -435,7 +430,7 @@ describe("reconciling an initial upgrade whose checkout response was lost", () =
     const { error } = await reconcile(await attemptId(idempotencyKey), MP_NEW, "authorized");
 
     expect(error?.message).toBe("current subscription changed during reconciliation");
-    expect(await readBusiness(businessId)).toEqual({ plan: "pro", current_subscription_id: oldSubscriptionId });
+    expect(await readBusiness(businessId)).toEqual({ current_subscription_id: oldSubscriptionId });
     expect(await readAttempt(idempotencyKey)).toEqual({ status: "unknown", provider_preapproval_id: null });
   });
 
@@ -445,7 +440,7 @@ describe("reconciling an initial upgrade whose checkout response was lost", () =
     const idempotencyKey = `initial-race-recovered-${stamp}`;
     const { businessId, currentSubscriptionId } = await createNegocioInCarencia("recovered", MP_PAUSED);
     const result = await startUpgrade({
-      business: { id: businessId, plan: "pro" },
+      business: { id: businessId, trialEndsAt: null },
       provider: ambiguousProvider(),
       ...upgradePersistence(),
       backUrl: "https://app.example/api/billing/return",
@@ -459,7 +454,7 @@ describe("reconciling an initial upgrade whose checkout response was lost", () =
     const { error } = await reconcile(await attemptId(idempotencyKey), MP_NEW, "pending");
 
     expect(error).toBeNull();
-    expect(await readBusiness(businessId)).toEqual({ plan: "pro", current_subscription_id: currentSubscriptionId });
+    expect(await readBusiness(businessId)).toEqual({ current_subscription_id: currentSubscriptionId });
     expect(await readAttempt(idempotencyKey)).toEqual({ status: "failed", provider_preapproval_id: MP_NEW });
   });
 });

@@ -1,7 +1,7 @@
 -- Regression test for #242: a stopped snapshot applied over a row that is
 -- already paused/cancelled keeps the carência the row recorded, even after it
--- lapsed, so re-applying the same snapshot never reopens it and the cron drops
--- the negócio to Free.
+-- lapsed, so re-applying the same snapshot never reopens it and the negócio is
+-- suspended (ADR 0013).
 -- Run against the local stack only (`npx supabase start`):
 --   docker exec -i supabase_db_projeto psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 < tests/sql/grace-not-reopened.sql
 -- Everything runs in one transaction that is rolled back.
@@ -20,10 +20,11 @@ declare
 begin
   insert into auth.users (id, email) values (v_owner, 'grace-' || p_tag || '@example.test');
   insert into public.profiles (id, display_name) values (v_owner, 'Dono ' || p_tag);
-  insert into public.businesses (id, owner_id, name, slug, phone, timezone)
-  values (v_business, v_owner, 'Negocio ' || p_tag, 'grace-' || p_tag, '11988887777', 'America/Sao_Paulo');
-  insert into public.subscriptions (business_id, mp_preapproval_id, status, plan)
-  values (v_business, 'mp-grace-' || p_tag, 'pending', 'pro')
+  insert into public.businesses (id, owner_id, name, slug, phone, timezone, trial_ends_at)
+  values (v_business, v_owner, 'Negocio ' || p_tag, 'grace-' || p_tag, '11988887777', 'America/Sao_Paulo',
+    now() - interval '1 day');
+  insert into public.subscriptions (business_id, mp_preapproval_id, status)
+  values (v_business, 'mp-grace-' || p_tag, 'pending')
   returning id into v_sub;
   update public.businesses set current_subscription_id = v_sub where id = v_business;
   perform public.apply_subscription_snapshot(
@@ -43,7 +44,6 @@ declare
   v record;
   r record;
   v_lapsed timestamptz := now() - interval '1 minute';
-  v_plan public.business_plan;
   v_grace timestamptz;
 begin
   -- The same cancelled snapshot (same version) re-applied with a fresh grace,
@@ -69,11 +69,9 @@ begin
     raise exception 'paused over cancelled: expected grace %, got %', v_lapsed, v_grace;
   end if;
 
-  -- The cron drops the negócio to Free once the recorded grace has passed.
-  perform public.downgrade_expired_subscriptions();
-  select b.plan into v_plan from public.businesses b where b.id = v.business_id;
-  if v_plan <> 'free' then
-    raise exception 'downgrade: expected free after the lapsed grace, got %', v_plan;
+  -- The negócio is suspended once the recorded grace has passed.
+  if public.business_has_access(v.business_id) then
+    raise exception 'suspension: expected no access after the lapsed grace';
   end if;
 
   -- A stopped row without a recorded grace still takes the one passed in.

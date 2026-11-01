@@ -54,7 +54,7 @@ function notify(mpPreapprovalId: string) {
 async function insertPendingSubscription(mpPreapprovalId: string): Promise<string> {
   const { data, error } = await admin
     .from("subscriptions")
-    .insert({ business_id: businessId, mp_preapproval_id: mpPreapprovalId, plan: "pro", status: "pending" })
+    .insert({ business_id: businessId, mp_preapproval_id: mpPreapprovalId, status: "pending" })
     .select("id")
     .single();
   if (error || !data) throw new Error(`subscription: ${error?.message ?? "no id"}`);
@@ -64,7 +64,7 @@ async function insertPendingSubscription(mpPreapprovalId: string): Promise<strin
 async function readBusiness() {
   const { data, error } = await admin
     .from("businesses")
-    .select("plan, current_subscription_id")
+    .select("current_subscription_id")
     .eq("id", businessId)
     .single();
   if (error) throw new Error(`business read: ${error.message}`);
@@ -132,7 +132,7 @@ describe("superseded checkouts", () => {
     const result = await notify(MP_OLD);
 
     expect(result).toEqual({ ok: true, applied: "authorized" });
-    expect(await readBusiness()).toEqual({ plan: "pro", current_subscription_id: oldSubscriptionId });
+    expect(await readBusiness()).toEqual({ current_subscription_id: oldSubscriptionId });
     expect(cancelPreapproval).toHaveBeenCalledTimes(1);
     expect(cancelPreapproval).toHaveBeenCalledWith(MP_NEW);
     expect(reportDoubleCharge).not.toHaveBeenCalled();
@@ -143,7 +143,7 @@ describe("superseded checkouts", () => {
 
     expect(result).toEqual({ ok: true, applied: "closed" });
     expect(await readSubscription(MP_NEW)).toEqual({ status: "cancelled", grace_period_end: null });
-    expect(await readBusiness()).toEqual({ plan: "pro", current_subscription_id: oldSubscriptionId });
+    expect(await readBusiness()).toEqual({ current_subscription_id: oldSubscriptionId });
   });
 
   it("a second paid checkout while the current one is paid is cancelled and reported", async () => {
@@ -154,7 +154,7 @@ describe("superseded checkouts", () => {
     const result = await notify(MP_THIRD);
 
     expect(result).toEqual({ ok: true, applied: "duplicate" });
-    expect(await readBusiness()).toEqual({ plan: "pro", current_subscription_id: oldSubscriptionId });
+    expect(await readBusiness()).toEqual({ current_subscription_id: oldSubscriptionId });
     expect(cancelPreapproval).toHaveBeenCalledWith(MP_THIRD);
     expect(reportDoubleCharge).toHaveBeenCalledWith({ businessId, mpPreapprovalId: MP_THIRD });
   });

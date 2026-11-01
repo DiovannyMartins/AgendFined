@@ -328,10 +328,11 @@ async function sendToGoogle(
 export async function runGoogleCalendarSyncBatch(): Promise<{ connections: number; synced: number; deleted: number; failed: number }> {
   const admin = createAdminClient();
   // A connection waiting for the owner to reconnect would fail every run;
-  // reconnecting clears last_error and brings it back into the batch.
+  // reconnecting clears last_error and brings it back into the batch. A
+  // suspenso negócio is skipped by `syncGoogleCalendarForBusiness`, which
+  // asks `business_has_access()` (ADR 0013).
   const { data: connections, error } = await admin.from("google_calendar_connections")
-    .select("business_id,businesses!inner(plan)")
-    .eq("businesses.plan", "pro")
+    .select("business_id")
     .or(`last_error.is.null,last_error.neq.${GOOGLE_CALENDAR_REAUTH_REQUIRED}`)
     .order("updated_at", { ascending: true }).limit(25);
   if (error) throw new Error("GOOGLE_CALENDAR_CONNECTIONS_LOAD_FAILED");

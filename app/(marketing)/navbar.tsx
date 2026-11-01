@@ -10,7 +10,7 @@ import { useIsAuthenticated } from "@/components/use-is-authenticated";
 const links = [
   { href: "/#recursos", label: "Recursos" },
   { href: "/#como-funciona", label: "Como funciona" },
-  { href: "/#planos", label: "Preços" },
+  { href: "/#planos", label: "Preço" },
 ];
 
 export function Navbar() {
@@ -62,7 +62,7 @@ export function Navbar() {
                 Entrar
               </Link>
               <Link href="/cadastro" className={buttonVariants({ size: "sm" })}>
-                Começar grátis
+                Começar teste grátis
               </Link>
             </>
           )}

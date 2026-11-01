@@ -53,14 +53,15 @@ export function SignupForm() {
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
         <CardTitle role="heading" aria-level={1} className="text-2xl">Criar conta</CardTitle>
-        <CardDescription>Comece a receber reservas grátis.</CardDescription>
+        <CardDescription>Teste o AgendFined completo por 30 dias, grátis e sem cartão.</CardDescription>
       </CardHeader>
       <CardContent>
         {done ? (
           <div className="space-y-3 text-center text-sm">
             <p className="font-medium">Conta criada com sucesso!</p>
             <p className="text-muted-foreground">
-              Verifique seu e-mail para confirmar o cadastro e depois faça login.
+              Verifique seu e-mail para confirmar o cadastro e depois faça login. Os 30 dias de teste grátis
+              começam quando você cria o seu negócio.
             </p>
             {/* With confirmations on, Supabase answers an existing e-mail with
                 the same success and sends nothing, so point those owners to
@@ -121,7 +122,7 @@ export function SignupForm() {
             {captcha.widget}
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={pending || !captcha.canSubmit}>
-              {pending ? "Criando..." : "Começar grátis"}
+              {pending ? "Criando..." : "Começar teste grátis"}
             </Button>
           </form>
         )}

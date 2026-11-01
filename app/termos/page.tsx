@@ -9,7 +9,7 @@ export default function TermosPage() {
   return (
     <article className="space-y-6">
       <h1 className="text-3xl font-semibold">Termos de Uso</h1>
-      <p className="text-sm text-muted-foreground">Última atualização: 15 de outubro de 2026</p>
+      <p className="text-sm text-muted-foreground">Última atualização: 1º de novembro de 2026</p>
 
       <section className="space-y-3">
         <h2 className="text-xl font-medium">1. Identificação e aceitação</h2>
@@ -50,22 +50,45 @@ export default function TermosPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-medium">5. Planos, pagamentos e suspensão</h2>
+        <h2 className="text-xl font-medium">5. Plano, teste grátis, pagamentos e suspensão</h2>
         <p>
-          O plano Grátis não tem cobrança mensal. O plano PROFISSIONAL é uma assinatura recorrente
-          mensal; o preço vigente e as condições da cobrança são apresentados na oferta e no
-          checkout antes da confirmação. O pagamento é processado pelo Mercado Pago. Os recursos
-          PROFISSIONAL são liberados depois que a assinatura é autorizada pelo provedor; o retorno
-          do navegador ao AgendFined, sozinho, não confirma o pagamento.
+          O AgendFined tem um plano único, o Plano AgendFined, uma assinatura recorrente mensal com
+          todos os recursos; o preço vigente e as condições da cobrança são apresentados na oferta e
+          no checkout antes da confirmação. O pagamento é processado pelo Mercado Pago. A assinatura
+          passa a valer depois que é autorizada pelo provedor; o retorno do navegador ao AgendFined,
+          sozinho, não confirma o pagamento.
+        </p>
+        <p>
+          Cada pessoa tem direito a um teste grátis de 30 dias corridos, contados da criação do
+          negócio, com todos os recursos e sem cadastro de cartão. O teste é concedido uma única
+          vez: um negócio cujo telefone ou cujo e-mail do dono já tenha recebido um teste, inclusive
+          em uma conta excluída, é criado sem teste. Casos legítimos, como um negócio que trocou de
+          dono e manteve o telefone, podem ser analisados pelo canal oficial.
+        </p>
+        <p>
+          Quem assina durante o teste não perde os dias restantes: a primeira cobrança acontece na
+          data do fim do teste, podendo variar em até 1 dia por causa do processamento do Mercado
+          Pago, e as seguintes a cada mês a partir dela. Se o teste terminar no mesmo dia da
+          assinatura, a primeira cobrança é feita na hora. Fora do teste, a cobrança começa na
+          assinatura.
+        </p>
+        <p>
+          Sem teste vigente e sem assinatura em dia, o negócio fica suspenso. Nada é apagado:
+          serviços, clientes, reservas e o endereço da página pública são preservados. Enquanto
+          estiver suspenso, a página pública não aceita novas reservas nem entradas na lista de
+          espera, as automações (lembretes, avisos da lista de espera e sincronização com o Google
+          Calendar) ficam paradas e o painel permite consultar os dados, cancelar reservas, assinar e
+          gerenciar a conta. As reservas já marcadas continuam valendo e podem ser canceladas pelo
+          cliente e pelo dono. Ao assinar, o negócio volta a funcionar normalmente.
         </p>
         <p>
           A assinatura pode ser cancelada pelo painel ou pelo canal oficial. Após o cancelamento,
-          novas cobranças são interrompidas conforme o processamento do Mercado Pago e os recursos
-          PROFISSIONAL permanecem disponíveis até o fim do período mensal já pago, e por no mínimo
-          7 dias. Encerrado esse período sem uma nova autorização, o negócio volta ao plano Grátis;
-          reservas e dados já registrados são preservados. Uma assinatura pausada por falha de
-          pagamento inicia uma carência de 7 dias. Esta carência operacional não substitui nem limita o direito de
-          arrependimento previsto na legislação aplicável.
+          novas cobranças são interrompidas conforme o processamento do Mercado Pago e o acesso
+          continua até o fim do período mensal já pago, e por no mínimo 7 dias, inclusive quando a
+          assinatura é cancelada durante o teste, antes da primeira cobrança. Encerrado esse período
+          sem uma nova autorização, o negócio fica suspenso. Uma assinatura pausada por falha de
+          pagamento inicia uma carência de 7 dias. Esta carência operacional não substitui nem limita
+          o direito de arrependimento previsto na legislação aplicável.
         </p>
         <p>
           Quando a contratação se enquadrar como relação de consumo realizada fora do

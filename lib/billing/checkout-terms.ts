@@ -17,7 +17,7 @@ export interface CheckoutTerms {
 }
 
 export interface CheckoutTermsDeps {
-  // The Plano AgendFined price now (`getProPriceCents`).
+  // The Plano AgendFined price now (`getPlanPriceCents`).
   currentPriceCents: number;
   reportStalePriceCharge: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;
   reportUnexpectedTermsCharge: (input: { businessId: string; mpPreapprovalId: string }) => void | Promise<void>;

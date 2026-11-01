@@ -42,8 +42,8 @@ describe("trackAnalyticsEvent", () => {
   it("sends through gtag when the tag is loaded", () => {
     const gtag = vi.fn();
     window.gtag = gtag;
-    trackAnalyticsEvent("booking_complete", { plan: "free" });
-    expect(gtag).toHaveBeenCalledWith("event", "booking_complete", { plan: "free" });
+    trackAnalyticsEvent("booking_complete", { source: "landing" });
+    expect(gtag).toHaveBeenCalledWith("event", "booking_complete", { source: "landing" });
     expect(window.dataLayer ?? []).toHaveLength(0);
   });
 

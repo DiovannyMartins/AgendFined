@@ -502,6 +502,9 @@ describe("Google Calendar batch concurrency", () => {
       }
       if (url.pathname.endsWith("/google_calendar_connections")) {
         if (method === "PATCH") return new Response(null, { status: 204 });
+        // `businesses.plan` left the database in #261 (fase 4); PostgREST
+        // refuses a query that still reads or filters it.
+        if (url.search.includes("plan")) return Response.json({ message: "column businesses.plan does not exist" }, { status: 400 });
         if (url.searchParams.has("order")) return Response.json(businesses.map(business_id => ({ business_id })));
         return Response.json({
           id: `${businessId}-connection`, business_id: businessId, google_email: "dono@example.com", calendar_id: "primary",

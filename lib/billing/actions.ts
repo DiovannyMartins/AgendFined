@@ -23,6 +23,7 @@ import {
 } from "./retry-upgrade";
 import { countPendingCheckouts, type CheckoutLimits } from "./checkout-limits";
 import { enforceBillingCheckoutRateLimit } from "@/lib/booking/rate-limit";
+import { planOfferState, type PlanOfferState } from "@/lib/plan/offer";
 
 // The checkout limits of the owner's negócio (one owner per negócio), shared by
 // the upgrade and the retry.
@@ -40,7 +41,24 @@ function reportOrphanCheckout(input: { businessId: string; mpPreapprovalId: stri
   console.error(JSON.stringify({ event: "billing_orphan_checkout_cancel_failed", ...input }));
 }
 
-// Server action called by the "Fazer upgrade" button. Returns the Mercado Pago
+// Server action called by the card of the Plano AgendFined on the static
+// marketing page, once the client knows the visitor is signed in: the state of
+// the owner's negócio picks what the card offers (`lib/plan/offer.ts`). Returns
+// only that state, never business data.
+export async function getPlanOfferState(): Promise<PlanOfferState> {
+  const business = await getCurrentBusiness();
+  if (!business) return "no_business";
+  const subscription = await fetchCurrentSubscription(business.id, business.current_subscription_id).catch(
+    () => null,
+  );
+  return planOfferState({
+    hasAccess: business.has_access,
+    trialEndsAt: business.trial_ends_at,
+    subscriptionStatus: subscription?.status ?? null,
+  });
+}
+
+// Server action called by the "Assinar" buttons. Returns the Mercado Pago
 // `init_point` so the client can redirect the payer to the checkout (sandbox in
 // dev). Reads `MERCADO_PAGO_ACCESS_TOKEN`; when unset it fails closed with a
 // friendly message rather than attempting a real call.

@@ -185,7 +185,7 @@ finish() {
 
 TOTAL_STAGES=3
 
-banner "Mercado Pago (sandbox) — assinatura PROFISSIONAL"
+banner "Mercado Pago (sandbox) — assinatura do Plano AgendFined"
 
 # ── Stage 1: expor o app local via túnel (URL do webhook + back_url) ───────
 stage "Túnel público (URL do webhook + back_url)"
@@ -226,6 +226,6 @@ step "Clique em 'Salvar'. Depois, em 'Webhooks > Configurar notificação', cliq
 ask_secret MERCADO_PAGO_WEBHOOK_SECRET "Cole a secret do webhook (x-signature):"
 write_env MERCADO_PAGO_WEBHOOK_SECRET "$MERCADO_PAGO_WEBHOOK_SECRET"
 note "Dica: use o botão 'Simular' para enviar um evento de teste à URL e confirmar a resposta 200."
-note "Depois, rode: npm run dev e teste o upgrade no dashboard (Plano → Fazer upgrade)."
+note "Depois, rode: npm run dev e teste a assinatura no dashboard (Configurações → Plano → Assinar)."
 
 finish

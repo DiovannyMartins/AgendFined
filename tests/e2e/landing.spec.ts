@@ -21,22 +21,23 @@ test("landing page exposes a usable keyboard skip link", async ({ page }) => {
   await expect(page.locator("#main-content")).toBeVisible();
 });
 
-test("landing shows the two plans with price and privileges", async ({ page }) => {
+test("landing shows the single plan with the teste grátis", async ({ page }) => {
   await page.goto("/");
-  await expect(
-    page.getByRole("heading", { name: "Escolha o ritmo do seu negócio.", exact: true }),
-  ).toBeVisible();
-  await expect(page.getByText("Grátis", { exact: true })).toBeVisible();
-  await expect(page.getByText("R$ 0", { exact: true })).toBeVisible();
-  await expect(page.getByText("PROFISSIONAL", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Um plano, tudo incluído.", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Plano AgendFined", exact: true })).toBeVisible();
   await expect(page.getByText("R$ 19,90", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("30 dias grátis, sem cartão · depois R$ 19,90/mês · cancele quando quiser", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Relatórios", { exact: true })).toBeVisible();
   await expect(page.getByText("Lembretes automáticos", { exact: true })).toBeVisible();
   await expect(page.getByText("Gestão da lista de espera", { exact: true })).toBeVisible();
   await expect(page.getByText("Exportação Google Calendar/.ics", { exact: true })).toBeVisible();
-  const proCta = page.getByRole("link", { name: /Assinar PROFISSIONAL/i });
-  await expect(proCta).toBeVisible();
-  await expect(proCta).toHaveAttribute("href", "/cadastro");
+  await expect(page.getByText("Grátis", { exact: true })).toHaveCount(0);
+  await expect(page.getByText(/PROFISSIONAL/)).toHaveCount(0);
+  const cta = page.locator("#planos").getByRole("link", { name: "Começar teste grátis" });
+  await expect(cta).toBeVisible();
+  await expect(cta).toHaveAttribute("href", "/cadastro");
 });
 
 test("landing footer Sobre link points to an existing section", async ({ page }) => {
@@ -52,7 +53,7 @@ test("auth and legal pages render", async ({ page }) => {
   await page.goto("/login");
   await expect(page.getByText("Acesse seu painel do AgendFined.")).toBeVisible();
   await page.goto("/cadastro");
-  await expect(page.getByText("Comece a receber reservas grátis.")).toBeVisible();
+  await expect(page.getByText("Teste o AgendFined completo por 30 dias, grátis e sem cartão.")).toBeVisible();
   await page.goto("/privacidade");
   await expect(page.getByRole("heading", { name: "Política de Privacidade" })).toBeVisible();
   await page.goto("/termos");

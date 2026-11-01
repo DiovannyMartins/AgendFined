@@ -23,7 +23,6 @@ export type {
   PreapprovalResource,
   WebhookEvent,
 } from "./handle-webhook";
-export { PLAN_INFO } from "./plans";
-export type { PlanInfo } from "./plans";
+export type { PlanInfo } from "@/lib/plan/catalog";
 export { cancelSubscription } from "./cancel-subscription";
 export type { CancelSubscriptionDeps, CancelSubscriptionResult } from "./cancel-subscription";

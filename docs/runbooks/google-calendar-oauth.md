@@ -53,7 +53,7 @@ GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY=<base64 de exatamente 32 bytes>
 node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 ```
 
-Depois de configurar as variáveis, faça um novo deploy e teste com uma conta do plano PROFISSIONAL:
+Depois de configurar as variáveis, faça um novo deploy e teste com uma conta que tenha acesso (teste grátis vigente ou assinatura do Plano AgendFined):
 
 1. Abra Configurações → Google Calendar.
 2. Clique em Conectar Google Calendar e conclua o consentimento.
@@ -102,7 +102,7 @@ Se o revisor perguntar por um escopo mais estreito, a alternativa é `.../auth/c
 Grave a tela, publique no YouTube como **Não listado** e cole o link no formulário. Os revisores do Google costumam pedir o vídeo em inglês; deixe o idioma da conta Google em inglês durante a gravação (ou acrescente `hl=en` à URL de consentimento).
 
 1. Mostre `https://agendfined.com.br` e o link da política de privacidade.
-2. Entre no painel com uma conta do plano PROFISSIONAL e abra **Configurações → Google Calendar**.
+2. Entre no painel com uma conta que tenha acesso (teste grátis ou assinatura) e abra **Configurações → Google Calendar**.
 3. Clique em **Conectar Google Calendar**. Na tela do Google, mostre a **barra de endereço com o `client_id`**, o nome do app e a permissão "View and edit events on all your calendars". Marque a permissão e continue.
 4. Volte ao AgendFined e mostre "Google Calendar conectado" com o e-mail da conta.
 5. Faça uma reserva na página pública do negócio e mostre o evento aparecendo no Google Calendar.

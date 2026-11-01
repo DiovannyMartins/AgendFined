@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button";
 import { startUpgrade } from "@/lib/billing/actions";
 import { navigateToCheckout } from "@/lib/billing/checkout-navigation";
 
-// "Fazer upgrade" CTA for the "Plano" section (ADR 0008). Calls the `startUpgrade`
+// "Assinar" CTA for the "Plano" section (ADR 0008). Calls the `startUpgrade`
 // server action, which creates a Mercado Pago preapproval and returns its
 // `init_point`; the browser navigates to it in the current tab. A failure
 // surfaces a message inline instead of navigating away. Also reused as
 // "Assinar novamente" during the grace window (US16), since re-subscribing runs
 // the same `startUpgrade` action.
-export function UpgradeButton({ label = "Fazer upgrade" }: { label?: string }) {
+export function UpgradeButton({ label = "Assinar" }: { label?: string }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 

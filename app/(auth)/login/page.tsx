@@ -38,7 +38,7 @@ export default async function LoginPage({
         <p className="mt-6 text-sm text-muted-foreground">
           Ainda não tem conta?{" "}
           <Link href="/cadastro" className="font-medium text-foreground hover:underline">
-            Cadastre-se grátis
+            Teste grátis por 30 dias
           </Link>
         </p>
       </Reveal>

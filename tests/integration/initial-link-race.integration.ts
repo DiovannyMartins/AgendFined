@@ -310,7 +310,7 @@ describe("initial upgrade racing a paid superseded checkout", () => {
   });
 });
 
-// A PROFISSIONAL negócio whose assinatura was paused (failed recurring payment)
+// A negócio whose assinatura was paused (failed recurring payment)
 // and is in carência; the owner may start a fresh preapproval.
 async function createNegocioInCarencia(label: string, mpPreapprovalId: string) {
   const businessId = await createNegocio(label);
@@ -362,7 +362,7 @@ describe("reconciling an initial upgrade whose checkout response was lost", () =
     const MP_GRACE = `mp-initial-grace-${stamp}`;
     const MP_NEW = `mp-initial-resub-${stamp}`;
     const idempotencyKey = `initial-race-resub-${stamp}`;
-    // A PROFISSIONAL negócio whose assinatura was cancelled and is in carência.
+    // A negócio whose assinatura was cancelled and is in carência.
     const businessId = await createNegocio("resub");
     await setCurrent(
       businessId,

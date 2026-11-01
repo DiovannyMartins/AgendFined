@@ -793,6 +793,50 @@ export type Database = {
         }
         Relationships: []
       }
+      trial_reminder_sends: {
+        Row: {
+          attempts: number
+          business_id: string
+          claim_token: string | null
+          claimed_at: string | null
+          created_at: string
+          id: string
+          kind: string
+          sent_at: string | null
+          trial_ends_at: string
+        }
+        Insert: {
+          attempts?: number
+          business_id: string
+          claim_token?: string | null
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          sent_at?: string | null
+          trial_ends_at: string
+        }
+        Update: {
+          attempts?: number
+          business_id?: string
+          claim_token?: string | null
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          sent_at?: string | null
+          trial_ends_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_reminder_sends_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1254,6 +1298,24 @@ export type Database = {
       grant_business_trial: {
         Args: { p_business_id: string; p_days?: number }
         Returns: string
+      }
+      claim_trial_reminders: {
+        Args: { p_lease_seconds?: number; p_limit?: number; p_now?: string }
+        Returns: {
+          business_id: string
+          business_name: string
+          business_timezone: string
+          claim_token: string
+          days_left: number
+          kind: string
+          owner_email: string | null
+          send_id: string
+          trial_ends_at: string
+        }[]
+      }
+      mark_trial_reminder_sent: {
+        Args: { p_claim_token: string; p_send_id: string }
+        Returns: boolean
       }
     }
     Enums: {

@@ -17,8 +17,10 @@ declare
 begin
   insert into auth.users (id, email) values (v_owner, 'hardening-' || p_tag || '@example.test');
   insert into public.profiles (id, display_name) values (v_owner, 'Dono ' || p_tag);
-  insert into public.businesses (id, owner_id, name, slug, phone, timezone)
-  values (v_business, v_owner, 'Negocio ' || p_tag, 'hardening-' || p_tag, '11988887777', 'America/Sao_Paulo');
+  -- trial_ends_at explícito: o negócio tem acesso (ADR 0013) sem passar pelo
+  -- registro de testes, que já conhece este telefone.
+  insert into public.businesses (id, owner_id, name, slug, phone, timezone, trial_ends_at)
+  values (v_business, v_owner, 'Negocio ' || p_tag, 'hardening-' || p_tag, '11988887777', 'America/Sao_Paulo', '2999-12-31');
   insert into public.services (id, business_id, name, duration_minutes, price_cents)
   values (v_service, v_business, 'Corte', 30, 5000);
   return query select v_owner, v_business, v_service;
@@ -112,7 +114,6 @@ declare
   v_converted text;
   v_source text;
 begin
-  update public.businesses set plan = 'pro' where id in (v.business_id, v_other.business_id);
 
   insert into public.waitlist_entries (business_id, service_id, start_at, customer_name, customer_phone, cancel_token_hash)
   values (v.business_id, v.service_id, date_trunc('hour', now()) + interval '3 days', 'Fila', '+5511977775555', repeat('a', 64))

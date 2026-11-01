@@ -1,37 +1,6 @@
-// Plan gate seam (ADR 0008). `businesses.plan` is the seat of the gate: a
-// business is Pro only when its plan is exactly `pro`. `assertProPlan` is the
-// server-side check every gated boundary (reports, reminders, waitlist
-// management, calendar export) funnels through; it returns the agreed result
-// shape so the caller can branch on it and surface an `UPGRADE_REQUIRED`
-// response without leaking internals.
-
+// `businesses.plan` (free | pro) still exists in the database until the billing
+// work of #261 (fase 4) removes it together with the `business_plan` enum. It is
+// no longer the seat of any gate nor of the janela: access comes from
+// `business_has_access()` (ADR 0013, `lib/plan/access.ts`). Only the billing
+// module and the marketing catalog still read this type.
 export type Plan = "free" | "pro";
-
-export const BOOKING_WINDOW_LIMIT_DAYS: Record<Plan, number> = {
-  free: 90,
-  pro: 365,
-};
-
-export function getBookingWindowLimitDays(plan: Plan | null | undefined): number {
-  return plan === "pro" ? BOOKING_WINDOW_LIMIT_DAYS.pro : BOOKING_WINDOW_LIMIT_DAYS.free;
-}
-
-export function getEffectiveBookingWindowDays(
-  plan: Plan | null | undefined,
-  configuredDays: number,
-): number {
-  return Math.min(configuredDays, getBookingWindowLimitDays(plan));
-}
-
-export type PlanGateResult = { ok: true } | { ok: false; code: "UPGRADE_REQUIRED" };
-
-// Fail-closed: anything that isn't exactly "pro" (free, null, undefined) is not
-// treated as Pro, so a missing/invalid plan can never open a Pro feature.
-export function isProPlan(plan: Plan | null | undefined): boolean {
-  return plan === "pro";
-}
-
-export function assertProPlan(business: { plan?: Plan | null }): PlanGateResult {
-  if (isProPlan(business.plan)) return { ok: true };
-  return { ok: false, code: "UPGRADE_REQUIRED" };
-}

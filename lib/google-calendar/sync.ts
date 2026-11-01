@@ -9,7 +9,6 @@ import {
   refreshGoogleAccessToken,
 } from "./oauth";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
-import { isProPlan } from "@/lib/plan/plan";
 import { formatPhoneBR } from "@/lib/format/phone";
 
 const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
@@ -107,13 +106,13 @@ async function loadConnection(businessId: string): Promise<Connection | null> {
     .maybeSingle();
   if (error) throw new Error("GOOGLE_CALENDAR_CONNECTION_LOAD_FAILED");
   if (!data) return null;
-  const { data: business, error: businessError } = await admin
-    .from("businesses")
-    .select("timezone,plan")
-    .eq("id", businessId)
-    .single();
-  if (businessError) throw new Error("GOOGLE_CALENDAR_BUSINESS_LOAD_FAILED");
-  if (!business || !isProPlan(business.plan)) return null;
+  // A suspended negócio (ADR 0013) is not synced: no connection to work with.
+  const [{ data: business, error: businessError }, { data: hasAccess, error: accessError }] = await Promise.all([
+    admin.from("businesses").select("timezone").eq("id", businessId).single(),
+    admin.rpc("business_has_access", { p_business_id: businessId }),
+  ]);
+  if (businessError || accessError) throw new Error("GOOGLE_CALENDAR_BUSINESS_LOAD_FAILED");
+  if (!business || hasAccess !== true) return null;
   return { ...data, business_timezone: business?.timezone ?? APP_TIMEZONE };
 }
 

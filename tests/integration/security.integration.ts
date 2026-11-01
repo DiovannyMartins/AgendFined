@@ -298,7 +298,7 @@ describe("anon data exposure (§36)", () => {
     expect(inactive?.length ?? 0).toBe(0);
   });
 
-  // #216: the page RPC is an allowlist too; the plan never leaves the database.
+  // #216: the page RPC is an allowlist too; the plan and the access reason never leave the database.
   it("anon reads the public page through one allowlisted RPC, without the plan", async () => {
     const anon = anonClient();
     const { data, error } = await anon.rpc("get_public_booking_page", { p_slug: `biz-a-${stamp}` });
@@ -306,12 +306,12 @@ describe("anon data exposure (§36)", () => {
     const page = data?.[0];
     expect(page?.id).toBe(businessA);
     expect(Object.keys(page ?? {}).sort()).toEqual([
+      "accepts_bookings",
       "booking_window_days",
       "description",
       "has_availability",
       "id",
       "name",
-      "offers_waitlist",
       "phone",
       "search_indexing_enabled",
       "services",

@@ -10,6 +10,7 @@ const { state } = vi.hoisted(() => ({
     faixas: { data: [], error: null } as Result,
     blocks: { data: [], error: null } as Result,
     bookings: { data: [], error: null } as Result,
+    access: { data: true, error: null } as Result,
     queried: [] as string[],
   },
 }));
@@ -23,6 +24,7 @@ vi.mock("@/lib/booking/rate-limit", () => ({
 }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
+    rpc: async () => state.access,
     from: (table: string) => {
       state.queried.push(table);
       // Like PostgREST, maybeSingle answers a missing row with data: null and no error.
@@ -58,7 +60,6 @@ const business = {
   slot_interval_minutes: 60,
   min_notice_minutes: 0,
   booking_window_days: 60,
-  plan: "free",
   timezone: "America/Sao_Paulo",
 };
 
@@ -78,6 +79,7 @@ describe("getPublicSlots", () => {
     state.blocks = { data: [], error: null };
     state.bookings = { data: [], error: null };
     state.queried = [];
+    state.access = { data: true, error: null };
   });
 
   it("answers only the free slots of the requested weekday", async () => {
@@ -125,5 +127,27 @@ describe("getPublicSlots", () => {
       available: [],
       error: "booking_window",
     });
+  });
+});
+
+describe("getPublicSlots for a suspended negócio (ADR 0013)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-30T12:00:00Z") });
+    state.allowed = true;
+    state.business = { data: business, error: null };
+    state.service = { data: { duration_minutes: 60 }, error: null };
+    state.faixas = { data: [{ weekday: 3, start_time: "09:00", end_time: "11:00" }], error: null };
+    state.queried = [];
+  });
+
+  it("offers no slot and says the negócio is suspended", async () => {
+    state.access = { data: false, error: null };
+    expect(await getPublicSlots(input, "203.0.113.7")).toEqual({ available: [], error: "suspended" });
+    expect(state.queried).not.toContain("bookings");
+  });
+
+  it("fails closed when the access lookup fails", async () => {
+    state.access = { data: null, error: { message: "boom" } };
+    expect(await getPublicSlots(input, "203.0.113.7")).toEqual({ available: [], error: "db_error" });
   });
 });

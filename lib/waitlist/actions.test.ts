@@ -25,7 +25,7 @@ vi.mock("@/lib/business/queries", () => ({
     slug: "barbearia-demo",
     phone: "11987654321",
     timezone: "America/Sao_Paulo",
-    plan: "pro",
+    has_access: true,
   }),
 }));
 vi.mock("@/lib/supabase/server", () => ({

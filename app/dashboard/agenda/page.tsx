@@ -9,8 +9,7 @@ import { CalendarDays, CalendarClock, CalendarPlus, Download } from "lucide-reac
 import { localDayRangeUtc, toLocalDate } from "@/lib/booking/availability";
 import { parseAgendaSearchParams } from "@/lib/agenda/view";
 import { fetchAgendaWeek } from "@/lib/agenda/get-week";
-import { UpgradePrompt } from "@/components/upgrade-prompt";
-import { isProPlan } from "@/lib/plan/plan";
+import { hasAccess as businessHasAccess } from "@/lib/plan/access";
 import { AgendaView } from "./agenda-view";
 
 export const metadata: Metadata = { title: "Reservas — AgendFined" };
@@ -55,7 +54,7 @@ export default async function AgendaPage({
 
   const todayBookings = todayCount ?? 0;
   const upcoming = upcomingCount ?? 0;
-  const isPro = isProPlan(business.plan);
+  const hasAccess = businessHasAccess(business);
 
   return (
     <div className="space-y-6">
@@ -65,11 +64,12 @@ export default async function AgendaPage({
           <p className="mt-2 text-sm text-muted-foreground">Acompanhe e gerencie seus atendimentos.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {/* Owner calendar export (INC-3 / US25, Pro): built on demand by the
-              route, never embedded in this page (#215). A plain styled link:
-              wrapping a <Button> in <a> nests a button in a link and trips
-              Base UI's native-button check. */}
-          {isPro && upcoming > 0 && (
+          {/* Owner calendar export (INC-3 / US25; needs access, ADR 0013):
+              built on demand by the route, never embedded in this page (#215).
+              A plain styled link: wrapping a <Button> in <a> nests a button in
+              a link and trips Base UI's native-button check. A suspended
+              negócio is told why by the painel banner. */}
+          {hasAccess && upcoming > 0 && (
             <a
               href="/dashboard/agenda/exportar"
               download="agendfined-agenda.ics"
@@ -80,10 +80,12 @@ export default async function AgendaPage({
             </a>
           )}
           {/* Cliente que marcou por WhatsApp, telefone ou no balcão (#193). */}
-          <Link href="/dashboard/agenda/nova" className={buttonVariants({ size: "sm" })}>
-            <CalendarPlus className="size-4" />
-            Nova reserva
-          </Link>
+          {hasAccess && (
+            <Link href="/dashboard/agenda/nova" className={buttonVariants({ size: "sm" })}>
+              <CalendarPlus className="size-4" />
+              Nova reserva
+            </Link>
+          )}
         </div>
       </div>
 
@@ -125,21 +127,12 @@ export default async function AgendaPage({
         bookings={week.bookings}
         timezone={business.timezone}
         businessName={business.name}
-        automaticReminders={isPro}
+        automaticReminders={hasAccess}
+        cancelOnly={!hasAccess}
         initialDate={day}
         initialStatus={initialFilters.status}
         hasAnyBooking={(anyCount ?? 0) > 0}
       />
-
-      {/* After the list, and compact: on a phone the reservations must stay
-          above the fold. */}
-      {!isPro && (
-        <UpgradePrompt
-          compact
-          title="Exportação de agenda é um recurso PROFISSIONAL"
-          description="Assine o PROFISSIONAL para exportar sua agenda em .ics, que você pode importar no Google Calendar."
-        />
-      )}
     </div>
   );
 }

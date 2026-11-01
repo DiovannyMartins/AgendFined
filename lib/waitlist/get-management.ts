@@ -1,7 +1,7 @@
 // Server-side retrieval of the owner's waitlist management view (issue #22, ADR
-// 0008). It resolves the current business and builds the list of waitlist entries
-// the dashboard renders, but only after the Pro gate passes: a Free business gets
-// `upgrade_required` and never sees its waitlist. The gate + mapping live in the
+// 0013). It resolves the current business and builds the list of waitlist entries
+// the dashboard renders, but only after the access gate passes: a suspended negócio gets
+// `access_required` and never sees its waitlist. The gate + mapping live in the
 // pure module; this file is only the boundary that fetches. The deps are
 // injectable so the boundary can be exercised with a real user-scoped client
 // (RLS) in the integration tests.

@@ -4,13 +4,26 @@ import { useState, useTransition } from "react";
 import { Switch } from "@/components/ui/switch";
 import { toggleService } from "@/lib/services/actions";
 
-export function ServiceToggle({ id, name, isActive }: { id: string; name: string; isActive: boolean }) {
+export function ServiceToggle({
+  id,
+  name,
+  isActive,
+  disabled = false,
+}: {
+  id: string;
+  name: string;
+  isActive: boolean;
+  // A suspended negócio (ADR 0013): the switch is not a native control, so the
+  // page fieldset does not disable it.
+  disabled?: boolean;
+}) {
   const [checked, setChecked] = useState(isActive);
   const [, startTransition] = useTransition();
 
   return (
     <Switch
       checked={checked}
+      disabled={disabled}
       onCheckedChange={(next) => {
         setChecked(next);
         startTransition(() => {

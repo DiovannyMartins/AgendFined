@@ -5,6 +5,8 @@ import { formatServicePrice } from "@/lib/format/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles } from "lucide-react";
+import { hasAccess } from "@/lib/plan/access";
+import { SuspendedFieldset } from "@/components/suspended-fieldset";
 import { ServiceForm } from "./service-form";
 import { ServiceToggle } from "./service-toggle";
 import { ServiceDelete } from "./service-delete";
@@ -38,7 +40,8 @@ export default async function ServicosPage() {
   }
 
   return (
-    <div className="space-y-6">
+    // A suspended negócio (ADR 0013) sees its serviços but cannot change them.
+    <SuspendedFieldset suspended={!!business && !hasAccess(business)} className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Serviços</h1>
@@ -75,7 +78,12 @@ export default async function ServicosPage() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <ServiceToggle id={service.id} name={service.name} isActive={service.is_active} />
+                <ServiceToggle
+                  id={service.id}
+                  name={service.name}
+                  isActive={service.is_active}
+                  disabled={!!business && !hasAccess(business)}
+                />
                 <ServiceForm
                   service={{
                     id: service.id,
@@ -98,6 +106,6 @@ export default async function ServicosPage() {
           ))}
         </div>
       )}
-    </div>
+    </SuspendedFieldset>
   );
 }

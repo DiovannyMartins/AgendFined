@@ -21,12 +21,12 @@ import {
   enforcePublicRescheduleLimit,
   getClientIp,
 } from "@/lib/booking/rate-limit";
-import { getEffectiveBookingWindowDays, type Plan } from "@/lib/plan/plan";
+import { getEffectiveBookingWindowDays } from "@/lib/plan/access";
 import { sendCustomerRescheduledEmail } from "@/lib/email/booking-reschedule";
 import { notifyOwner } from "@/lib/bookings/owner-notification";
 import { runAfterResponse, syncGoogleCalendarBookingAfterResponse } from "@/lib/after-response";
 import { buildPublicConfirmationUrl } from "@/lib/bookings/public-booking-url";
-import { BOOKING_ALREADY_STARTED_MESSAGE } from "@/lib/bookings/public-status";
+import { BOOKING_ALREADY_STARTED_MESSAGE, SUSPENDED_BOOKING_MESSAGE } from "@/lib/bookings/public-status";
 import { resolveAppOrigin } from "@/lib/app-origin";
 
 // Remarcação pelo cliente (#194, ADR 0010), through the private link of the
@@ -53,6 +53,7 @@ export type PublicRescheduleState =
         | "SLOT_TAKEN"
         | "SAME_START"
         | "SERVICE_INACTIVE"
+        | "BUSINESS_SUSPENDED"
         | "DB_ERROR";
       message: string;
     };
@@ -71,7 +72,7 @@ type RescheduleContext = {
     slot_interval_minutes: number;
     min_notice_minutes: number;
     booking_window_days: number;
-    plan: Plan;
+    has_access: boolean;
     timezone: string;
   };
 };
@@ -80,6 +81,14 @@ const REJECTED: PublicRescheduleState = {
   status: "error",
   code: "INVALID_TOKEN",
   message: "Não foi possível remarcar esta reserva.",
+};
+
+// A suspended negócio (ADR 0013) keeps its reservas, which the cliente can still
+// cancel, but takes no new horário.
+const SUSPENDED: PublicRescheduleState = {
+  status: "error",
+  code: "BUSINESS_SUSPENDED",
+  message: SUSPENDED_BOOKING_MESSAGE,
 };
 
 const SLOT_TAKEN: PublicRescheduleState = {
@@ -99,19 +108,25 @@ async function loadContext(admin: ServerClient, code: string, token: string): Pr
     .maybeSingle();
   if (!booking) return null;
 
-  const { data: business } = await admin
-    .from("businesses")
-    .select("id, is_active, slot_interval_minutes, min_notice_minutes, booking_window_days, plan, timezone")
-    .eq("id", booking.business_id)
-    .maybeSingle();
-  return business ? { booking, business } : null;
+  const [{ data: business }, { data: hasAccess, error: accessError }] = await Promise.all([
+    admin
+      .from("businesses")
+      .select("id, is_active, slot_interval_minutes, min_notice_minutes, booking_window_days, timezone")
+      .eq("id", booking.business_id)
+      .maybeSingle(),
+    admin.rpc("business_has_access", { p_business_id: booking.business_id }),
+  ]);
+  if (!business) return null;
+  // A failed lookup reads as suspended (ADR 0013): the database refuses the
+  // move anyway, and the cliente gets the same message.
+  return { booking, business: { ...business, has_access: !accessError && hasAccess === true } };
 }
 
 function publicRules(business: RescheduleContext["business"]) {
   return {
     slotIntervalMinutes: business.slot_interval_minutes,
     minNoticeMinutes: business.min_notice_minutes,
-    bookingWindowDays: getEffectiveBookingWindowDays(business.plan, business.booking_window_days),
+    bookingWindowDays: getEffectiveBookingWindowDays(business.booking_window_days),
     timezone: business.timezone,
   };
 }
@@ -170,7 +185,7 @@ export async function getPublicRescheduleSlots(
   code: string,
   token: string,
   date: string,
-): Promise<{ available: string[]; error?: "rejected" | "validation" | "rate_limited" | "db_error" }> {
+): Promise<{ available: string[]; error?: "rejected" | "validation" | "rate_limited" | "db_error" | "suspended" }> {
   const parsedCode = publicCodeSchema.safeParse(code);
   if (!parsedCode.success || !isValidCancelToken(token)) return { available: [], error: "rejected" };
   if (!publicSlotSchema.shape.date.safeParse(date).success) return { available: [], error: "validation" };
@@ -191,6 +206,7 @@ export async function getPublicRescheduleSlots(
 
   const context = await loadContext(admin, parsedCode.data, token);
   if (!context || !isReschedulable(context)) return { available: [], error: "rejected" };
+  if (!context.business.has_access) return { available: [], error: "suspended" };
 
   try {
     allowed = await enforceAvailabilityBusinessRateLimit(admin, ip, context.business.id);
@@ -237,6 +253,7 @@ export async function reschedulePublicBooking(
 
   const context = await loadContext(admin, parsedCode.data, token);
   if (!context || !isReschedulable(context)) return REJECTED;
+  if (!context.business.has_access) return SUSPENDED;
   if (Date.parse(context.booking.start_at) <= Date.now()) {
     return { status: "error", code: "ALREADY_STARTED", message: BOOKING_ALREADY_STARTED_MESSAGE };
   }
@@ -365,6 +382,7 @@ function rpcErrorState(error: { message?: string; code?: string } | null): Publi
   ) {
     return SLOT_TAKEN;
   }
+  if (/BUSINESS_SUSPENDED/.test(message)) return SUSPENDED;
   if (/RESCHEDULE_REJECTED|BUSINESS_INACTIVE/.test(message)) return REJECTED;
   return { status: "error", code: "DB_ERROR", message: "Não foi possível remarcar a reserva. Tente novamente." };
 }

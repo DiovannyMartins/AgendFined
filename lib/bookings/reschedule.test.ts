@@ -93,7 +93,7 @@ beforeEach(() => {
     slug: "barbearia-demo",
     phone: "11987654321",
     timezone: "America/Sao_Paulo",
-    plan: "free",
+    has_access: true,
     slot_interval_minutes: 60,
     min_notice_minutes: 120,
     booking_window_days: 60,
@@ -197,7 +197,8 @@ describe("rescheduleOwnerBooking (#194)", () => {
 
   it("aceita além da janela configurada, dentro do limite do plano, e recusa além dele", async () => {
     expect((await reschedule(form({ date: "2027-01-11", startTime: "10:00" }))).code).toBeUndefined();
-    expect((await reschedule(form({ date: "2027-03-01", startTime: "10:00" }))).code).toBe("booking_window");
+    expect((await reschedule(form({ date: "2027-03-01", startTime: "10:00" }))).code).toBeUndefined();
+    expect((await reschedule(form({ date: "2027-11-01", startTime: "10:00" }))).code).toBe("booking_window");
   });
 
   it("pede confirmação de encaixe fora da disponibilidade, com a duração do snapshot", async () => {

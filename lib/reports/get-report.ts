@@ -1,7 +1,7 @@
-// Server-side retrieval of the billing report (INC-2, Pro feature). It resolves
+// Server-side retrieval of the billing report (INC-2). It resolves
 // the selected period and computes the report from the owner's own bookings,
-// aggregated in the database (RLS scopes them), but only after the Pro gate
-// passes: a Free business gets `upgrade_required` and never sees report data.
+// aggregated in the database (RLS scopes them), but only after the access gate
+// passes (ADR 0013): a suspended negócio gets `access_required` and no data.
 // The gate + math live in the pure module; this file is only the boundary that
 // fetches. The deps are injectable so the boundary can be exercised with a real
 // user-scoped client (RLS) in the integration tests.

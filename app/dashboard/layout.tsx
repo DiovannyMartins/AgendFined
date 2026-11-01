@@ -6,6 +6,7 @@ import { getCurrentBusiness } from "@/lib/business/queries";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { DashboardNav } from "./nav";
 import { GraceBanner } from "./grace-banner";
+import { AccessBanner } from "./access-banner";
 import { REQUEST_PATH_HEADER, getVerifiedAssurance, mfaChallengePath, requiresMfaChallenge } from "@/lib/auth/assurance";
 
 export const metadata: Metadata = {
@@ -34,14 +35,25 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <main id="main-content" className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-10 lg:py-10">
           <div className="mx-auto max-w-6xl">
             {business && (
-              <GraceBanner
-                business={{
-                  id: business.id,
-                  plan: business.plan,
-                  timezone: business.timezone,
-                  currentSubscriptionId: business.current_subscription_id,
-                }}
-              />
+              <>
+                <AccessBanner
+                  business={{
+                    id: business.id,
+                    plan: business.plan,
+                    currentSubscriptionId: business.current_subscription_id,
+                    hasAccess: business.has_access,
+                    trialEndsAt: business.trial_ends_at,
+                  }}
+                />
+                <GraceBanner
+                  business={{
+                    id: business.id,
+                    plan: business.plan,
+                    timezone: business.timezone,
+                    currentSubscriptionId: business.current_subscription_id,
+                  }}
+                />
+              </>
             )}
             {children}
           </div>

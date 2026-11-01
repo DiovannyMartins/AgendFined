@@ -41,7 +41,7 @@ describe("GraceBanner", () => {
 
     expect(
       screen.getByText(
-        "Não conseguimos cobrar a sua assinatura. Atualize a forma de pagamento até 27/10/2026 para manter o PROFISSIONAL.",
+        "Não conseguimos cobrar a sua assinatura. Atualize a forma de pagamento até 27/10/2026 para não suspender o negócio.",
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Atualizar pagamento" })).toHaveAttribute(
@@ -50,7 +50,7 @@ describe("GraceBanner", () => {
     );
   });
 
-  it("reminds a cancelled assinatura of the date the PROFISSIONAL ends", async () => {
+  it("reminds a cancelled assinatura of the date the access ends", async () => {
     vi.mocked(getSubscription).mockResolvedValue({
       plan: "pro",
       subscription: subscription({ status: "cancelled", gracePeriodEnd: "2026-11-21T15:00:00.000Z" }),
@@ -59,7 +59,7 @@ describe("GraceBanner", () => {
 
     render((await GraceBanner({ business: BUSINESS }))!);
 
-    expect(screen.getByText(/Seu PROFISSIONAL fica ativo até 21\/11\/2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Seu acesso continua até 21\/11\/2026/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Reativar assinatura" })).toBeInTheDocument();
   });
 
@@ -75,7 +75,7 @@ describe("GraceBanner", () => {
     expect(await GraceBanner({ business: BUSINESS })).toBeNull();
   });
 
-  it("skips the assinatura read on the Grátis plan", async () => {
+  it("skips the assinatura read without a subscription (plan free)", async () => {
     vi.mocked(getSubscription).mockClear();
     expect(await GraceBanner({ business: { ...BUSINESS, plan: "free" } })).toBeNull();
     expect(getSubscription).not.toHaveBeenCalled();

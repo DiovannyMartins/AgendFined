@@ -9,6 +9,7 @@ import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { formatPhoneBR } from "@/lib/format/phone";
 import { formatWhenWithTimezone } from "@/lib/format/when";
 import { formatPublicCode } from "@/lib/bookings/public-code";
+import { hasAccess } from "@/lib/plan/access";
 import { RescheduleForm } from "./reschedule-form";
 
 export const metadata: Metadata = { title: "Remarcar reserva — AgendFined" };
@@ -72,7 +73,11 @@ export default async function RemarcarReservaPage({ params }: { params: Promise<
       </div>
 
       <div className="max-w-2xl rounded-xl border border-border bg-card/40 p-4">
-        {reschedulable ? (
+        {!hasAccess(business) ? (
+          <p className="text-sm text-muted-foreground">
+            Seu negócio está suspenso. Assine o Plano AgendFined para remarcar; cancelar continua disponível na agenda.
+          </p>
+        ) : reschedulable ? (
           <RescheduleForm
             bookingId={booking.id}
             currentDate={toLocalDate(new Date(booking.start_at), timezone)}

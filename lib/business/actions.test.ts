@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { state } = vi.hoisted(() => ({
   state: {
-    existing: null as { id: string; plan: string; slot_interval_minutes?: number } | null,
+    existing: null as { id: string; slot_interval_minutes?: number } | null,
+    hasAccess: true,
     writes: [] as string[],
     insertError: null as { code?: string; message: string } | null,
     currentTimezone: "America/Sao_Paulo",
@@ -14,6 +15,7 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
     auth: { getUser: async () => ({ data: { user: { id: "user-1" } } }) },
+    rpc: async () => ({ data: state.hasAccess, error: null }),
     from: (table: string) => {
       const chain = {
         select: () => chain,
@@ -42,7 +44,7 @@ vi.mock("@/lib/supabase/server", () => ({
 import { createBusiness, updateBusiness } from "./actions";
 
 const INITIAL = { ok: true as const, data: undefined };
-const EXISTING = { id: "business-1", plan: "free" };
+const EXISTING = { id: "business-1" };
 
 function form(slug: string, timezone = "America/Sao_Paulo", slotIntervalMinutes = "30") {
   const fd = new FormData();
@@ -58,6 +60,7 @@ function form(slug: string, timezone = "America/Sao_Paulo", slotIntervalMinutes 
 
 beforeEach(() => {
   state.existing = null;
+  state.hasAccess = true;
   state.writes = [];
   state.insertError = null;
   state.currentTimezone = "America/Sao_Paulo";
@@ -184,6 +187,21 @@ describe("updateBusiness", () => {
     const result = await updateBusiness(INITIAL, form("barbearia-demo"));
     expect(result).toEqual({ ok: true, data: undefined });
     expect(state.writes).toEqual(["update:businesses"]);
+  });
+
+  it("refuses to change the configurações of a suspended negócio (ADR 0013)", async () => {
+    state.existing = EXISTING;
+    state.hasAccess = false;
+    const result = await updateBusiness(INITIAL, form("barbearia-demo"));
+    expect(result).toMatchObject({ ok: false, code: "ACCESS_REQUIRED" });
+    expect(state.writes).toEqual([]);
+  });
+
+  it("accepts a janela of up to 365 days, the Plano AgendFined's limit", async () => {
+    state.existing = EXISTING;
+    const fd = form("barbearia-demo");
+    fd.set("bookingWindowDays", "365");
+    expect(await updateBusiness(INITIAL, fd)).toEqual({ ok: true, data: undefined });
   });
 
   it("never creates a business", async () => {

@@ -1066,12 +1066,12 @@ export type Database = {
       get_public_booking_page: {
         Args: { p_slug: string }
         Returns: {
+          accepts_bookings: boolean
           booking_window_days: number
           description: string | null
           has_availability: boolean
           id: string
           name: string
-          offers_waitlist: boolean
           phone: string | null
           search_indexing_enabled: boolean
           services: Json

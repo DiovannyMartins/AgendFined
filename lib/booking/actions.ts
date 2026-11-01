@@ -38,8 +38,7 @@ import {
   type PublicWriteKind,
 } from "@/lib/booking/rate-limit";
 import { verifyTurnstile } from "@/lib/booking/anti-bot";
-import { assertProPlan, getEffectiveBookingWindowDays } from "@/lib/plan/plan";
-import type { Plan } from "@/lib/plan/plan";
+import { getEffectiveBookingWindowDays } from "@/lib/plan/access";
 import { sendBookingConfirmationEmail } from "@/lib/email/booking-confirmation";
 import { sendCustomerCancelledEmail } from "@/lib/email/booking-cancellation";
 import { sendWaitlistJoinedEmail } from "@/lib/email/waitlist-joined";
@@ -53,7 +52,7 @@ import {
 import { runAfterResponse, syncGoogleCalendarBookingAfterResponse } from "@/lib/after-response";
 import { buildPrivateConfirmationUrl, type ConfirmationEmailStatus } from "@/lib/bookings/private-confirmation";
 import { buildPublicBookingUrl } from "@/lib/bookings/public-booking-url";
-import { BOOKING_ALREADY_STARTED_MESSAGE } from "@/lib/bookings/public-status";
+import { BOOKING_ALREADY_STARTED_MESSAGE, SUSPENDED_BOOKING_MESSAGE } from "@/lib/bookings/public-status";
 import { resolveAppOrigin } from "@/lib/app-origin";
 import { customerCalendarLinks } from "@/lib/gcal/customer-event";
 
@@ -77,6 +76,14 @@ const INVALID_SLOT_RESULT: ActionResult = {
   ok: false,
   code: "validation",
   message: "Não foi possível validar o serviço ou o horário. Escolha novamente.",
+};
+
+// A suspended negócio (ADR 0013): the database refuses the reserva and the
+// lista de espera, and the cliente gets one message that names no plan.
+const SUSPENDED_RESULT: ActionResult = {
+  ok: false,
+  code: "business_suspended",
+  message: SUSPENDED_BOOKING_MESSAGE,
 };
 
 const waitlistCustomerSchema = waitlistSchema.pick({
@@ -174,7 +181,7 @@ export async function createBooking(input: {
   const rules = {
     slotIntervalMinutes: business.slot_interval_minutes,
     minNoticeMinutes: business.min_notice_minutes,
-    bookingWindowDays: getEffectiveBookingWindowDays(business.plan, business.booking_window_days),
+    bookingWindowDays: getEffectiveBookingWindowDays(business.booking_window_days),
     timezone: business.timezone,
   };
   if (!isWithinWindow(input.date, rules, new Date())) {
@@ -213,11 +220,12 @@ export async function createBooking(input: {
 
   if (error) {
     const message = String(error.message ?? "");
+    if (/BUSINESS_SUSPENDED/.test(message)) return SUSPENDED_RESULT;
     if (/BOOKING_OUTSIDE_PLAN_WINDOW/i.test(message)) {
       return {
         ok: false,
         code: "booking_window",
-        message: "O plano deste negócio não permite reservas para essa data.",
+        message: "Este negócio não aceita reservas para essa data.",
       };
     }
     if (message.includes("bookings_no_overlap") || /overlap|SLOT|23P01/i.test(message)) {
@@ -583,17 +591,6 @@ export async function joinWaitlist(input: {
   if (!preamble.ok) return preamble.result;
   const { business } = preamble;
 
-  // Waitlist management is a PROFISSIONAL feature (ADR 0008): a Grátis business
-  // has nobody to follow the request up, so the entry is refused before any
-  // write. The message never names the plan to the customer.
-  if (!assertProPlan(business).ok) {
-    return {
-      ok: false,
-      code: "waitlist_unavailable",
-      message: "Esse horário acabou de ser reservado. Escolha outro.",
-    };
-  }
-
   // A horário inside the horário de verão gap would be stored as another
   // instant than the one the cliente chose (#190).
   if (!localTimeExists(input.date, input.startTime, business.timezone)) return INVALID_SLOT_RESULT;
@@ -631,6 +628,7 @@ export async function joinWaitlist(input: {
 
   if (error || !data) {
     const msg = String(error?.message ?? "");
+    if (/BUSINESS_SUSPENDED/.test(msg)) return SUSPENDED_RESULT;
     if (/WAITLIST_SLOT_NOT_OCCUPIED/i.test(msg)) {
       return { ok: false, code: "slot_free", message: "Esse horário está livre — você pode reservá-lo." };
     }
@@ -764,7 +762,6 @@ type ResolvedBusiness = {
   owner_id: string;
   name: string;
   phone: string;
-  plan: Plan | null;
   slot_interval_minutes: number;
   min_notice_minutes: number;
   booking_window_days: number;

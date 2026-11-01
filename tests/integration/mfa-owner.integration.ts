@@ -1,6 +1,6 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
-import { adminClient, anonClientForUser, verifyTotpThroughApp } from "./index";
+import { adminClient, anonClientForUser, verifyTotpThroughApp, ACTIVE_TRIAL_ENDS_AT } from "./index";
 
 const admin = adminClient();
 const stamp = randomBytes(5).toString("hex");
@@ -61,6 +61,7 @@ describe("MFA and owner-only business access with disposable accounts", () => {
       name: `Security ${stamp}`,
       slug: `security-${stamp}`,
       phone: "+5511999999999",
+      trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
     }).select("id").single();
     if (businessError || !business) throw businessError;
     businessId = business.id;

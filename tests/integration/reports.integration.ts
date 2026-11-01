@@ -1,13 +1,14 @@
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
-import { adminClient, anonClientForUser, retryOnFk } from "./index";
+import { adminClient, anonClientForUser, retryOnFk, businessWithAccess, ACTIVE_TRIAL_ENDS_AT, SUSPENDED_TRIAL_ENDS_AT } from "./index";
 import { buildBillingReport, type FetchReportGroups, type ReportBooking } from "@/lib/reports/reports";
 import { getBillingReport } from "@/lib/reports/get-report";
 
-// Integration tests against the real Supabase project. INC-2 (Pro reports): the
+// Integration tests against the real Supabase project. INC-2 (reports): the
 // dashboard reads the owner's bookings via RLS and computes the report from the
 // snapshot columns. This block verifies (a) an owner can read their own bookings,
 // (b) the pure report math is correct on real rows, (c) an outsider cannot
-// read them, and (d) the plan gate (the read boundary) denies Free and lets Pro
+// read them, and (d) the access gate (the read boundary, ADR 0013) denies a
+// suspended negócio, whose bookings stay readable, and lets one in teste
 // through. RUN: npm run test:integration.
 const stamp = Date.now().toString().slice(-8);
 const EMAIL = `relatorio.${stamp}@agendfined.dev`;
@@ -59,6 +60,7 @@ beforeAll(async () => {
         owner_id: ownerId,
         name: "Agenda Relatório",
         slug: `agenda-relatorio-${stamp}`,
+        trial_ends_at: SUSPENDED_TRIAL_ENDS_AT,
         phone: "+5511987654321",
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
@@ -144,8 +146,8 @@ beforeAll(async () => {
     return biz!.id;
   });
 
-  // A Pro business (own owner + own user, since a business has one owner) whose
-  // bookings the plan gate must let through.
+  // A business in teste (own owner + own user, since a business has one owner) whose
+  // bookings the access gate must let through.
   const { data: pro } = await admin.auth.admin.createUser({
     email: PRO_EMAIL,
     password: PASSWORD,
@@ -164,7 +166,7 @@ beforeAll(async () => {
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
         booking_window_days: 60,
-        plan: "pro",
+        trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
       })
       .select("*")
       .single();
@@ -259,35 +261,25 @@ describe("INC-2 relatórios: dados + RLS", () => {
   });
 });
 
-describe("INC-2 relatórios: gate de plano (free negado, pro liberado)", () => {
-  it("denies a Free business with upgrade_required before any fetch", async () => {
-    const { data: freeBiz } = await admin
-      .from("businesses")
-      .select("id, plan")
-      .eq("id", businessId)
-      .single();
-    expect(freeBiz?.plan).toBe("free");
+describe("INC-2 relatórios: gate de acesso (suspenso negado, em teste liberado)", () => {
+  it("denies a suspended business with access_required before any fetch", async () => {
+    expect((await businessWithAccess(businessId)).has_access).toBe(false);
 
     const fetchSpy = vi.fn<FetchReportGroups>(async () => []);
     const result = await getBillingReport("all", {
-      getBusiness: async () => ({ id: businessId, plan: "free" }),
+      getBusiness: () => businessWithAccess(businessId),
       fetchGroups: fetchSpy,
     });
-    expect(result).toEqual({ status: "upgrade_required" });
+    expect(result).toEqual({ status: "access_required" });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("lets a Pro business see the report through the user-scoped boundary", async () => {
-    const { data: proBiz } = await admin
-      .from("businesses")
-      .select("id, plan")
-      .eq("id", proBusinessId)
-      .single();
-    expect(proBiz?.plan).toBe("pro");
+  it("lets a business in teste see the report through the user-scoped boundary", async () => {
+    expect((await businessWithAccess(proBusinessId)).has_access).toBe(true);
 
     const proOwner = await anonClientForUser(PRO_EMAIL, PASSWORD);
     const result = await getBillingReport("all", {
-      getBusiness: async () => ({ id: proBusinessId, plan: "pro" }),
+      getBusiness: () => businessWithAccess(proBusinessId),
       fetchGroups: async (businessId, range) => {
         const { data, error } = await proOwner.rpc("billing_report_groups", {
           p_business_id: businessId,

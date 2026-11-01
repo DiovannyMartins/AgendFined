@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentBusiness } from "@/lib/business/queries";
-import { isProPlan } from "@/lib/plan/plan";
+import { hasAccess } from "@/lib/plan/access";
 import { buildGoogleCalendarAuthorizationUrl } from "@/lib/google-calendar/oauth";
 import type { GoogleCalendarCallbackStatus } from "@/lib/google-calendar/callback-status";
 
@@ -16,7 +16,7 @@ function settingsRedirect(request: NextRequest, status: GoogleCalendarCallbackSt
 export async function GET(request: NextRequest) {
   const business = await getCurrentBusiness();
   if (!business) return settingsRedirect(request, "unauthorized");
-  if (!isProPlan(business.plan)) return settingsRedirect(request, "upgrade_required");
+  if (!hasAccess(business)) return settingsRedirect(request, "access_required");
 
   const state = randomBytes(32).toString("hex");
   try {

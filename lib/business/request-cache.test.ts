@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // React.cache only memoizes inside a server render; outside one (vitest) it is
 // a passthrough. This stand-in models one request's scope (#214).
 const { calls, memo } = vi.hoisted(() => ({
-  calls: { auth: 0, tables: [] as string[] },
+  calls: { auth: 0, tables: [] as string[], rpcs: [] as string[] },
   memo: new Map<unknown, Map<string, unknown>>(),
 }));
 
@@ -34,6 +34,10 @@ vi.mock("@/lib/supabase/server", () => ({
       calls.tables.push(table);
       return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: BUSINESS }) }) }) };
     },
+    rpc: async (fn: string) => {
+      calls.rpcs.push(fn);
+      return { data: true, error: null };
+    },
   }),
 }));
 
@@ -45,6 +49,7 @@ describe("painel request cache", () => {
   beforeEach(() => {
     calls.auth = 0;
     calls.tables = [];
+    calls.rpcs = [];
     memo.forEach((store) => store.clear());
   });
 
@@ -55,10 +60,11 @@ describe("painel request cache", () => {
     await getCurrentBusiness();
 
     expect(calls.auth).toBe(1);
+    expect(calls.rpcs).toEqual(["business_has_access"]);
     expect(calls.tables).toEqual(["businesses"]);
   });
 
-  it("does not query subscriptions for a Grátis negócio without an assinatura", async () => {
+  it("does not query subscriptions for a negócio without an assinatura", async () => {
     const business = await getCurrentBusiness();
     const result = await getSubscription({
       id: business!.id,

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { availabilitySchema, blockSchema } from "@/lib/validation/schemas";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
 import { getCurrentBusiness } from "@/lib/business/queries";
+import { ACCESS_REQUIRED_MESSAGE, assertAccess } from "@/lib/plan/access";
 import { formatWhen } from "@/lib/format/when";
 import type { ActionResult } from "@/lib/business/actions";
 import { localDateTimeToUtc, overlaps } from "@/lib/booking/availability";
@@ -17,6 +18,10 @@ import {
 } from "@/lib/availability/outside-bookings";
 
 export type { ActionResult };
+
+// A suspended negócio (ADR 0013) keeps its data read-only; RLS refuses the
+// write too.
+const ACCESS_REQUIRED: ActionResult = { ok: false, code: "ACCESS_REQUIRED", message: ACCESS_REQUIRED_MESSAGE };
 
 // What an edit or removal left behind: reservas confirmadas e futuras that no
 // faixa covers anymore (#192). `agendaDate` opens the agenda on the first one.
@@ -93,6 +98,7 @@ export async function setAvailability(
 
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
+  if (!assertAccess(business).ok) return ACCESS_REQUIRED;
 
   const supabase = await createClient();
 
@@ -162,6 +168,7 @@ export async function updateAvailability(
 
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
+  if (!assertAccess(business).ok) return ACCESS_REQUIRED;
 
   const supabase = await createClient();
 
@@ -215,6 +222,7 @@ export async function updateAvailability(
 export async function deleteAvailability(id: string): Promise<ActionResult<AvailabilityChange>> {
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
+  if (!assertAccess(business).ok) return ACCESS_REQUIRED;
   const supabase = await createClient();
   const { error, data } = await supabase
     .from("availability")
@@ -249,6 +257,7 @@ export async function createBlock(
 
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
+  if (!assertAccess(business).ok) return ACCESS_REQUIRED;
 
   // datetime-local has no offset: resolve it in the business timezone here so
   // the conflict check and the insert use the same UTC instants (§10.2).
@@ -311,6 +320,7 @@ export async function createBlock(
 export async function deleteBlock(id: string): Promise<ActionResult> {
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
+  if (!assertAccess(business).ok) return ACCESS_REQUIRED;
   const supabase = await createClient();
   const { error, data } = await supabase
     .from("availability_blocks")

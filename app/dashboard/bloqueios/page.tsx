@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { splitBlocksByTime } from "@/lib/availability/blocks";
+import { hasAccess } from "@/lib/plan/access";
+import { SuspendedFieldset } from "@/components/suspended-fieldset";
 import { BlockForm, BlockRow } from "./block-form";
 
 export const metadata: Metadata = { title: "Bloqueios — AgendFined" };
@@ -41,11 +43,14 @@ export default async function BloqueiosPage() {
         Bloqueie períodos para pausas, férias e exceções. Os horários bloqueados não aparecem para reserva.
       </p>
 
-      <div className="rounded-xl border border-border bg-card/40 p-4">
-        <BlockForm timezone={business?.timezone} />
-      </div>
+      {/* A suspended negócio (ADR 0013) sees its bloqueios but cannot change them. */}
+      <SuspendedFieldset suspended={!!business && !hasAccess(business)} className="space-y-6">
+        <div className="rounded-xl border border-border bg-card/40 p-4">
+          <BlockForm timezone={business?.timezone} />
+        </div>
 
-      {current.length > 0 && <div className="mt-6 space-y-2">{current.map(renderRow)}</div>}
+        {current.length > 0 && <div className="mt-6 space-y-2">{current.map(renderRow)}</div>}
+      </SuspendedFieldset>
 
       {past.length > 0 && (
         <section className="mt-8 space-y-2">

@@ -22,8 +22,8 @@ const services = [
   { id: "svc-1", name: "Corte", description: null, durationMinutes: 30, priceCents: 5000 },
 ];
 
-async function fillAndSubmit(customerName: string, offersWaitlist = true) {
-  render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist={offersWaitlist} />);
+async function fillAndSubmit(customerName: string) {
+  render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} />);
   fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-20" } });
   fireEvent.click(await screen.findByRole("button", { name: "09:00" }));
   fireEvent.change(screen.getByLabelText("Nome"), { target: { value: customerName } });
@@ -122,7 +122,7 @@ describe("BookingWidget", () => {
 
   // #195: o e-mail é opcional; o formulário não trava sem ele.
   it("lets the cliente book without an e-mail", () => {
-    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} />);
 
     const email = screen.getByLabelText("E-mail (opcional)");
     expect(email).not.toBeRequired();
@@ -130,7 +130,7 @@ describe("BookingWidget", () => {
   });
 
   it("limits the date picker to the janela futura", () => {
-    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" bookingWindowDays={60} services={services} offersWaitlist />);
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" bookingWindowDays={60} services={services} />);
 
     const date = screen.getByLabelText("Escolha a data");
     expect(date).toHaveAttribute("min", "2026-10-18");
@@ -138,7 +138,7 @@ describe("BookingWidget", () => {
   });
 
   it("shows the selected slot as a pt-BR date", async () => {
-    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} />);
     fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-20" } });
     fireEvent.click(await screen.findByRole("button", { name: "09:00" }));
 
@@ -146,7 +146,7 @@ describe("BookingWidget", () => {
   });
 
   it("asks consent for the e-mail only when the cliente gives one", () => {
-    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} />);
 
     const consent = screen.getByRole("checkbox", { name: /Autorizo o tratamento/ });
     expect(consent).toHaveAccessibleName(expect.stringContaining("(nome, telefone e e-mail, se informado)"));
@@ -154,7 +154,7 @@ describe("BookingWidget", () => {
 
   it("associates the consent text to the checkbox explicitly", () => {
     const { container } = render(
-      <BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />,
+      <BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} />,
     );
 
     const consent = screen.getByRole("checkbox", { name: /Autorizo o tratamento/ });
@@ -164,7 +164,7 @@ describe("BookingWidget", () => {
 
   it("says once, in a live region, that the date has no slots", async () => {
     mockedFetchSlots.mockResolvedValue({ available: [] });
-    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} />);
     fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-20" } });
 
     const messages = await screen.findAllByText(/Nenhum horário disponível nesta data/);
@@ -174,7 +174,7 @@ describe("BookingWidget", () => {
 
   it("explains an invalid date instead of blaming the business", async () => {
     mockedFetchSlots.mockResolvedValue({ available: [], error: "validation" });
-    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} />);
     fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-20" } });
 
     expect(await screen.findByText("Não foi possível consultar esta data. Confira a data escolhida e tente novamente.")).toBeInTheDocument();
@@ -182,7 +182,7 @@ describe("BookingWidget", () => {
   });
 
   it("asks the browser for a phone keyboard and contact autofill", () => {
-    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} />);
 
     const phone = screen.getByLabelText("Telefone / WhatsApp");
     expect(phone).toHaveAttribute("type", "tel");
@@ -213,22 +213,28 @@ describe("BookingWidget", () => {
     expect(phone).toHaveAccessibleDescription("Informe um telefone com DDD.");
   });
 
-  it("without a waitlist, a taken slot only asks for another one and reloads the slots", async () => {
+  it("a negócio suspended mid-flow (ADR 0013) gets its own message and no waitlist offer", async () => {
     mockedCreateBooking.mockResolvedValue({
       ok: false,
-      code: "slot_taken",
-      message: "Esse horário não está mais disponível. Escolha outro.",
+      code: "business_suspended",
+      message: "O agendamento online deste negócio está indisponível no momento. Fale diretamente com o negócio.",
     });
-    mockedFetchSlots.mockResolvedValueOnce({ available: ["09:00", "09:30"] });
-    mockedFetchSlots.mockResolvedValueOnce({ available: ["09:30"] });
 
-    await fillAndSubmit("Maria Souza", false);
+    await fillAndSubmit("Maria Souza");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Esse horário acabou de ser reservado. Escolha outro.");
-    await waitFor(() => expect(screen.queryByRole("button", { name: "09:00" })).not.toBeInTheDocument());
-    expect(screen.getByRole("button", { name: "09:30" })).toHaveAttribute("aria-pressed", "false");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "O agendamento online deste negócio está indisponível no momento.",
+    );
     expect(screen.queryByRole("button", { name: "Entrar na lista de espera" })).not.toBeInTheDocument();
-    expect(screen.queryByText(/lista de espera/i)).not.toBeInTheDocument();
+  });
+
+  it("says the agendamento is unavailable when the slots lookup finds a suspended negócio", async () => {
+    mockedFetchSlots.mockResolvedValueOnce({ available: [], error: "suspended" });
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} />);
+
+    fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-20" } });
+
+    expect(await screen.findByText(/O agendamento online deste negócio está indisponível/)).toBeInTheDocument();
   });
 
   it("with a waitlist, a taken slot leaves the slot list but stays on offer for the waitlist", async () => {
@@ -278,7 +284,7 @@ describe("BookingWidget", () => {
 
   it("says the serviço is no longer available when it was turned off with the page open", async () => {
     mockedFetchSlots.mockResolvedValue({ available: [], error: "service_not_found" });
-    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} />);
     fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-20" } });
 
     expect(await screen.findByText("Este serviço não está mais disponível. Escolha outro.")).toBeInTheDocument();
@@ -314,7 +320,7 @@ describe("BookingWidget — consulta de horários", () => {
     mockedFetchSlots.mockImplementation(
       (_b, _s, _d, signal) => new Promise((resolve) => pending.push({ signal, resolve })),
     );
-    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} offersWaitlist />);
+    render(<BookingWidget businessId="biz-1" slug="barbearia" timezone="America/Sao_Paulo" services={services} />);
 
     fireEvent.change(screen.getByLabelText("Escolha a data"), { target: { value: "2026-10-20" } });
     await waitFor(() => expect(pending).toHaveLength(1));

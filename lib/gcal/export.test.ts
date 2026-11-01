@@ -10,13 +10,13 @@ import {
 // A fixed clock so the "upcoming" filter is deterministic.
 const now = new Date("2026-09-01T12:00:00.000Z");
 
-const proBusiness: GcalExportBusiness = {
-  id: "biz-pro",
-  plan: "pro",
+const activeBusiness: GcalExportBusiness = {
+  id: "biz-active",
+  has_access: true,
 };
-const freeBusiness: GcalExportBusiness = {
-  id: "biz-free",
-  plan: "free",
+const suspendedBusiness: GcalExportBusiness = {
+  id: "biz-suspended",
+  has_access: false,
 };
 
 const upcoming: GcalExportBooking = {
@@ -31,30 +31,30 @@ const upcoming: GcalExportBooking = {
 };
 const customer = { customer_name_snapshot: "Bia", customer_phone_snapshot: "11911112222", customer_note: null };
 
-describe("buildGcalExportResult (Pro gate, ADR 0008)", () => {
+describe("buildGcalExportResult (access gate, ADR 0013)", () => {
   it("returns no_business when there is no business", async () => {
     const result = await buildGcalExportResult(null, async () => [], now);
     expect(result).toEqual({ status: "no_business" });
   });
 
-  it("returns upgrade_required for a free business without fetching bookings", async () => {
+  it("returns access_required for a suspended business without fetching bookings", async () => {
     const spy = vi.fn<FetchGcalBookings>(async () => []);
-    const result = await buildGcalExportResult(freeBusiness, spy, now);
-    expect(result).toEqual({ status: "upgrade_required" });
+    const result = await buildGcalExportResult(suspendedBusiness, spy, now);
+    expect(result).toEqual({ status: "access_required" });
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it("fails closed for a business with a null plan", async () => {
+  it("fails closed for a business with an unknown access", async () => {
     const result = await buildGcalExportResult(
-      { id: "biz", plan: null },
+      { id: "biz", has_access: null },
       async () => [],
       now,
     );
-    expect(result).toEqual({ status: "upgrade_required" });
+    expect(result).toEqual({ status: "access_required" });
   });
 
-  it("returns ok with an importable .ics feed for a pro business", async () => {
-    const result = await buildGcalExportResult(proBusiness, async () => [upcoming], now);
+  it("returns ok with an importable .ics feed for a business with access", async () => {
+    const result = await buildGcalExportResult(activeBusiness, async () => [upcoming], now);
     expect(result.status).toBe("ok");
     if (result.status === "ok") {
       expect(result.count).toBe(1);
@@ -85,7 +85,7 @@ describe("buildGcalExportResult (Pro gate, ADR 0008)", () => {
         ...customer,
       },
     ];
-    const result = await buildGcalExportResult(proBusiness, async () => rows, now);
+    const result = await buildGcalExportResult(activeBusiness, async () => rows, now);
     expect(result.status).toBe("ok");
     if (result.status === "ok") {
       expect(result.count).toBe(1);
@@ -97,7 +97,7 @@ describe("buildGcalExportResult (Pro gate, ADR 0008)", () => {
 
   it("names the cliente and phone, and keys the event by the reserva id", async () => {
     const withNote = { ...upcoming, customer_note: "Alergia a lâmina" };
-    const result = await buildGcalExportResult(proBusiness, async () => [withNote], now);
+    const result = await buildGcalExportResult(activeBusiness, async () => [withNote], now);
     expect(result.status).toBe("ok");
     if (result.status === "ok") {
       expect(result.icsFeed).toContain("SUMMARY:Corte — Ana Souza");
@@ -114,7 +114,7 @@ describe("buildGcalExportResult (Pro gate, ADR 0008)", () => {
       { ...upcoming, customer_name_snapshot: "Ana\rSouza", customer_note: "linha 1\r\nlinha 2\u2028linha 3" },
       { ...upcoming, id: "b2", customer_note: "a\u0085b\rc\u0000d" },
     ];
-    const result = await buildGcalExportResult(proBusiness, async () => rows, now);
+    const result = await buildGcalExportResult(activeBusiness, async () => rows, now);
     expect(result.status).toBe("ok");
     if (result.status === "ok") {
       const lines = result.icsFeed.replace(/\r\n /g, "").split("\r\n");
@@ -129,8 +129,8 @@ describe("buildGcalExportResult (Pro gate, ADR 0008)", () => {
   });
 
   it("keeps the UID when the serviço is renamed, so a reimport does not duplicate", async () => {
-    const before = await buildGcalExportResult(proBusiness, async () => [upcoming], now);
-    const after = await buildGcalExportResult(proBusiness, async () => [{ ...upcoming, service_name_snapshot: "Corte novo" }], now);
+    const before = await buildGcalExportResult(activeBusiness, async () => [upcoming], now);
+    const after = await buildGcalExportResult(activeBusiness, async () => [{ ...upcoming, service_name_snapshot: "Corte novo" }], now);
     const uid = (r: typeof before) => (r.status === "ok" ? r.icsFeed.match(/^UID:.*$/m)?.[0] : null);
     expect(uid(after)).toBe(uid(before));
   });
@@ -139,7 +139,7 @@ describe("buildGcalExportResult (Pro gate, ADR 0008)", () => {
     const failing: FetchGcalBookings = async () => {
       throw new Error("boom");
     };
-    const result = await buildGcalExportResult(proBusiness, failing, now);
+    const result = await buildGcalExportResult(activeBusiness, failing, now);
     expect(result).toEqual({ status: "error" });
   });
 });

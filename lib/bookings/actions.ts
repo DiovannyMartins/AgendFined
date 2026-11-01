@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentBusiness } from "@/lib/business/queries";
+import { ACCESS_REQUIRED_MESSAGE, assertAccess } from "@/lib/plan/access";
 import { createClient } from "@/lib/supabase/server";
 import { canTransition, isTooEarlyFor, type BookingStatus } from "@/lib/bookings/transitions";
 import { bookingStatusSchema } from "@/lib/validation/schemas";
@@ -33,6 +34,11 @@ export async function updateBookingStatus(
 
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, message: "Configure seu negócio primeiro." };
+  // A suspended negócio (ADR 0013) can still cancel, so its clientes are told;
+  // concluir and no-show wait for the assinatura. RLS enforces the same rule.
+  if (nextStatus !== "cancelled" && !assertAccess(business).ok) {
+    return { ok: false, message: ACCESS_REQUIRED_MESSAGE };
+  }
 
   const supabase = await createClient();
 

@@ -6,7 +6,8 @@ import { PlanSection } from "./plan-section";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { isProPlan } from "@/lib/plan/plan";
+import { hasAccess } from "@/lib/plan/access";
+import { SuspendedFieldset } from "@/components/suspended-fieldset";
 import { getGoogleCalendarConnectionStatus } from "@/lib/google-calendar/queries";
 import { GoogleCalendarSection } from "./google-calendar-section";
 
@@ -30,24 +31,30 @@ export default async function ConfiguracoesPage({
     .order("weekday", { ascending: true })
     .order("start_time", { ascending: true });
 
+  // A suspended negócio (ADR 0013) sees its configurações but cannot change
+  // them; the Plano section, the conta and the segurança stay usable.
+  const suspended = !hasAccess(business);
+
   return (
     <div className="max-w-3xl space-y-10">
-      <BusinessForm
-        initial={{
-          name: business.name,
-          slug: business.slug,
-          phone: business.phone,
-          slotIntervalMinutes: business.slot_interval_minutes,
-          minNoticeMinutes: business.min_notice_minutes,
-          bookingWindowDays: business.booking_window_days,
-          timezone: business.timezone,
-          description: business.description,
-          plan: business.plan,
-        }}
-      />
+      <SuspendedFieldset suspended={suspended}>
+        <BusinessForm
+          initial={{
+            name: business.name,
+            slug: business.slug,
+            phone: business.phone,
+            slotIntervalMinutes: business.slot_interval_minutes,
+            minNoticeMinutes: business.min_notice_minutes,
+            bookingWindowDays: business.booking_window_days,
+            timezone: business.timezone,
+            description: business.description,
+          }}
+        />
+      </SuspendedFieldset>
 
       {/* Para um negócio novo, a disponibilidade é o passo que libera as
           reservas, então vem logo depois dos dados do negócio (#149). */}
+      <SuspendedFieldset suspended={suspended}>
       <section id="disponibilidade" className="scroll-mt-20">
         <h2 className="text-xl font-semibold">Disponibilidade recorrente</h2>
         <p className="mt-1 text-muted-foreground">
@@ -73,6 +80,7 @@ export default async function ConfiguracoesPage({
           )}
         </AvailabilityChangeProvider>
       </section>
+      </SuspendedFieldset>
 
       <PlanSection
         business={{
@@ -80,10 +88,12 @@ export default async function ConfiguracoesPage({
           plan: business.plan,
           timezone: business.timezone,
           currentSubscriptionId: business.current_subscription_id,
+          hasAccess: !suspended,
+          trialEndsAt: business.trial_ends_at,
         }}
       />
 
-      <GoogleCalendarSection connection={googleCalendar} isPro={isProPlan(business.plan)} callbackStatus={calendar} />
+      <GoogleCalendarSection connection={googleCalendar} hasAccess={!suspended} callbackStatus={calendar} />
 
       <section className="space-y-2">
         <h2 className="text-xl font-semibold">Segurança da conta</h2>

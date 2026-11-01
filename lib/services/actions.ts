@@ -6,9 +6,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { serviceSchema } from "@/lib/validation/schemas";
 import { parsePriceToCents } from "@/lib/format/currency";
 import { getCurrentBusiness } from "@/lib/business/queries";
+import { ACCESS_REQUIRED_MESSAGE, assertAccess } from "@/lib/plan/access";
 import type { ActionResult } from "@/lib/business/actions";
 
 export type { ActionResult };
+
+// A suspended negócio (ADR 0013) keeps its data read-only; RLS refuses the
+// write too.
+const ACCESS_REQUIRED: ActionResult = { ok: false, code: "ACCESS_REQUIRED", message: ACCESS_REQUIRED_MESSAGE };
 
 type ServicePayload = {
   name: string;
@@ -71,6 +76,7 @@ export async function createService(
 
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
+  if (!assertAccess(business).ok) return ACCESS_REQUIRED;
 
   const supabase = await createClient();
   if (await isServiceNameTaken(supabase, business.id, parsed.data.name)) return DUPLICATE_NAME;
@@ -109,6 +115,7 @@ export async function updateService(
 
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
+  if (!assertAccess(business).ok) return ACCESS_REQUIRED;
 
   const supabase = await createClient();
   if (await isServiceNameTaken(supabase, business.id, parsed.data.name, id)) return DUPLICATE_NAME;
@@ -138,6 +145,7 @@ export async function updateService(
 export async function toggleService(id: string, isActive: boolean): Promise<ActionResult> {
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
+  if (!assertAccess(business).ok) return ACCESS_REQUIRED;
 
   const supabase = await createClient();
   const { error, data } = await supabase
@@ -157,6 +165,7 @@ export async function toggleService(id: string, isActive: boolean): Promise<Acti
 export async function deleteService(id: string): Promise<ActionResult> {
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, code: "NO_BUSINESS", message: "Configure seu negócio primeiro." };
+  if (!assertAccess(business).ok) return ACCESS_REQUIRED;
 
   const admin = createAdminClient();
   const { data: result, error } = await admin.rpc("delete_service_if_unused", {
@@ -166,6 +175,7 @@ export async function deleteService(id: string): Promise<ActionResult> {
   });
 
   if (error) return { ok: false, code: "DB_ERROR", message: "Não foi possível excluir o serviço." };
+  if (result === "BUSINESS_SUSPENDED") return ACCESS_REQUIRED;
   if (result === "HAS_SCHEDULED_BOOKINGS") {
     return {
       ok: false,

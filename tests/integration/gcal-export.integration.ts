@@ -1,13 +1,13 @@
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
-import { adminClient, anonClientForUser, retryOnFk } from "./index";
+import { adminClient, anonClientForUser, retryOnFk, businessWithAccess, ACTIVE_TRIAL_ENDS_AT, SUSPENDED_TRIAL_ENDS_AT } from "./index";
 import { getGcalExport } from "@/lib/gcal/get-export";
 import type { FetchGcalBookings, GcalExportBooking } from "@/lib/gcal/export";
 
 // Integration tests against the real Supabase project. INC-3 / US25 (owner
 // calendar export): the dashboard reads the owner's bookings via RLS and builds
-// an importable .ics feed, gated behind the PROFISSIONAL plan. This block
-// verifies (a) a Free business is denied with `upgrade_required` before any
-// fetch and (b) a Pro business gets the feed through the user-scoped boundary.
+// an importable .ics feed, gated behind access (ADR 0013). This block
+// verifies (a) a suspended business is denied with `access_required` before any
+// fetch and (b) a business in teste gets the feed through the user-scoped boundary.
 // RUN: npm run test:integration.
 const stamp = Date.now().toString().slice(-8);
 const FREE_EMAIL = `gcal-free.${stamp}@agendfined.dev`;
@@ -23,7 +23,7 @@ let proBusinessId = "";
 beforeAll(async () => {
   admin = adminClient();
 
-  // A FREE business (default plan) whose export the gate must deny.
+  // A suspended business (teste ended) whose export the gate must deny.
   const { data: free } = await admin.auth.admin.createUser({
     email: FREE_EMAIL,
     password: PASSWORD,
@@ -39,6 +39,7 @@ beforeAll(async () => {
         name: "Agenda Grátis",
         slug: `gcal-free-${stamp}`,
         phone: "+5511987654321",
+        trial_ends_at: SUSPENDED_TRIAL_ENDS_AT,
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
         booking_window_days: 60,
@@ -68,7 +69,7 @@ beforeAll(async () => {
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
         booking_window_days: 60,
-        plan: "pro",
+        trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
       })
       .select("*")
       .single();
@@ -117,35 +118,25 @@ afterAll(async () => {
   await admin.auth.admin.deleteUser(proOwnerId).catch(() => undefined);
 });
 
-describe("INC-3 exportação de agenda: gate de plano (free negado, pro liberado)", () => {
-  it("denies a Free business with upgrade_required before any fetch", async () => {
-    const { data: freeBiz } = await admin
-      .from("businesses")
-      .select("id, plan")
-      .eq("id", freeBusinessId)
-      .single();
-    expect(freeBiz?.plan).toBe("free");
+describe("INC-3 exportação de agenda: gate de acesso (suspenso negado, em teste liberado)", () => {
+  it("denies a suspended business with access_required before any fetch", async () => {
+    expect((await businessWithAccess(freeBusinessId)).has_access).toBe(false);
 
     const fetchSpy = vi.fn<FetchGcalBookings>(async () => []);
     const result = await getGcalExport({
-      getBusiness: async () => ({ id: freeBusinessId, plan: "free" }),
+      getBusiness: () => businessWithAccess(freeBusinessId),
       fetchBookings: fetchSpy,
     });
-    expect(result).toEqual({ status: "upgrade_required" });
+    expect(result).toEqual({ status: "access_required" });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("lets a Pro business export the agenda through the user-scoped boundary", async () => {
-    const { data: proBiz } = await admin
-      .from("businesses")
-      .select("id, plan")
-      .eq("id", proBusinessId)
-      .single();
-    expect(proBiz?.plan).toBe("pro");
+  it("lets a business in teste export the agenda through the user-scoped boundary", async () => {
+    expect((await businessWithAccess(proBusinessId)).has_access).toBe(true);
 
     const proOwner = await anonClientForUser(PRO_EMAIL, PASSWORD);
     const result = await getGcalExport({
-      getBusiness: async () => ({ id: proBusinessId, plan: "pro" }),
+      getBusiness: () => businessWithAccess(proBusinessId),
       fetchBookings: async (businessId) => {
         const { data, error } = await proOwner
           .from("bookings")

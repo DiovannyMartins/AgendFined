@@ -231,7 +231,6 @@ describe("createBooking", () => {
         id: "business-1",
         owner_id: "owner-1",
         name: "Barbearia Demo",
-        plan: "free",
         slot_interval_minutes: 30,
         min_notice_minutes: 120,
         booking_window_days: 30,
@@ -375,6 +374,17 @@ describe("createBooking", () => {
       expect(notifyOwner).not.toHaveBeenCalled();
     });
 
+    it("tells the cliente the agendamento is unavailable when the negócio is suspended (ADR 0013)", async () => {
+      state.rpcResults.create_booking = { data: null, error: { message: "BUSINESS_SUSPENDED" } };
+
+      const result = await createBooking(validInput);
+
+      expect(result).toMatchObject({ ok: false, code: "business_suspended" });
+      expect(result.message).toContain("indisponível");
+      expect(notifyOwner).not.toHaveBeenCalled();
+      expect(recordPublicWrite).not.toHaveBeenCalled();
+    });
+
     // #188: only what was written spends the negócio's limit.
     it("counts the reserva created against the negócio's limit of reservas", async () => {
       await createBooking(validInput);
@@ -468,7 +478,7 @@ describe("joinWaitlist", () => {
   });
 
   it("answers a malformed date with validation instead of throwing", async () => {
-    state.business = { id: "business-1", plan: "pro", timezone: "America/Sao_Paulo" };
+    state.business = { id: "business-1", timezone: "America/Sao_Paulo" };
     state.rpcCalls = [];
 
     const result = await joinWaitlist({ ...validInput, date: "2026-02-30" });
@@ -477,7 +487,7 @@ describe("joinWaitlist", () => {
     expect(state.rpcCalls).toEqual([]);
   });
 
-  describe("plan gate", () => {
+  describe("access (ADR 0013)", () => {
     const futureInput = { ...validInput, date: "2030-01-15" };
     const business = {
       id: "business-1",
@@ -494,28 +504,24 @@ describe("joinWaitlist", () => {
       recordPublicWrite.mockClear();
     });
 
-    it("refuses a Grátis business without writing anything", async () => {
-      state.business = { ...business, plan: "free" };
+    afterEach(() => {
+      delete state.rpcResults.join_waitlist;
+    });
+
+    it("tells the cliente the agendamento is unavailable when the negócio is suspended (ADR 0013)", async () => {
+      state.business = business;
+      state.rpcResults.join_waitlist = { data: null, error: { message: "BUSINESS_SUSPENDED" } };
 
       const result = await joinWaitlist(futureInput);
 
-      expect(result).toMatchObject({ ok: false, code: "waitlist_unavailable" });
-      expect(result.message).not.toMatch(/plano|grátis|pro/i);
-      expect(state.rpcCalls).toEqual([]);
+      expect(result).toMatchObject({ ok: false, code: "business_suspended" });
+      expect(result.message).toContain("indisponível");
+      expect(result.message).not.toMatch(/plano|assinatura|suspens/i);
       expect(recordPublicWrite).not.toHaveBeenCalled();
     });
 
-    it("fails closed when the business has no plan", async () => {
-      state.business = { ...business, plan: null };
-
-      const result = await joinWaitlist(futureInput);
-
-      expect(result).toMatchObject({ ok: false, code: "waitlist_unavailable" });
-      expect(state.rpcCalls).toEqual([]);
-    });
-
-    it("keeps adding PROFISSIONAL customers to the waitlist", async () => {
-      state.business = { ...business, plan: "pro" };
+    it("keeps adding customers to the waitlist of a negócio with access", async () => {
+      state.business = business;
 
       const result = await joinWaitlist(futureInput);
 
@@ -536,7 +542,7 @@ describe("joinWaitlist", () => {
     });
 
     it("does not count an entrada that was not written", async () => {
-      state.business = { ...business, plan: "pro" };
+      state.business = business;
       state.rpcResults = { join_waitlist: { data: null, error: { message: "WAITLIST_SLOT_NOT_OCCUPIED" } } };
 
       const result = await joinWaitlist(futureInput);
@@ -548,7 +554,7 @@ describe("joinWaitlist", () => {
 
     // #190: 02:00 would become 03:00 EDT, another horário than the one shown.
     it("refuses a horário that does not exist in the business's fuso", async () => {
-      state.business = { ...business, plan: "pro", timezone: "America/New_York" };
+      state.business = { ...business, timezone: "America/New_York" };
 
       const result = await joinWaitlist({ ...validInput, date: "2030-03-10", startTime: "02:00" });
 
@@ -570,7 +576,6 @@ describe("joinWaitlist", () => {
         id: "business-1",
         name: "Barbearia",
         phone: "11987654321",
-        plan: "pro",
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
         booking_window_days: 365,

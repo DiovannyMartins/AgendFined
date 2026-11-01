@@ -10,6 +10,7 @@ const STATUS: Record<PublicSlotsError, number> = {
   not_found: 404,
   service_not_found: 404,
   booking_window: 422,
+  suspended: 409,
   rate_limited: 429,
   db_error: 503,
 };

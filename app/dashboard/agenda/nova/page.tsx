@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { toLocalDate } from "@/lib/booking/availability";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
+import { hasAccess } from "@/lib/plan/access";
+import { SuspendedPrompt } from "@/components/suspended-prompt";
 import { NewBookingForm } from "./new-booking-form";
 
 export const metadata: Metadata = { title: "Nova reserva — AgendFined" };
@@ -40,9 +42,13 @@ export default async function NovaReservaPage() {
         </p>
       </div>
 
-      <div className="max-w-2xl rounded-xl border border-border bg-card/40 p-4">
-        <NewBookingForm services={services ?? []} timezone={timezone} today={toLocalDate(new Date(), timezone)} />
-      </div>
+      {hasAccess(business) ? (
+        <div className="max-w-2xl rounded-xl border border-border bg-card/40 p-4">
+          <NewBookingForm services={services ?? []} timezone={timezone} today={toLocalDate(new Date(), timezone)} />
+        </div>
+      ) : (
+        <SuspendedPrompt description="Seus dados continuam guardados. Assine o Plano AgendFined para voltar a criar reservas." />
+      )}
     </div>
   );
 }

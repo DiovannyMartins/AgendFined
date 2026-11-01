@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { randomBytes } from "node:crypto";
-import { adminClient, anonClient, anonClientForUser, retryOnFk } from "./index";
+import { adminClient, anonClient, anonClientForUser, retryOnFk, ACTIVE_TRIAL_ENDS_AT } from "./index";
 import { futureSlot } from "./future-slot";
 
 // #193: create_owner_booking lets the dono book a cliente from the dashboard.
 // Only the dono calls it, the antecedência and the configured janela do not
-// apply, and bloqueios, sobreposição (ADR 0003) and the plan limit still do.
+// apply, and bloqueios, sobreposição (ADR 0003) and the plan limit (365 days)
+// still do.
 // RUN: npm run test:integration:local
 const stamp = Date.now().toString().slice(-8);
 const OWNER_EMAIL = `owner-bk.${stamp}@agendfined.dev`;
@@ -40,6 +41,7 @@ async function createBusiness(owner: string, name: string): Promise<string> {
         // A public reserva would need a day of notice and fit in a week.
         min_notice_minutes: 1440,
         booking_window_days: 7,
+        trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
       })
       .select("id")
       .single();
@@ -109,10 +111,10 @@ describe("create_owner_booking (#193)", () => {
     expect(error).toBeNull();
   });
 
-  it("recusa além do limite do plano Grátis e no passado", async () => {
+  it("recusa além dos 365 dias do plano e no passado", async () => {
     const owner = await anonClientForUser(OWNER_EMAIL, PASSWORD);
 
-    const beyond = await owner.rpc("create_owner_booking", bookingArgs(futureSlot(120, 15)));
+    const beyond = await owner.rpc("create_owner_booking", bookingArgs(futureSlot(400, 15)));
     expect(beyond.error?.message).toContain("BOOKING_OUTSIDE_PLAN_WINDOW");
 
     const past = await owner.rpc("create_owner_booking", bookingArgs(new Date(Date.now() - 60_000).toISOString()));

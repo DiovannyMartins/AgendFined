@@ -16,13 +16,13 @@ describe("CancelSubscriptionButton", () => {
     cancelSubscription.mockResolvedValue({ ok: true });
   });
 
-  it("asks for confirmation, with the date the PROFISSIONAL stays active, before cancelling", async () => {
+  it("asks for confirmation, with the date the access lasts, before cancelling", async () => {
     render(<CancelSubscriptionButton activeUntil={{ date: "21/11/2026", atLeast: false }} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Cancelar assinatura" }));
     expect(cancelSubscription).not.toHaveBeenCalled();
 
-    expect(await screen.findByText(/Seu PROFISSIONAL fica ativo até 21\/11\/2026\./)).toBeInTheDocument();
+    expect(await screen.findByText(/Seu acesso continua até 21\/11\/2026\./)).toBeInTheDocument();
     expect(screen.getByText(/As novas cobranças no Mercado Pago param\./)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Confirmar cancelamento" }));
@@ -37,7 +37,7 @@ describe("CancelSubscriptionButton", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancelar assinatura" }));
 
     expect(
-      await screen.findByText(/fica ativo até o fim do mês já pago, no mínimo até 29\/10\/2026\./),
+      await screen.findByText(/continua até o fim do mês já pago, no mínimo até 29\/10\/2026\./),
     ).toBeInTheDocument();
   });
 

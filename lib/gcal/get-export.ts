@@ -1,6 +1,6 @@
-// Server-side retrieval of the owner's agenda export (Pro feature, ADR 0008). It
+// Server-side retrieval of the owner's agenda export (ADR 0013). It
 // resolves the current business and builds the importable .ics feed, but only
-// after the Pro gate passes: a Free business gets `upgrade_required` and never
+// after the access gate passes: a suspended negócio gets `access_required` and never
 // sees the feed. The gate + serialisation live in the pure module; this file is
 // only the boundary that fetches. The deps are injectable so the boundary can be
 // exercised with a real user-scoped client (RLS) in the integration tests, and

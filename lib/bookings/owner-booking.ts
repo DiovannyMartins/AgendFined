@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getCurrentBusiness } from "@/lib/business/queries";
+import { ACCESS_REQUIRED_MESSAGE, assertAccess } from "@/lib/plan/access";
 import { createClient } from "@/lib/supabase/server";
 import { ownerBookingSchema } from "@/lib/validation/schemas";
 import { APP_TIMEZONE } from "@/lib/app-timezone";
@@ -30,6 +31,7 @@ export type OwnerBookingResult = {
   code?:
     | "validation"
     | "no_business"
+    | "access_required"
     | "outside_availability"
     | "past"
     | "booking_window"
@@ -46,6 +48,9 @@ export type OwnerBookingResult = {
   customerName?: string;
   customerPhone?: string;
 };
+
+// A suspended negócio (ADR 0013) cannot book; the database refuses it too.
+const ACCESS_REQUIRED: OwnerBookingResult = { ok: false, code: "access_required", message: ACCESS_REQUIRED_MESSAGE };
 
 const DB_ERROR: OwnerBookingResult = {
   ok: false,
@@ -80,6 +85,7 @@ export async function createOwnerBooking(
 
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, code: "no_business", message: "Configure seu negócio primeiro." };
+  if (!assertAccess(business).ok) return ACCESS_REQUIRED;
   const timezone = business.timezone || APP_TIMEZONE;
 
   const start = resolveOwnerStart(input.date, input.startTime, business, timezone, new Date());
@@ -169,12 +175,13 @@ export async function createOwnerBooking(
 export async function getOwnerSlots(
   serviceId: string,
   date: string,
-): Promise<{ available: string[]; error?: "validation" | "no_business" | "db_error" }> {
+): Promise<{ available: string[]; error?: "validation" | "no_business" | "access_required" | "db_error" }> {
   const parsed = ownerBookingSchema.pick({ serviceId: true, date: true }).safeParse({ serviceId, date });
   if (!parsed.success) return { available: [], error: "validation" };
 
   const business = await getCurrentBusiness();
   if (!business) return { available: [], error: "no_business" };
+  if (!assertAccess(business).ok) return { available: [], error: "access_required" };
   const timezone = business.timezone || APP_TIMEZONE;
 
   const supabase = await createClient();
@@ -200,8 +207,9 @@ function rpcErrorResult(error: { message?: string; code?: string } | null): Owne
   if (/BOOKING_IN_PAST/.test(message)) {
     return { ok: false, code: "past", message: "Esse horário já passou. Escolha um horário no futuro." };
   }
+  if (/BUSINESS_SUSPENDED/.test(message)) return ACCESS_REQUIRED;
   if (/BOOKING_OUTSIDE_PLAN_WINDOW/.test(message)) {
-    return { ok: false, code: "booking_window", message: "Seu plano não permite reservas para essa data." };
+    return { ok: false, code: "booking_window", message: "O Plano AgendFined permite reservas até 365 dias à frente." };
   }
   if (/SERVICE_NOT_FOUND|SERVICE_INACTIVE/.test(message)) {
     return { ok: false, code: "service_not_found", message: "Serviço indisponível. Escolha outro." };

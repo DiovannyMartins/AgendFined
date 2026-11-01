@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { adminClient, anonClientForUser, retryOnFk } from "./index";
+import { adminClient, anonClientForUser, retryOnFk, ACTIVE_TRIAL_ENDS_AT } from "./index";
 
 // `businesses.current_subscription_id` decides which assinatura makes the
 // negócio PROFISSIONAL when Mercado Pago authorizes it
@@ -59,6 +59,7 @@ beforeAll(async () => {
         name: "Biz Assinatura",
         slug: `biz-cursub-${stamp}`,
         phone: "+5511966666666",
+        trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
         booking_window_days: 60,

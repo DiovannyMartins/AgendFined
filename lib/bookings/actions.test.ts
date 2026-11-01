@@ -17,6 +17,7 @@ const { state, sendBusinessCancelledEmail } = vi.hoisted(() => ({
     booking: null as BookingRow | null,
     updates: [] as Record<string, unknown>[],
     conflict: false,
+    hasAccess: true,
   },
   sendBusinessCancelledEmail: vi.fn<(input: unknown) => Promise<SendResult>>(async () => ({ sent: true })),
 }));
@@ -33,6 +34,7 @@ vi.mock("@/lib/business/queries", () => ({
     name: "Barbearia Demo",
     slug: "barbearia-demo",
     timezone: "America/Fortaleza",
+    has_access: state.hasAccess,
   }),
 }));
 vi.mock("@/lib/supabase/server", () => ({
@@ -88,6 +90,7 @@ describe("updateBookingStatus", () => {
     };
     state.updates = [];
     state.conflict = false;
+    state.hasAccess = true;
     sendBusinessCancelledEmail.mockClear();
     sendBusinessCancelledEmail.mockResolvedValue({ sent: true });
     rateLimitAdmin.reset();
@@ -155,6 +158,20 @@ describe("updateBookingStatus", () => {
     });
     expect(state.updates).toEqual([]);
     expect(await updateBookingStatus({ ok: true }, atLimit)).toEqual({ ok: true });
+  });
+
+  it("lets a suspended negócio cancel a reserva but not conclude one (ADR 0013)", async () => {
+    vi.setSystemTime(new Date("2026-10-17T12:00:00.000Z"));
+    state.hasAccess = false;
+
+    expect(await updateBookingStatus({ ok: true }, statusForm("cancelled"))).toEqual({ ok: true });
+    expect(state.booking?.status).toBe("cancelled");
+
+    state.booking = { ...state.booking!, status: "confirmed" };
+    vi.setSystemTime(new Date("2026-10-19T18:00:00.000Z"));
+    const concluded = await updateBookingStatus({ ok: true }, statusForm("completed"));
+    expect(concluded).toMatchObject({ ok: false, message: expect.stringContaining("suspenso") });
+    expect(state.booking?.status).toBe("confirmed");
   });
 
   it("still cancels a reserva that has not started", async () => {

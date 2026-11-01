@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
-import { adminClient, anonClient, anonClientForUser, retryOnFk } from "./index";
+import { adminClient, anonClient, anonClientForUser, retryOnFk, ACTIVE_TRIAL_ENDS_AT } from "./index";
 import { fetchAgendaWeek } from "@/lib/agenda/get-week";
 import { getBillingReport } from "@/lib/reports/get-report";
 import { toCustomerSummary } from "@/lib/customers/history";
@@ -61,6 +61,7 @@ async function createOwner(email: string, name: string, slug: string, plan: "pro
         booking_window_days: 60,
         timezone: TIMEZONE,
         plan,
+        trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
       })
       .select("id")
       .single();
@@ -137,7 +138,7 @@ describe("#215 telas do painel acima de 1000 reservas", () => {
   it("Relatórios em \"Sempre\" agrega todas as reservas", async () => {
     const owner = await anonClientForUser(EMAIL, PASSWORD);
     const result = await getBillingReport("all", {
-      getBusiness: async () => ({ id: businessId, plan: "pro" }),
+      getBusiness: async () => ({ id: businessId, has_access: true }),
       fetchGroups: async (id, range) => {
         const { data, error } = await owner.rpc("billing_report_groups", {
           p_business_id: id,

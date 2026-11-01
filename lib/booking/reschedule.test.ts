@@ -12,6 +12,7 @@ const { state, mocks } = vi.hoisted(() => ({
     rpcResult: null as RpcResult | null,
     allowed: true,
     businessAllowed: true,
+    hasAccess: true,
     // Counters of check_booking_rate_limit, by key, as the RPC keeps them.
     counters: new Map<string, number>(),
   },
@@ -55,6 +56,7 @@ vi.mock("@/lib/supabase/admin", () => ({
       return query;
     },
     rpc: async (name: string, args: Record<string, unknown>) => {
+      if (name === "business_has_access") return { data: state.hasAccess, error: null };
       if (name === "check_booking_rate_limit") {
         const key = String(args.p_key);
         const count = (state.counters.get(key) ?? 0) + 1;
@@ -119,7 +121,6 @@ beforeEach(() => {
       slot_interval_minutes: 60,
       min_notice_minutes: 120,
       booking_window_days: 30,
-      plan: "free",
       timezone: "America/Sao_Paulo",
       name: "Barbearia Demo",
       slug: "barbearia-demo",
@@ -134,6 +135,7 @@ beforeEach(() => {
   state.rpcResult = null;
   state.allowed = true;
   state.businessAllowed = true;
+  state.hasAccess = true;
   state.counters = new Map();
 });
 
@@ -273,9 +275,30 @@ describe("reschedulePublicBooking (#194)", () => {
     state.rpcResult = { data: null, error: { message: "RESCHEDULE_REJECTED" } };
     expect(await reschedule(form())).toMatchObject({ code: "INVALID_TOKEN" });
   });
+
+  it("traduz o negócio suspenso pelo banco (ADR 0013)", async () => {
+    state.rpcResult = { data: null, error: { message: "BUSINESS_SUSPENDED" } };
+    expect(await reschedule(form())).toMatchObject({ code: "BUSINESS_SUSPENDED" });
+  });
+
+  it("recusa remarcar num negócio suspenso com mensagem própria, sem chamar a RPC (ADR 0013)", async () => {
+    state.hasAccess = false;
+
+    const result = await reschedule(form());
+
+    expect(result).toMatchObject({ status: "error", code: "BUSINESS_SUSPENDED" });
+    expect(result.status === "error" && result.message).toContain("indisponível");
+    expect(state.rpcCalls).toHaveLength(0);
+  });
 });
 
 describe("getPublicRescheduleSlots (#194)", () => {
+  it("não oferece horários de um negócio suspenso (ADR 0013)", async () => {
+    state.hasAccess = false;
+
+    expect(await getPublicRescheduleSlots(CODE, TOKEN, MONDAY)).toEqual({ available: [], error: "suspended" });
+  });
+
   it("lista os horários livres da página pública para a reserva do token", async () => {
     const result = await getPublicRescheduleSlots(CODE, TOKEN, MONDAY);
 

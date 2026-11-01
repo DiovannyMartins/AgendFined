@@ -21,10 +21,11 @@ import {
 import { toLocalDate } from "@/lib/booking/availability";
 import { formatWhenWithTimezone } from "@/lib/format/when";
 import { submitWithoutReset } from "@/lib/forms/submit-without-reset";
+import { SUSPENDED_BOOKING_MESSAGE } from "@/lib/bookings/public-status";
 
 const INITIAL: PublicRescheduleState = { status: "idle" };
 
-type SlotsState = { key: string; available: string[]; failed: boolean; rateLimited: boolean };
+type SlotsState = { key: string; available: string[]; failed: boolean; rateLimited: boolean; suspended: boolean };
 
 // Remarcação pelo cliente (#194): the same private capability as the
 // cancellation (ADR 0005) moves the reserva to another free horário of the
@@ -66,11 +67,12 @@ export function RescheduleBooking({
             available: result.available,
             failed: Boolean(result.error),
             rateLimited: result.error === "rate_limited",
+            suspended: result.error === "suspended",
           });
         }
       })
       .catch(() => {
-        if (!cancelled) setSlots({ key: date, available: [], failed: true, rateLimited: false });
+        if (!cancelled) setSlots({ key: date, available: [], failed: true, rateLimited: false, suspended: false });
       });
     return () => {
       cancelled = true;
@@ -119,6 +121,8 @@ export function RescheduleBooking({
             <div className="space-y-2" aria-live="polite">
               {!currentSlots ? (
                 <p className="text-xs text-muted-foreground">Carregando horários...</p>
+              ) : currentSlots.suspended ? (
+                <p className="text-xs text-muted-foreground">{SUSPENDED_BOOKING_MESSAGE}</p>
               ) : currentSlots.rateLimited ? (
                 <p className="text-xs text-muted-foreground">Muitas consultas. Aguarde alguns minutos e tente de novo.</p>
               ) : currentSlots.failed ? (

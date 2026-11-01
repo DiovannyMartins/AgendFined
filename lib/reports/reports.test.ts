@@ -124,10 +124,10 @@ describe("format helpers", () => {
   });
 });
 
-describe("buildBillingReportResult (Pro gate, ADR 0008)", () => {
-  const proBusiness: ReportBusiness = { id: "biz-pro", plan: "pro" };
-  const freeBusiness: ReportBusiness = { id: "biz-free", plan: "free" };
-  const nullPlanBusiness: ReportBusiness = { id: "biz-null", plan: null };
+describe("buildBillingReportResult (access gate, ADR 0013)", () => {
+  const activeBusiness: ReportBusiness = { id: "biz-active", has_access: true };
+  const suspendedBusiness: ReportBusiness = { id: "biz-suspended", has_access: false };
+  const unknownAccessBusiness: ReportBusiness = { id: "biz-unknown", has_access: null };
 
   const fetch: FetchReportGroups = async () => groupReportBookings(bookings);
 
@@ -135,21 +135,21 @@ describe("buildBillingReportResult (Pro gate, ADR 0008)", () => {
     expect(await buildBillingReportResult(null, fetch)).toEqual({ status: "no_business" });
   });
 
-  it("returns upgrade_required for a free business without fetching bookings", async () => {
+  it("returns access_required for a suspended business without fetching bookings", async () => {
     const spy = vi.fn(fetch);
-    const result = await buildBillingReportResult(freeBusiness, spy);
-    expect(result).toEqual({ status: "upgrade_required" });
+    const result = await buildBillingReportResult(suspendedBusiness, spy);
+    expect(result).toEqual({ status: "access_required" });
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it("fails closed for a business with a null plan", async () => {
-    expect(await buildBillingReportResult(nullPlanBusiness, fetch)).toEqual({
-      status: "upgrade_required",
+  it("fails closed for a business with an unknown access", async () => {
+    expect(await buildBillingReportResult(unknownAccessBusiness, fetch)).toEqual({
+      status: "access_required",
     });
   });
 
-  it("returns ok with the computed report for a pro business", async () => {
-    const result = await buildBillingReportResult(proBusiness, fetch, "all");
+  it("returns ok with the computed report for a business with access", async () => {
+    const result = await buildBillingReportResult(activeBusiness, fetch, "all");
     expect(result.status).toBe("ok");
     if (result.status === "ok") {
       expect(result.key).toBe("all");
@@ -162,6 +162,6 @@ describe("buildBillingReportResult (Pro gate, ADR 0008)", () => {
     const failing: FetchReportGroups = async () => {
       throw new Error("boom");
     };
-    expect(await buildBillingReportResult(proBusiness, failing)).toEqual({ status: "error" });
+    expect(await buildBillingReportResult(activeBusiness, failing)).toEqual({ status: "error" });
   });
 });

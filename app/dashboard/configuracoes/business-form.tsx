@@ -30,7 +30,7 @@ import {
   isSlotIntervalOption,
   type BusinessFormValues,
 } from "@/lib/validation/schemas";
-import { getBookingWindowLimitDays, type Plan } from "@/lib/plan/plan";
+import { BOOKING_WINDOW_LIMIT_DAYS } from "@/lib/plan/access";
 import { trackAnalyticsEvent } from "@/lib/analytics";
 import { formatPhoneBR } from "@/lib/format/phone";
 import { APP_TIMEZONE, TIMEZONE_OPTIONS } from "@/lib/app-timezone";
@@ -64,7 +64,6 @@ type BusinessFormInitial = {
   bookingWindowDays: number;
   timezone: string;
   description: string | null;
-  plan: Plan;
 };
 
 export function BusinessForm({
@@ -83,8 +82,7 @@ export function BusinessForm({
   const [slugChangeToConfirm, setSlugChangeToConfirm] = useState<BusinessFormValues | null>(null);
   const slug = typeof initial?.slug === "string" ? initial.slug : "";
   const creating = !slug;
-  const plan: Plan = initial?.plan === "pro" ? "pro" : "free";
-  const bookingWindowLimitDays = getBookingWindowLimitDays(plan);
+  const bookingWindowLimitDays = BOOKING_WINDOW_LIMIT_DAYS;
   const timezoneOptions = initial?.timezone && !TIMEZONE_OPTIONS.some((option) => option.value === initial.timezone)
     ? [{ value: initial.timezone, label: initial.timezone }, ...TIMEZONE_OPTIONS]
     : TIMEZONE_OPTIONS;
@@ -302,7 +300,7 @@ export function BusinessForm({
                 {...registerWithDefault("bookingWindowDays", { valueAsNumber: true })}
               />
               <p id="bookingWindowDays-hint" className="text-xs text-muted-foreground">
-                Seu plano permite reservas com até {bookingWindowLimitDays} dias de antecedência.
+                O Plano AgendFined permite reservas com até {bookingWindowLimitDays} dias de antecedência.
               </p>
               {renderFieldError("bookingWindowDays")}
             </div>

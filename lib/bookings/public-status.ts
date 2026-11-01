@@ -13,6 +13,12 @@ export function publicStatusView(status: BookingStatus, started: boolean): Publi
 
 export const BOOKING_ALREADY_STARTED_MESSAGE = "Este horário já passou. Fale com o negócio.";
 
+// A suspended negócio (ADR 0013) takes no new reserva, entrada na lista de
+// espera or remarcação. The cliente is not told why, only that it is not
+// possible now; cancelling still works.
+export const SUSPENDED_BOOKING_MESSAGE =
+  "O agendamento online deste negócio está indisponível no momento. Fale diretamente com o negócio.";
+
 // What the customer-facing confirmation/consult screens say for each reserva
 // status. Only a confirmed booking may be presented as a guaranteed slot: a
 // cancelled one must warn that the slot was freed (issue #110).

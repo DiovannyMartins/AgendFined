@@ -3,13 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { decryptGoogleToken, encryptGoogleToken } from "./oauth";
 import { runGoogleCalendarSyncBatch, syncGoogleCalendarBooking, syncGoogleCalendarForBusiness } from "./sync";
 
-describe("Google Calendar plan authorization", () => {
-  let plan: string | null;
+describe("Google Calendar access authorization (ADR 0013)", () => {
+  let access: boolean | null;
   let businessReadFails: boolean;
   let googleRequests: string[];
 
   beforeEach(() => {
-    plan = "free";
+    access = false;
     businessReadFails = false;
     googleRequests = [];
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://database.example");
@@ -22,10 +22,11 @@ describe("Google Calendar plan authorization", () => {
         return new Response(null, { status: 204 });
       }
       if (url.pathname.endsWith("/businesses")) {
-        return Response.json(businessReadFails ? { message: "unavailable" } : { plan, timezone: "America/Sao_Paulo" }, { status: businessReadFails ? 400 : 200 });
+        return Response.json(businessReadFails ? { message: "unavailable" } : { timezone: "America/Sao_Paulo" }, { status: businessReadFails ? 400 : 200 });
       }
+      if (url.pathname.endsWith("/rpc/business_has_access")) return Response.json(access);
       if (url.pathname.endsWith("/google_calendar_connections")) {
-        if (url.searchParams.has("order")) return Response.json(plan === "pro" ? [{ business_id: "business" }] : []);
+        if (url.searchParams.has("order")) return Response.json([{ business_id: "business" }]);
         return Response.json({
           id: "connection", business_id: "business", calendar_id: "primary",
           access_token_ciphertext: encryptGoogleToken("test-token"),
@@ -39,22 +40,22 @@ describe("Google Calendar plan authorization", () => {
 
   afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
-  it.each(["free", null])("does not send customer data or use Google credentials for plan %s", async (value) => {
-    plan = value;
+  it.each([false, null])("does not send customer data or use Google credentials without access (%s)", async (value) => {
+    access = value;
     await syncGoogleCalendarBooking("business", "booking");
     expect(await syncGoogleCalendarForBusiness("business")).toEqual({ synced: 0, deleted: 0 });
     await runGoogleCalendarSyncBatch();
     expect(googleRequests).toEqual([]);
   });
 
-  it("fails closed when the current plan cannot be read", async () => {
+  it("fails closed when the negócio cannot be read", async () => {
     businessReadFails = true;
     await expect(syncGoogleCalendarBooking("business", "booking")).rejects.toThrow();
     expect(googleRequests).toEqual([]);
   });
 
-  it("still removes a missing booking from a professional calendar", async () => {
-    plan = "pro";
+  it("still removes a missing booking from the calendar of a negócio with access", async () => {
+    access = true;
     await syncGoogleCalendarBooking("business", "booking");
     expect(googleRequests).toHaveLength(1);
     expect(googleRequests[0]).toContain("/calendars/primary/events/");
@@ -119,7 +120,8 @@ function installGoogleCalendarFakes(options: {
       if (method === "DELETE") return new Response(null, { status: 204 });
       return Response.json({ id: "event" });
     }
-    if (url.pathname.endsWith("/businesses")) return Response.json({ plan: "pro", timezone: "America/Sao_Paulo" });
+    if (url.pathname.endsWith("/rpc/business_has_access")) return Response.json(true);
+    if (url.pathname.endsWith("/businesses")) return Response.json({ timezone: "America/Sao_Paulo" });
     if (url.pathname.endsWith("/google_calendar_connections")) {
       if (method === "PATCH") {
         connectionUpdates.push(JSON.parse(String(init?.body)));
@@ -461,7 +463,9 @@ describe("Google Calendar batch sync", () => {
           token_expires_at: new Date(Date.now() - 1_000).toISOString(),
         });
       }
-      if (url.pathname.endsWith("/businesses")) return Response.json({ plan: "pro", timezone: "America/Sao_Paulo" });
+      if (url.pathname.endsWith("/rpc/business_has_access")) return Response.json(true);
+      if (url.pathname.endsWith("/rpc/business_has_access")) return Response.json(true);
+    if (url.pathname.endsWith("/businesses")) return Response.json({ timezone: "America/Sao_Paulo" });
       throw new Error(`Unexpected request: ${url.pathname}`);
     }));
   });
@@ -507,7 +511,9 @@ describe("Google Calendar batch concurrency", () => {
           calendar_timezone: "America/Sao_Paulo",
         });
       }
-      if (url.pathname.endsWith("/businesses")) return Response.json({ plan: "pro", timezone: "America/Sao_Paulo" });
+      if (url.pathname.endsWith("/rpc/business_has_access")) return Response.json(true);
+      if (url.pathname.endsWith("/rpc/business_has_access")) return Response.json(true);
+    if (url.pathname.endsWith("/businesses")) return Response.json({ timezone: "America/Sao_Paulo" });
       if (url.pathname.endsWith("/google_calendar_booking_syncs")) {
         for (const row of JSON.parse(String(init?.body)) as { booking_id: string; booking_updated_at: string }[]) {
           syncedVersions.set(row.booking_id, row.booking_updated_at);

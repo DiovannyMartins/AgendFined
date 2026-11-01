@@ -19,8 +19,9 @@ export type PublicBookingPage = {
   description: string | null;
   timezone: string;
   searchIndexingEnabled: boolean;
-  // Derived from the plan in the database; the plan itself never reaches the page.
-  offersWaitlist: boolean;
+  // business_has_access() (ADR 0013): a suspended negócio keeps its page, without
+  // slots or lista de espera. Why it is suspended never reaches the page.
+  acceptsBookings: boolean;
   bookingWindowDays: number;
   hasAvailability: boolean;
   // Only present when the negócio cannot take reservas online.
@@ -44,7 +45,7 @@ export const getPublicBookingPage = cache(async (slug: string): Promise<PublicBo
     description: row.description,
     timezone: row.timezone,
     searchIndexingEnabled: row.search_indexing_enabled,
-    offersWaitlist: row.offers_waitlist,
+    acceptsBookings: row.accepts_bookings,
     bookingWindowDays: row.booking_window_days,
     hasAvailability: row.has_availability,
     phone: row.phone,

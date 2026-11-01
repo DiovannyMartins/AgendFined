@@ -4,8 +4,14 @@ import { formatPhoneBR } from "@/lib/format/phone";
 
 // Shown instead of the booking form while the negócio cannot take reservas:
 // without an active serviço or without any faixa of disponibilidade recorrente,
-// the form would only offer an empty select or dates with no horários.
+// the form would only offer an empty select or dates with no horários. A
+// suspended negócio (ADR 0013) shows it too, without saying why.
 const COPY = {
+  suspended: {
+    title: "Agendamento indisponível",
+    description:
+      "Este negócio não está recebendo reservas online no momento. Fale diretamente com o negócio. Se você já tem uma reserva, ainda pode consultá-la e cancelá-la.",
+  },
   no_services: {
     title: "Este negócio ainda não está recebendo reservas online",
     description: "Os serviços ainda não foram cadastrados. Volte mais tarde ou fale diretamente com o negócio.",

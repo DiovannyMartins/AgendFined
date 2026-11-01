@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { UpgradePrompt } from "@/components/upgrade-prompt";
+import { SuspendedPrompt } from "@/components/suspended-prompt";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { getWaitlistManagement } from "@/lib/waitlist/get-management";
 import { formatWhen } from "@/lib/format/when";
@@ -18,7 +18,7 @@ export default async function ListaEsperaPage() {
   if (!business) redirect("/dashboard/setup");
 
   const result = await getWaitlistManagement({
-    getBusiness: async () => ({ id: business.id, plan: business.plan }),
+    getBusiness: async () => ({ id: business.id, has_access: business.has_access }),
   });
 
   return (
@@ -30,11 +30,8 @@ export default async function ListaEsperaPage() {
         </p>
       </div>
 
-      {result.status === "upgrade_required" && (
-        <UpgradePrompt
-          title="A gestão da lista de espera é um recurso PROFISSIONAL"
-          description="Assine o PROFISSIONAL para ver quem espera por um horário, notificar e converter em reserva."
-        />
+      {result.status === "access_required" && (
+        <SuspendedPrompt description="Seus dados continuam guardados. Assine o Plano AgendFined para ver quem espera por um horário, avisar e converter em reserva." />
       )}
       {result.status === "error" && <ErrorState />}
       {result.status === "ok" && (

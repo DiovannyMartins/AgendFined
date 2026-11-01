@@ -2,7 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { publicAvailabilitySchema } from "@/lib/validation/schemas";
-import { getEffectiveBookingWindowDays } from "@/lib/plan/plan";
+import { getEffectiveBookingWindowDays } from "@/lib/plan/access";
 import { computeAvailableSlots, isWithinWindow, localDayRangeUtc, toUtcRange, weekdayOf } from "@/lib/booking/availability";
 import type { UtcRange } from "@/lib/booking/availability";
 import { enforceAvailabilityRateLimit } from "@/lib/booking/rate-limit";
@@ -13,7 +13,8 @@ export type PublicSlotsError =
   | "db_error"
   | "not_found"
   | "service_not_found"
-  | "booking_window";
+  | "booking_window"
+  | "suspended";
 
 // The body is an allowlist: only the free slots and, on failure, the code.
 export type PublicSlotsResult = { available: string[]; error?: PublicSlotsError };
@@ -47,10 +48,11 @@ export async function getPublicSlots(
     { data: business, error: businessError },
     { data: service, error: serviceError },
     { data: faixas, error: faixasError },
+    { data: hasAccess, error: accessError },
   ] = await Promise.all([
     supabase
       .from("businesses")
-      .select("id, is_active, slot_interval_minutes, min_notice_minutes, booking_window_days, plan, timezone")
+      .select("id, is_active, slot_interval_minutes, min_notice_minutes, booking_window_days, timezone")
       .eq("id", businessId)
       .maybeSingle(),
     supabase
@@ -65,18 +67,22 @@ export async function getPublicSlots(
       .select("weekday, start_time, end_time")
       .eq("business_id", businessId)
       .eq("is_active", true),
+    supabase.rpc("business_has_access", { p_business_id: businessId }),
   ]);
 
   // maybeSingle: a missing row is "not found", only a real failure is db_error.
   if (businessError) return { available: [], error: "db_error" };
   if (!business || !business.is_active) return { available: [], error: "not_found" };
+  // A suspended negócio (ADR 0013) offers no slot; a failed lookup fails closed.
+  if (accessError) return { available: [], error: "db_error" };
+  if (hasAccess !== true) return { available: [], error: "suspended" };
   if (serviceError) return { available: [], error: "db_error" };
   if (!service) return { available: [], error: "service_not_found" };
 
   const rules = {
     slotIntervalMinutes: business.slot_interval_minutes,
     minNoticeMinutes: business.min_notice_minutes,
-    bookingWindowDays: getEffectiveBookingWindowDays(business.plan, business.booking_window_days),
+    bookingWindowDays: getEffectiveBookingWindowDays(business.booking_window_days),
     timezone: business.timezone,
   };
   if (!isWithinWindow(date, rules, new Date())) return { available: [], error: "booking_window" };

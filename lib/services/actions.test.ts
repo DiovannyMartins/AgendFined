@@ -5,12 +5,13 @@ const { state } = vi.hoisted(() => ({
     inserts: [] as Record<string, unknown>[],
     updates: [] as Record<string, unknown>[],
     existing: [] as { id: string; name: string }[],
+    hasAccess: true,
   },
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
-vi.mock("@/lib/business/queries", () => ({ getCurrentBusiness: async () => ({ id: "business-1" }) }));
+vi.mock("@/lib/business/queries", () => ({ getCurrentBusiness: async () => ({ id: "business-1", has_access: state.hasAccess }) }));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
     from: () => ({
@@ -117,5 +118,25 @@ describe("service name uniqueness", () => {
 
     expect(result).toMatchObject({ ok: false, code: "DUPLICATE_NAME" });
     expect(state.updates).toEqual([]);
+  });
+});
+
+describe("suspended negócio (ADR 0013)", () => {
+  it("refuses to create or edit a serviço without writing", async () => {
+    state.hasAccess = false;
+    state.inserts = [];
+    state.updates = [];
+    state.existing = [];
+
+    expect(await createService({ ok: true, data: undefined }, serviceForm("50"))).toMatchObject({
+      ok: false,
+      code: "ACCESS_REQUIRED",
+    });
+    const edit = serviceForm("50");
+    edit.set("id", "svc-1");
+    expect(await updateService({ ok: true, data: undefined }, edit)).toMatchObject({ ok: false, code: "ACCESS_REQUIRED" });
+    expect(state.inserts).toEqual([]);
+    expect(state.updates).toEqual([]);
+    state.hasAccess = true;
   });
 });

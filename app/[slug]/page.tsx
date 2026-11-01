@@ -44,10 +44,11 @@ export async function generateMetadata({
 
 export default async function PublicPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  // One cached RPC shared with generateMetadata (#216). The plan stays in the
-  // database: only offersWaitlist and the effective janela reach the page. The
-  // janela only caps the date picker; the server still enforces it on every
-  // lookup and reserva.
+  // One cached RPC shared with generateMetadata (#216). Access stays in the
+  // database (ADR 0013): only acceptsBookings and the effective janela reach the
+  // page. The janela only caps the date picker; the server still enforces it on
+  // every lookup and reserva. A suspended negócio keeps its address and the
+  // "Consultar reserva" link, so a cliente can still find and cancel a reserva.
   const business = (await getPublicBookingPage(slug))
     ?? await redirectToCurrentSlugOrNotFound(await createClient(), slug);
   const activeServices = business.services;
@@ -66,7 +67,9 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
           )}
         </header>
 
-        {activeServices.length === 0 ? (
+        {!business.acceptsBookings ? (
+          <BookingUnavailable reason="suspended" phone={phone} />
+        ) : activeServices.length === 0 ? (
           <BookingUnavailable reason="no_services" phone={phone} />
         ) : !business.hasAvailability ? (
           <BookingUnavailable reason="no_availability" phone={phone} />
@@ -76,7 +79,6 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
             slug={slug}
             timezone={business.timezone}
             bookingWindowDays={business.bookingWindowDays}
-            offersWaitlist={business.offersWaitlist}
             services={activeServices}
           />
         )}

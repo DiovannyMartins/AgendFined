@@ -26,6 +26,9 @@ export function adminClient(): SupabaseClient<Database> {
 // and skips the trial registry (#261). Suites reuse telefones, so the ones that
 // book through the public RPCs set this to keep access on every run.
 export const ACTIVE_TRIAL_ENDS_AT = "2999-12-31T00:00:00Z";
+// A teste that already ended: the negócio is suspended (ADR 0013) unless it has
+// an assinatura em dia. Same service-role path as ACTIVE_TRIAL_ENDS_AT.
+export const SUSPENDED_TRIAL_ENDS_AT = "2000-01-01T00:00:00Z";
 
 // Retry a business upsert/insert on the transient `businesses_owner_id_fkey` FK
 // race (23503) that can appear when integration files run against the shared
@@ -81,4 +84,12 @@ export async function verifyTotpThroughApp(
   if (granted.error) throw granted.error;
   if (granted.data !== true) throw new Error("grant_mfa_challenge refused");
   return client.auth.mfa.verify({ factorId, challengeId: challenge.data.id, code });
+}
+
+// The access the painel would see for a negócio: business_has_access() as the
+// database answers it (ADR 0013), for the gated reads' injected getBusiness.
+export async function businessWithAccess(businessId: string): Promise<{ id: string; has_access: boolean }> {
+  const { data, error } = await adminClient().rpc("business_has_access", { p_business_id: businessId });
+  if (error) throw new Error(`business_has_access: ${error.message}`);
+  return { id: businessId, has_access: data === true };
 }

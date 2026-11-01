@@ -17,7 +17,6 @@ const initial = {
   bookingWindowDays: 60,
   timezone: "America/Sao_Paulo",
   description: null,
-  plan: "free" as const,
 };
 
 describe("BusinessForm", () => {
@@ -121,8 +120,8 @@ describe("BusinessForm", () => {
     vi.mocked(updateBusiness).mockResolvedValue({
       ok: false,
       code: "VALIDATION",
-      message: "A janela de reservas excede o limite do seu plano.",
-      fieldErrors: { bookingWindowDays: ["O limite do seu plano é de 90 dias."] },
+      message: "A janela de reservas excede o limite do plano.",
+      fieldErrors: { bookingWindowDays: ["O limite do Plano AgendFined é de 365 dias."] },
     });
     render(<BusinessForm initial={initial} />);
     const windowInput = screen.getByLabelText("Janela de reservas (dias)");
@@ -130,7 +129,7 @@ describe("BusinessForm", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
 
-    await screen.findByText("O limite do seu plano é de 90 dias.");
+    await screen.findByText("O limite do Plano AgendFined é de 365 dias.");
     expect(windowInput).toHaveAttribute("aria-invalid", "true");
     expect(windowInput).toHaveAttribute("aria-describedby", "bookingWindowDays-hint bookingWindowDays-error");
   });
@@ -139,22 +138,22 @@ describe("BusinessForm", () => {
     vi.mocked(updateBusiness).mockResolvedValue({
       ok: false,
       code: "VALIDATION",
-      message: "A janela de reservas excede o limite do seu plano.",
-      fieldErrors: { bookingWindowDays: ["O limite do seu plano é de 90 dias."] },
+      message: "A janela de reservas excede o limite do plano.",
+      fieldErrors: { bookingWindowDays: ["O limite do Plano AgendFined é de 365 dias."] },
     });
     render(<BusinessForm initial={initial} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
-    expect(await screen.findByText("O limite do seu plano é de 90 dias.")).toBeInTheDocument();
+    expect(await screen.findByText("O limite do Plano AgendFined é de 365 dias.")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Endereço público (slug)"), { target: { value: "login" } });
     fireEvent.click(await screen.findByRole("button", { name: "Salvar alterações" }));
 
     expect(await screen.findByText(/Este endereço está reservado/)).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.queryByText("O limite do seu plano é de 90 dias.")).not.toBeInTheDocument();
+      expect(screen.queryByText("O limite do Plano AgendFined é de 365 dias.")).not.toBeInTheDocument();
     });
-    expect(screen.queryByText("A janela de reservas excede o limite do seu plano.")).not.toBeInTheDocument();
+    expect(screen.queryByText("A janela de reservas excede o limite do plano.")).not.toBeInTheDocument();
     expect(updateBusiness).toHaveBeenCalledTimes(1);
   });
 });

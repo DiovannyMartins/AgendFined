@@ -7,16 +7,17 @@ import type { BillingPlan } from "@/lib/billing/types";
 import { formatDate } from "@/lib/format/when";
 import { cn } from "@/lib/utils";
 
-// Painel-wide warning while the negócio keeps the PROFISSIONAL only because of
-// the carência (issue #151): without it the dono learns about the downgrade
-// only in Configurações, after losing the recursos. A failed read hides the
-// banner instead of breaking the painel.
+// Painel-wide warning while the negócio keeps its access only because of the
+// carência (issue #151, ADR 0008): without it the dono learns that the negócio
+// will be suspended (ADR 0013) only in Configurações, after it happened. A
+// failed read hides the banner instead of breaking the painel.
 export async function GraceBanner({
   business,
 }: {
   business: { id: string; plan: BillingPlan; timezone: string; currentSubscriptionId?: string | null };
 }) {
-  // A carência only exists on a PROFISSIONAL negócio; Grátis skips the read (#214).
+  // A carência only exists on a subscribed negócio (plan = pro until #261, fase 4);
+  // the others skip the read (#214).
   if (business.plan !== "pro") return null;
   let notice: GraceNotice | null;
   try {
@@ -28,10 +29,10 @@ export async function GraceBanner({
 
   const activeUntil = formatDate(notice.activeUntil, business.timezone);
   const message = notice.checkoutInProgress
-    ? `Novo pagamento em andamento. Seu PROFISSIONAL fica ativo até ${activeUntil}; conclua o pagamento para mantê-lo.`
+    ? `Novo pagamento em andamento. Seu acesso continua até ${activeUntil}; conclua o pagamento para não suspender o negócio.`
     : notice.reason === "payment_failed"
-      ? `Não conseguimos cobrar a sua assinatura. Atualize a forma de pagamento até ${activeUntil} para manter o PROFISSIONAL.`
-      : `Sua assinatura foi cancelada. Seu PROFISSIONAL fica ativo até ${activeUntil}; depois, o negócio volta ao Grátis.`;
+      ? `Não conseguimos cobrar a sua assinatura. Atualize a forma de pagamento até ${activeUntil} para não suspender o negócio.`
+      : `Sua assinatura foi cancelada. Seu acesso continua até ${activeUntil}; depois, o negócio fica suspenso, sem perder dados.`;
   const action = notice.checkoutInProgress
     ? "Concluir pagamento"
     : notice.reason === "payment_failed"

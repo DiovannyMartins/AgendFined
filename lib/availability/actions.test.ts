@@ -4,7 +4,7 @@ type Filter = [op: string, column: string, value: unknown];
 
 const { state } = vi.hoisted(() => ({
   state: {
-    business: { id: "business-1", timezone: "America/Sao_Paulo" } as { id: string; timezone: string } | null,
+    business: { id: "business-1", timezone: "America/Sao_Paulo", has_access: true } as { id: string; timezone: string; has_access?: boolean } | null,
     bookings: [] as { id: string; customer_name_snapshot: string; status: string; start_at: string; end_at: string }[],
     bookingFilters: [] as Filter[],
     bookingsError: null as { message: string } | null,
@@ -118,7 +118,7 @@ describe("createBlock", () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-17T12:00:00Z"));
-    state.business = { id: "business-1", timezone: "America/Sao_Paulo" };
+    state.business = { id: "business-1", timezone: "America/Sao_Paulo", has_access: true };
     state.bookings = [];
     state.bookingFilters = [];
     state.bookingsError = null;
@@ -161,7 +161,7 @@ describe("createBlock", () => {
   });
 
   it("uses the business timezone, not a fixed one (America/Manaus)", async () => {
-    state.business = { id: "business-1", timezone: "America/Manaus" };
+    state.business = { id: "business-1", timezone: "America/Manaus", has_access: true };
 
     const result = await createBlock({ ok: true, data: undefined }, blockForm("2026-10-19T12:00", "2026-10-19T13:00"));
 
@@ -288,7 +288,7 @@ describe("availability faixa validation", () => {
   }
 
   beforeEach(() => {
-    state.business = { id: "business-1", timezone: "America/Sao_Paulo" };
+    state.business = { id: "business-1", timezone: "America/Sao_Paulo", has_access: true };
     state.faixas = [];
     state.faixaWrites = [];
     state.bookings = [];
@@ -351,7 +351,7 @@ describe("faixa em vários dias de uma vez (#149)", () => {
   }
 
   beforeEach(() => {
-    state.business = { id: "business-1", timezone: "America/Sao_Paulo" };
+    state.business = { id: "business-1", timezone: "America/Sao_Paulo", has_access: true };
     state.faixas = [];
     state.faixaWrites = [];
   });
@@ -399,7 +399,7 @@ describe("aviso de reservas fora da nova disponibilidade (#192)", () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-24T12:00:00Z"));
-    state.business = { id: "business-1", timezone: "America/Sao_Paulo" };
+    state.business = { id: "business-1", timezone: "America/Sao_Paulo", has_access: true };
     state.faixas = [{ id: "segunda", weekday: 2, start_time: "08:00:00", end_time: "12:00:00" }];
     state.faixaWrites = [];
     state.bookings = [];

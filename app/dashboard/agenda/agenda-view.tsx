@@ -50,6 +50,7 @@ export function AgendaView({
   timezone,
   businessName = "",
   automaticReminders = false,
+  cancelOnly = false,
   initialDate = null,
   initialStatus = null,
   hasAnyBooking = true,
@@ -59,6 +60,8 @@ export function AgendaView({
   // For the lembrete pelo WhatsApp in the list (#195).
   businessName?: string;
   automaticReminders?: boolean;
+  // Suspended negócio (ADR 0013): the reservas can only be cancelled.
+  cancelOnly?: boolean;
   initialDate?: string | null;
   initialStatus?: BookingStatus | null;
   // False for a business with no reserva at all, to show the first-steps hint.
@@ -204,6 +207,7 @@ export function AgendaView({
           timezone={businessTimezone}
           businessName={businessName}
           automaticReminders={automaticReminders}
+          cancelOnly={cancelOnly}
           filterActive={hasAnyBooking}
         />
       </div>

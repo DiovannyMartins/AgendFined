@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { createClient } from "@/lib/supabase/server";
-import { assertProPlan } from "@/lib/plan/plan";
+import { ACCESS_REQUIRED_MESSAGE, assertAccess } from "@/lib/plan/access";
 import { classifyOperationalError } from "@/lib/bookings/classification";
 import { generateCancelToken, hashCancelToken } from "@/lib/bookings/cancel";
 import { buildPrivateConfirmationPath, buildPrivateConfirmationUrl } from "@/lib/bookings/private-confirmation";
@@ -13,11 +13,10 @@ import { sendWaitlistSlotFreedEmail } from "@/lib/email/waitlist-slot-freed";
 import { spendOwnerEmail } from "@/lib/email/owner-email-budget";
 import { resolveAppOrigin } from "@/lib/app-origin";
 
-// Server actions for the waitlist management dashboard (issue #22, ADR 0008).
-// Managing the waitlist is a PROFISSIONAL feature, so both actions gate on the
-// business plan first (fail-closed) and only then hand off to the owner-scoped
-// RPCs. The public join (`joinWaitlist` in lib/booking/actions.ts) is untouched
-// and stays free.
+// Server actions for the waitlist management dashboard (issue #22, ADR 0013).
+// Managing the waitlist needs access, so both actions gate on it first
+// (fail-closed) and only then hand off to the owner-scoped RPCs, which refuse a
+// suspended negócio too (BUSINESS_SUSPENDED).
 //
 // Once the RPC succeeds, both actions reach the cliente by e-mail (#152):
 // notifying sends "o horário ficou livre" with the public page link, and
@@ -33,16 +32,16 @@ export type WaitlistActionResult = {
   cancellationUrl?: string;
 };
 
-type ProBusiness = NonNullable<Awaited<ReturnType<typeof getCurrentBusiness>>>;
+type AccessBusiness = NonNullable<Awaited<ReturnType<typeof getCurrentBusiness>>>;
 
-async function requireProBusiness(): Promise<
-  { ok: true; business: ProBusiness } | { ok: false; message: string }
+async function requireAccessBusiness(): Promise<
+  { ok: true; business: AccessBusiness } | { ok: false; message: string }
 > {
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, message: "Configure seu negócio primeiro." };
-  const gate = assertProPlan(business);
+  const gate = assertAccess(business);
   if (!gate.ok) {
-    return { ok: false, message: "A gestão da lista de espera é exclusiva do plano PROFISSIONAL." };
+    return { ok: false, message: ACCESS_REQUIRED_MESSAGE };
   }
   return { ok: true, business };
 }
@@ -54,15 +53,15 @@ export async function notifyWaitlistEntry(
   const id = String(formData.get("id") ?? "");
   if (!id) return { ok: false, message: "Entrada inválida." };
 
-  const gate = await requireProBusiness();
+  const gate = await requireAccessBusiness();
   if (!gate.ok) return gate;
 
   const supabase = await createClient();
   const { data: entry, error } = await supabase.rpc("notify_waitlist_entry", { p_entry_id: id });
   if (error) {
     const msg = String(error.message ?? "");
-    if (/WAITLIST_PRO_REQUIRED/i.test(msg)) {
-      return { ok: false, message: "A gestão da lista de espera é exclusiva do plano PROFISSIONAL." };
+    if (/BUSINESS_SUSPENDED/.test(msg)) {
+      return { ok: false, message: ACCESS_REQUIRED_MESSAGE };
     }
     if (/WAITLIST_NOT_OWNER|WAITLIST_ENTRY_NOT_FOUND/i.test(msg)) {
       return { ok: false, message: "Entrada não encontrada." };
@@ -120,7 +119,7 @@ export async function convertWaitlistEntry(
   const id = String(formData.get("id") ?? "");
   if (!id) return { ok: false, message: "Entrada inválida." };
 
-  const gate = await requireProBusiness();
+  const gate = await requireAccessBusiness();
   if (!gate.ok) return gate;
 
   const supabase = await createClient();
@@ -131,8 +130,8 @@ export async function convertWaitlistEntry(
   });
   if (error) {
     const msg = String(error.message ?? "");
-    if (/WAITLIST_PRO_REQUIRED/i.test(msg)) {
-      return { ok: false, message: "A gestão da lista de espera é exclusiva do plano PROFISSIONAL." };
+    if (/BUSINESS_SUSPENDED/.test(msg)) {
+      return { ok: false, message: ACCESS_REQUIRED_MESSAGE };
     }
     if (/WAITLIST_NOT_OWNER|WAITLIST_ENTRY_NOT_FOUND/i.test(msg)) {
       return { ok: false, message: "Entrada não encontrada." };

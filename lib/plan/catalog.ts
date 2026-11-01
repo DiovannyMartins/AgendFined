@@ -1,7 +1,7 @@
-// Plan catalog (ADR 0008). Single source of truth for the human-facing plan
+// Plan catalog (ADR 0013). Single source of truth for the human-facing plan
 // metadata (name, price, period, description, privilege list), shared by the
 // landing page (app/(marketing)/plans.tsx) and the dashboard "Plano" section
-// (lib/billing/plans re-exports it). `plan.ts` is the behavioral gate seam; this
+// (lib/billing/plans re-exports it). `access.ts` is the behavioral gate seam; this
 // file is only the catalog, so the two never drift.
 import "server-only";
 import { formatCurrencyBRL } from "@/lib/format/currency";
@@ -55,4 +55,25 @@ export const PLAN_INFO: Record<Plan, PlanInfo> = {
       "Reservas futuras até 365 dias",
     ],
   },
+};
+
+// The Plano AgendFined (ADR 0013), the only plan, as the painel shows it: what
+// was the PROFISSIONAL, everything included. The marketing page still shows
+// PLAN_INFO until #261, fase 6, which moves it here too.
+export const AGENDFINED_PLAN_INFO: PlanInfo = {
+  name: "Plano AgendFined",
+  price: formatCurrencyBRL(getProPriceCents()),
+  period: "/mês",
+  description: "Tudo o que o AgendFined oferece para receber e organizar as reservas do seu negócio.",
+  features: [
+    "Página pública",
+    "Serviços ilimitados",
+    "Clientes e histórico",
+    "Bloqueios",
+    "Relatórios",
+    "Lembretes automáticos",
+    "Gestão da lista de espera",
+    "Exportação Google Calendar/.ics",
+    "Reservas futuras até 365 dias",
+  ],
 };

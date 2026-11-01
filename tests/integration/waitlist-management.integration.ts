@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 import { randomBytes } from "node:crypto";
-import { adminClient, anonClientForUser, retryOnFk, ACTIVE_TRIAL_ENDS_AT } from "./index";
+import { adminClient, anonClientForUser, retryOnFk, businessWithAccess, ACTIVE_TRIAL_ENDS_AT, SUSPENDED_TRIAL_ENDS_AT } from "./index";
 import { futureSlot } from "./future-slot";
 import {
   buildWaitlistManagementResult,
@@ -9,10 +9,10 @@ import {
 } from "@/lib/waitlist/manage";
 
 // Integration tests against the real Supabase project for issue #22 (waitlist
-// management, PROFESSIONAL). The dashboard boundary must deny a Free business and
-// let a Pro business through, the owner-scoped notify/convert RPCs must work for
-// the owner, and an outsider must be denied. The public join stays free (covered
-// by cancel-waitlist.integration.ts); here we validate the management side.
+// management, ADR 0013). The dashboard boundary must deny a suspended business
+// and let one in teste through, the owner-scoped notify/convert RPCs must work for
+// the owner, and an outsider must be denied. The public join is covered by
+// cancel-waitlist.integration.ts; here we validate the management side.
 // RUN: npm run test:integration (requires the 0036 migration pushed).
 const stamp = Date.now().toString().slice(-8);
 const FREE_EMAIL = `wl-free.${stamp}@agendfined.dev`;
@@ -31,7 +31,7 @@ let proBusinessId = "";
 let proServiceId = "";
 let outsiderOwnerId = "";
 
-async function createBusiness(ownerId: string, name: string, plan: "free" | "pro"): Promise<string> {
+async function createBusiness(ownerId: string, name: string): Promise<string> {
   return retryOnFk(async () => {
     const { data: biz, error: bizErr } = await admin
       .from("businesses")
@@ -44,7 +44,6 @@ async function createBusiness(ownerId: string, name: string, plan: "free" | "pro
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
         booking_window_days: 60,
-        ...(plan === "pro" ? { plan: "pro" } : {}),
       })
       .select("*")
       .single();
@@ -104,17 +103,23 @@ async function createUser(email: string, displayName: string): Promise<string> {
 beforeAll(async () => {
   admin = adminClient();
 
-  // Free business with a waitlist entry (the boundary must deny it anyway).
+  // Suspended business with a waitlist entry (the boundary must deny it anyway).
   freeOwnerId = await createUser(FREE_EMAIL, "Dona Free");
-  freeBusinessId = await createBusiness(freeOwnerId, "Agenda Free", "free");
+  freeBusinessId = await createBusiness(freeOwnerId, "Agenda Free");
   const freeServiceId = await createService(freeBusinessId, "Corte");
   await createBookingAt(freeBusinessId, freeServiceId, SLOT, "+5511981110001");
   await joinWaitlist(freeBusinessId, freeServiceId, SLOT, "+5511981110002");
+  // Then the teste ends (ADR 0013): the negócio keeps its entry, suspended.
+  const { error: suspendErr } = await admin
+    .from("businesses")
+    .update({ trial_ends_at: SUSPENDED_TRIAL_ENDS_AT })
+    .eq("id", freeBusinessId);
+  expect(suspendErr).toBeNull();
 
-  // Pro business with two slots: one for the notify test (stays occupied) and one
+  // Business in teste with two slots: one for the notify test (stays occupied) and one
   // whose occupying booking is cancelled so the convert test can create a booking.
   proOwnerId = await createUser(PRO_EMAIL, "Dona Pro");
-  proBusinessId = await createBusiness(proOwnerId, "Agenda Pro", "pro");
+  proBusinessId = await createBusiness(proOwnerId, "Agenda Pro");
   proServiceId = await createService(proBusinessId, "Corte");
   await createBookingAt(proBusinessId, proServiceId, SLOT, "+5511982220001");
   await joinWaitlist(proBusinessId, proServiceId, SLOT, "+5511982220002");
@@ -129,7 +134,7 @@ beforeAll(async () => {
 
   // An outsider with their own business (must not manage someone else's waitlist).
   outsiderOwnerId = await createUser(OUTSIDER_EMAIL, "Forasteiro");
-  await createBusiness(outsiderOwnerId, "Alheia", "free");
+  await createBusiness(outsiderOwnerId, "Alheia");
 });
 
 afterAll(async () => {
@@ -161,20 +166,20 @@ function ownerFetch(email: string, password: string): FetchWaitlistEntries {
   };
 }
 
-describe("issue #22: waitlist management gate (free negado, pro liberado)", () => {
-  it("denies a Free business with upgrade_required before any fetch", async () => {
+describe("issue #22: waitlist management gate (suspenso negado, em teste liberado)", () => {
+  it("denies a suspended business with access_required before any fetch", async () => {
     const fetchSpy = vi.fn<FetchWaitlistEntries>(async () => []);
     const result = await buildWaitlistManagementResult(
-      { id: freeBusinessId, plan: "free" },
+      await businessWithAccess(freeBusinessId),
       fetchSpy,
     );
-    expect(result).toEqual({ status: "upgrade_required" });
+    expect(result).toEqual({ status: "access_required" });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("lets a Pro business see its waitlist through the user-scoped boundary (RLS)", async () => {
+  it("lets a business in teste see its waitlist through the user-scoped boundary (RLS)", async () => {
     const result = await buildWaitlistManagementResult(
-      { id: proBusinessId, plan: "pro" },
+      await businessWithAccess(proBusinessId),
       ownerFetch(PRO_EMAIL, PASSWORD),
     );
     expect(result.status).toBe("ok");
@@ -186,7 +191,7 @@ describe("issue #22: waitlist management gate (free negado, pro liberado)", () =
     }
   });
 
-  it("the public join stays free (a Free business can still hold waitlist entries)", async () => {
+  it("a suspended business keeps its waitlist entries", async () => {
     const { data } = await admin
       .from("waitlist_entries")
       .select("id")
@@ -260,7 +265,7 @@ describe("issue #22: owner-scoped notify/convert RPCs", () => {
     expect(String(convert.error?.message)).toMatch(/NOT_OWNER|NOT_FOUND/i);
   });
 
-  it("a Free business is denied by the RPCs (pro gate is fail-closed at the API)", async () => {
+  it("a suspended business is denied by the RPCs (fail-closed at the API)", async () => {
     const free = await anonClientForUser(FREE_EMAIL, PASSWORD);
     const { data: entry } = await free
       .from("waitlist_entries")
@@ -272,14 +277,14 @@ describe("issue #22: owner-scoped notify/convert RPCs", () => {
 
     const notify = await free.rpc("notify_waitlist_entry", { p_entry_id: entry!.id });
     expect(notify.error).not.toBeNull();
-    expect(String(notify.error?.message)).toMatch(/PRO_REQUIRED/i);
+    expect(String(notify.error?.message)).toMatch(/BUSINESS_SUSPENDED/);
 
     const convert = await free.rpc("convert_waitlist_entry", {
       p_entry_id: entry!.id,
       p_cancel_token_hash: "f".repeat(64),
     });
     expect(convert.error).not.toBeNull();
-    expect(String(convert.error?.message)).toMatch(/PRO_REQUIRED/i);
+    expect(String(convert.error?.message)).toMatch(/BUSINESS_SUSPENDED/);
   });
 
   it("anon cannot execute the notify/convert RPCs directly", async () => {

@@ -30,13 +30,16 @@ export function AgendaList({
   timezone,
   businessName = "",
   automaticReminders = false,
+  cancelOnly = false,
   filterActive = false,
 }: {
   bookings: BookingRow[];
   timezone: string;
   businessName?: string;
-  // PROFISSIONAL: the cliente with an e-mail gets the lembrete automático.
+  // With access (ADR 0013), the cliente with an e-mail gets the lembrete automático.
   automaticReminders?: boolean;
+  // Suspended negócio (ADR 0013): the reservas can only be cancelled.
+  cancelOnly?: boolean;
   // True when the date/status filters narrowed `bookings`: an empty list then
   // means "nothing matches", not "no reservations yet".
   filterActive?: boolean;
@@ -190,6 +193,7 @@ export function AgendaList({
                   id={booking.id}
                   status={booking.status}
                   startAt={booking.start_at}
+                  cancelOnly={cancelOnly}
                   summary={{
                     customerName: booking.customer_name_snapshot,
                     serviceName: booking.service_name_snapshot,

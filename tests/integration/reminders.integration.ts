@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
-import { adminClient, retryOnFk } from "./index";
+import { adminClient, retryOnFk, ACTIVE_TRIAL_ENDS_AT, SUSPENDED_TRIAL_ENDS_AT } from "./index";
 
 // Integration tests against the real Supabase project. INC-2 (reminders):
 // `get_due_booking_reminders` is the source of truth for the pg_cron tick — it
@@ -36,7 +36,7 @@ let dueClaimedRow: {
   public_code: string;
   reminder_claim_token: string;
 } | null = null;
-// A due booking on a FREE business that must be excluded by the plan gate.
+// A due booking on a suspended business (ADR 0013) that must be excluded.
 let freeDueBookingId = "";
 // Made 3 h before it starts: the confirmation is its reminder (#144).
 let lateBookingId = "";
@@ -114,7 +114,7 @@ beforeAll(async () => {
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
         booking_window_days: 60,
-        plan: "pro",
+        trial_ends_at: ACTIVE_TRIAL_ENDS_AT,
       })
       .select("*")
       .single();
@@ -143,7 +143,7 @@ beforeAll(async () => {
     .upsert({ id: freeOwnerId, display_name: "Dona Grátis" }, { onConflict: "id" });
   if (freeOwnerProfileError) throw new Error(`free owner profile: ${freeOwnerProfileError.message}`);
 
-  // A FREE business (default plan) whose due booking must be excluded by the gate.
+  // A suspended business (teste ended, no assinatura) whose due booking must be excluded.
   freeBusinessId = await retryOnFk(async () => {
     const { data: biz, error: bizErr } = await admin
       .from("businesses")
@@ -152,6 +152,7 @@ beforeAll(async () => {
         name: "Agenda Grátis",
         slug: `agenda-gratis-${stamp}`,
         phone: "+5511987654322",
+        trial_ends_at: SUSPENDED_TRIAL_ENDS_AT,
         slot_interval_minutes: 30,
         min_notice_minutes: 0,
         booking_window_days: 60,
@@ -225,7 +226,7 @@ beforeAll(async () => {
     rescheduledAt: new Date(now).toISOString(),
   });
 
-  // A due booking on the FREE business — must be filtered out by the plan gate.
+  // A due booking on the suspended business — must be filtered out by the access gate.
   freeDueBookingId = await insertBooking({
     businessId: freeBusinessId,
     serviceId: freeServiceId,
@@ -274,7 +275,7 @@ describe("INC-2 lembretes: get_due_booking_reminders", () => {
     expect((data ?? []).map((b) => b.id)).not.toContain(rescheduledBookingId);
   });
 
-  it("excludes candidates from non-Pro businesses (plan gate)", async () => {
+  it("excludes candidates from suspended businesses (ADR 0013)", async () => {
     const { data } = await admin.rpc("get_due_booking_reminders", { p_lead_minutes: 1440 });
     const ids = (data ?? []).map((b) => b.id);
     expect(ids).not.toContain(freeDueBookingId);

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { businessSchemaFor, type BusinessInput } from "@/lib/validation/schemas";
-import { getBookingWindowLimitDays, type Plan } from "@/lib/plan/plan";
+import { ACCESS_REQUIRED_MESSAGE, BOOKING_WINDOW_LIMIT_DAYS } from "@/lib/plan/access";
 import { RESERVED_SLUG_MESSAGE, isReservedSlug } from "@/lib/business/reserved-slugs";
 import { BRAZILIAN_TIMEZONE_MESSAGE, isBrazilianTimeZone } from "@/lib/app-timezone";
 
@@ -64,7 +64,7 @@ export async function createBusiness(
   const timezoneError = checkTimezone(parsed.data.timezone, null);
   if (timezoneError) return timezoneError;
 
-  const limitError = checkBookingWindowLimit(parsed.data, undefined);
+  const limitError = checkBookingWindowLimit(parsed.data);
   if (limitError) return limitError;
 
   // The owner_id FK needs a profile row.
@@ -108,18 +108,27 @@ export async function updateBusiness(
 
   const existing = await supabase
     .from("businesses")
-    .select("id, plan, slot_interval_minutes")
+    .select("id, slot_interval_minutes")
     .eq("owner_id", user.id)
     .maybeSingle();
   if (!existing.data?.id) {
     return { ok: false, code: "BUSINESS_NOT_FOUND", message: "Configure seu negócio antes de editá-lo." };
   }
 
+  // A suspended negócio (ADR 0013) cannot change its configurações; RLS refuses
+  // the update too. A failed lookup fails closed.
+  const { data: hasAccess, error: accessError } = await supabase.rpc("business_has_access", {
+    p_business_id: existing.data.id,
+  });
+  if (accessError || hasAccess !== true) {
+    return { ok: false, code: "ACCESS_REQUIRED", message: ACCESS_REQUIRED_MESSAGE };
+  }
+
   // Parsed after the read so an interval saved before the list (#191) still validates.
   const parsed = parseBusinessForm(formData, existing.data.slot_interval_minutes);
   if (!parsed.ok) return parsed.error;
 
-  const limitError = checkBookingWindowLimit(parsed.data, existing.data.plan);
+  const limitError = checkBookingWindowLimit(parsed.data);
   if (limitError) return limitError;
 
   const { count: futureBookings } = await supabase
@@ -216,18 +225,14 @@ function checkTimezone(timezone: string, currentTimezone: string | null): Action
   };
 }
 
-function checkBookingWindowLimit(
-  business: ParsedBusiness,
-  plan: Plan | null | undefined,
-): ActionResultState | null {
-  const bookingWindowLimitDays = getBookingWindowLimitDays(plan);
-  if (business.bookingWindowDays <= bookingWindowLimitDays) return null;
+function checkBookingWindowLimit(business: ParsedBusiness): ActionResultState | null {
+  if (business.bookingWindowDays <= BOOKING_WINDOW_LIMIT_DAYS) return null;
   return {
     ok: false,
     code: "VALIDATION",
-    message: "A janela de reservas excede o limite do seu plano.",
+    message: "A janela de reservas excede o limite do plano.",
     fieldErrors: {
-      bookingWindowDays: [`O limite do seu plano é de ${bookingWindowLimitDays} dias.`],
+      bookingWindowDays: [`O limite do Plano AgendFined é de ${BOOKING_WINDOW_LIMIT_DAYS} dias.`],
     },
   };
 }

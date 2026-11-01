@@ -20,7 +20,7 @@ beforeEach(() => {
   vi.stubEnv("GOOGLE_CALENDAR_CLIENT_ID", "client-id");
   vi.stubEnv("GOOGLE_CALENDAR_CLIENT_SECRET", "client-secret");
   vi.stubEnv("GOOGLE_CALENDAR_REDIRECT_URI", "https://agenda.example/api/google-calendar/callback");
-  getCurrentBusiness.mockResolvedValue({ id: "business", plan: "pro" });
+  getCurrentBusiness.mockResolvedValue({ id: "business", has_access: true });
 });
 
 afterEach(() => {
@@ -57,12 +57,12 @@ describe("Google Calendar OAuth connect", () => {
     expect(calendarStatus(await connect())).toBe("unauthorized");
   });
 
-  it("offers the upgrade on the free plan without contacting Google", async () => {
-    getCurrentBusiness.mockResolvedValue({ id: "business", plan: "free" });
+  it("asks a suspended negócio to subscribe without contacting Google", async () => {
+    getCurrentBusiness.mockResolvedValue({ id: "business", has_access: false });
 
     const response = await connect();
 
-    expect(calendarStatus(response)).toBe("upgrade_required");
+    expect(calendarStatus(response)).toBe("access_required");
     expect(response.headers.get("set-cookie")).toBeNull();
   });
 

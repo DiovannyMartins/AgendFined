@@ -8,7 +8,7 @@ import {
 
 const entry: ManageWaitlistEntry = {
   id: "w1",
-  business_id: "biz-pro",
+  business_id: "biz-active",
   service_id: "svc-1",
   service_name: "Corte",
   start_at: "2099-01-05T14:00:00.000Z",
@@ -19,30 +19,30 @@ const entry: ManageWaitlistEntry = {
   created_at: "2099-01-01T10:00:00.000Z",
 };
 
-const proBusiness: WaitlistManagementBusiness = { id: "biz-pro", plan: "pro" };
-const freeBusiness: WaitlistManagementBusiness = { id: "biz-free", plan: "free" };
-const nullPlanBusiness: WaitlistManagementBusiness = { id: "biz-null", plan: null };
+const activeBusiness: WaitlistManagementBusiness = { id: "biz-active", has_access: true };
+const suspendedBusiness: WaitlistManagementBusiness = { id: "biz-suspended", has_access: false };
+const unknownAccessBusiness: WaitlistManagementBusiness = { id: "biz-unknown", has_access: null };
 
-describe("buildWaitlistManagementResult (Pro gate, ADR 0008 / issue #22)", () => {
+describe("buildWaitlistManagementResult (access gate, ADR 0013 / issue #22)", () => {
   it("returns no_business when there is no business", async () => {
     const result = await buildWaitlistManagementResult(null, async () => []);
     expect(result).toEqual({ status: "no_business" });
   });
 
-  it("returns upgrade_required for a free business without fetching entries", async () => {
+  it("returns access_required for a suspended business without fetching entries", async () => {
     const spy = vi.fn<FetchWaitlistEntries>(async () => []);
-    const result = await buildWaitlistManagementResult(freeBusiness, spy);
-    expect(result).toEqual({ status: "upgrade_required" });
+    const result = await buildWaitlistManagementResult(suspendedBusiness, spy);
+    expect(result).toEqual({ status: "access_required" });
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it("fails closed for a business with a null plan", async () => {
-    const result = await buildWaitlistManagementResult(nullPlanBusiness, async () => []);
-    expect(result).toEqual({ status: "upgrade_required" });
+  it("fails closed for a business with an unknown access", async () => {
+    const result = await buildWaitlistManagementResult(unknownAccessBusiness, async () => []);
+    expect(result).toEqual({ status: "access_required" });
   });
 
-  it("returns ok with the entries for a pro business", async () => {
-    const result = await buildWaitlistManagementResult(proBusiness, async () => [entry]);
+  it("returns ok with the entries for a business with access", async () => {
+    const result = await buildWaitlistManagementResult(activeBusiness, async () => [entry]);
     expect(result).toEqual({ status: "ok", entries: [entry] });
   });
 
@@ -50,7 +50,7 @@ describe("buildWaitlistManagementResult (Pro gate, ADR 0008 / issue #22)", () =>
     const failing: FetchWaitlistEntries = async () => {
       throw new Error("boom");
     };
-    const result = await buildWaitlistManagementResult(proBusiness, failing);
+    const result = await buildWaitlistManagementResult(activeBusiness, failing);
     expect(result).toEqual({ status: "error" });
   });
 });

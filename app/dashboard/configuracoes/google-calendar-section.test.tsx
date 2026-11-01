@@ -14,19 +14,19 @@ describe("GoogleCalendarSection callback notice", () => {
     ["cancelled", "status", "Você cancelou a conexão no Google"],
     ["invalid_state", "alert", "Não foi possível validar a conexão"],
     ["unauthorized", "alert", "Entre com a conta do negócio"],
-    ["upgrade_required", "alert", "disponível no plano PROFISSIONAL"],
+    ["access_required", "alert", "Seu negócio está suspenso"],
     ["not_configured", "alert", "ainda não está configurada"],
     ["missing_email", "alert", "não informou o e-mail"],
     ["missing_refresh_token", "alert", "não concedeu acesso contínuo"],
     ["connection_failed", "alert", "Não foi possível concluir a conexão"],
   ])("explains the %s result in Portuguese", (callbackStatus, role, text) => {
-    render(<GoogleCalendarSection connection={null} isPro callbackStatus={callbackStatus} />);
+    render(<GoogleCalendarSection connection={null} hasAccess callbackStatus={callbackStatus} />);
 
     expect(screen.getByRole(role)).toHaveTextContent(text);
   });
 
   it("ignores an unknown result instead of echoing the query string", () => {
-    render(<GoogleCalendarSection connection={null} isPro callbackStatus="<script>" />);
+    render(<GoogleCalendarSection connection={null} hasAccess callbackStatus="<script>" />);
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
@@ -46,7 +46,7 @@ describe("GoogleCalendarSection sync failure", () => {
   };
 
   it("suggests syncing again after a passing failure", () => {
-    render(<GoogleCalendarSection connection={connection} isPro />);
+    render(<GoogleCalendarSection connection={connection} hasAccess />);
 
     expect(screen.getByText(/A última sincronização falhou/)).toBeInTheDocument();
   });
@@ -56,7 +56,7 @@ describe("GoogleCalendarSection sync failure", () => {
     render(
       <GoogleCalendarSection
         connection={{ ...connection, needsReconnect: true }}
-        isPro
+        hasAccess
       />,
     );
 
@@ -70,7 +70,7 @@ describe("GoogleCalendarSection sync failure", () => {
 describe("GoogleCalendarSection connect link", () => {
   // #136: um <a type="button"> confunde o leitor de tela e dispara o aviso do Base UI.
   it("renders the connect action as a plain link", () => {
-    render(<GoogleCalendarSection connection={null} isPro />);
+    render(<GoogleCalendarSection connection={null} hasAccess />);
 
     const link = screen.getByRole("link", { name: "Conectar Google Calendar" });
     expect(link).toHaveAttribute("href", "/api/google-calendar/connect");
@@ -93,13 +93,13 @@ describe("GoogleCalendarSection fuso mismatch", () => {
   };
 
   it("offers to adopt a Brazilian Google Calendar fuso", () => {
-    render(<GoogleCalendarSection connection={connection} isPro />);
+    render(<GoogleCalendarSection connection={connection} hasAccess />);
 
     expect(screen.getByRole("button", { name: "Usar o fuso do Google Calendar" })).toBeInTheDocument();
   });
 
   it("explains instead of offering a Google Calendar fuso abroad", () => {
-    render(<GoogleCalendarSection connection={{ ...connection, calendarTimezone: "Europe/Lisbon" }} isPro />);
+    render(<GoogleCalendarSection connection={{ ...connection, calendarTimezone: "Europe/Lisbon" }} hasAccess />);
 
     expect(screen.queryByRole("button", { name: "Usar o fuso do Google Calendar" })).not.toBeInTheDocument();
     expect(screen.getByText(/fora do Brasil/)).toHaveTextContent("ajuste o fuso no Google Calendar");

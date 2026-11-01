@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { encryptGoogleToken } from "./oauth";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/lib/business/queries", () => ({ getCurrentBusiness: async () => ({ id: "business", plan: "pro" }) }));
+vi.mock("@/lib/business/queries", () => ({ getCurrentBusiness: async () => ({ id: "business", has_access: true }) }));
 vi.mock("./sync", () => ({ syncGoogleCalendarForBusiness: vi.fn() }));
 
 import { adoptGoogleCalendarTimezone, disconnectGoogleCalendar } from "./actions";

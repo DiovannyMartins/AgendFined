@@ -46,7 +46,7 @@ beforeEach(() => {
   vi.stubEnv("GOOGLE_CALENDAR_CLIENT_SECRET", "client-secret");
   vi.stubEnv("GOOGLE_CALENDAR_REDIRECT_URI", "https://agenda.example/api/google-calendar/callback");
   vi.stubEnv("GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY", Buffer.alloc(32, 3).toString("base64"));
-  getCurrentBusiness.mockResolvedValue({ id: "business", plan: "pro" });
+  getCurrentBusiness.mockResolvedValue({ id: "business", has_access: true });
   getUser.mockResolvedValue({ data: { user: { id: "owner" } } });
   syncGoogleCalendarForBusiness.mockResolvedValue({ synced: 0, deleted: 0 });
   vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -118,7 +118,7 @@ describe("Google Calendar OAuth callback", () => {
   });
 
   it("refuses to connect the calendar to a different business", async () => {
-    getCurrentBusiness.mockResolvedValue({ id: "other-business", plan: "pro" });
+    getCurrentBusiness.mockResolvedValue({ id: "other-business", has_access: true });
 
     const response = await GET(callback("?state=expected-state&code=auth-code"));
 
@@ -126,8 +126,8 @@ describe("Google Calendar OAuth callback", () => {
     expect(tokenExchanges).toEqual([]);
   });
 
-  it("refuses to connect on the free plan", async () => {
-    getCurrentBusiness.mockResolvedValue({ id: "business", plan: "free" });
+  it("refuses to connect a suspended negócio", async () => {
+    getCurrentBusiness.mockResolvedValue({ id: "business", has_access: false });
 
     const response = await GET(callback("?state=expected-state&code=auth-code"));
 

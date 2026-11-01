@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { createClient } from "@/lib/supabase/server";
-import { getBookingWindowLimitDays, type Plan } from "@/lib/plan/plan";
+import { BOOKING_WINDOW_LIMIT_DAYS } from "@/lib/plan/access";
 import {
   computeAvailableSlots,
   isWithinWindow,
@@ -14,22 +14,21 @@ import {
 import { bookingsOutsideAvailability } from "@/lib/availability/outside-bookings";
 
 // Rules the dono books and reschedules with in the painel (#193, #194): the
-// slots of the public page, without the antecedência and with the plan limit as
-// the janela. Shared by the reserva pelo painel and the remarcação.
+// slots of the public page, without the antecedência and with the plan limit
+// (365 days) as the janela. Shared by the reserva pelo painel and the remarcação.
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>;
 
 export type OwnerBusiness = {
   id: string;
-  plan: Plan;
   slot_interval_minutes: number;
 };
 
-export function ownerRules(business: Pick<OwnerBusiness, "plan" | "slot_interval_minutes">, timezone: string) {
+export function ownerRules(business: Pick<OwnerBusiness, "slot_interval_minutes">, timezone: string) {
   return {
     slotIntervalMinutes: business.slot_interval_minutes,
     minNoticeMinutes: 0,
-    bookingWindowDays: getBookingWindowLimitDays(business.plan),
+    bookingWindowDays: BOOKING_WINDOW_LIMIT_DAYS,
     timezone,
   };
 }
@@ -39,11 +38,11 @@ export type OwnerStart =
   | { ok: false; code: "validation" | "past" | "booking_window"; message: string; fieldErrors?: Record<string, string[]> };
 
 // The horário the dono typed, as a UTC instant, once it exists, is in the
-// future and fits the plan limit.
+// future and fits the janela of the plan (365 days).
 export function resolveOwnerStart(
   date: string,
   startTime: string,
-  business: Pick<OwnerBusiness, "plan" | "slot_interval_minutes">,
+  business: Pick<OwnerBusiness, "slot_interval_minutes">,
   timezone: string,
   now: Date,
 ): OwnerStart {
@@ -65,7 +64,7 @@ export function resolveOwnerStart(
     return {
       ok: false,
       code: "booking_window",
-      message: `Seu plano permite reservas até ${getBookingWindowLimitDays(business.plan)} dias à frente.`,
+      message: `O Plano AgendFined permite reservas até ${BOOKING_WINDOW_LIMIT_DAYS} dias à frente.`,
     };
   }
   return { ok: true, startAt };

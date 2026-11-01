@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentBusiness } from "@/lib/business/queries";
-import { isProPlan } from "@/lib/plan/plan";
+import { hasAccess } from "@/lib/plan/access";
 import {
   encryptGoogleToken,
   exchangeGoogleAuthorizationCode,
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
   if (!code) return finish(request, "invalid_state");
 
   const business = await getCurrentBusiness();
-  if (!business || business.id !== businessId || !isProPlan(business.plan)) return finish(request, "unauthorized");
+  if (!business || business.id !== businessId || !hasAccess(business)) return finish(request, "unauthorized");
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

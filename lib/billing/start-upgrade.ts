@@ -6,7 +6,7 @@
 // seam is testable without Mercado Pago or a database. The plan only becomes
 // `pro` once the preapproval is `authorized` (webhook lifecycle, issue #24) —
 // this function never touches `businesses.plan`.
-import { isProPlan } from "@/lib/plan/plan";
+
 import { isSubscriptionInGrace, type BillingPlan, type BillingSubscription } from "./types";
 import type { BillingProvider } from "./provider";
 import type { FetchSubscription } from "./get-subscription";
@@ -100,8 +100,8 @@ export async function startUpgrade(deps: StartUpgradeDeps): Promise<StartUpgrade
   // subscription is `cancelled`/`paused` is no longer being charged, so it may
   // start a fresh preapproval even while `businesses.plan` is still `pro`. Every
   // other Pro state (authorized, pending, or no row) may not start another.
-  if (isProPlan(business.plan) && !isSubscriptionInGrace(existing?.status)) {
-    return { ok: false, code: "ALREADY_PRO", message: "Sua conta já está no plano PROFISSIONAL." };
+  if (business.plan === "pro" && !isSubscriptionInGrace(existing?.status)) {
+    return { ok: false, code: "ALREADY_PRO", message: "Você já tem uma assinatura ativa do Plano AgendFined." };
   }
 
   if (existing?.status === "pending") {

@@ -1,12 +1,12 @@
-// Owner calendar-export gate (ADR 0008). Exporting the agenda (.ics) is a Pro
-// feature, so the same `assertProPlan` seam that gates reports/reminders funnels
-// this boundary. `buildGcalExportResult` is the pure decision core: it checks
-// the business plan first (fail-closed) and only fetches/builds the feed for a
-// Pro business, so a Free business can never see its agenda export. The bookings
+// Owner calendar-export gate (ADR 0013). Exporting the agenda (.ics) needs
+// access, so the same `assertAccess` seam that gates reports funnels this
+// boundary. `buildGcalExportResult` is the pure decision core: it checks the
+// negócio's access first (fail-closed) and only fetches/builds the feed when it
+// has access, so a suspended negócio never gets its agenda export. The bookings
 // fetch is injected so the gate is unit-testable without a database. The actual
 // VCALENDAR serialisation lives in `lib/gcal/gcal`.
 import { buildIcsFeed, type GcalBooking } from "@/lib/gcal/gcal";
-import { runProGated, type GatedBusiness } from "@/lib/plan/gate";
+import { runAccessGated, type GatedBusiness } from "@/lib/plan/gate";
 import type { BookingStatus } from "@/lib/bookings/transitions";
 import { formatPhoneBR } from "@/lib/format/phone";
 
@@ -28,7 +28,7 @@ export type FetchGcalBookings = (businessId: string) => Promise<GcalExportBookin
 export type GcalExportResult =
   | { status: "no_business" }
   | { status: "error" }
-  | { status: "upgrade_required" }
+  | { status: "access_required" }
   | { status: "ok"; icsFeed: string; count: number };
 
 // A booking belongs in the owner's agenda export only when it is confirmed and
@@ -72,7 +72,7 @@ export async function buildGcalExportResult(
   fetchBookings: FetchGcalBookings,
   now: Date = new Date(),
 ): Promise<GcalExportResult> {
-  const gated = await runProGated(business, (businessId) => fetchBookings(businessId));
+  const gated = await runAccessGated(business, (businessId) => fetchBookings(businessId));
   if (gated.status !== "ok") return gated;
 
   const events = toGcalBookings(gated.data, now, business?.timezone);

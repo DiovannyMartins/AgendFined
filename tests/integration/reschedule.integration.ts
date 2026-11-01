@@ -159,7 +159,7 @@ describe("reschedule_owner_booking (#194)", () => {
     expect((await move(futureSlot(3, 15))).error?.code).toBe("23P01");
     expect((await move(futureSlot(3, 17))).error?.message).toContain("BOOKING_BLOCK_OVERLAP");
     expect((await move(new Date(Date.now() - 60_000).toISOString())).error?.message).toContain("BOOKING_IN_PAST");
-    expect((await move(futureSlot(120, 15))).error?.message).toContain("BOOKING_OUTSIDE_PLAN_WINDOW");
+    expect((await move(futureSlot(400, 15))).error?.message).toContain("BOOKING_OUTSIDE_PLAN_WINDOW");
     expect((await move(futureSlot(3, 13))).error?.message).toContain("BOOKING_SAME_START");
     // Beyond the configured janela, inside the plan limit: the dono may.
     expect((await move(futureSlot(30, 15))).error).toBeNull();

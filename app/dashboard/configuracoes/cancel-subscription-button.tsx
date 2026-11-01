@@ -16,7 +16,7 @@ import { cancelSubscription } from "@/lib/billing/actions";
 
 // "Cancelar assinatura" CTA for the "Plano" section (US16). A misclick would
 // stop the charges in Mercado Pago and only a new checkout brings them back, so
-// it asks first and says until when the PROFISSIONAL stays active (issue
+// it asks first and says until when the access lasts (issue
 // #151). `activeUntil` is the server's preview: the action reads the paid
 // period from Mercado Pago before cancelling (ADR 0008), so without a local
 // next charge date only the 7-day minimum is promised. On success the server
@@ -62,9 +62,9 @@ export function CancelSubscriptionButton({
           <DialogDescription>
             As novas cobranças no Mercado Pago param.{" "}
             {activeUntil.atLeast
-              ? `Seu PROFISSIONAL fica ativo até o fim do mês já pago, no mínimo até ${activeUntil.date}.`
-              : `Seu PROFISSIONAL fica ativo até ${activeUntil.date}.`}{" "}
-            Depois, o negócio volta ao Grátis, sem perder dados.
+              ? `Seu acesso continua até o fim do mês já pago, no mínimo até ${activeUntil.date}.`
+              : `Seu acesso continua até ${activeUntil.date}.`}{" "}
+            Depois, o negócio fica suspenso, sem perder dados.
           </DialogDescription>
         </DialogHeader>
         {error && <p className="text-sm text-destructive">{error}</p>}

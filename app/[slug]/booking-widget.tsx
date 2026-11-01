@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { trackAnalyticsEventBeforeLeaving } from "@/lib/analytics";
 import { disableAnalyticsBeforeNavigation } from "@/lib/analytics/google-analytics";
 import { buildPrivateConfirmationPath } from "@/lib/bookings/private-confirmation";
+import { SUSPENDED_BOOKING_MESSAGE } from "@/lib/bookings/public-status";
 
 type CustomerField = "customerName" | "customerPhone" | "customerEmail" | "customerNote";
 type FieldErrors = Partial<Record<CustomerField, string>>;
@@ -25,7 +26,6 @@ type FieldErrors = Partial<Record<CustomerField, string>>;
 // Server errors meaning the chosen slot itself is gone; any other failure keeps
 // it so the customer can fix the form and retry. `slot_taken` has its own branch.
 const SLOT_GONE_CODES = new Set(["no_availability", "booking_window", "service_not_found"]);
-const SLOT_TAKEN_MESSAGE = "Esse horário acabou de ser reservado. Escolha outro.";
 const SERVICE_GONE_MESSAGE = "Este serviço não está mais disponível. Escolha outro.";
 const CONNECTION_ERROR_MESSAGE ="Não foi possível concluir. Verifique sua conexão e tente novamente.";
 
@@ -43,18 +43,16 @@ export function BookingWidget({
   timezone,
   bookingWindowDays,
   services,
-  offersWaitlist,
 }: {
   businessId: string;
   slug: string;
   timezone: string;
-  // Effective janela futura (configured days capped by the plan), used only to
+  // Effective janela futura (configured days, capped at 365), used only to
   // cap the date picker; the server enforces it on every lookup and reserva.
   bookingWindowDays?: number;
+  // Only rendered for a negócio that takes reservas (ADR 0013), which also
+  // takes waitlist requests.
   services: ServiceOption[];
-  // Whether the business can follow up waitlist requests (PROFISSIONAL only).
-  // The plan itself never reaches the customer-facing page.
-  offersWaitlist: boolean;
 }) {
   const router = useRouter();
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
@@ -181,6 +179,8 @@ export function BookingWidget({
               ? "Não foi possível consultar esta data. Confira a data escolhida e tente novamente."
             : res.error === "service_not_found"
               ? SERVICE_GONE_MESSAGE
+            : res.error === "suspended"
+              ? SUSPENDED_BOOKING_MESSAGE
             : res.error
               ? "Não foi possível encontrar este serviço ou negócio."
               : null,
@@ -248,19 +248,13 @@ export function BookingWidget({
       return;
     }
     setSubmitting(false);
-    if (result.code === "slot_taken" && offersWaitlist) {
+    if (result.code === "slot_taken") {
       // INC-3: the slot was lost to another reservation — offer the waitlist.
       setError(result.message ?? "Esse horário não está mais disponível.");
       // The lost slot leaves the list; the offer keeps it in `lastAttempt`.
       setLastAttempt({ date, startTime: slot });
       setWaitlistOffered(true);
       setWaitlistSubmitted(null);
-      setSelectedSlot(null);
-      refreshSlots(date);
-      resetTurnstile();
-    } else if (result.code === "slot_taken") {
-      // Without a waitlist there is nothing to promise: ask for another slot.
-      setError(SLOT_TAKEN_MESSAGE);
       setSelectedSlot(null);
       refreshSlots(date);
       resetTurnstile();
@@ -306,12 +300,16 @@ export function BookingWidget({
       setWaitlistSubmitted(res.message ?? "Você entrou na lista de espera deste horário.");
       setSelectedSlot(null);
       setSlots([]);
-    } else if (res.code === "slot_free" || res.code === "waitlist_unavailable") {
-      // The slot was freed mid-flow, or the business can no longer take
-      // waitlist requests: drop the offer and refresh the slots so the
-      // customer can pick one directly.
+    } else if (res.code === "business_suspended") {
+      // The negócio was suspended mid-flow (ADR 0013): no waitlist, no slot.
       setWaitlistOffered(false);
-      setError(res.message ?? (res.code === "slot_free" ? "Esse horário está livre." : SLOT_TAKEN_MESSAGE));
+      setError(res.message ?? SUSPENDED_BOOKING_MESSAGE);
+      setSelectedSlot(null);
+    } else if (res.code === "slot_free") {
+      // The slot was freed mid-flow: drop the offer and refresh the slots so
+      // the customer can pick one directly.
+      setWaitlistOffered(false);
+      setError(res.message ?? "Esse horário está livre.");
       setSelectedSlot(null);
       refreshSlots(lastAttempt.date);
     } else if (res.code === "validation" && res.fieldErrors) {

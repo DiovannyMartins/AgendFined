@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentBusiness } from "@/lib/business/queries";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isProPlan } from "@/lib/plan/plan";
+import { ACCESS_REQUIRED_MESSAGE, hasAccess } from "@/lib/plan/access";
 import { isBrazilianTimeZone } from "@/lib/app-timezone";
 import { decryptGoogleToken } from "./oauth";
 import { syncGoogleCalendarForBusiness } from "./sync";
@@ -16,7 +16,7 @@ export async function syncGoogleCalendarNow(
   void _prev;
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, message: "Configure seu negócio primeiro." };
-  if (!isProPlan(business.plan)) return { ok: false, message: "A sincronização está disponível no plano PROFISSIONAL." };
+  if (!hasAccess(business)) return { ok: false, message: ACCESS_REQUIRED_MESSAGE };
   try {
     await syncGoogleCalendarForBusiness(business.id);
     revalidatePath("/dashboard/configuracoes");
@@ -66,6 +66,9 @@ export async function adoptGoogleCalendarTimezone(
   void _prev;
   const business = await getCurrentBusiness();
   if (!business) return { ok: false, message: "Configure seu negócio primeiro." };
+  // Changes the configurações with the service role, so RLS does not see it:
+  // the access gate (ADR 0013) is this one.
+  if (!hasAccess(business)) return { ok: false, message: ACCESS_REQUIRED_MESSAGE };
   const admin = createAdminClient();
   const { data: connection } = await admin
     .from("google_calendar_connections")

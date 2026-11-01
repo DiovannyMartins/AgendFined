@@ -18,6 +18,7 @@ const { state, navigation } = vi.hoisted(() => ({
     previousSlugError: null as { message: string } | null,
     services: [] as Array<Record<string, unknown>>,
     hasAvailability: true,
+    acceptsBookings: true,
     rpcCalls: [] as string[],
   },
   navigation: {
@@ -38,11 +39,11 @@ vi.mock("@/lib/supabase/server", () => ({
       if (name === "get_public_booking_page") {
         if (state.businessError) return { data: null, error: state.businessError };
         // Like the RPC: the phone only comes back when the page cannot take reservas.
-        const bookable = state.services.length > 0 && state.hasAvailability;
+        const bookable = state.acceptsBookings && state.services.length > 0 && state.hasAvailability;
         return {
           data: state.businesses.map((b) => ({
             ...b,
-            offers_waitlist: false,
+            accepts_bookings: state.acceptsBookings,
             booking_window_days: 90,
             has_availability: state.hasAvailability,
             phone: bookable ? null : "11988887777",
@@ -78,6 +79,7 @@ describe("página pública do negócio", () => {
     state.previousSlugError = null;
     state.services = [corte];
     state.hasAvailability = true;
+    state.acceptsBookings = true;
     state.rpcCalls = [];
   });
 
@@ -126,6 +128,19 @@ describe("página pública do negócio", () => {
       "href",
       "https://wa.me/5511988887777",
     );
+  });
+
+  // ADR 0013: o negócio suspenso continua no mesmo endereço, sem slots nem lista de espera.
+  it("avisa que o agendamento está indisponível num negócio suspenso, com contato e consulta", async () => {
+    state.acceptsBookings = false;
+
+    await renderPage();
+
+    expect(screen.getByRole("heading", { name: "Agendamento indisponível" })).toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "Formulário de reserva" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Conversar no WhatsApp" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Consultar reserva" })).toHaveAttribute("href", "/barbearia/consultar");
+    expect(screen.queryByText(/plano|assinatura|suspens/i)).not.toBeInTheDocument();
   });
 
   it("mantém o link para consultar uma reserva existente mesmo sem serviços", async () => {

@@ -93,7 +93,7 @@ beforeEach(() => {
     slug: "barbearia-demo",
     phone: "11987654321",
     timezone: "America/Sao_Paulo",
-    plan: "free",
+    has_access: true,
     slot_interval_minutes: 60,
     min_notice_minutes: 120,
     booking_window_days: 60,
@@ -223,10 +223,10 @@ describe("createOwnerBooking (#193)", () => {
   });
 
   it("recusa uma data além do limite do plano sem chamar o banco", async () => {
-    const result = await create(bookingForm({ date: "2027-02-01" }));
+    const result = await create(bookingForm({ date: "2027-11-01" }));
 
     expect(result).toMatchObject({ ok: false, code: "booking_window" });
-    expect(result.message).toContain("90 dias");
+    expect(result.message).toContain("365 dias");
     expect(state.rpcCalls).toHaveLength(0);
   });
 

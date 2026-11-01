@@ -1,6 +1,6 @@
-// Billing-reports seam (INC-2, Pro feature). The math lives here as a pure
+// Billing-reports seam (INC-2). The math lives here as a pure
 // module so it is unit-testable without a database: the report computations take
-// the owner's bookings (already scoped by RLS) and the Pro gate decision takes
+// the owner's bookings (already scoped by RLS) and the access gate decision takes
 // an injected bookings fetch. The DB only supplies rows; this module turns them
 // into the report the dashboard renders and decides whether the gate lets the
 // business through. Uses the snapshot columns (service_name_snapshot,
@@ -16,7 +16,7 @@
 //     over every booking in the period (confirmed + completed + cancelled +
 //     no_show).
 import type { BookingStatus } from "@/lib/bookings/transitions";
-import { runProGated, type GatedBusiness } from "@/lib/plan/gate";
+import { runAccessGated, type GatedBusiness } from "@/lib/plan/gate";
 
 export type ReportBooking = {
   id: string;
@@ -188,17 +188,17 @@ export function formatRate(rate: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Server-side result (ADR 0008). Reports are a Pro feature: the gate is applied
+// Server-side result (ADR 0013). Reports need access: the gate is applied
 // at the read boundary. `buildBillingReportResult` is the pure decision core —
-// it checks the business plan first (fail-closed) and only fetches/computes the
-// report for Pro businesses, so a Free business can never see report data. The
+// it checks the negócio's access first (fail-closed) and only fetches/computes the
+// report when it has access, so a suspended negócio never sees report data. The
 // groups fetch is injected so the gate is unit-testable without a database.
 // ---------------------------------------------------------------------------
 
 export type BillingReportResult =
   | { status: "no_business" }
   | { status: "error" }
-  | { status: "upgrade_required" }
+  | { status: "access_required" }
   | { status: "ok"; key: RangeKey; range: DateRange; report: BillingReport };
 
 export type ReportBusiness = GatedBusiness;
@@ -214,7 +214,7 @@ export async function buildBillingReportResult(
   rangeKey?: string,
 ): Promise<BillingReportResult> {
   const { key, range } = resolveRange(rangeKey);
-  const gated = await runProGated(business, (businessId) => fetchGroups(businessId, range));
+  const gated = await runAccessGated(business, (businessId) => fetchGroups(businessId, range));
   if (gated.status !== "ok") return gated;
 
   const report = buildBillingReportFromGroups(gated.data, range);

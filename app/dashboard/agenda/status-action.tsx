@@ -29,12 +29,19 @@ export function StatusAction({
   status,
   startAt,
   summary,
+  cancelOnly = false,
 }: {
   id: string;
   status: string;
   startAt: string;
   summary?: BookingSummary;
+  // A suspended negócio (ADR 0013) can still cancel, so its clientes are told;
+  // everything else waits for the assinatura. The server enforces the same.
+  cancelOnly?: boolean;
 }) {
+  if (cancelOnly) {
+    return status === "confirmed" ? <CancelDialog id={id} summary={summary} /> : null;
+  }
   // Keyed by status so the dialog closes once the correction lands.
   if (status === "completed" || status === "no_show") return <CorrectionDialog key={status} id={id} status={status} />;
   if (status !== "confirmed") return null;

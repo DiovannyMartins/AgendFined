@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { getBillingReport } from "@/lib/reports/get-report";
 import { formatCurrencyBRL } from "@/lib/format/currency";
-import { UpgradePrompt } from "@/components/upgrade-prompt";
+import { SuspendedPrompt } from "@/components/suspended-prompt";
 import {
   DEFAULT_RANGE_KEY,
   RANGE_KEYS,
@@ -37,7 +37,7 @@ export default async function RelatoriosPage({
             Faturamento, serviços mais vendidos e taxas de cancelamento e no-show.
           </p>
         </div>
-        {result.status !== "upgrade_required" && (
+        {result.status !== "access_required" && (
           <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border p-1">
             {RANGE_KEYS.map((key) => {
               const active = range ? key === range : key === DEFAULT_RANGE_KEY;
@@ -61,11 +61,8 @@ export default async function RelatoriosPage({
         )}
       </div>
 
-      {result.status === "upgrade_required" && (
-        <UpgradePrompt
-          title="Relatórios é um recurso PROFISSIONAL"
-          description="Assine o PROFISSIONAL para ver faturamento, serviços mais vendidos e taxas de cancelamento e no-show."
-        />
+      {result.status === "access_required" && (
+        <SuspendedPrompt description="Seus dados continuam guardados. Assine o Plano AgendFined para ver faturamento, serviços mais vendidos e taxas de cancelamento e no-show." />
       )}
       {result.status === "error" && <ErrorState />}
       {result.status === "ok" && <ReportBody key={result.key} report={result.report} />}

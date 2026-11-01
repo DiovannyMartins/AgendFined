@@ -17,7 +17,7 @@ const NOTICE_CLASS = {
   error: "text-destructive",
 } as const;
 
-export function GoogleCalendarSection({ connection, isPro, callbackStatus }: { connection: GoogleCalendarConnectionStatus; isPro: boolean; callbackStatus?: string }) {
+export function GoogleCalendarSection({ connection, hasAccess, callbackStatus }: { connection: GoogleCalendarConnectionStatus; hasAccess: boolean; callbackStatus?: string }) {
   const notice = googleCalendarCallbackNotice(callbackStatus);
   const [syncState, syncAction, syncPending] = useActionState(syncGoogleCalendarNow, INITIAL);
   const [disconnectState, disconnectAction, disconnectPending] = useActionState(disconnectGoogleCalendar, INITIAL);
@@ -37,8 +37,8 @@ export function GoogleCalendarSection({ connection, isPro, callbackStatus }: { c
             {notice.message}
           </p>
         )}
-        {!isPro ? (
-          <p className="text-sm text-muted-foreground">Recurso disponível no plano PROFISSIONAL.</p>
+        {!hasAccess ? (
+          <p className="text-sm text-muted-foreground">Seu negócio está suspenso. A sincronização volta quando você assinar o Plano AgendFined.</p>
         ) : connection ? (
           <>
             <div className="rounded-lg border border-border p-3 text-sm">

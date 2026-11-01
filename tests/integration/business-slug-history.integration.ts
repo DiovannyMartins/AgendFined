@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { adminClient, anonClient, anonClientForUser, retryOnFk } from "./index";
+import { adminClient, anonClient, anonClientForUser, retryOnFk, ACTIVE_TRIAL_ENDS_AT } from "./index";
 
 // Slug antigo (ADR 0007): a troca de slug guarda o anterior em
 // business_slug_history, o link antigo redireciona para o slug atual e nenhum
@@ -34,7 +34,7 @@ async function makeBusiness(ownerId: string, slug: string) {
   return retryOnFk(async () => {
     const { data, error } = await admin
       .from("businesses")
-      .insert({ owner_id: ownerId, name: `Negócio ${slug}`, slug, phone: "+5511977777777" })
+      .insert({ owner_id: ownerId, name: `Negócio ${slug}`, slug, phone: "+5511977777777", trial_ends_at: ACTIVE_TRIAL_ENDS_AT })
       .select("id")
       .single();
     if (error) throw new Error(`business ${slug}: ${error.message}`);
@@ -82,7 +82,7 @@ describe("histórico de slugs (ADR 0007)", () => {
 
     const { error: insertError } = await admin
       .from("businesses")
-      .insert({ owner_id: await makeOwner("historicoc"), name: "Intruso", slug: SLUG_X, phone: "+5511977777777" });
+      .insert({ owner_id: await makeOwner("historicoc"), name: "Intruso", slug: SLUG_X, phone: "+5511977777777", trial_ends_at: ACTIVE_TRIAL_ENDS_AT });
     expect(insertError?.code).toBe("23505");
 
     expect(await redirectTarget(SLUG_X)).toEqual([SLUG_Y]);
